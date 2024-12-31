@@ -2,8 +2,12 @@
 
 from homeassistant.helpers.entity import Entity
 from homeassistant.const import UnitOfTemperature
+from homeassistant.core import callback
+from homeassistant.helpers.device_registry import DeviceInfo
 import logging
 from .const import DOMAIN
+from .coordinator import CSNetHomeCoordinator
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -15,13 +19,14 @@ async def async_setup_entry(hass, entry, async_add_entities):
         _LOGGER.error("No coordinator instance found!")
         return None
     # Add sensors based on the coordinator's data
-    async_add_entities([CSNetHomeSensor(sensor_data) for sensor_data in coordinator.get_sensors_data()])
+    async_add_entities([CSNetHomeSensor(coordinator, sensor_data) for sensor_data in coordinator.get_sensors_data()])
 
-class CSNetHomeSensor(Entity):
-    """Representation of a sensor from the My Cloud Service integration."""
+class CSNetHomeSensor(CoordinatorEntity, Entity):
+    """Representation of a sensor from the CSNet Home integration."""
 
-    def __init__(self, sensor_data):
+    def __init__(self, coordinator: CSNetHomeCoordinator, sensor_data):
         """Initialize the sensor."""
+        super().__init__(coordinator)
         self._sensor_data = sensor_data
         self._name = f"{sensor_data['device_name']} {sensor_data['room_name']}"
         self._current_temperature = sensor_data['current_temperature']
@@ -55,6 +60,39 @@ class CSNetHomeSensor(Entity):
             "planned_temperature": self._planned_temperature,
         }
     
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Update sensor with latest data from coordinator."""
+        self.async_write_ha_state()
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device information."""
+        return DeviceInfo(
+            name=f"{self._sensor_data['device_name']}-{self._sensor_data['room_name']}",
+            manufacturer="Hitachi",
+            model="Hitachi temp",
+            sw_version="1.0",
+            identifiers={
+                (
+                    DOMAIN,
+                    f"{self._sensor_data['device_name']}-{self._sensor_data['room_name']}",
+                )
+            },
+        )
+
+    @property
+    def name(self) -> str:
+        """Return the name of the sensor."""
+        return f"{self._sensor_data['device_name']}-{self._sensor_data['room_name']}"
+    
+    @property
+    def unique_id(self) -> str:
+        """Return unique id."""
+        # All entities must have a unique id.  Think carefully what you want this to be as
+        # changing it later will cause HA to create new entities.
+        return f"{DOMAIN}-{self._sensor_data["room_name"]}"
+
     async def async_update(self):
         """Fetch new state data for the sensor."""
         self._state = self._sensor_data['current_temperature']

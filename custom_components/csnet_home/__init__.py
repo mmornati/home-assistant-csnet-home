@@ -19,13 +19,13 @@ SCAN_INTERVAL = 60
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.CLIMATE]
 
 async def async_setup(hass: HomeAssistant, config: dict):
-    """Set up the My Cloud Service component."""
+    """Set up the CSNet Home component."""
     _LOGGER.debug("Initializing CSNet Home Service integration")
 
     return True
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
-    """Set up My Cloud Service from a config entry."""
+    """Set up CSNet Home from a config entry."""
     hass.data.setdefault(DOMAIN, {})
 
     _LOGGER.debug("Config entry found")

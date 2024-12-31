@@ -31,7 +31,7 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             # Create the config entry and store the data
             return self.async_create_entry(
-                title="My Cloud Service",
+                title="CSNet Home",
                 data={
                     CONF_USERNAME: self._username, 
                     CONF_PASSWORD: self._password,
