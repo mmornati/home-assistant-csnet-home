@@ -27,7 +27,10 @@ class CSNetHomeClimate(ClimateEntity):
         self._attr_temperature_unit = UnitOfTemperature.CELSIUS
         self._attr_hvac_modes = ["off", "heat", "cool"] # [HVACMode.OFF, HVACMode.HEAT, HVACMode.COOL, HVACMode.AUTO]
         self._attr_preset_modes = ['away', 'comfort', 'eco']
-        self._attr_preset_mode = 'comfort'
+        if self.sensor_data["ecocomfort"] &self.sensor_data["ecocomfort"]==0:
+            self._attr_preset_mode = 'eco'
+        else:        
+            self._attr_preset_mode = 'comfort'
         self._attr_supported_features = (
             self.supported_features.PRESET_MODE |
             self.supported_features.TARGET_TEMPERATURE |
@@ -41,10 +44,26 @@ class CSNetHomeClimate(ClimateEntity):
         return self.sensor_data["current_temperature"]
 
     @property
+    def current_temperature(self):
+        """Return the current temperature."""
+        return self.sensor_data["current_temperature"]
+
+    @property
     def hvac_mode(self):
         """Return the current operation mode."""
         # Operation mode can be COOL, HEAT, AUTO, OFF
-        return "heat"  # Adjust as needed based on your API data
+        if self.sensor_data["on_off"] & self.sensor_data["on_off"]==0:
+            return "off"
+        else:        
+            return "heat" 
+
+    @property 
+    def preset_mode(self):
+        """Return the current preset mode."""
+        if self.sensor_data["ecocomfort"]& self.sensor_data["ecocomfort"]==0:
+            return "eco"
+        else:        
+            return "comfort" 
 
     @property
     def target_temperature(self):

@@ -90,15 +90,16 @@ class CSNetHomeAPI:
                                     "device_name": element.get("deviceName"),
                                     "room_name": element.get("parentName"),
                                     "parent_id": element.get("parentId"),
-                                    "room_id": element.get("room_id"),
+                                    "room_id": element.get("roomId"),
                                     "operation_status": element.get("operationStatus"),
                                     "mode": element.get("mode"),
                                     "real_mode": element.get("realMode"),
-                                    "on_off": element.get("onOff"),
+                                    "on_off": element.get("onOff"), #0 = Off, 1 = On
                                     "timer_running": element.get("timerRunning"),
                                     "alarm_code": element.get("alarmCode"),
                                     "c1_demand": element.get("c1Demand"),
                                     "c2_demand": element.get("c2Demand"),
+                                    "ecocomfort": element.get("ecocomfort"), #0 = Eco, 1 = Comfort
                                     "current_temperature": element.get("currentTemperature"),
                                     "setting_temperature": element.get("settingTemperature"),
                                     "mode": element.get("mode"),
