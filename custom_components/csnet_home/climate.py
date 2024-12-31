@@ -1,5 +1,5 @@
 from homeassistant.const import UnitOfTemperature
-from homeassistant.components.climate import ClimateEntity
+from homeassistant.components.climate import ClimateEntity, HVACMode
 from .const import DOMAIN
 import logging
 
@@ -25,7 +25,7 @@ class CSNetHomeClimate(ClimateEntity):
         self._attr_name = sensor_data["room_name"]
         self.entry = entry
         self._attr_temperature_unit = UnitOfTemperature.CELSIUS
-        self._attr_hvac_modes = ["off", "heat", "cool"] # [HVACMode.OFF, HVACMode.HEAT, HVACMode.COOL, HVACMode.AUTO]
+        self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
         self._attr_preset_modes = ['away', 'comfort', 'eco']
         if self.sensor_data["ecocomfort"] &self.sensor_data["ecocomfort"]==0:
             self._attr_preset_mode = 'eco'
@@ -75,6 +75,11 @@ class CSNetHomeClimate(ClimateEntity):
         temperature = kwargs.get("temperature")
         cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
         await cloud_api.async_set_temperature(self.sensor_data["zone_id"], self.sensor_data["parent_id"], temperature=temperature)
+
+    async def async_set_hvac_mode(self, hvac_mode: HVACMode):
+        """Set new target hvac mode."""
+        cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
+        await cloud_api.async_on_off(self.sensor_data["zone_id"], self.sensor_data["parent_id"], hvac_mode)
 
     async def async_update(self):
         """Update the thermostat data from the API."""

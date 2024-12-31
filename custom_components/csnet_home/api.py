@@ -1,8 +1,8 @@
 import aiohttp
 import logging
 from homeassistant.core import HomeAssistant
-from .const import API_URL, LOGIN_PATH, ELEMENTS_PATH, LOGIN_CSRF_TOKEN, ACTIONS_CSRF_TOKEN, COMMON_API_HEADERS, DEFAULT_API_TIMEOUT, SET_TEMPERATURE_PATH
-from homeassistant.exceptions import PlatformNotReady
+from .const import API_URL, LOGIN_PATH, ELEMENTS_PATH, COMMON_API_HEADERS, DEFAULT_API_TIMEOUT, HEAT_SETTINGS_PATH
+from homeassistant.components.climate import HVACMode
 import async_timeout
 import asyncio
 
@@ -11,7 +11,7 @@ _LOGGER = logging.getLogger(__name__)
 class CSNetHomeAPI:
     """Handles communication with the cloud service API."""
 
-    def __init__(self, hass: HomeAssistant, username: str, password: str, base_url=API_URL, login_csrf_token=LOGIN_CSRF_TOKEN, actions_csrf_token=ACTIONS_CSRF_TOKEN):
+    def __init__(self, hass: HomeAssistant, username: str, password: str, base_url=API_URL):
         """Initialize the CloudServiceAPI class with username and password."""
         self.hass = hass
         self.base_url = base_url
@@ -19,8 +19,6 @@ class CSNetHomeAPI:
         self.password = password
         self.session = None
         self.cookies = None
-        self.login_csrf_token = login_csrf_token
-        self.actions_csrf_token = actions_csrf_token
 
     async def async_login(self):
         """Log in to the cloud service and return a session cookie."""
@@ -32,12 +30,12 @@ class CSNetHomeAPI:
         }
 
         cookies = {
-            'XSRF-TOKEN': self.login_csrf_token,  # CSRF token
+            'XSRF-TOKEN': "be186598-c4d0-4d16-80f0-dc2ab35aad23", 
             'acceptedCookies': 'yes',
         }
 
         form_data = {
-            '_csrf': self.login_csrf_token,
+            '_csrf': "be186598-c4d0-4d16-80f0-dc2ab35aad23",
             'token': '',
             'username': self.username,
             'password_unsanitized': self.password,
@@ -120,7 +118,7 @@ class CSNetHomeAPI:
         
     async def async_set_temperature(self, zone_id, parent_id, **kwargs):
         """Set the target temperature for a room."""
-        set_temperature_url = f"{self.base_url}{SET_TEMPERATURE_PATH}"
+        settings_url = f"{self.base_url}{HEAT_SETTINGS_PATH}"
 
         temperature = kwargs.get("temperature")
 
@@ -135,22 +133,52 @@ class CSNetHomeAPI:
             "orderStatus": "PENDING",
             f"settingTempRoomZ{zone_id}": str(int(temperature * 10)),
             "indoorId": parent_id,
-            "_csrf": self.actions_csrf_token
+            "_csrf": "9d63b828-f229-402f-899c-19dc40b5e447"
         }
 
         cookies = {
-            'XSRF-TOKEN': self.actions_csrf_token,
+            'XSRF-TOKEN': "9d63b828-f229-402f-899c-19dc40b5e447",
             'acceptedCookies': 'yes',
         }
 
-        _LOGGER.debug(f"Headers: {headers}")
-        _LOGGER.debug(f"Data: {data}")
+        try:
+            async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+                async with self.session.post(settings_url, headers=headers, cookies=cookies, data=data) as response:
+                    response.raise_for_status()
+                    _LOGGER.debug("Temperature set to %s for %s", temperature, zone_id)
+        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+            _LOGGER.error("Error setting temperature for %s: %s", zone_id, err)
+    
+    async def async_on_off(self, zone_id, parent_id, hvac_mode):
+        """Set the target temperature for a room."""
+        settings_url = f"{self.base_url}{HEAT_SETTINGS_PATH}"
+
+        status = 1 if hvac_mode == HVACMode.HEAT else 0
+
+        headers = COMMON_API_HEADERS | {
+            'accept': '*/*',
+            'x-requested-with': 'XMLHttpRequest',
+            'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'origin': self.base_url
+        }
+
+        data = {
+            "orderStatus": "PENDING",
+            f"runStopC{zone_id}Air": status,
+            "indoorId": parent_id,
+            "_csrf": "c93a2274-f19b-4453-b920-8888abd914f8"
+        }
+
+        cookies = {
+            'XSRF-TOKEN': "c93a2274-f19b-4453-b920-8888abd914f8",
+            'acceptedCookies': 'yes',
+        }
 
         try:
             async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
-                async with self.session.post(set_temperature_url, headers=headers, cookies=cookies, data=data) as response:
+                async with self.session.post(settings_url, headers=headers, cookies=cookies, data=data) as response:
                     response.raise_for_status()
-                    _LOGGER.debug("Temperature set to %s for %s", temperature, zone_id)
+                    _LOGGER.debug("Changing status %s for %s", status, zone_id)
         except (aiohttp.ClientError, asyncio.TimeoutError) as err:
             _LOGGER.error("Error setting temperature for %s: %s", zone_id, err)
 
