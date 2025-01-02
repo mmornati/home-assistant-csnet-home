@@ -14,6 +14,12 @@ git clone https://github.com/mmornati/home-assistant-csnet-home
 cp -r home-assistant-csnet-home/custom_components/csnet_home config/custom_components
 ```
 
+After the Home Assistant restart, go to the Integrations dashboard (`/config/integrations/dashboard`) and click on the "add new integration button".
+Look for "Hitachi" integration and if everything went well you should find this one.
+![Add Integration](images/add_integration.png)
+
+Then you will be asked for your login credentials and is everything is OK with the installation and your configuration, you will have new entities in Home Assistant.
+
 ## Is not working for me, what to do?
 I was able to test the application only with my configuration: 1 heater with 2 zones. Hitachi is not providing APIs for this part and I just inspect how the website is working and what calls are done to retrieve the data and execute the base operations.
 This mainly means that I'm not sure with different device or configuration that the information are returned in the same way.
