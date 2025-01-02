@@ -76,7 +76,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # If you have created any custom services, they need to be removed here too.
 
     # Remove the config options update listener
-    hass.data[DOMAIN][entry.entry_id]["cancel_update_listener"].cancel_update_listener()
+    hass.data[DOMAIN][entry.entry_id]["cancel_update_listener"]()
 
     # Unload platforms
     unload_ok = await hass.config_entries.async_unload_platforms(

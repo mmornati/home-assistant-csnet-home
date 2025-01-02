@@ -19,15 +19,16 @@ async def async_setup_entry(hass, entry, async_add_entities):
         _LOGGER.error("No coordinator instance found!")
         return None
     # Add sensors based on the coordinator's data
-    async_add_entities([CSNetHomeSensor(coordinator, sensor_data) for sensor_data in coordinator.get_sensors_data()])
+    async_add_entities([CSNetHomeSensor(coordinator, sensor_data=sensor_data, common_data=coordinator.get_common_data()["device_status"][sensor_data['device_id']]) for sensor_data in coordinator.get_sensors_data()])
 
 class CSNetHomeSensor(CoordinatorEntity, Entity):
     """Representation of a sensor from the CSNet Home integration."""
 
-    def __init__(self, coordinator: CSNetHomeCoordinator, sensor_data):
+    def __init__(self, coordinator: CSNetHomeCoordinator, sensor_data, common_data):
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._sensor_data = sensor_data
+        self._common_data = common_data
         self._name = f"{sensor_data['device_name']} {sensor_data['room_name']}"
         self._current_temperature = sensor_data['current_temperature']
         self._planned_temperature = sensor_data['setting_temperature']
@@ -71,8 +72,8 @@ class CSNetHomeSensor(CoordinatorEntity, Entity):
         return DeviceInfo(
             name=f"{self._sensor_data['device_name']}-{self._sensor_data['room_name']}",
             manufacturer="Hitachi",
-            model="Hitachi temp",
-            sw_version="1.0",
+            model=f"{self._common_data['name']} ATW-IOT-01",
+            sw_version=self._common_data['firmware'],
             identifiers={
                 (
                     DOMAIN,

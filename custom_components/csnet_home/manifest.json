@@ -1,15 +1,18 @@
 {
     "domain": "csnet_home",
-    "name": "CSNet Home Hitachi",
+    "name": "Hitachi CSNet Home",
     "version": "1.0.0",
-    "documentation": "https://example.com/docs",
+    "documentation": "https://github.com/mmornati/home-assistant-csnet-home",
+    "issue_tracker": "https://github.com/mmornati/home-assistant-csnet-home/issues",
     "requirements": [
         "aiohttp>=3.7.4",  
         "requests>=2.25.1" 
     ],
+    "integration_type": "hub",
     "dependencies": [],
     "codeowners": ["@mmornati"],
     "iot_class": "cloud_polling",
     "config_flow": true,
+    "single_config_entry": true,
     "loggers": ["custom_components.csnet_home"]
   }

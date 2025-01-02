@@ -1,6 +1,6 @@
 from unittest.mock import patch
 import pytest
-from ..api import CSNetHomeAPI
+from custom_components.csnet_home.api import CSNetHomeAPI
 
 @pytest.fixture
 def cloud_service_api():

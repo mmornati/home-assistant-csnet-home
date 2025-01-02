@@ -3,6 +3,7 @@ import logging
 from homeassistant.core import HomeAssistant
 from .const import API_URL, LOGIN_PATH, ELEMENTS_PATH, COMMON_API_HEADERS, DEFAULT_API_TIMEOUT, HEAT_SETTINGS_PATH
 from homeassistant.components.climate import HVACMode
+import datetime
 import async_timeout
 import asyncio
 import json
@@ -58,7 +59,7 @@ class CSNetHomeAPI:
             _LOGGER.error(f"Error during login: {e}")
             return False
 
-    async def async_get_sensor_data(self):
+    async def async_get_elements_data(self):
         """Get sensor data from the cloud service."""
         sensor_data_url = f"{self.base_url}{ELEMENTS_PATH}"
 
@@ -81,10 +82,22 @@ class CSNetHomeAPI:
                         # Parse the sensor data from the API response
                         elements = data.get("data", {}).get("elements", [])
                         sensors = []
-
+                        common_data = {
+                            "name": data.get("data", {}).get("name"),
+                            "latitude": data.get("data", {}).get("latitude"),
+                            "longitude": data.get("data", {}).get("longitude"),
+                            "weather_temperature": data.get("data", {}).get("weatherTemperature"),
+                            "device_status": {
+                                device.get("id"): {
+                                "name": device.get("name"),
+                                "status": device.get("status"),
+                                "firmware": device.get("firmware"),
+                            } for device in data.get("data", {}).get("device_status", [])},
+                        }
                         for element in elements:
                             sensor = {
                                 "device_name": element.get("deviceName"),
+                                "device_id": element.get("deviceId"),
                                 "room_name": element.get("parentName"),
                                 "parent_id": element.get("parentId"),
                                 "room_id": element.get("roomId"),
@@ -104,7 +117,9 @@ class CSNetHomeAPI:
                             }
                             sensors.append(sensor)
                         _LOGGER.debug(f"Retrieved Sensors: {sensors}")
-                        return sensors
+                        data_elements = {"common_data": common_data, "sensors": sensors}
+                        _LOGGER.debug(f"Retrieved Data Elements: {data_elements}")
+                        return data_elements
                     else:
                         _LOGGER.error("Error in API response, status not 'success'")
                         return None
@@ -143,8 +158,10 @@ class CSNetHomeAPI:
                 async with self.session.post(settings_url, headers=headers, cookies=cookies, data=data) as response:
                     response.raise_for_status()
                     _LOGGER.debug("Temperature set to %s for %s", temperature, zone_id)
+                    return True
         except (aiohttp.ClientError, asyncio.TimeoutError) as err:
             _LOGGER.error("Error setting temperature for %s: %s", zone_id, err)
+            return False
     
     async def async_on_off(self, zone_id, parent_id, hvac_mode):
         """Set the target temperature for a room."""
@@ -176,8 +193,10 @@ class CSNetHomeAPI:
                 async with self.session.post(settings_url, headers=headers, cookies=cookies, data=data) as response:
                     response.raise_for_status()
                     _LOGGER.debug("Changing status %s for %s", status, zone_id)
+                    return True
         except (aiohttp.ClientError, asyncio.TimeoutError) as err:
             _LOGGER.error("Error setting temperature for %s: %s", zone_id, err)
+            return False
 
 
     async def close(self):

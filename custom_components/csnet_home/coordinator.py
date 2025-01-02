@@ -15,7 +15,7 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         self.hass = hass
         self.entry_id = entry_id
         self.update_interval = timedelta(seconds=update_interval)
-        self.sensors_data = []
+        self.device_data = {"sensors": [], "common_data": {}}
         super().__init__(
             hass, _LOGGER, name=DOMAIN, update_method=self._async_update_data, update_interval=self.update_interval
         )
@@ -30,9 +30,12 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
             _LOGGER.error("No CloudServiceAPI instance found!")
             return
         
-        sensor_data = await cloud_api.async_get_sensor_data()
-        self.sensors_data = sensor_data
-        return self.sensors_data
+        device_data = await cloud_api.async_get_elements_data()
+        self.device_data = device_data
+        return self.device_data
     
     def get_sensors_data(self):
-        return self.sensors_data
+        return self.device_data["sensors"]
+    
+    def get_common_data(self):
+        return self.device_data["common_data"]
