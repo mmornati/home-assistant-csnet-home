@@ -5,6 +5,7 @@ from .const import API_URL, LOGIN_PATH, ELEMENTS_PATH, COMMON_API_HEADERS, DEFAU
 from homeassistant.components.climate import HVACMode
 import async_timeout
 import asyncio
+import json
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -19,6 +20,7 @@ class CSNetHomeAPI:
         self.password = password
         self.session = None
         self.cookies = None
+        self.logged_in = False
 
     async def async_login(self):
         """Log in to the cloud service and return a session cookie."""
@@ -46,7 +48,7 @@ class CSNetHomeAPI:
             self.session = aiohttp.ClientSession()
             async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
                 async with self.session.post(login_url, headers=headers, cookies=cookies, data=form_data) as response:
-                    if response.status == 200:
+                    if await self.check_logged_in(response):
                         _LOGGER.info("Login successful")
                         return True
                     else:
@@ -60,10 +62,9 @@ class CSNetHomeAPI:
         """Get sensor data from the cloud service."""
         sensor_data_url = f"{self.base_url}{ELEMENTS_PATH}"
 
-        if not self.session:
+        if not self.session or not self.logged_in:
             _LOGGER.warning("No active session found.")
             await self.async_login()
-            #return None
         
         headers = COMMON_API_HEADERS | {
             'accept': 'application/json, text/javascript, */*; q=0.01',
@@ -73,47 +74,43 @@ class CSNetHomeAPI:
         try:
             async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
                 async with self.session.get(sensor_data_url, headers=headers, cookies=self.cookies) as response:
-                    if response.status == 200:
-                        data = await response.json()
+                    data = await self.check_api_response(response)
+                    if data != None and data.get("status") == "success":
+                        _LOGGER.debug(f"Sensor data retrieved: {data['data']}")
 
-                        if data.get("status") == "success":
-                            _LOGGER.debug(f"Sensor data retrieved: {data['data']}")
+                        # Parse the sensor data from the API response
+                        elements = data.get("data", {}).get("elements", [])
+                        sensors = []
 
-                            # Parse the sensor data from the API response
-                            elements = data.get("data", {}).get("elements", [])
-                            sensors = []
-
-                            for element in elements:
-                                sensor = {
-                                    "device_name": element.get("deviceName"),
-                                    "room_name": element.get("parentName"),
-                                    "parent_id": element.get("parentId"),
-                                    "room_id": element.get("roomId"),
-                                    "operation_status": element.get("operationStatus"),
-                                    "mode": element.get("mode"),
-                                    "real_mode": element.get("realMode"),
-                                    "on_off": element.get("onOff"), #0 = Off, 1 = On
-                                    "timer_running": element.get("timerRunning"),
-                                    "alarm_code": element.get("alarmCode"),
-                                    "c1_demand": element.get("c1Demand"),
-                                    "c2_demand": element.get("c2Demand"),
-                                    "ecocomfort": element.get("ecocomfort"), #0 = Eco, 1 = Comfort
-                                    "current_temperature": element.get("currentTemperature"),
-                                    "setting_temperature": element.get("settingTemperature"),
-                                    "mode": element.get("mode"),
-                                    "zone_id": element.get("elementType"),
-                                }
-                                sensors.append(sensor)
-                            _LOGGER.debug(f"Retrieved Sensors: {sensors}")
-                            return sensors
-                        else:
-                            _LOGGER.error("Error in API response, status not 'success'")
-                            return None
+                        for element in elements:
+                            sensor = {
+                                "device_name": element.get("deviceName"),
+                                "room_name": element.get("parentName"),
+                                "parent_id": element.get("parentId"),
+                                "room_id": element.get("roomId"),
+                                "operation_status": element.get("operationStatus"),
+                                "mode": element.get("mode"),
+                                "real_mode": element.get("realMode"),
+                                "on_off": element.get("onOff"), #0 = Off, 1 = On
+                                "timer_running": element.get("timerRunning"),
+                                "alarm_code": element.get("alarmCode"),
+                                "c1_demand": element.get("c1Demand"),
+                                "c2_demand": element.get("c2Demand"),
+                                "ecocomfort": element.get("ecocomfort"), #0 = Eco, 1 = Comfort
+                                "current_temperature": element.get("currentTemperature"),
+                                "setting_temperature": element.get("settingTemperature"),
+                                "mode": element.get("mode"),
+                                "zone_id": element.get("elementType"),
+                            }
+                            sensors.append(sensor)
+                        _LOGGER.debug(f"Retrieved Sensors: {sensors}")
+                        return sensors
                     else:
-                        _LOGGER.error(f"Failed to get sensor data. Status code: {response.status}")
+                        _LOGGER.error("Error in API response, status not 'success'")
                         return None
         except Exception as e:
             _LOGGER.error(f"Error during sensor data retrieval: {e}")
+            self.logged_in = False
             return None
         
     async def async_set_temperature(self, zone_id, parent_id, **kwargs):
@@ -187,3 +184,24 @@ class CSNetHomeAPI:
         """Close the session after usage."""
         if self.session:
             await self.session.close()
+
+    async def check_logged_in(self, response):
+        page_content = await response.text()
+        if response.status == 200 and "loadContent(\"login\")" not in page_content:
+            _LOGGER.info("Login successful")
+            self.logged_in = True
+            return True
+        else:
+            _LOGGER.error(f"Failed to login. Status code: {response.status}")
+            self.logged_in = False
+            return False
+        
+    async def check_api_response(self, response):
+        if response.status == 200:
+            try: 
+                data = await response.json()
+                return data
+            except json.JSONDecodeError as e:
+                _LOGGER.error(f"API Response error: {e}")
+                self.logged_in = False
+                return None
