@@ -25,7 +25,7 @@ class CSNetHomeAPI:
 
     async def async_login(self):
         """Log in to the cloud service and return a session cookie."""
-        login_url = f"{self.base_url}/{LOGIN_PATH}"
+        login_url = f"{self.base_url}{LOGIN_PATH}"
         
         headers = COMMON_API_HEADERS |  {
             'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
