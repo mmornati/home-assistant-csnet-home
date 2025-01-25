@@ -1,9 +1,12 @@
-import pytest
+"""Test ConfigFlows configuration."""
+
 from unittest.mock import patch
-from homeassistant import config_entries, data_entry_flow
-from homeassistant.core import HomeAssistant
+
+import pytest
 
 from custom_components.csnet_home.const import DOMAIN
+from homeassistant import config_entries, data_entry_flow
+from homeassistant.core import HomeAssistant
 
 # Define test constants
 TEST_CONFIG = {
@@ -13,7 +16,8 @@ TEST_CONFIG = {
     "password": "test_password",
 }
 
-@pytest.fixture(name='hass')
+
+@pytest.fixture(name="hass")
 async def test_config_flow_user_init(hass: HomeAssistant, mock_csnet_connection):
     """Test the initial step of the config flow."""
     result = await hass.config_entries.flow.async_init(
@@ -23,7 +27,8 @@ async def test_config_flow_user_init(hass: HomeAssistant, mock_csnet_connection)
     assert result["type"] == data_entry_flow.FlowResultType.FORM
     assert result["step_id"] == "user"
 
-@pytest.fixture(name='hass')
+
+@pytest.fixture(name="hass")
 async def test_config_flow_user_success(hass: HomeAssistant, mock_csnet_connection):
     """Test a successful configuration flow."""
     result = await hass.config_entries.flow.async_init(
@@ -41,7 +46,8 @@ async def test_config_flow_user_success(hass: HomeAssistant, mock_csnet_connecti
     assert result["title"] == TEST_CONFIG["host"]
     assert result["data"] == TEST_CONFIG
 
-@pytest.fixture(name='hass')
+
+@pytest.fixture(name="hass")
 async def test_config_flow_invalid_auth(hass: HomeAssistant):
     """Test the config flow with invalid authentication."""
     with patch("custom_components.csnet_home.api.CSNetHomeAPI") as mock_api:
@@ -62,7 +68,8 @@ async def test_config_flow_invalid_auth(hass: HomeAssistant):
         assert result["type"] == data_entry_flow.FlowResultType.FORM
         assert result["errors"] == {"base": "invalid_auth"}
 
-@pytest.fixture(name='hass')
+
+@pytest.fixture(name="hass")
 async def test_config_flow_cannot_connect(hass: HomeAssistant):
     """Test the config flow when the connection fails."""
     with patch("custom_components.csnet_home.config_flow.CSNetApi") as mock_api:
@@ -83,19 +90,23 @@ async def test_config_flow_cannot_connect(hass: HomeAssistant):
         assert result["type"] == data_entry_flow.FlowResultType.FORM
         assert result["errors"] == {"base": "cannot_connect"}
 
-@pytest.fixture(name='hass')
+
+@pytest.fixture(name="hass")
 async def test_config_flow_duplicate_entry(hass: HomeAssistant, mock_csnet_connection):
     """Test that the config flow aborts on duplicate entries."""
     # Create an existing entry
     hass.config_entries.async_add(
         config_entries.ConfigEntry(
             version=1,
+            minor_version=0,
             domain=DOMAIN,
             title=TEST_CONFIG["host"],
             data=TEST_CONFIG,
             source=config_entries.SOURCE_USER,
             entry_id="test",
             unique_id=TEST_CONFIG["host"],
+            discovery_keys={"host": TEST_CONFIG["host"]},
+            options={},
         )
     )
 

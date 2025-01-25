@@ -1,4 +1,10 @@
+coverage
+mypy
+pre-commit
 pytest
+pytest-cov
+pylint
+pylint-strict-informational
 pytest-homeassistant-custom-component
 pytest-asyncio
 homeassistant
