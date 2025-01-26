@@ -1,7 +1,6 @@
 {
     "name": "csnet_home",
     "content_in_root": false,
-    "domains": ["automation", "script", "climate"],
     "zip_release": true,
     "filename": "hass-custom-csnet-home.zip"
 }
