@@ -32,6 +32,6 @@ jobs:
         with:
           python-version: "3.12"
           allow-prereleases: true
-      - run: python3 -m pip install -r tests/requirements_test.txt
+      - run: python3 -m pip install -r custom_components/csnet_home/requirements-dev.txt
       - run: pytest --cov=custom_components
 
