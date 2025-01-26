@@ -26,7 +26,7 @@ This mainly means that I'm not sure with different device or configuration that 
 So feel free to test the integration and share any information that can help to fix your problems creating an issue on this repository
 
 ### Get information for sensor
-The sensor/climate are created using the `/elements` call (I prefer not to name it as API becasue is far from well code API)
+The sensor/climate are created using the `/elements` call (I prefer not to name it as API because is far from well code API)
 * Access to your browser developer console
 * Look within the Network data for the `elements` call
 * share the JSON in the Response
