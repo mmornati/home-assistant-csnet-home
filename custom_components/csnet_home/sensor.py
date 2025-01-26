@@ -1,17 +1,21 @@
-# custom_components/my_cloud_service/sensor.py
+"""Support for CSNet Home sensors."""
 
-from homeassistant.helpers.entity import Entity
+import logging
+
 from homeassistant.const import UnitOfTemperature
 from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
-import logging
+from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
 from .const import DOMAIN
 from .coordinator import CSNetHomeCoordinator
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 _LOGGER = logging.getLogger(__name__)
 
+
 async def async_setup_entry(hass, entry, async_add_entities):
+    """Set up sensors for CSNet Home."""
     _LOGGER.debug("Starting CSNet Home sensor setup")
 
     coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
@@ -19,7 +23,19 @@ async def async_setup_entry(hass, entry, async_add_entities):
         _LOGGER.error("No coordinator instance found!")
         return None
     # Add sensors based on the coordinator's data
-    async_add_entities([CSNetHomeSensor(coordinator, sensor_data=sensor_data, common_data=coordinator.get_common_data()["device_status"][sensor_data['device_id']]) for sensor_data in coordinator.get_sensors_data()])
+    async_add_entities(
+        [
+            CSNetHomeSensor(
+                coordinator,
+                sensor_data=sensor_data,
+                common_data=coordinator.get_common_data()["device_status"][
+                    sensor_data["device_id"]
+                ],
+            )
+            for sensor_data in coordinator.get_sensors_data()
+        ]
+    )
+
 
 class CSNetHomeSensor(CoordinatorEntity, Entity):
     """Representation of a sensor from the CSNet Home integration."""
@@ -30,14 +46,9 @@ class CSNetHomeSensor(CoordinatorEntity, Entity):
         self._sensor_data = sensor_data
         self._common_data = common_data
         self._name = f"{sensor_data['device_name']} {sensor_data['room_name']}"
-        self._current_temperature = sensor_data['current_temperature']
-        self._planned_temperature = sensor_data['setting_temperature']
-        _LOGGER.debug(f"Configuring Sensor {self._name}")
-
-    @property
-    def name(self):
-        """Return the name of the sensor."""
-        return self._name
+        self._current_temperature = sensor_data["current_temperature"]
+        self._planned_temperature = sensor_data["setting_temperature"]
+        _LOGGER.debug("Configuring Sensor %s", self._name)
 
     @property
     def state(self):
@@ -60,7 +71,7 @@ class CSNetHomeSensor(CoordinatorEntity, Entity):
         return {
             "planned_temperature": self._planned_temperature,
         }
-    
+
     @callback
     def _handle_coordinator_update(self) -> None:
         """Update sensor with latest data from coordinator."""
@@ -73,7 +84,7 @@ class CSNetHomeSensor(CoordinatorEntity, Entity):
             name=f"{self._sensor_data['device_name']}-{self._sensor_data['room_name']}",
             manufacturer="Hitachi",
             model=f"{self._common_data['name']} ATW-IOT-01",
-            sw_version=self._common_data['firmware'],
+            sw_version=self._common_data["firmware"],
             identifiers={
                 (
                     DOMAIN,
@@ -86,14 +97,10 @@ class CSNetHomeSensor(CoordinatorEntity, Entity):
     def name(self) -> str:
         """Return the name of the sensor."""
         return f"{self._sensor_data['device_name']}-{self._sensor_data['room_name']}"
-    
+
     @property
     def unique_id(self) -> str:
         """Return unique id."""
         # All entities must have a unique id.  Think carefully what you want this to be as
         # changing it later will cause HA to create new entities.
-        return f"{DOMAIN}-{self._sensor_data["room_name"]}"
-
-    async def async_update(self):
-        """Fetch new state data for the sensor."""
-        self._state = self._sensor_data['current_temperature']
+        return f"{DOMAIN}-{self._sensor_data['room_name']}"
