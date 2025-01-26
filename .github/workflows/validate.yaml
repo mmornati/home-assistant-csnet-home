@@ -6,17 +6,29 @@ on:
 
 jobs:
   validate:
+    name: Validate
     runs-on: "ubuntu-latest"
     steps:
-      - uses: "actions/checkout@v3"
+      - uses: "actions/checkout@v4.2.2"
       - uses: home-assistant/actions/hassfest@master
+
+  hacs_validation:
+    name: HACS Validation
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+      - name: HACS validation
+        uses: hacs/action@main
+        with:
+          category: integration
 
   style:
     runs-on: "ubuntu-latest"
     name: Check style formatting
     steps:
-      - uses: "actions/checkout@v3"
-      - uses: "actions/setup-python@v1"
+      - uses: "actions/checkout@v4.2.2"
+      - uses: "actions/setup-python@v5.3.0"
         with:
           python-version: "3.12"
           allow-prereleases: true
@@ -27,8 +39,8 @@ jobs:
     runs-on: "ubuntu-latest"
     name: Run tests
     steps:
-      - uses: "actions/checkout@v3"
-      - uses: "actions/setup-python@v1"
+      - uses: "actions/checkout@v4.2.2"
+      - uses: "actions/setup-python@v5.3.0"
         with:
           python-version: "3.12"
           allow-prereleases: true
