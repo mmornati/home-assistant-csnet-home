@@ -25,10 +25,6 @@ jobs:
         if: ${{ github.event_name == 'release' && github.event.release.draft == false }}
         run: |
           sed -i 's/\"version\"\s*\:\s*\".*\"/\"version\"\:\"${{ github.ref_name }}\"/g' ./custom_components/csnet_home/manifest.json
-      - name: Update Version in const.py
-        if: ${{ github.event_name == 'release' && github.event.release.draft == false }}
-        run: |
-          sed -i 's/^VERSION \= \".*\"/VERSION \= \"${{ github.ref_name }}\"/' ./custom_components/csnet_home/const.py
       - name: Commit & Push Version Changes
         if: ${{ github.event_name == 'release' && github.event.release.draft == false && github.event.release.prerelease == false  }}
         uses: actions-js/push@master
