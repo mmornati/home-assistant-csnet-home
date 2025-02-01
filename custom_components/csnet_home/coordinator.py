@@ -20,7 +20,7 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         self.hass = hass
         self.entry_id = entry_id
         self.update_interval = timedelta(seconds=update_interval)
-        self.device_data = {"sensors": [], "common_data": {}}
+        self._device_data = {"sensors": [], "common_data": {}}
         super().__init__(
             hass,
             _LOGGER,
@@ -41,15 +41,15 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
             return
 
         device_data = await cloud_api.async_get_elements_data()
-        self.device_data = device_data
-        return self.device_data
+        self._device_data = device_data
+        return self._device_data
 
     def get_sensors_data(self):
         """Return the list of sensor data."""
 
-        return self.device_data["sensors"]
+        return self._device_data["sensors"]
 
     def get_common_data(self):
         """Return common data shared between all sensors."""
 
-        return self.device_data["common_data"]
+        return self._device_data["common_data"]
