@@ -7,9 +7,9 @@ from homeassistant.const import CONF_SCAN_INTERVAL, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceEntry
 
-from .api import CSNetHomeAPI
-from .const import DOMAIN
-from .coordinator import CSNetHomeCoordinator
+from custom_components.csnet_home.api import CSNetHomeAPI
+from custom_components.csnet_home.const import DOMAIN
+from custom_components.csnet_home.coordinator import CSNetHomeCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
