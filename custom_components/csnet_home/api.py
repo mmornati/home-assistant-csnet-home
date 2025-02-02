@@ -198,7 +198,7 @@ class CSNetHomeAPI:
             _LOGGER.error("Error setting temperature for %s: %s", zone_id, err)
             return False
 
-    async def force_water_heater(self, zone_id, parent_id, status):
+    async def set_water_heater_status(self, zone_id, parent_id, status):
         """Change the water heater forcing status."""
         settings_url = f"{self.base_url}{HEAT_SETTINGS_PATH}"
 
