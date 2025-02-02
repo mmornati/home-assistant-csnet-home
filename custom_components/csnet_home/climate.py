@@ -6,7 +6,13 @@ from homeassistant.components.climate import ClimateEntity, HVACMode
 from homeassistant.const import UnitOfTemperature
 from homeassistant.helpers.device_registry import DeviceInfo
 
-from .const import DOMAIN
+from .const import (
+    DOMAIN,
+    HEATING_MAX_TEMPERATURE,
+    HEATING_MIN_TEMPERATURE,
+    WATER_HEATER_MAX_TEMPERATURE,
+    WATER_HEATER_MIN_TEMPERATURE,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -45,6 +51,14 @@ class CSNetHomeClimate(ClimateEntity):
         self._common_data = common_data
         self._attr_name = self._sensor_data["room_name"]
         self.entry = entry
+        if self._sensor_data["zone_id"] == 3:
+            self._attr_min_temp = WATER_HEATER_MIN_TEMPERATURE
+        else:
+            self._attr_min_temp = HEATING_MIN_TEMPERATURE
+        if self._sensor_data["zone_id"] == 3:
+            self._attr_max_temp = WATER_HEATER_MAX_TEMPERATURE
+        else:
+            self._attr_max_temp = HEATING_MAX_TEMPERATURE
         self._attr_temperature_unit = UnitOfTemperature.CELSIUS
         self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
         self._attr_preset_modes = ["comfort", "eco"]

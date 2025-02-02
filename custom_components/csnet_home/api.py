@@ -120,7 +120,7 @@ class CSNetHomeAPI:
                         for index, element in enumerate(elements):
                             sensor = {
                                 "device_name": element.get("deviceName")
-                                or "Hitachi PAC",
+                                or "ATW-IOT-01",
                                 "device_id": element.get("deviceId"),
                                 "room_name": element.get("parentName")
                                 or f"Room-{element.get('parentId')}-{index}",
@@ -173,10 +173,13 @@ class CSNetHomeAPI:
 
         data = {
             "orderStatus": "PENDING",
-            f"settingTempRoomZ{zone_id}": str(int(temperature * 10)),
             "indoorId": parent_id,
             "_csrf": "9d63b828-f229-402f-899c-19dc40b5e447",
         }
+        if zone_id == 3:
+            data["settingTempDHW"] = str(int(temperature))
+        else:
+            data[f"settingTempRoomZ{zone_id}"] = str(int(temperature * 10))
 
         cookies = {
             "XSRF-TOKEN": "9d63b828-f229-402f-899c-19dc40b5e447",
