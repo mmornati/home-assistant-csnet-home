@@ -10,7 +10,7 @@ import async_timeout
 from homeassistant.components.climate import HVACMode
 from homeassistant.core import HomeAssistant
 
-from .const import (
+from custom_components.csnet_home.const import (
     API_URL,
     COMMON_API_HEADERS,
     DEFAULT_API_TIMEOUT,
@@ -117,11 +117,13 @@ class CSNetHomeAPI:
                                 )
                             },
                         }
-                        for element in elements:
+                        for index, element in enumerate(elements):
                             sensor = {
-                                "device_name": element.get("deviceName"),
+                                "device_name": element.get("deviceName")
+                                or f"Device-{element.get('deviceId')}-{index}",
                                 "device_id": element.get("deviceId"),
-                                "room_name": element.get("parentName"),
+                                "room_name": element.get("parentName")
+                                or f"Room-{element.get('parentId')}",
                                 "parent_id": element.get("parentId"),
                                 "room_id": element.get("roomId"),
                                 "operation_status": element.get("operationStatus"),
