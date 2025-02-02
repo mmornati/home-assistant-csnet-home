@@ -51,11 +51,11 @@ class CSNetHomeClimate(ClimateEntity):
         self._common_data = common_data
         self._attr_name = self._sensor_data["room_name"]
         self.entry = entry
-        if self._sensor_data["elementType"] == 3:
+        if self._sensor_data["zone_id"] == 3:
             self._attr_min_temp = WATER_HEATER_MIN_TEMPERATURE
         else:
             self._attr_min_temp = HEATING_MIN_TEMPERATURE
-        if self._sensor_data["elementType"] == 3:
+        if self._sensor_data["zone_id"] == 3:
             self._attr_max_temp = WATER_HEATER_MAX_TEMPERATURE
         else:
             self._attr_max_temp = HEATING_MAX_TEMPERATURE
