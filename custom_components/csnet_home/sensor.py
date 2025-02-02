@@ -43,6 +43,7 @@ class CSNetHomeSensor(CoordinatorEntity, Entity):
     def __init__(self, coordinator: CSNetHomeCoordinator, sensor_data, common_data):
         """Initialize the sensor."""
         super().__init__(coordinator)
+        self._coordinator = coordinator
         self._sensor_data = sensor_data
         self._common_data = common_data
         self._name = f"{sensor_data['device_name']} {sensor_data['room_name']}"
@@ -75,6 +76,17 @@ class CSNetHomeSensor(CoordinatorEntity, Entity):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Update sensor with latest data from coordinator."""
+        self._sensor_data = next(
+            (
+                x
+                for x in self._coordinator.get_sensors_data()
+                if x.get("room_name") in self._name
+            ),
+            None,
+        )
+        self._common_data = self._coordinator.get_common_data()
+        self._current_temperature = self._sensor_data["current_temperature"]
+        self._planned_temperature = self._sensor_data["setting_temperature"]
         self.async_write_ha_state()
 
     @property

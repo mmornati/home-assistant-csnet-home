@@ -60,11 +60,6 @@ class CSNetHomeClimate(ClimateEntity):
         )
 
     @property
-    def temperature(self):
-        """Return the current temperature."""
-        return self._sensor_data["current_temperature"]
-
-    @property
     def current_temperature(self):
         """Return the current temperature."""
         return self._sensor_data["current_temperature"]
@@ -140,3 +135,12 @@ class CSNetHomeClimate(ClimateEntity):
         if not coordinator:
             _LOGGER.error("No coordinator instance found!")
         await coordinator.async_request_refresh()
+        self._sensor_data = next(
+            (
+                x
+                for x in coordinator.get_sensors_data()
+                if x.get("room_name") == self._attr_name
+            ),
+            None,
+        )
+        self._common_data = coordinator.get_common_data()
