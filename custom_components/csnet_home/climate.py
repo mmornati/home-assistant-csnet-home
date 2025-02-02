@@ -61,7 +61,7 @@ class CSNetHomeClimate(ClimateEntity):
             self._attr_max_temp = HEATING_MAX_TEMPERATURE
         self._attr_temperature_unit = UnitOfTemperature.CELSIUS
         self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
-        self._attr_preset_modes = ["away", "comfort", "eco"]
+        self._attr_preset_modes = ["comfort", "eco"]
         if self._sensor_data["ecocomfort"] and self._sensor_data["ecocomfort"] == 0:
             self._attr_preset_mode = "eco"
         else:
@@ -139,6 +139,15 @@ class CSNetHomeClimate(ClimateEntity):
         )
         if response:
             self._sensor_data["on_off"] = 1 if hvac_mode == HVACMode.HEAT else 0
+
+    async def async_set_preset_mode(self, preset_mode: str) -> None:
+        """Set new preset mode."""
+        cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
+        response = await cloud_api.set_preset_modes(
+            self._sensor_data["zone_id"], self._sensor_data["parent_id"], preset_mode
+        )
+        if response:
+            self._sensor_data["ecocomfort"] = 1 if preset_mode == "eco" else 0
 
     async def async_update(self):
         """Update the thermostat data from the API."""
