@@ -1,4 +1,4 @@
-name: Python package
+name: Validate
 
 on:
   push:
@@ -47,4 +47,9 @@ jobs:
           allow-prereleases: true
       - run: python3 -m pip install -r custom_components/csnet_home/requirements-dev.txt
       - run: pytest --cov=custom_components
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: mmornati/home-assistant-csnet-home
 
