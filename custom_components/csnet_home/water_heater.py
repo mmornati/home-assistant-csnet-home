@@ -3,6 +3,7 @@
 import logging
 from homeassistant.components.water_heater import WaterHeaterEntity
 from homeassistant.const import UnitOfTemperature
+from homeassistant.helpers.device_registry import DeviceInfo
 from typing import Any
 
 from custom_components.csnet_home.const import (
@@ -12,6 +13,31 @@ from custom_components.csnet_home.const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+
+async def async_setup_entry(hass, entry, async_add_entities):
+    """Set up the Water Heater platform for CSNet Home."""
+    _LOGGER.debug("Starting CSNet Home water heater setup")
+
+    coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    if not coordinator:
+        _LOGGER.error("No coordinator instance found!")
+        return None
+    # Add sensors based on the coordinator's data
+    async_add_entities(
+        [
+            CSNetHomeWaterHeater(
+                hass,
+                entry,
+                sensor_data=sensor_data,
+                common_data=coordinator.get_common_data()["device_status"][
+                    sensor_data["device_id"]
+                ],
+            )
+            for sensor_data in coordinator.get_sensors_data()
+            if sensor_data.get("zone_id") == 3  # Add only the water heater
+        ]
+    )
 
 
 class CSNetHomeWaterHeater(WaterHeaterEntity):
@@ -46,6 +72,27 @@ class CSNetHomeWaterHeater(WaterHeaterEntity):
     def current_operation(self):
         """Return the current operation mode."""
         return self._operation_mode
+
+    @property
+    def unique_id(self) -> str:
+        """Return unique id."""
+        return f"{DOMAIN}-water-heater-{self._sensor_data['room_name']}"
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device information."""
+        return DeviceInfo(
+            name=f"{self._sensor_data['device_name']}-{self._sensor_data['room_name']}",
+            manufacturer="Hitachi",
+            model=f"{self._common_data['name']} ATW-IOT-01",
+            sw_version=self._common_data["firmware"],
+            identifiers={
+                (
+                    DOMAIN,
+                    f"{self._sensor_data['device_name']}-{self._sensor_data['room_name']}",
+                )
+            },
+        )
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
         """Set new target temperature."""
