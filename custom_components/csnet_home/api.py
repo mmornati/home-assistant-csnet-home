@@ -198,6 +198,45 @@ class CSNetHomeAPI:
             _LOGGER.error("Error setting temperature for %s: %s", zone_id, err)
             return False
 
+    async def force_water_heater(self, zone_id, parent_id, status):
+        """Change the water heater forcing status."""
+        settings_url = f"{self.base_url}{HEAT_SETTINGS_PATH}"
+
+        headers = COMMON_API_HEADERS | {
+            "accept": "*/*",
+            "x-requested-with": "XMLHttpRequest",
+            "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "origin": self.base_url,
+        }
+
+        data = {
+            "orderStatus": "PENDING",
+            "indoorId": parent_id,
+            "boostDHW": status,
+            "_csrf": "190b23c3-f1f8-44d6-a6ef-700767fa9d1e",
+        }
+
+        cookies = {
+            "XSRF-TOKEN": "190b23c3-f1f8-44d6-a6ef-700767fa9d1e",
+            "acceptedCookies": "yes",
+        }
+
+        try:
+            async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+                async with self.session.post(
+                    settings_url, headers=headers, cookies=cookies, data=data
+                ) as response:
+                    response.raise_for_status()
+                    _LOGGER.debug(
+                        "Force water heater status to %s for %s", status, zone_id
+                    )
+                    return True
+        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+            _LOGGER.error(
+                "Error forcing the water heater status for %s: %s", zone_id, err
+            )
+            return False
+
     async def async_on_off(self, zone_id, parent_id, hvac_mode):
         """Set the target temperature for a room."""
         settings_url = f"{self.base_url}{HEAT_SETTINGS_PATH}"
