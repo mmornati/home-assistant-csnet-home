@@ -120,10 +120,10 @@ class CSNetHomeAPI:
                         for index, element in enumerate(elements):
                             sensor = {
                                 "device_name": element.get("deviceName")
-                                or f"Device-{element.get('deviceId')}-{index}",
+                                or "Hitachi PAC",
                                 "device_id": element.get("deviceId"),
                                 "room_name": element.get("parentName")
-                                or f"Room-{element.get('parentId')}",
+                                or f"Room-{element.get('parentId')}-{index}",
                                 "parent_id": element.get("parentId"),
                                 "room_id": element.get("roomId"),
                                 "operation_status": element.get("operationStatus"),

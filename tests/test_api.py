@@ -414,9 +414,9 @@ async def test_api_get_elements_data_empty_names(mock_aiohttp_client, hass):
         },
         "sensors": [
             {
-                "device_name": "Device-9876-0",
+                "device_name": "Hitachi PAC",
                 "device_id": 9876,
-                "room_name": "Room-1234",
+                "room_name": "Room-1234-0",
                 "parent_id": 1234,
                 "room_id": -1,
                 "operation_status": 5,
@@ -433,9 +433,9 @@ async def test_api_get_elements_data_empty_names(mock_aiohttp_client, hass):
                 "zone_id": 1,
             },
             {
-                "device_name": "Device-9876-1",
+                "device_name": "Hitachi PAC",
                 "device_id": 9876,
-                "room_name": "Room-1234",
+                "room_name": "Room-1234-1",
                 "parent_id": 1234,
                 "room_id": -1,
                 "operation_status": 5,
