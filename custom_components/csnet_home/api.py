@@ -235,6 +235,44 @@ class CSNetHomeAPI:
             _LOGGER.error("Error setting temperature for %s: %s", zone_id, err)
             return False
 
+    async def set_preset_modes(self, zone_id, parent_id, preset_mode):
+        """Set the eco/comfort mode for a zone."""
+        settings_url = f"{self.base_url}{HEAT_SETTINGS_PATH}"
+
+        headers = COMMON_API_HEADERS | {
+            "accept": "*/*",
+            "x-requested-with": "XMLHttpRequest",
+            "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "origin": self.base_url,
+        }
+
+        data = {
+            "orderStatus": "PENDING",
+            "indoorId": parent_id,
+            "_csrf": "4ff26127-a1db-4555-aba2-0c713dda6c0e",
+        }
+        if preset_mode == "eco":
+            data[f"ecoModeC{zone_id}"] = "0"
+        else:
+            data[f"ecoModeC{zone_id}"] = "1"
+
+        cookies = {
+            "XSRF-TOKEN": "4ff26127-a1db-4555-aba2-0c713dda6c0e",
+            "acceptedCookies": "yes",
+        }
+
+        try:
+            async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+                async with self.session.post(
+                    settings_url, headers=headers, cookies=cookies, data=data
+                ) as response:
+                    response.raise_for_status()
+                    _LOGGER.debug("Set preset_mode to %s for %s", preset_mode, zone_id)
+                    return True
+        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+            _LOGGER.error("Error setting preset_mode for %s: %s", zone_id, err)
+            return False
+
     async def close(self):
         """Close the session after usage."""
         if self.session:
