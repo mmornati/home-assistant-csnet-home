@@ -1,4 +1,5 @@
 """Water Heater Entity."""
+
 # https://github.com/home-assistant/core/blob/dev/homeassistant/components/water_heater/__init__.py
 
 import logging

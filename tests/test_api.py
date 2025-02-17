@@ -245,6 +245,7 @@ async def test_api_get_elements_data_success(mock_aiohttp_client, hass):
         "sensors": [
             {
                 "device_name": "Hitachi PAC",
+                "doingBoost": False,
                 "device_id": 1234,
                 "room_name": "Room1",
                 "parent_id": 1234,
@@ -264,6 +265,7 @@ async def test_api_get_elements_data_success(mock_aiohttp_client, hass):
             },
             {
                 "device_name": "Hitachi PAC",
+                "doingBoost": False,
                 "device_id": 1234,
                 "room_name": "Room 2",
                 "parent_id": 1234,
@@ -415,6 +417,7 @@ async def test_api_get_elements_data_empty_names(mock_aiohttp_client, hass):
         "sensors": [
             {
                 "device_name": "ATW-IOT-01",
+                "doingBoost": False,
                 "device_id": 9876,
                 "room_name": "Room-1234-0",
                 "parent_id": 1234,
@@ -434,6 +437,7 @@ async def test_api_get_elements_data_empty_names(mock_aiohttp_client, hass):
             },
             {
                 "device_name": "ATW-IOT-01",
+                "doingBoost": False,
                 "device_id": 9876,
                 "room_name": "Room-1234-1",
                 "parent_id": 1234,
