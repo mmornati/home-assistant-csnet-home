@@ -10,7 +10,7 @@ Next, create a virtual environment (make sure `python` is at least `v3.7`; you m
 `python3` instead):
 ```bash
 python -m venv venv
-source venv/bin/activate
+source venv/bin/activate OR venv\Scripts\activate
 ```
 
 Finally, install the requirements and the pre-commit hooks:
@@ -30,7 +30,7 @@ This directory contains various tests to validate (in a Mocked way, no real call
 After completing the above setup steps, you need to activate the virtual environment
 **every time you start a new shell**:
 ```bash
-source venv/bin/activate
+source venv/bin/activate OR venv\Scripts\activate
 ```
 
 Now you can run the tests using this command:
