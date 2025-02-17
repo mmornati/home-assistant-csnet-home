@@ -14,7 +14,7 @@ from custom_components.csnet_home.coordinator import CSNetHomeCoordinator
 _LOGGER = logging.getLogger(__name__)
 
 SCAN_INTERVAL = 60
-PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.CLIMATE]
+PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.CLIMATE, Platform.WATER_HEATER]
 
 
 async def async_setup(hass: HomeAssistant, config: dict):

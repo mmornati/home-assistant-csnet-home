@@ -245,6 +245,7 @@ async def test_api_get_elements_data_success(mock_aiohttp_client, hass):
         "sensors": [
             {
                 "device_name": "Hitachi PAC",
+                "doingBoost": False,
                 "device_id": 1234,
                 "room_name": "Room1",
                 "parent_id": 1234,
@@ -264,6 +265,7 @@ async def test_api_get_elements_data_success(mock_aiohttp_client, hass):
             },
             {
                 "device_name": "Hitachi PAC",
+                "doingBoost": False,
                 "device_id": 1234,
                 "room_name": "Room 2",
                 "parent_id": 1234,
@@ -415,6 +417,7 @@ async def test_api_get_elements_data_empty_names(mock_aiohttp_client, hass):
         "sensors": [
             {
                 "device_name": "ATW-IOT-01",
+                "doingBoost": False,
                 "device_id": 9876,
                 "room_name": "Room-1234-0",
                 "parent_id": 1234,
@@ -434,6 +437,7 @@ async def test_api_get_elements_data_empty_names(mock_aiohttp_client, hass):
             },
             {
                 "device_name": "ATW-IOT-01",
+                "doingBoost": False,
                 "device_id": 9876,
                 "room_name": "Room-1234-1",
                 "parent_id": 1234,
@@ -483,3 +487,57 @@ async def test_api_close_session(mock_aiohttp_client, hass):
 
     await api.close()
     mock_client_instance.close.assert_called_once()
+
+
+# @pytest.mark.asyncio
+# async def test_set_water_heater_mode(mock_aiohttp_client, hass):
+#     """Test setting the water heater mode."""
+#     mock_client_instance = mock_aiohttp_client.return_value
+
+#     # Configuration de la réponse simulée
+#     mock_response = mock_client_instance.post.return_value.__aenter__.return_value
+#     mock_response.status = 200
+#     mock_response.text = AsyncMock(return_value="OK")
+
+#     # Initialisation de l'API
+#     api = CSNetHomeAPI(hass, "user", "pass")
+#     api._session = mock_client_instance
+#     api.base_url = "https://www.csnetmanager.com"
+
+#     # Appel de la méthode à tester
+#     result = await api.set_water_heater_mode(zone_id=1, parent_id=1234, preset_mode="performance")
+
+#     # Vérifications
+#     assert result is True
+#     mock_client_instance.post.assert_called_once_with(
+#         f"{api.base_url}/data/indoor/heat_setting",
+#         headers=ANY,
+#         cookies=ANY,
+#         data={
+#             "orderStatus": "PENDING",
+#             "indoorId": 1234,
+#             "_csrf": "4ff26127-a1db-4555-aba2-0c713dda6c0e",
+#             "boostDHW": 1,
+#             "runStopDHW": 1
+#         }
+#     )
+#     mock_response.raise_for_status.assert_called_once()
+
+# @pytest.mark.asyncio
+# async def test_set_water_heater_mode_failure(mock_aiohttp_client, hass):
+# """Test failure in setting the water heater mode."""
+# mock_client_instance = mock_aiohttp_client.return_value
+
+# # Simuler une exception lors de l'appel API
+# mock_client_instance.post.side_effect = aiohttp.ClientError("Connection error")
+
+# # Initialisation de l'API
+# api = CSNetHomeAPI(hass, "user", "pass")
+# api._session = mock_client_instance
+# api.base_url = "https://www.csnetmanager.com"
+
+# # Appel de la méthode à tester
+# result = await api.set_water_heater_mode(zone_id=1, parent_id=1234, preset_mode="eco")
+
+# # Vérifications
+# assert result is False

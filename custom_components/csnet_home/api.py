@@ -136,7 +136,8 @@ class CSNetHomeAPI:
                                 "c2_demand": element.get("c2Demand"),
                                 "ecocomfort": element.get(
                                     "ecocomfort"
-                                ),  # 0 = Eco, 1 = Comfort
+                                ),  # 0 = Eco, 1 = Comfort, -1 = No available mode
+                                "doingBoost": element.get("doingBoost"),
                                 "current_temperature": element.get(
                                     "currentTemperature"
                                 ),
@@ -196,6 +197,45 @@ class CSNetHomeAPI:
                     return True
         except (aiohttp.ClientError, asyncio.TimeoutError) as err:
             _LOGGER.error("Error setting temperature for %s: %s", zone_id, err)
+            return False
+
+    async def set_water_heater_status(self, zone_id, parent_id, status):
+        """Change the water heater forcing status."""
+        settings_url = f"{self.base_url}{HEAT_SETTINGS_PATH}"
+
+        headers = COMMON_API_HEADERS | {
+            "accept": "*/*",
+            "x-requested-with": "XMLHttpRequest",
+            "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "origin": self.base_url,
+        }
+
+        data = {
+            "orderStatus": "PENDING",
+            "indoorId": parent_id,
+            "boostDHW": status,
+            "_csrf": "190b23c3-f1f8-44d6-a6ef-700767fa9d1e",
+        }
+
+        cookies = {
+            "XSRF-TOKEN": "190b23c3-f1f8-44d6-a6ef-700767fa9d1e",
+            "acceptedCookies": "yes",
+        }
+
+        try:
+            async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+                async with self.session.post(
+                    settings_url, headers=headers, cookies=cookies, data=data
+                ) as response:
+                    response.raise_for_status()
+                    _LOGGER.debug(
+                        "Force water heater status to %s for %s", status, zone_id
+                    )
+                    return True
+        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+            _LOGGER.error(
+                "Error forcing the water heater status for %s: %s", zone_id, err
+            )
             return False
 
     async def async_on_off(self, zone_id, parent_id, hvac_mode):
@@ -267,6 +307,59 @@ class CSNetHomeAPI:
                     settings_url, headers=headers, cookies=cookies, data=data
                 ) as response:
                     response.raise_for_status()
+                    _LOGGER.debug("Set preset_mode to %s for %s", preset_mode, zone_id)
+                    return True
+        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+            _LOGGER.error("Error setting preset_mode for %s: %s", zone_id, err)
+            return False
+
+    async def set_water_heater_mode(self, zone_id, parent_id, preset_mode):
+        """Set the off/eco/performance demand mode for water_heater."""
+        settings_url = f"{self.base_url}{HEAT_SETTINGS_PATH}"
+        _LOGGER.debug("URL %s et mode %s", settings_url, preset_mode)
+
+        headers = COMMON_API_HEADERS | {
+            "accept": "*/*",
+            "x-requested-with": "XMLHttpRequest",
+            "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "origin": self.base_url,
+        }
+
+        data = {
+            "orderStatus": "PENDING",
+            "indoorId": parent_id,
+            "_csrf": "4ff26127-a1db-4555-aba2-0c713dda6c0e",
+        }
+        if preset_mode == "performance":
+            data["boostDHW"] = 1
+            data["runStopDHW"] = 1
+        if preset_mode == "eco":
+            data["boostDHW"] = 0
+            data["runStopDHW"] = 1
+        if preset_mode == "off":
+            data["runStopDHW"] = 0
+        if preset_mode == "on":
+            data["runStopDHW"] = 1
+
+        cookies = {
+            "XSRF-TOKEN": "4ff26127-a1db-4555-aba2-0c713dda6c0e",
+            "acceptedCookies": "yes",
+        }
+
+        _LOGGER.debug("Sending data (%s): ", data)
+
+        try:
+            async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+                async with self.session.post(
+                    settings_url, headers=headers, cookies=cookies, data=data
+                ) as response:
+                    response.raise_for_status()
+                    response_text = (
+                        await response.text()
+                    )  # Récupère la réponse en texte
+                    _LOGGER.debug(
+                        "Réponse API (%s): %s", response.status, response_text
+                    )
                     _LOGGER.debug("Set preset_mode to %s for %s", preset_mode, zone_id)
                     return True
         except (aiohttp.ClientError, asyncio.TimeoutError) as err:

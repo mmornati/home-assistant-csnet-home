@@ -1,0 +1,10 @@
+version: '3.8'
+services:
+  home-assistant:
+    container_name: home-assistant
+    image: homeassistant/home-assistant:latest
+    volumes:
+      - ./custom_components/csnet_home:/config/custom_components/csnet_home
+    ports:
+      - "8080:8123"
+    restart: unless-stopped
