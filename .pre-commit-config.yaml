@@ -48,7 +48,7 @@ repos:
       - id: pylint
         name: pylint
         args: [-j 0]
-        entry: tests/venv/bin/pylint
+        entry: venv/bin/pylint
         language: system
         files: ^(custom_components|tests)/.+\.py$
   - repo: https://github.com/pre-commit/mirrors-mypy
