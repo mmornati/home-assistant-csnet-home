@@ -2,7 +2,7 @@
 
 import logging
 
-from homeassistant.components.climate import ClimateEntity, HVACMode
+from homeassistant.components.climate import ClimateEntity, HVACMode, HVACAction
 from homeassistant.const import UnitOfTemperature
 from homeassistant.helpers.device_registry import DeviceInfo
 
@@ -112,6 +112,13 @@ class CSNetHomeClimate(ClimateEntity):
             },
         )
 
+    @property
+    def hvac_action(self):
+        """Return the current running HVAC action."""
+        if self.is_heating():
+            return HVACAction.HEATING
+        return HVACAction.IDLE
+
     async def async_set_temperature(self, **kwargs):
         """Set the target temperature for a room."""
         temperature = kwargs.get("temperature")
@@ -141,6 +148,14 @@ class CSNetHomeClimate(ClimateEntity):
         )
         if response:
             self._sensor_data["ecocomfort"] = 1 if preset_mode == "eco" else 0
+
+    def is_heating(self):
+        """Return true if the thermostat is currently heating."""
+        return (
+            self._sensor_data["on_off"] == 1
+            and self._sensor_data["setting_temperature"]
+            > self._sensor_data["current_temperature"]
+        )
 
     async def async_update(self):
         """Update the thermostat data from the API."""
