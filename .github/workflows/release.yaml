@@ -39,6 +39,8 @@ jobs:
       - name: Update Release with Version Changes Commit
         if: ${{ github.event_name == 'release' && github.event.release.draft == false && github.event.release.prerelease == false  }}
         run: |
+          git config --global user.name 'Github Actions'
+          git config --global user.email 'mmornati@users.noreply.github.com'
           git tag -f ${{ github.ref_name }}
           git push -f origin ${{ github.ref_name }}
 
