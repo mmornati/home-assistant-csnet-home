@@ -53,7 +53,7 @@ class CSNetHomeClimate(ClimateEntity):
         self._attr_min_temp = HEATING_MIN_TEMPERATURE
         self._attr_max_temp = HEATING_MAX_TEMPERATURE
         self._attr_temperature_unit = UnitOfTemperature.CELSIUS
-        self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
+        self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT, HVACMode.COOL]
         self._attr_preset_modes = ["comfort", "eco"]
         if self._sensor_data["ecocomfort"] and self._sensor_data["ecocomfort"] == 0:
             self._attr_preset_mode = "eco"
