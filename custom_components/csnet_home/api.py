@@ -156,7 +156,7 @@ class CSNetHomeAPI:
             _LOGGER.error("Error during sensor data retrieval: %s", e)
             self.logged_in = False
             return None
-
+    
     def get_current_temperature(self, element):
         etype = element.get("elementType")
         if etype == 5:
