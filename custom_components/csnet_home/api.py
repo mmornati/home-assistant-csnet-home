@@ -36,9 +36,10 @@ class CSNetHomeAPI:
         self.session = None
         self.cookies = None
         self.logged_in = False
+        self.xsrf_token = None
 
-    async def async_login(self):
-        """Log in to the cloud service and return a session cookie."""
+    async def get_xsrf_token(self):
+        """Get the XSRF token from the cloud service."""
         login_url = f"{self.base_url}{LOGIN_PATH}"
 
         headers = COMMON_API_HEADERS | {
@@ -47,12 +48,45 @@ class CSNetHomeAPI:
         }
 
         cookies = {
-            "XSRF-TOKEN": "be186598-c4d0-4d16-80f0-dc2ab35aad23",
+            "acceptedCookies": "yes",
+        }
+
+        async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+            async with self.session.get(
+                login_url, headers=headers, cookies=cookies, data={}
+            ) as response:
+                if response.status == 200:
+                    _LOGGER.debug("Login page called...")
+                    self.xsrf_token = self.extract_cookie_value(
+                        self.session.cookie_jar, "XSRF-TOKEN"
+                    )
+                    return True
+                _LOGGER.error(
+                    "Failed to display login page. Status code: %s", response.status
+                )
+                return False
+
+    async def async_login(self):
+        """Log in to the cloud service and return a session cookie."""
+        self.session = aiohttp.ClientSession(cookie_jar=aiohttp.CookieJar())
+        if not await self.get_xsrf_token():
+            _LOGGER.error("Failed to get XSRF token.")
+            return False
+
+        login_url = f"{self.base_url}{LOGIN_PATH}"
+
+        headers = COMMON_API_HEADERS | {
+            "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+            "content-type": "application/x-www-form-urlencoded",
+        }
+
+        cookies = {
+            "XSRF-TOKEN": self.xsrf_token,
             "acceptedCookies": "yes",
         }
 
         form_data = {
-            "_csrf": "be186598-c4d0-4d16-80f0-dc2ab35aad23",
+            "_csrf": self.xsrf_token,
             "token": "",
             "username": self.username,
             "password_unsanitized": self.password,
@@ -60,7 +94,6 @@ class CSNetHomeAPI:
         }
 
         try:
-            self.session = aiohttp.ClientSession()
             async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
                 async with self.session.post(
                     login_url, headers=headers, cookies=cookies, data=form_data
@@ -180,7 +213,7 @@ class CSNetHomeAPI:
         data = {
             "orderStatus": "PENDING",
             "indoorId": parent_id,
-            "_csrf": "be186598-c4d0-4d16-80f0-dc2ab35aad23",
+            "_csrf": self.xsrf_token,
         }
         if zone_id == 3:
             data["settingTempDHW"] = str(int(temperature))
@@ -190,7 +223,7 @@ class CSNetHomeAPI:
             data[f"settingTempRoomZ{zone_id}"] = str(int(temperature * 10))
 
         cookies = {
-            "XSRF-TOKEN": "be186598-c4d0-4d16-80f0-dc2ab35aad23",
+            "XSRF-TOKEN": self.xsrf_token,
             "acceptedCookies": "yes",
         }
 
@@ -221,11 +254,11 @@ class CSNetHomeAPI:
             "orderStatus": "PENDING",
             "indoorId": parent_id,
             "boostDHW": status,
-            "_csrf": "190b23c3-f1f8-44d6-a6ef-700767fa9d1e",
+            "_csrf": self.xsrf_token,
         }
 
         cookies = {
-            "XSRF-TOKEN": "190b23c3-f1f8-44d6-a6ef-700767fa9d1e",
+            "XSRF-TOKEN": self.xsrf_token,
             "acceptedCookies": "yes",
         }
 
@@ -262,11 +295,11 @@ class CSNetHomeAPI:
             "orderStatus": "PENDING",
             f"runStopC{zone_id}Air": status,
             "indoorId": parent_id,
-            "_csrf": "c93a2274-f19b-4453-b920-8888abd914f8",
+            "_csrf": self.xsrf_token,
         }
 
         cookies = {
-            "XSRF-TOKEN": "c93a2274-f19b-4453-b920-8888abd914f8",
+            "XSRF-TOKEN": self.xsrf_token,
             "acceptedCookies": "yes",
         }
 
@@ -296,7 +329,7 @@ class CSNetHomeAPI:
         data = {
             "orderStatus": "PENDING",
             "indoorId": parent_id,
-            "_csrf": "4ff26127-a1db-4555-aba2-0c713dda6c0e",
+            "_csrf": self.xsrf_token,
         }
         if preset_mode == "eco":
             data[f"ecoModeC{zone_id}"] = "0"
@@ -304,7 +337,7 @@ class CSNetHomeAPI:
             data[f"ecoModeC{zone_id}"] = "1"
 
         cookies = {
-            "XSRF-TOKEN": "4ff26127-a1db-4555-aba2-0c713dda6c0e",
+            "XSRF-TOKEN": self.xsrf_token,
             "acceptedCookies": "yes",
         }
 
@@ -335,7 +368,7 @@ class CSNetHomeAPI:
         data = {
             "orderStatus": "PENDING",
             "indoorId": parent_id,
-            "_csrf": "4ff26127-a1db-4555-aba2-0c713dda6c0e",
+            "_csrf": self.xsrf_token,
         }
         if preset_mode == "performance":
             data["boostDHW"] = 1
@@ -349,7 +382,7 @@ class CSNetHomeAPI:
             data["runStopDHW"] = 1
 
         cookies = {
-            "XSRF-TOKEN": "4ff26127-a1db-4555-aba2-0c713dda6c0e",
+            "XSRF-TOKEN": self.xsrf_token,
             "acceptedCookies": "yes",
         }
 
@@ -411,3 +444,21 @@ class CSNetHomeAPI:
                 _LOGGER.error("API Response error: %s", e)
                 self.logged_in = False
                 return None
+
+    def extract_cookie_value(self, cookies, cookie_name):
+        """Extract a cookie value from a cookie jar.
+
+        Args:
+            cookies (aiohttp.cookiejar.CookieJar): The cookie jar to extract the value from.
+            cookie_name (str): The name of the cookie to extract the value from.
+
+        Returns:
+            str or None: The value of the cookie, or None if the cookie is not found.
+        """
+        for cookie in cookies:
+            if cookie.key == cookie_name:
+                _LOGGER.debug(
+                    "Found cookie %s with value %s", cookie_name, cookie.value
+                )
+                return cookie.value
+        return None
