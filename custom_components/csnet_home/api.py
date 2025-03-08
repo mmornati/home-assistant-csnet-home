@@ -174,9 +174,7 @@ class CSNetHomeAPI:
                                 "current_temperature": element.get(
                                     "currentTemperature"
                                 ),
-                                "setting_temperature": element.get(
-                                    "settingTemperature"
-                                ),
+                                "setting_temperature": self.get_current_temperature(element),
                                 "zone_id": element.get("elementType"),
                             }
                             sensors.append(sensor)
@@ -191,6 +189,13 @@ class CSNetHomeAPI:
             _LOGGER.error("Error during sensor data retrieval: %s", e)
             self.logged_in = False
             return None
+    
+    def get_current_temperature(self, element):
+        etype = element.get("elementType")
+        if etype == 5:
+            return element.get("settingTemperature") * 10
+        else:
+            return element.get("settingTemperature")
 
     async def async_set_temperature(self, zone_id, parent_id, **kwargs):
         """Set the target temperature for a room."""
@@ -212,6 +217,8 @@ class CSNetHomeAPI:
         }
         if zone_id == 3:
             data["settingTempDHW"] = str(int(temperature))
+        elif zone_id == 5:
+            data["fixTempHeatC1"] = str(int(temperature))
         else:
             data[f"settingTempRoomZ{zone_id}"] = str(int(temperature * 10))
 
