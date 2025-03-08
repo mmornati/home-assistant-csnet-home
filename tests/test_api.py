@@ -28,6 +28,10 @@ async def test_login_success(mock_aiohttp_client, hass):
     """Test a successful get_data call."""
     mock_client_instance = mock_aiohttp_client.return_value
 
+    mock_login_response = mock_client_instance.get.return_value.__aenter__.return_value
+    mock_login_response.status = 200
+    mock_login_response.text = AsyncMock(return_value="xxx xxx xxx")
+
     mock_login_response = mock_client_instance.post.return_value.__aenter__.return_value
     mock_login_response.status = 200
     mock_login_response.text = AsyncMock(return_value="xxx xxx xxx")
@@ -44,7 +48,7 @@ async def test_login_success(mock_aiohttp_client, hass):
         headers=ANY,
         cookies=ANY,
         data={
-            "_csrf": "be186598-c4d0-4d16-80f0-dc2ab35aad23",
+            "_csrf": ANY,
             "token": "",
             "username": "user",
             "password_unsanitized": "pass",
@@ -57,6 +61,10 @@ async def test_login_success(mock_aiohttp_client, hass):
 async def test_login_error(mock_aiohttp_client, hass):
     """Test a successful get_data call."""
     mock_client_instance = mock_aiohttp_client.return_value
+
+    mock_login_response = mock_client_instance.get.return_value.__aenter__.return_value
+    mock_login_response.status = 200
+    mock_login_response.text = AsyncMock(return_value="xxx xxx xxx")
 
     mock_login_response = mock_client_instance.post.return_value.__aenter__.return_value
     # The Website is always returning 200 with a wrong login. It just display the login page again
@@ -75,7 +83,7 @@ async def test_login_error(mock_aiohttp_client, hass):
         headers=ANY,
         cookies=ANY,
         data={
-            "_csrf": "be186598-c4d0-4d16-80f0-dc2ab35aad23",
+            "_csrf": ANY,
             "token": "",
             "username": "user",
             "password_unsanitized": "pass_wrong",
@@ -285,7 +293,7 @@ async def test_api_get_elements_data_success(mock_aiohttp_client, hass):
             },
         ],
     }
-    mock_client_instance.get.assert_called_once_with(
+    mock_client_instance.get.assert_called_with(
         "https://www.csnetmanager.com/data/elements", headers=ANY, cookies=ANY
     )
 
@@ -294,6 +302,10 @@ async def test_api_get_elements_data_success(mock_aiohttp_client, hass):
 async def test_api_get_elements_data_empty_names(mock_aiohttp_client, hass):
     """Test a successful get_data call when room name and device name are empty."""
     mock_client_instance = mock_aiohttp_client.return_value
+
+    mock_login_response = mock_client_instance.get.return_value.__aenter__.return_value
+    mock_login_response.status = 200
+    mock_login_response.text = AsyncMock(return_value="xxx xxx xxx")
 
     mock_login_response = mock_client_instance.post.return_value.__aenter__.return_value
     mock_login_response.status = 200
@@ -457,7 +469,7 @@ async def test_api_get_elements_data_empty_names(mock_aiohttp_client, hass):
             },
         ],
     }
-    mock_client_instance.get.assert_called_once_with(
+    mock_client_instance.get.assert_called_with(
         "https://www.csnetmanager.com/data/elements", headers=ANY, cookies=ANY
     )
 
@@ -487,57 +499,3 @@ async def test_api_close_session(mock_aiohttp_client, hass):
 
     await api.close()
     mock_client_instance.close.assert_called_once()
-
-
-# @pytest.mark.asyncio
-# async def test_set_water_heater_mode(mock_aiohttp_client, hass):
-#     """Test setting the water heater mode."""
-#     mock_client_instance = mock_aiohttp_client.return_value
-
-#     # Configuration de la réponse simulée
-#     mock_response = mock_client_instance.post.return_value.__aenter__.return_value
-#     mock_response.status = 200
-#     mock_response.text = AsyncMock(return_value="OK")
-
-#     # Initialisation de l'API
-#     api = CSNetHomeAPI(hass, "user", "pass")
-#     api._session = mock_client_instance
-#     api.base_url = "https://www.csnetmanager.com"
-
-#     # Appel de la méthode à tester
-#     result = await api.set_water_heater_mode(zone_id=1, parent_id=1234, preset_mode="performance")
-
-#     # Vérifications
-#     assert result is True
-#     mock_client_instance.post.assert_called_once_with(
-#         f"{api.base_url}/data/indoor/heat_setting",
-#         headers=ANY,
-#         cookies=ANY,
-#         data={
-#             "orderStatus": "PENDING",
-#             "indoorId": 1234,
-#             "_csrf": "4ff26127-a1db-4555-aba2-0c713dda6c0e",
-#             "boostDHW": 1,
-#             "runStopDHW": 1
-#         }
-#     )
-#     mock_response.raise_for_status.assert_called_once()
-
-# @pytest.mark.asyncio
-# async def test_set_water_heater_mode_failure(mock_aiohttp_client, hass):
-# """Test failure in setting the water heater mode."""
-# mock_client_instance = mock_aiohttp_client.return_value
-
-# # Simuler une exception lors de l'appel API
-# mock_client_instance.post.side_effect = aiohttp.ClientError("Connection error")
-
-# # Initialisation de l'API
-# api = CSNetHomeAPI(hass, "user", "pass")
-# api._session = mock_client_instance
-# api.base_url = "https://www.csnetmanager.com"
-
-# # Appel de la méthode à tester
-# result = await api.set_water_heater_mode(zone_id=1, parent_id=1234, preset_mode="eco")
-
-# # Vérifications
-# assert result is False
