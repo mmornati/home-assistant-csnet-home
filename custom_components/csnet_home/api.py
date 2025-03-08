@@ -163,7 +163,7 @@ class CSNetHomeAPI:
             return element.get("settingTemperature") * 10
         else:
             return element.get("settingTemperature")
-    
+
     async def async_set_temperature(self, zone_id, parent_id, **kwargs):
         """Set the target temperature for a room."""
         settings_url = f"{self.base_url}{HEAT_SETTINGS_PATH}"
@@ -180,15 +180,17 @@ class CSNetHomeAPI:
         data = {
             "orderStatus": "PENDING",
             "indoorId": parent_id,
-            "_csrf": "9d63b828-f229-402f-899c-19dc40b5e447",
+            "_csrf": "be186598-c4d0-4d16-80f0-dc2ab35aad23",
         }
         if zone_id == 3:
             data["settingTempDHW"] = str(int(temperature))
+        elif zone_id == 5:
+            data["fixTempHeatC1"] = str(int(temperature))
         else:
             data[f"settingTempRoomZ{zone_id}"] = str(int(temperature * 10))
 
         cookies = {
-            "XSRF-TOKEN": "9d63b828-f229-402f-899c-19dc40b5e447",
+            "XSRF-TOKEN": "be186598-c4d0-4d16-80f0-dc2ab35aad23",
             "acceptedCookies": "yes",
         }
 

@@ -53,7 +53,7 @@ class CSNetHomeClimate(ClimateEntity):
         self._attr_min_temp = HEATING_MIN_TEMPERATURE
         self._attr_max_temp = HEATING_MAX_TEMPERATURE
         self._attr_temperature_unit = UnitOfTemperature.CELSIUS
-        self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
+        self._attr_hvac_modes = [HVACMode.AUTO, HVACMode.OFF, HVACMode.HEAT, HVACMode.COOL]
         self._attr_preset_modes = ["comfort", "eco"]
         if self._sensor_data["ecocomfort"] and self._sensor_data["ecocomfort"] == 0:
             self._attr_preset_mode = "eco"
@@ -77,7 +77,11 @@ class CSNetHomeClimate(ClimateEntity):
         # Operation mode can be COOL, HEAT, AUTO, OFF
         if self._sensor_data["on_off"] & self._sensor_data["on_off"] == 0:
             return "off"
-        return "heat"
+        elif self._sensor_data["mode"] & self._sensor_data["mode"] == 0:
+            return "cool"
+        elif self._sensor_data["mode"] & self._sensor_data["mode"] == 1:
+            return "heat"
+        return "auto"
 
     @property
     def preset_mode(self):
