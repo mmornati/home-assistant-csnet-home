@@ -8,7 +8,7 @@ jobs:
   update_version_and_create_zip:
     permissions:
       id-token: write
-      contents: read
+      contents: write
       repository-projects: write
     runs-on: ubuntu-latest
     steps:
