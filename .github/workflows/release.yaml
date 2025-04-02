@@ -8,7 +8,7 @@ jobs:
   update_version_and_create_zip:
     permissions:
       id-token: write
-      contents: read
+      contents: write
       repository-projects: write
     runs-on: ubuntu-latest
     steps:
@@ -42,7 +42,7 @@ jobs:
           git config --global user.name 'Github Actions'
           git config --global user.email 'mmornati@users.noreply.github.com'
           git tag -f ${{ github.ref_name }}
-          git push -f origin ${{ github.ref_name }}
+          git push -f -f https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/mmornati/home-assistant-csnet-home.git ${{ github.ref_name }}
 
       - name: Create Zip
         uses: thedoctor0/zip-release@0.7.6
