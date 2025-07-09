@@ -160,7 +160,7 @@ class CSNetHomeAPI:
                                 "parent_id": element.get("parentId"),
                                 "room_id": element.get("roomId"),
                                 "operation_status": element.get("operationStatus"),
-                                "mode": element.get("mode"),
+                                "mode": element.get("mode"), # 0 = cool, 1 = heat, 2 = auto
                                 "real_mode": element.get("realMode"),
                                 "on_off": element.get("onOff"),  # 0 = Off, 1 = On
                                 "timer_running": element.get("timerRunning"),
@@ -197,7 +197,7 @@ class CSNetHomeAPI:
         else:
             return element.get("settingTemperature")
 
-    async def async_set_temperature(self, zone_id, parent_id, **kwargs):
+    async def async_set_temperature(self, zone_id, parent_id, mode, **kwargs):
         """Set the target temperature for a room."""
         settings_url = f"{self.base_url}{HEAT_SETTINGS_PATH}"
 
@@ -218,7 +218,10 @@ class CSNetHomeAPI:
         if zone_id == 3:
             data["settingTempDHW"] = str(int(temperature))
         elif zone_id == 5:
-            data["fixTempHeatC1"] = str(int(temperature))
+            if mode == 0:
+                data["fixTempCoolC1"] = str(int(temperature))
+            else:
+                data["fixTempHeatC1"] = str(int(temperature))
         else:
             data[f"settingTempRoomZ{zone_id}"] = str(int(temperature * 10))
 

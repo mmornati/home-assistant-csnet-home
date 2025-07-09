@@ -130,6 +130,7 @@ class CSNetHomeClimate(ClimateEntity):
         response = await cloud_api.async_set_temperature(
             self._sensor_data["zone_id"],
             self._sensor_data["parent_id"],
+            self._sensor_data["mode"],
             temperature=temperature,
         )
         if response:
