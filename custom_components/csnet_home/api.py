@@ -285,7 +285,7 @@ class CSNetHomeAPI:
         """Set the target temperature for a room."""
         settings_url = f"{self.base_url}{HEAT_SETTINGS_PATH}"
 
-        status = 1 if hvac_mode == HVACMode.HEAT else 0
+        status = 1 if hvac_mode == HVACMode.HEAT or hvac_mode == HVACMode.COOL or hvac_mode == HVACMode.AUTO else 0
 
         headers = COMMON_API_HEADERS | {
             "accept": "*/*",

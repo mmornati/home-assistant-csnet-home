@@ -143,7 +143,7 @@ class CSNetHomeClimate(ClimateEntity):
             self._sensor_data["zone_id"], self._sensor_data["parent_id"], hvac_mode
         )
         if response:
-            self._sensor_data["on_off"] = 1 if hvac_mode == HVACMode.HEAT else 0
+            self._sensor_data["on_off"] = 1 if hvac_mode == HVACMode.HEAT or hvac_mode == HVACMode.COOL or hvac_mode == HVACMode.AUTO else 0
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
         """Set new preset mode."""
