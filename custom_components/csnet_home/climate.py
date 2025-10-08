@@ -139,11 +139,11 @@ class CSNetHomeClimate(ClimateEntity):
     async def async_set_hvac_mode(self, hvac_mode: HVACMode):
         """Set new target hvac mode."""
         cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
-        response = await cloud_api.async_on_off(
+        response = await cloud_api.async_set_hvac_mode(
             self._sensor_data["zone_id"], self._sensor_data["parent_id"], hvac_mode
         )
-        if response:
-            self._sensor_data["on_off"] = 1 if hvac_mode == HVACMode.HEAT or hvac_mode == HVACMode.COOL or hvac_mode == HVACMode.AUTO else 0
+        #if response:
+        #    self._sensor_data["on_off"] = 1 if hvac_mode == HVACMode.HEAT else 0
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
         """Set new preset mode."""
