@@ -302,13 +302,13 @@ class CSNetHomeAPI:
 
         if hvac_mode_lower == "heat":
             data["mode"] = "1"
-            data["runStopC1"] = "1"
+            data[f"runStopC{zone_id}"] = "1"
         elif hvac_mode_lower == "cool":
             data["mode"] = "0"
-            data["runStopC1"] = "1"
+            data[f"runStopC{zone_id}"] = "1"
         elif hvac_mode_lower == "off":
             # only stop — do not send "mode" to preserve last setting
-            data["runStopC1"] = "0"
+            data[f"runStopC{zone_id}"] = "0"
         else:
             _LOGGER.warning("Unsupported hvac_mode=%s ignored", hvac_mode)
             return True
