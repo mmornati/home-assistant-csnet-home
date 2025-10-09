@@ -281,11 +281,9 @@ class CSNetHomeAPI:
             )
             return False
 
-    async def async_on_off(self, zone_id, parent_id, hvac_mode):
-        """Set the target temperature for a room."""
+    async def async_set_hvac_mode(self, zone_id, parent_id, hvac_mode: str):
+        """Set HVAC mode: HEAT, COOL, or OFF."""
         settings_url = f"{self.base_url}{HEAT_SETTINGS_PATH}"
-
-        status = 1 if hvac_mode == HVACMode.HEAT else 0
 
         headers = COMMON_API_HEADERS | {
             "accept": "*/*",
@@ -294,12 +292,26 @@ class CSNetHomeAPI:
             "origin": self.base_url,
         }
 
+        # Mapping from HA mode to CSNet parameters
+        hvac_mode_lower = hvac_mode.lower()
         data = {
             "orderStatus": "PENDING",
-            f"runStopC{zone_id}Air": status,
             "indoorId": parent_id,
             "_csrf": self.xsrf_token,
         }
+
+        if hvac_mode_lower == "heat":
+            data["mode"] = "1"
+            data[f"runStopC{zone_id}"] = "1"
+        elif hvac_mode_lower == "cool":
+            data["mode"] = "0"
+            data[f"runStopC{zone_id}"] = "1"
+        elif hvac_mode_lower == "off":
+            # only stop — do not send "mode" to preserve last setting
+            data[f"runStopC{zone_id}"] = "0"
+        else:
+            _LOGGER.warning("Unsupported hvac_mode=%s ignored", hvac_mode)
+            return True
 
         cookies = {
             "XSRF-TOKEN": self.xsrf_token,
@@ -312,11 +324,14 @@ class CSNetHomeAPI:
                     settings_url, headers=headers, cookies=cookies, data=data
                 ) as response:
                     response.raise_for_status()
-                    _LOGGER.debug("Changing status %s for %s", status, zone_id)
+                    _LOGGER.debug(
+                        "Set hvac_mode=%s with payload=%s", hvac_mode, data
+                    )
                     return True
         except (aiohttp.ClientError, asyncio.TimeoutError) as err:
-            _LOGGER.error("Error setting temperature for %s: %s", zone_id, err)
+            _LOGGER.error("Error setting hvac_mode=%s: %s", hvac_mode, err)
             return False
+
 
     async def set_preset_modes(self, zone_id, parent_id, preset_mode):
         """Set the eco/comfort mode for a zone."""
