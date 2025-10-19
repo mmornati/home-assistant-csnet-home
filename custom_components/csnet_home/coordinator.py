@@ -21,6 +21,7 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         self.entry_id = entry_id
         self.update_interval = timedelta(seconds=update_interval)
         self._device_data = {"sensors": [], "common_data": {}}
+        self._last_alarm_codes: dict[str, int] = {}
         super().__init__(
             hass,
             _LOGGER,
@@ -44,6 +45,43 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         await cloud_api.load_translations()
         device_data = await cloud_api.async_get_elements_data()
         self._device_data = device_data
+
+        # Raise notification if new alarm codes appear
+        try:
+            for sensor in self._device_data.get("sensors", []):
+                key = f"{sensor.get('device_id')}-{sensor.get('room_id')}-{sensor.get('zone_id')}"
+                alarm_code = sensor.get("alarm_code")
+                if alarm_code is None or alarm_code == 0:
+                    # clear last stored to allow future notifications
+                    self._last_alarm_codes.pop(key, None)
+                    continue
+
+                prev_code = self._last_alarm_codes.get(key)
+                if prev_code != alarm_code:
+                    # store and notify
+                    self._last_alarm_codes[key] = alarm_code
+                    title = "Hitachi Heat Pump Alarm"
+                    message_parts = [
+                        f"Device: {sensor.get('device_name')} | Room: {sensor.get('room_name')}",
+                        f"Code: {alarm_code}",
+                    ]
+                    alarm_msg = sensor.get("alarm_message")
+                    if alarm_msg:
+                        message_parts.append(f"Message: {alarm_msg}")
+                    message = "\n".join(message_parts)
+                    await self.hass.services.async_call(
+                        "persistent_notification",
+                        "create",
+                        {
+                            "title": title,
+                            "message": message,
+                            "notification_id": f"csnet_home_alarm_{key}",
+                        },
+                        blocking=False,
+                    )
+        except Exception as exc:  # pragma: no cover - do not fail updates on notify
+            _LOGGER.debug("Alarm notification handling error: %s", exc)
+
         return self._device_data
 
     def get_sensors_data(self):
