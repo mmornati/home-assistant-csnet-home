@@ -23,6 +23,20 @@ async def test_api_initialization(hass):
     assert api.session is None
 
 
+def test_get_current_temperature_scaling(hass):
+    """Scale or return settingTemperature according to elementType."""
+    api = CSNetHomeAPI(hass, "u", "p")
+    # type 5 multiplies by 10
+    assert (
+        api.get_current_temperature({"elementType": 5, "settingTemperature": 25}) == 250
+    )
+    # other types return raw value
+    assert (
+        api.get_current_temperature({"elementType": 1, "settingTemperature": 19.5})
+        == 19.5
+    )
+
+
 @pytest.mark.asyncio
 async def test_login_success(mock_aiohttp_client, hass):
     """Test a successful get_data call."""

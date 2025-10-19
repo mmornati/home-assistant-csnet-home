@@ -80,6 +80,8 @@ def test_preset_mode(hass):
     """Map ecocomfort 0->eco and 1->comfort."""
     assert build_entity(hass, ecocomfort=0).preset_mode == "eco"
     assert build_entity(hass, ecocomfort=1).preset_mode == "comfort"
+    # default path for unknown values
+    assert build_entity(hass, ecocomfort=-1).preset_mode == "comfort"
 
 
 def test_hvac_action_heat_and_cool(hass):
