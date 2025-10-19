@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import time
 
 import aiohttp
 import async_timeout
@@ -302,6 +303,8 @@ class CSNetHomeAPI:
         # Mapping from HA mode to CSNet parameters
         hvac_mode_lower = hvac_mode.lower()
         data = {
+            "id": f"{parent_id}{zone_id}",  # device id + zone id
+            "updatedOn": str(int(time.time() * 1000)),  # current timestamp in ms
             "orderStatus": "PENDING",
             "indoorId": parent_id,
             "_csrf": self.xsrf_token,
@@ -310,12 +313,15 @@ class CSNetHomeAPI:
         if hvac_mode_lower == "heat":
             data["mode"] = "1"
             data[f"runStopC{zone_id}"] = "1"
+            data[f"runStopC{zone_id}Air"] = "1"
         elif hvac_mode_lower == "cool":
             data["mode"] = "0"
             data[f"runStopC{zone_id}"] = "1"
+            data[f"runStopC{zone_id}Air"] = "1"
         elif hvac_mode_lower == "off":
             # only stop — do not send "mode" to preserve last setting
             data[f"runStopC{zone_id}"] = "0"
+            data[f"runStopC{zone_id}Air"] = "0"
         else:
             _LOGGER.warning("Unsupported hvac_mode=%s ignored", hvac_mode)
             return True
@@ -330,8 +336,23 @@ class CSNetHomeAPI:
                 async with self.session.post(
                     settings_url, headers=headers, cookies=cookies, data=data
                 ) as response:
+                    response_text = await response.text()
+                    _LOGGER.debug(
+                        "Set hvac_mode=%s with payload=%s, status=%s, response=%s",
+                        hvac_mode,
+                        data,
+                        response.status,
+                        response_text,
+                    )
+                    if response.status != 200:
+                        _LOGGER.warning(
+                            "HTTP %s for hvac_mode=%s: %s",
+                            response.status,
+                            hvac_mode,
+                            response_text,
+                        )
+                        return False
                     response.raise_for_status()
-                    _LOGGER.debug("Set hvac_mode=%s with payload=%s", hvac_mode, data)
                     return True
         except (aiohttp.ClientError, asyncio.TimeoutError) as err:
             _LOGGER.error("Error setting hvac_mode=%s: %s", hvac_mode, err)
@@ -349,6 +370,8 @@ class CSNetHomeAPI:
         }
 
         data = {
+            "id": f"{parent_id}{zone_id}",  # device id + zone id
+            "updatedOn": str(int(time.time() * 1000)),  # current timestamp in ms
             "orderStatus": "PENDING",
             "indoorId": parent_id,
             "_csrf": self.xsrf_token,
@@ -368,8 +391,24 @@ class CSNetHomeAPI:
                 async with self.session.post(
                     settings_url, headers=headers, cookies=cookies, data=data
                 ) as response:
+                    response_text = await response.text()
+                    _LOGGER.debug(
+                        "Set preset_mode=%s for zone=%s with payload=%s, status=%s, response=%s",
+                        preset_mode,
+                        zone_id,
+                        data,
+                        response.status,
+                        response_text,
+                    )
+                    if response.status != 200:
+                        _LOGGER.warning(
+                            "HTTP %s for preset_mode=%s: %s",
+                            response.status,
+                            preset_mode,
+                            response_text,
+                        )
+                        return False
                     response.raise_for_status()
-                    _LOGGER.debug("Set preset_mode to %s for %s", preset_mode, zone_id)
                     return True
         except (aiohttp.ClientError, asyncio.TimeoutError) as err:
             _LOGGER.error("Error setting preset_mode for %s: %s", zone_id, err)
