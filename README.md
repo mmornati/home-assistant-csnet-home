@@ -75,6 +75,28 @@ Then you will be asked for your login credentials and is everything is OK with t
 
 If a control has no effect, open your browser DevTools on the CSNet web app and confirm the same action works there; report mismatches as issues with a snippet from the `elements` response (see below).
 
+### Install a release ZIP locally (official release)
+
+1. Download `hass-custom-csnet-home.zip` from the latest release page.
+2. Stop Home Assistant.
+3. Extract the ZIP contents into `YOUR_HASS_CONFIG_DIRECTORY/custom_components/csnet_home`.
+   - The directory structure should be: `custom_components/csnet_home/__init__.py`, `api.py`, `manifest.json`, etc.
+4. Start Home Assistant and reload the integration (or restart HA).
+
+### Install a preview ZIP from a Pull Request (PR)
+
+Each PR creates a downloadable preview ZIP as an Actions artifact.
+
+1. Open the PR and find the bot comment with a link to the workflow run.
+2. Download the artifact named `csnet_home-pr-preview`.
+3. Stop Home Assistant.
+4. Extract the ZIP contents into `YOUR_HASS_CONFIG_DIRECTORY/custom_components/csnet_home` (overwrite existing files).
+5. Start Home Assistant and reload the integration (or restart HA).
+
+Notes
+- If you installed via HACS, disable automatic updates while testing a preview ZIP to avoid overwrites.
+- After testing, you can restore by re-installing from HACS or re-extracting the official release ZIP.
+
 ## Is not working for me, what to do?
 I was able to test the application only with my configuration: 1 heater with 2 zones. Hitachi is not providing APIs for this part and I just inspect how the website is working and what calls are done to retrieve the data and execute the base operations.
 This mainly means that I'm not sure with different device or configuration that the information are returned in the same way.
