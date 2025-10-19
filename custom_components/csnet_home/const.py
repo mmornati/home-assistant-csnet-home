@@ -20,3 +20,11 @@ WATER_HEATER_MIN_TEMPERATURE = 30
 
 HEATING_MAX_TEMPERATURE = 35
 HEATING_MIN_TEMPERATURE = 8
+
+# Localization
+CONF_LANGUAGE = "language"
+DEFAULT_LANGUAGE = "en"
+LANGUAGE_FILES = {
+    "en": "english.json",
+    "fr": "french.json",
+}

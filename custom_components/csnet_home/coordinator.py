@@ -40,6 +40,8 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
             _LOGGER.error("No CloudServiceAPI instance found!")
             return
 
+        # ensure translations are loaded before elements to enrich alarm messages
+        await cloud_api.load_translations()
         device_data = await cloud_api.async_get_elements_data()
         self._device_data = device_data
         return self._device_data

@@ -8,7 +8,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceEntry
 
 from custom_components.csnet_home.api import CSNetHomeAPI
-from custom_components.csnet_home.const import DOMAIN
+from custom_components.csnet_home.const import DOMAIN, CONF_LANGUAGE
 from custom_components.csnet_home.coordinator import CSNetHomeCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -34,6 +34,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     # Initialize the CloudServiceAPI with credentials from config
     api = CSNetHomeAPI(hass, username, password)
+    # store preferred language for translations
+    api.preferred_language = entry.data.get(CONF_LANGUAGE)
 
     _LOGGER.debug("Starting CSNet Home sensor setup")
     coordinator = CSNetHomeCoordinator(

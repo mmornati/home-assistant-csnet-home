@@ -16,6 +16,7 @@ from custom_components.csnet_home.const import (
     ELEMENTS_PATH,
     HEAT_SETTINGS_PATH,
     LOGIN_PATH,
+    LANGUAGE_FILES,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -36,6 +37,7 @@ class CSNetHomeAPI:
         self.cookies = None
         self.logged_in = False
         self.xsrf_token = None
+        self.translations = {}
 
     async def get_xsrf_token(self):
         """Get the XSRF token from the cloud service."""
@@ -166,6 +168,9 @@ class CSNetHomeAPI:
                                 "on_off": element.get("onOff"),  # 0 = Off, 1 = On
                                 "timer_running": element.get("timerRunning"),
                                 "alarm_code": element.get("alarmCode"),
+                                "alarm_message": self.translate_alarm(
+                                    element.get("alarmCode")
+                                ),
                                 "c1_demand": element.get("c1Demand"),
                                 "c2_demand": element.get("c2Demand"),
                                 "ecocomfort": element.get(
@@ -483,4 +488,50 @@ class CSNetHomeAPI:
                     "Found cookie %s with value %s", cookie_name, cookie.value
                 )
                 return cookie.value
+        return None
+
+    async def load_translations(self):
+        """Load translations dictionaries for alarm messages (lazy)."""
+        if self.translations:
+            return
+        # load preferred language first, then fallback
+        endpoints = []
+        preferred = getattr(self, "preferred_language", None)
+        if preferred and preferred in LANGUAGE_FILES:
+            endpoints.append(LANGUAGE_FILES[preferred])
+        # ensure both are loaded to maximize hit rate
+        for key, file in LANGUAGE_FILES.items():
+            if file not in endpoints:
+                _LOGGER.debug("Adding language file for %s", key)
+                endpoints.append(file)
+        headers = COMMON_API_HEADERS | {
+            "accept": "*/*",
+            "x-requested-with": "XMLHttpRequest",
+        }
+        for ep in endpoints:
+            url = f"{self.base_url}/translations/{ep}"
+            try:
+                async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+                    async with self.session.get(url, headers=headers) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            # merge/overwrite keeping last language wins for same key
+                            self.translations.update(data or {})
+            except Exception as e:
+                _LOGGER.debug("Translation load failed for %s: %s", ep, e)
+
+    def translate_alarm(self, code):
+        """Return localized alarm message for a numeric code if available."""
+        if not code:
+            return None
+        # Keys observed on website are like 'alarm_XX' or 'alarm_XXX'
+        # Provide multiple candidates; first match wins
+        key_candidates = [
+            f"alarm_{code}",
+            f"alarm_{int(code):02d}",
+            f"alarm_{int(code):03d}",
+        ]
+        for key in key_candidates:
+            if key in self.translations:
+                return self.translations[key]
         return None
