@@ -60,7 +60,7 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
                 if prev_code != alarm_code:
                     # store and notify
                     self._last_alarm_codes[key] = alarm_code
-                    title = "Hitachi Heat Pump Alarm"
+                    title = "Hitachi Device Alarm"
                     message_parts = [
                         f"Device: {sensor.get('device_name')} | Room: {sensor.get('room_name')}",
                         f"Code: {alarm_code}",
