@@ -7,7 +7,6 @@ import logging
 import aiohttp
 import async_timeout
 
-from homeassistant.components.climate import HVACMode
 from homeassistant.core import HomeAssistant
 
 from custom_components.csnet_home.const import (
@@ -160,7 +159,9 @@ class CSNetHomeAPI:
                                 "parent_id": element.get("parentId"),
                                 "room_id": element.get("roomId"),
                                 "operation_status": element.get("operationStatus"),
-                                "mode": element.get("mode"), # 0 = cool, 1 = heat, 2 = auto
+                                "mode": element.get(
+                                    "mode"
+                                ),  # 0 = cool, 1 = heat, 2 = auto
                                 "real_mode": element.get("realMode"),
                                 "on_off": element.get("onOff"),  # 0 = Off, 1 = On
                                 "timer_running": element.get("timerRunning"),
@@ -174,7 +175,9 @@ class CSNetHomeAPI:
                                 "current_temperature": element.get(
                                     "currentTemperature"
                                 ),
-                                "setting_temperature": self.get_current_temperature(element),
+                                "setting_temperature": self.get_current_temperature(
+                                    element
+                                ),
                                 "zone_id": element.get("elementType"),
                             }
                             sensors.append(sensor)
@@ -189,13 +192,17 @@ class CSNetHomeAPI:
             _LOGGER.error("Error during sensor data retrieval: %s", e)
             self.logged_in = False
             return None
-    
+
     def get_current_temperature(self, element):
+        """Return target/setting temperature normalized per element type.
+
+        For elementType 5 the server encodes temperature in whole degrees
+        but expects a value multiplied by 10; other types use raw value.
+        """
         etype = element.get("elementType")
         if etype == 5:
             return element.get("settingTemperature") * 10
-        else:
-            return element.get("settingTemperature")
+        return element.get("settingTemperature")
 
     async def async_set_temperature(self, zone_id, parent_id, mode, **kwargs):
         """Set the target temperature for a room."""
@@ -324,14 +331,11 @@ class CSNetHomeAPI:
                     settings_url, headers=headers, cookies=cookies, data=data
                 ) as response:
                     response.raise_for_status()
-                    _LOGGER.debug(
-                        "Set hvac_mode=%s with payload=%s", hvac_mode, data
-                    )
+                    _LOGGER.debug("Set hvac_mode=%s with payload=%s", hvac_mode, data)
                     return True
         except (aiohttp.ClientError, asyncio.TimeoutError) as err:
             _LOGGER.error("Error setting hvac_mode=%s: %s", hvac_mode, err)
             return False
-
 
     async def set_preset_modes(self, zone_id, parent_id, preset_mode):
         """Set the eco/comfort mode for a zone."""

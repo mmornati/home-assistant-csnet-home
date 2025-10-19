@@ -12,6 +12,20 @@ CSNet Home to control Hitachi heaters using the atw-iot-01 module
 Has hitachi is [explaining](https://device.report/manual/12211094) the ATW-IOT-01 device is now replacing the old version going through Hi-Kumo. This is blocking any way to recover the Hitachi devices data and control them.
 This integration is making this possible connecting directly to the "Cloud" application.
 
+## Features
+
+- Climate entities per zone with:
+  - HVAC modes: off, heat, cool
+  - Presets: comfort, eco (mapped from `ecocomfort`)
+  - Target temperature control
+  - On/Off support
+  - Action reporting: heating, cooling, idle
+  - Extra attributes from the elements endpoint: `real_mode`, `operation_status`, `timer_running`, `alarm_code`, `c1_demand`, `c2_demand`, `doingBoost`
+- Water heater entity (DHW) with temperature and modes (off/eco/performance)
+- Basic sensors for current/target temperatures and state fields
+
+Notes about modes/presets mapping are being refined based on community findings in the discussion: [Add new sensors getting from all remaining device data #21](https://github.com/mmornati/home-assistant-csnet-home/discussions/21).
+
 ## Installation
 
 ### Option 1: HACS
@@ -43,6 +57,24 @@ Look for "Hitachi" integration and if everything went well you should find this 
 
 Then you will be asked for your login credentials and is everything is OK with the installation and your configuration, you will have new entities in Home Assistant.
 
+### Quick start checklist
+
+1. Install the integration (HACS or Manual)
+2. Restart Home Assistant
+3. Add the integration from Settings → Devices & Services → Add Integration → "Hitachi"
+4. Enter your CSNet credentials and submit
+5. Verify entities are created:
+   - Climate entities per zone: names follow `device_name-room_name`
+   - DHW water heater entity if available
+   - Temperature sensors
+6. Test controls:
+   - Change climate target temperature
+   - Toggle heat/cool/off
+   - Switch preset between comfort/eco
+   - For DHW, try eco/performance/off
+
+If a control has no effect, open your browser DevTools on the CSNet web app and confirm the same action works there; report mismatches as issues with a snippet from the `elements` response (see below).
+
 ## Is not working for me, what to do?
 I was able to test the application only with my configuration: 1 heater with 2 zones. Hitachi is not providing APIs for this part and I just inspect how the website is working and what calls are done to retrieve the data and execute the base operations.
 This mainly means that I'm not sure with different device or configuration that the information are returned in the same way.
@@ -58,6 +90,42 @@ The sensor/climate are created using the `/elements` call (I prefer not to name 
 
 > **WARNING**
 There are not critical information inside the response, but feel free to clean anything you want to keep private.
+
+Please also consider commenting in the discussion that tracks additional parameters and meanings: [#21](https://github.com/mmornati/home-assistant-csnet-home/discussions/21).
+
+## Development and testing locally
+
+This repo ships a basic test suite you can run without Home Assistant Supervisor:
+
+```bash
+python -m venv .venv
+. .venv/bin/activate
+pip install -r custom_components/csnet_home/requirements-dev.txt -r custom_components/csnet_home/requirements.txt
+pytest -q
+```
+
+What the tests cover:
+- API parsing of the `/data/elements` response
+- Coordinator update wiring
+- Climate entity behavior (hvac modes, presets, hvac_action, attributes, on/off, set temperature)
+
+If you want to validate end-to-end in your HA instance:
+- Install the integration (HACS or manual)
+- Enable debug logging in `configuration.yaml`:
+
+```yaml
+logger:
+  default: warning
+  logs:
+    custom_components.csnet_home: debug
+```
+
+- Restart HA and watch logs for `custom_components.csnet_home`
+
+## Known limitations
+
+- AUTO mode is not exposed as a settable HA hvac mode due to server-side semantics; the entity reports heating/cooling/idle actions based on temperatures and `mode`.
+- Some fields from the elements endpoint are device-specific and undocumented; we are progressively surfacing them. See [#21](https://github.com/mmornati/home-assistant-csnet-home/discussions/21).
 
 ## Contributing
 
