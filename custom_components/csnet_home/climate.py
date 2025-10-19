@@ -3,6 +3,7 @@
 import logging
 
 from homeassistant.components.climate import ClimateEntity, HVACMode, HVACAction
+from homeassistant.components.climate.const import ClimateEntityFeature
 from homeassistant.const import UnitOfTemperature
 from homeassistant.helpers.device_registry import DeviceInfo
 
@@ -53,17 +54,18 @@ class CSNetHomeClimate(ClimateEntity):
         self._attr_min_temp = HEATING_MIN_TEMPERATURE
         self._attr_max_temp = HEATING_MAX_TEMPERATURE
         self._attr_temperature_unit = UnitOfTemperature.CELSIUS
-        self._attr_hvac_modes = [HVACMode.AUTO, HVACMode.OFF, HVACMode.HEAT, HVACMode.COOL]
+        # Expose only modes we can reliably set via the API
+        self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT, HVACMode.COOL]
         self._attr_preset_modes = ["comfort", "eco"]
         if self._sensor_data["ecocomfort"] and self._sensor_data["ecocomfort"] == 0:
             self._attr_preset_mode = "eco"
         else:
             self._attr_preset_mode = "comfort"
         self._attr_supported_features = (
-            self.supported_features.PRESET_MODE
-            | self.supported_features.TARGET_TEMPERATURE
-            | self.supported_features.TURN_ON
-            | self.supported_features.TURN_OFF
+            ClimateEntityFeature.PRESET_MODE
+            | ClimateEntityFeature.TARGET_TEMPERATURE
+            | ClimateEntityFeature.TURN_ON
+            | ClimateEntityFeature.TURN_OFF
         )
 
     @property
@@ -74,20 +76,25 @@ class CSNetHomeClimate(ClimateEntity):
     @property
     def hvac_mode(self):
         """Return the current operation mode."""
-        # Operation mode can be COOL, HEAT, AUTO, OFF
-        if self._sensor_data["on_off"] & self._sensor_data["on_off"] == 0:
-            return "off"
-        elif self._sensor_data["mode"] & self._sensor_data["mode"] == 0:
-            return "cool"
-        elif self._sensor_data["mode"] & self._sensor_data["mode"] == 1:
-            return "heat"
-        return "auto"
+        # Operation mode can be COOL, HEAT, OFF (AUTO not reliably settable)
+        if self._sensor_data.get("on_off") == 0:
+            return HVACMode.OFF
+        mode = self._sensor_data.get("mode")
+        if mode == 0:
+            return HVACMode.COOL
+        if mode == 1:
+            return HVACMode.HEAT
+        return HVACMode.OFF
 
     @property
     def preset_mode(self):
         """Return the current preset mode."""
-        if self._sensor_data["ecocomfort"] & self._sensor_data["ecocomfort"] == 0:
+        eco_comfort = self._sensor_data.get("ecocomfort")
+        if eco_comfort == 0:
             return "eco"
+        if eco_comfort == 1:
+            return "comfort"
+        # If not available (-1) default to comfort
         return "comfort"
 
     @property
@@ -98,7 +105,7 @@ class CSNetHomeClimate(ClimateEntity):
     @property
     def unique_id(self) -> str:
         """Return unique id."""
-        return f"{DOMAIN}-climate-{self._sensor_data['room_name']}"
+        return f"{DOMAIN}-climate-{self._sensor_data['device_id']}-{self._sensor_data['room_name']}"
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -119,9 +126,25 @@ class CSNetHomeClimate(ClimateEntity):
     @property
     def hvac_action(self):
         """Return the current running HVAC action."""
+        # Prefer real operating mode if available
         if self.is_heating():
             return HVACAction.HEATING
+        if self.is_cooling():
+            return HVACAction.COOLING
         return HVACAction.IDLE
+
+    @property
+    def extra_state_attributes(self):
+        """Return additional attributes from elements API."""
+        return {
+            "real_mode": self._sensor_data.get("real_mode"),
+            "operation_status": self._sensor_data.get("operation_status"),
+            "timer_running": self._sensor_data.get("timer_running"),
+            "alarm_code": self._sensor_data.get("alarm_code"),
+            "c1_demand": self._sensor_data.get("c1_demand"),
+            "c2_demand": self._sensor_data.get("c2_demand"),
+            "doingBoost": self._sensor_data.get("doingBoost"),
+        }
 
     async def async_set_temperature(self, **kwargs):
         """Set the target temperature for a room."""
@@ -139,11 +162,25 @@ class CSNetHomeClimate(ClimateEntity):
     async def async_set_hvac_mode(self, hvac_mode: HVACMode):
         """Set new target hvac mode."""
         cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
-        response = await cloud_api.async_set_hvac_mode(
+        await cloud_api.async_set_hvac_mode(
             self._sensor_data["zone_id"], self._sensor_data["parent_id"], hvac_mode
         )
-        #if response:
+        # if response:
         #    self._sensor_data["on_off"] = 1 if hvac_mode == HVACMode.HEAT else 0
+
+    async def async_turn_on(self) -> None:
+        """Turn the climate device on (preserve current mode if possible)."""
+        desired_mode = self.hvac_mode
+        if desired_mode == HVACMode.OFF:
+            # fallback to last known mode or HEAT
+            desired_mode = (
+                HVACMode.HEAT if self._sensor_data.get("mode") != 0 else HVACMode.COOL
+            )
+        await self.async_set_hvac_mode(desired_mode)
+
+    async def async_turn_off(self) -> None:
+        """Turn the climate device off."""
+        await self.async_set_hvac_mode(HVACMode.OFF)
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
         """Set new preset mode."""
@@ -157,9 +194,19 @@ class CSNetHomeClimate(ClimateEntity):
     def is_heating(self):
         """Return true if the thermostat is currently heating."""
         return (
-            self._sensor_data["on_off"] == 1
-            and self._sensor_data["setting_temperature"]
-            > self._sensor_data["current_temperature"]
+            self._sensor_data.get("on_off") == 1
+            and self._sensor_data.get("mode") == 1
+            and self._sensor_data.get("setting_temperature")
+            > self._sensor_data.get("current_temperature")
+        )
+
+    def is_cooling(self):
+        """Return true if the thermostat is currently cooling."""
+        return (
+            self._sensor_data.get("on_off") == 1
+            and self._sensor_data.get("mode") == 0
+            and self._sensor_data.get("setting_temperature")
+            < self._sensor_data.get("current_temperature")
         )
 
     async def async_update(self):

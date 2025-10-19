@@ -32,6 +32,8 @@ repos:
           - --quiet
           - --format=custom
           - --configfile=tests/bandit.yaml
+        additional_dependencies:
+          - pbr==5.11.1
         files: ^(custom_components|tests)/.+\.py$
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.3.0

@@ -27,21 +27,57 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     sensors = []
     for sensor_data in coordinator.get_sensors_data():
-        common_data = coordinator.get_common_data()["device_status"][sensor_data["device_id"]]
+        common_data = coordinator.get_common_data()["device_status"][
+            sensor_data["device_id"]
+        ]
 
-        sensors.append(CSNetHomeSensor(coordinator, sensor_data, common_data, "current_temperature", "temperature", UnitOfTemperature.CELSIUS))
-        sensors.append(CSNetHomeSensor(coordinator, sensor_data, common_data, "setting_temperature", "temperature", UnitOfTemperature.CELSIUS))
-        sensors.append(CSNetHomeSensor(coordinator, sensor_data, common_data, "mode", "enum"))
-        sensors.append(CSNetHomeSensor(coordinator, sensor_data, common_data, "on_off", "enum"))
-        sensors.append(CSNetHomeSensor(coordinator, sensor_data, common_data, "doingBoost", "binary"))
-    
+        sensors.append(
+            CSNetHomeSensor(
+                coordinator,
+                sensor_data,
+                common_data,
+                "current_temperature",
+                "temperature",
+                UnitOfTemperature.CELSIUS,
+            )
+        )
+        sensors.append(
+            CSNetHomeSensor(
+                coordinator,
+                sensor_data,
+                common_data,
+                "setting_temperature",
+                "temperature",
+                UnitOfTemperature.CELSIUS,
+            )
+        )
+        sensors.append(
+            CSNetHomeSensor(coordinator, sensor_data, common_data, "mode", "enum")
+        )
+        sensors.append(
+            CSNetHomeSensor(coordinator, sensor_data, common_data, "on_off", "enum")
+        )
+        sensors.append(
+            CSNetHomeSensor(
+                coordinator, sensor_data, common_data, "doingBoost", "binary"
+            )
+        )
+
     async_add_entities(sensors)
 
 
 class CSNetHomeSensor(CoordinatorEntity, Entity):
     """Representation of a sensor from the CSNet Home integration."""
 
-    def __init__(self, coordinator: CSNetHomeCoordinator, sensor_data, common_data, key, device_class=None, unit=None):
+    def __init__(
+        self,
+        coordinator: CSNetHomeCoordinator,
+        sensor_data,
+        common_data,
+        key,
+        device_class=None,
+        unit=None,
+    ):
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._coordinator = coordinator
@@ -60,11 +96,10 @@ class CSNetHomeSensor(CoordinatorEntity, Entity):
         if self._key == "mode":
             if value == 0:
                 return HVACMode.COOL
-            elif value == 1:
+            if value == 1:
                 return HVACMode.HEAT
-            else:
-                return HVACMode.OFF
-        elif self._key == "on_off":
+            return HVACMode.OFF
+        if self._key == "on_off":
             return STATE_ON if value == 1 else STATE_OFF
         return value
 

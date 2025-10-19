@@ -8,3 +8,5 @@ pylint-strict-informational
 pytest-homeassistant-custom-component
 pytest-asyncio
 homeassistant
+bandit
+pbr
