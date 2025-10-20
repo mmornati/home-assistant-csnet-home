@@ -344,7 +344,7 @@ class CSNetHomeAPI:
 
         # For zone_id 5 (fixed temp circuit), use C1 in parameter names
         circuit_id = 1 if zone_id == 5 else zone_id
-        
+
         if hvac_mode_lower == "heat":
             data["mode"] = "1"
             data[f"runStopC{circuit_id}"] = "1"
