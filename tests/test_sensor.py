@@ -97,24 +97,30 @@ def test_installation_sensor():
     }
     common_data = {"name": "Hitachi Installation", "firmware": "1.0.0"}
 
-    # Mock installation devices data with correct structure
+    # Mock installation devices data with correct API response structure
     installation_data = {
-        "indoors": {
-            "heatingStatus": {
-                "pumpSpeed": 100,
-                "waterFlow": 39,  # Will be divided by 10
-                "waterInletTemp": 20,
-                "waterOutletTemp": 20,
-                "waterTempSetting": 23,
-                "waterPressure": 224,  # Will be divided by 50
-                "gasTemp": 20,
-                "liquidTemp": 20,
-                "defrosting": 1,  # 1 = on, 0 = off
-                "mixingValveOpening": 100,
-                "outdoorAmbientTemp": 14,
-                "outdoorAmbientAverageTemp": 15,
+        "data": [
+            {
+                "indoors": [
+                    {
+                        "heatingStatus": {
+                            "pumpSpeed": 100,
+                            "waterFlow": 39,  # Will be divided by 10
+                            "waterInletTemp": 20,
+                            "waterOutletTemp": 20,
+                            "waterTempSetting": 23,
+                            "waterPressure": 224,  # Will be divided by 50
+                            "gasTemp": 20,
+                            "liquidTemp": 20,
+                            "defrosting": 1,  # 1 = on, 0 = off
+                            "mixingValveOpening": 100,
+                            "outdoorAmbientTemp": 14,
+                            "outdoorAmbientAverageTemp": 15,
+                        }
+                    }
+                ]
             }
-        }
+        ]
     }
 
     coordinator = SimpleNamespace(
@@ -204,21 +210,27 @@ def test_installation_sensor_edge_cases():
 
     # Test with different data formats
     installation_data = {
-        "indoors": {
-            "heatingStatus": {
-                "pumpSpeed": 50,  # Will be converted to 0.5
-                "waterFlow": 25,  # Will be divided by 10 = 2.5
-                "waterInletTemp": 18,
-                "waterOutletTemp": 22,
-                "waterPressure": 160,  # Will be divided by 50 = 3.2
-                "defrosting": 0,  # 0 = off
-                "mixingValveOpening": 75,  # Will be converted to 0.75
-                "outdoorAmbientTemp": 12,
-                "outdoorAmbientAverageTemp": 13,
-                "gasTemp": 15,
-                "liquidTemp": 17,
+        "data": [
+            {
+                "indoors": [
+                    {
+                        "heatingStatus": {
+                            "pumpSpeed": 50,  # Will be converted to 0.5
+                            "waterFlow": 25,  # Will be divided by 10 = 2.5
+                            "waterInletTemp": 18,
+                            "waterOutletTemp": 22,
+                            "waterPressure": 160,  # Will be divided by 50 = 3.2
+                            "defrosting": 0,  # 0 = off
+                            "mixingValveOpening": 75,  # Will be converted to 0.75
+                            "outdoorAmbientTemp": 12,
+                            "outdoorAmbientAverageTemp": 13,
+                            "gasTemp": 15,
+                            "liquidTemp": 17,
+                        }
+                    }
+                ]
             }
-        }
+        ]
     }
 
     coordinator = SimpleNamespace(
@@ -337,14 +349,20 @@ def test_installation_sensor_nested_data():
 
     # Test with nested devices structure
     installation_data = {
-        "indoors": {
-            "heatingStatus": {
-                "pumpSpeed": 80,
-                "defrosting": 1,
-                "waterFlow": 30,
-                "waterPressure": 200,
+        "data": [
+            {
+                "indoors": [
+                    {
+                        "heatingStatus": {
+                            "pumpSpeed": 80,
+                            "defrosting": 1,
+                            "waterFlow": 30,
+                            "waterPressure": 200,
+                        }
+                    }
+                ]
             }
-        }
+        ]
     }
 
     coordinator = SimpleNamespace(
@@ -407,11 +425,17 @@ def test_installation_sensor_metadata():
 
     coordinator = SimpleNamespace(
         get_installation_devices_data=lambda: {
-            "indoors": {
-                "heatingStatus": {
-                    "pumpSpeed": 100,
+            "data": [
+                {
+                    "indoors": [
+                        {
+                            "heatingStatus": {
+                                "pumpSpeed": 100,
+                            }
+                        }
+                    ]
                 }
-            }
+            ]
         },
     )
 

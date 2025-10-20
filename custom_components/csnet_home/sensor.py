@@ -359,7 +359,7 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, Entity):
         possible_keys = key_mappings.get(self._key, [self._key])
         value = None
 
-        # Look in the indoors/heatingStatus structure
+        # Look in the correct API response structure: data[0].indoors[0].heatingStatus
         if isinstance(installation_data, dict):
             # First try direct access
             for possible_key in possible_keys:
@@ -367,16 +367,22 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, Entity):
                 if value is not None:
                     break
 
-            # If not found, try in indoors/heatingStatus structure
+            # If not found, try in data[0].indoors[0].heatingStatus structure
             if value is None:
-                indoors_data = installation_data.get("indoors", {})
-                if isinstance(indoors_data, dict):
-                    heating_status = indoors_data.get("heatingStatus", {})
-                    if isinstance(heating_status, dict):
-                        for possible_key in possible_keys:
-                            value = heating_status.get(possible_key)
-                            if value is not None:
-                                break
+                data_array = installation_data.get("data", [])
+                if isinstance(data_array, list) and len(data_array) > 0:
+                    first_device = data_array[0]
+                    if isinstance(first_device, dict):
+                        indoors_array = first_device.get("indoors", [])
+                        if isinstance(indoors_array, list) and len(indoors_array) > 0:
+                            first_indoors = indoors_array[0]
+                            if isinstance(first_indoors, dict):
+                                heating_status = first_indoors.get("heatingStatus", {})
+                                if isinstance(heating_status, dict):
+                                    for possible_key in possible_keys:
+                                        value = heating_status.get(possible_key)
+                                        if value is not None:
+                                            break
 
         # Handle special cases for different sensor types
         if self._key == "defrost":
