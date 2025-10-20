@@ -40,8 +40,23 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
             _LOGGER.error("No CloudServiceAPI instance found!")
             return
 
-        device_data = await cloud_api.async_get_elements_data()
-        self._device_data = device_data
+        # Fetch both elements data and installation devices data
+        elements_data = await cloud_api.async_get_elements_data()
+        installation_devices_data = (
+            await cloud_api.async_get_installation_devices_data()
+        )
+
+        if elements_data:
+            self._device_data = elements_data
+        else:
+            self._device_data = {"sensors": [], "common_data": {}}
+
+        # Add installation devices data to common_data
+        if installation_devices_data and self._device_data.get("common_data"):
+            self._device_data["common_data"][
+                "installation_devices"
+            ] = installation_devices_data
+
         return self._device_data
 
     def get_sensors_data(self):
@@ -53,3 +68,8 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         """Return common data shared between all sensors."""
 
         return self._device_data["common_data"]
+
+    def get_installation_devices_data(self):
+        """Return installation devices data."""
+
+        return self._device_data.get("common_data", {}).get("installation_devices", {})

@@ -6,7 +6,10 @@ from unittest.mock import MagicMock
 from homeassistant.components.climate.const import HVACMode
 from homeassistant.const import STATE_OFF, STATE_ON, UnitOfTemperature
 
-from custom_components.csnet_home.sensor import CSNetHomeSensor
+from custom_components.csnet_home.sensor import (
+    CSNetHomeSensor,
+    CSNetHomeInstallationSensor,
+)
 
 
 def build_context():
@@ -81,3 +84,80 @@ def test_handle_coordinator_update():
     sensor_data["setting_temperature"] = 21.0
     s._handle_coordinator_update()
     assert s.state == 21.0
+
+
+def test_installation_sensor():
+    """Test installation sensor functionality."""
+    device_data = {
+        "device_name": "Installation",
+        "device_id": "global",
+        "room_name": "Global",
+        "parent_id": "global",
+        "room_id": "global",
+    }
+    common_data = {"name": "Hitachi Installation", "firmware": "1.0.0"}
+
+    # Mock installation devices data
+    installation_data = {
+        "waterSpeed": 100,
+        "waterDebit": 3.9,
+        "inWaterTemperature": 20,
+        "outWaterTemperature": 20,
+        "setWaterTemperatureTTWO": 23,
+        "waterPressure": 4.48,
+        "outExchangerWaterTemperature": 20,
+        "defrost": True,
+        "mixValvePosition": 100,
+        "externalTemperature": 14,
+        "meanExternalTemperature": 15,
+        "workingElectricHeater": "Stopped",
+    }
+
+    coordinator = SimpleNamespace(
+        get_installation_devices_data=lambda: installation_data,
+    )
+
+    # Test water speed sensor
+    s = CSNetHomeInstallationSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "water_speed",
+        "water_speed",
+        "m/s",
+        "Water Speed",
+    )
+    assert s.state == 1.0  # 100% converted to 1.0
+    assert s.unit_of_measurement == "m/s"
+    assert s.name == "Installation Global Water Speed"
+
+    # Test water debit sensor
+    s = CSNetHomeInstallationSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "water_debit",
+        "water_debit",
+        "m³/h",
+        "Water Debit",
+    )
+    assert s.state == 3.9
+    assert s.unit_of_measurement == "m³/h"
+
+    # Test defrost sensor
+    s = CSNetHomeInstallationSensor(
+        coordinator, device_data, common_data, "defrost", "binary", None, "Defrost"
+    )
+    assert s.state == STATE_ON
+
+    # Test working electric heater sensor
+    s = CSNetHomeInstallationSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "working_electric_heater",
+        "enum",
+        None,
+        "Working Electric Heater",
+    )
+    assert s.state == "Stopped"
