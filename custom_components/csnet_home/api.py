@@ -15,6 +15,7 @@ from custom_components.csnet_home.const import (
     COMMON_API_HEADERS,
     DEFAULT_API_TIMEOUT,
     ELEMENTS_PATH,
+    INSTALLATION_DEVICES_PATH,
     HEAT_SETTINGS_PATH,
     LOGIN_PATH,
     LANGUAGE_FILES,
@@ -196,6 +197,37 @@ class CSNetHomeAPI:
                     return None
         except Exception as e:
             _LOGGER.error("Error during sensor data retrieval: %s", e)
+            self.logged_in = False
+            return None
+
+    async def async_get_installation_devices_data(self):
+        """Get installation devices data from the cloud service."""
+        installation_devices_url = (
+            f"{self.base_url}{INSTALLATION_DEVICES_PATH}?installationId=-1"
+        )
+
+        if not self.session or not self.logged_in:
+            _LOGGER.warning("No active session found.")
+            await self.async_login()
+
+        headers = COMMON_API_HEADERS | {
+            "accept": "application/json, text/javascript, */*; q=0.01",
+            "x-requested-with": "XMLHttpRequest",
+        }
+
+        try:
+            async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+                async with self.session.get(
+                    installation_devices_url, headers=headers, cookies=self.cookies
+                ) as response:
+                    data = await self.check_api_response(response)
+                    if data is not None:
+                        _LOGGER.debug("Installation devices data retrieved: %s", data)
+                        return data
+                    _LOGGER.error("Error in installation devices API response")
+                    return None
+        except Exception as e:
+            _LOGGER.error("Error during installation devices data retrieval: %s", e)
             self.logged_in = False
             return None
 

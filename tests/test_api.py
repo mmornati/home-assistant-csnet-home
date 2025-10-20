@@ -517,3 +517,135 @@ async def test_api_close_session(mock_aiohttp_client, hass):
 
     await api.close()
     mock_client_instance.close.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_api_get_installation_devices_data_success(mock_aiohttp_client, hass):
+    """Test a successful get installation devices data call."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    mock_login_response = mock_client_instance.post.return_value.__aenter__.return_value
+    mock_login_response.status = 200
+    mock_login_response.text = AsyncMock(return_value="xxx xxx xxx")
+
+    mock_response = mock_client_instance.get.return_value.__aenter__.return_value
+    mock_response.status = 200
+    mock_response.json = AsyncMock(
+        return_value={
+            "waterSpeed": 100,
+            "waterDebit": 3.9,
+            "inWaterTemperature": 20,
+            "outWaterTemperature": 20,
+            "setWaterTemperatureTTWO": 23,
+            "waterPressure": 4.48,
+            "outExchangerWaterTemperature": 20,
+            "defrost": True,
+            "mixValvePosition": 100,
+            "externalTemperature": 14,
+            "meanExternalTemperature": 15,
+            "workingElectricHeater": "Stopped",
+        }
+    )
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api._session = mock_client_instance
+    api.logged_in = True
+    api.cookies = {"test": "cookie"}
+
+    data = await api.async_get_installation_devices_data()
+
+    assert data == {
+        "waterSpeed": 100,
+        "waterDebit": 3.9,
+        "inWaterTemperature": 20,
+        "outWaterTemperature": 20,
+        "setWaterTemperatureTTWO": 23,
+        "waterPressure": 4.48,
+        "outExchangerWaterTemperature": 20,
+        "defrost": True,
+        "mixValvePosition": 100,
+        "externalTemperature": 14,
+        "meanExternalTemperature": 15,
+        "workingElectricHeater": "Stopped",
+    }
+    mock_client_instance.get.assert_called_with(
+        "https://www.csnetmanager.com/data/installationdevices?installationId=-1",
+        headers=ANY,
+        cookies=ANY,
+    )
+
+
+@pytest.mark.asyncio
+async def test_api_get_installation_devices_data_failure(mock_aiohttp_client, hass):
+    """Test installation devices data retrieval failure."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    mock_response = mock_client_instance.get.return_value.__aenter__.return_value
+    mock_response.status = 200
+    mock_response.json = AsyncMock(return_value=None)
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api._session = mock_client_instance
+    api.logged_in = True
+    api.cookies = {"test": "cookie"}
+
+    data = await api.async_get_installation_devices_data()
+
+    assert data is None
+
+
+@pytest.mark.asyncio
+async def test_api_get_installation_devices_data_exception(mock_aiohttp_client, hass):
+    """Test installation devices data retrieval with exception."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    # Mock the login process to succeed
+    mock_login_response = mock_client_instance.post.return_value.__aenter__.return_value
+    mock_login_response.status = 200
+    mock_login_response.text = AsyncMock(return_value="xxx xxx xxx")
+
+    # Mock the installation devices call to raise exception
+    def side_effect(*args, **kwargs):
+        url = args[0] if args else kwargs.get("url", "")
+        if "installationdevices" in url:
+            raise ConnectionError("Network error")
+        # For login calls, return a normal response
+        return mock_client_instance.get.return_value.__aenter__.return_value
+
+    mock_client_instance.get.side_effect = side_effect
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api._session = mock_client_instance
+    api.logged_in = False  # Start as not logged in
+
+    data = await api.async_get_installation_devices_data()
+
+    assert data is None
+    assert api.logged_in is False
+
+
+@pytest.mark.asyncio
+async def test_api_get_installation_devices_data_not_logged_in(
+    mock_aiohttp_client, hass
+):
+    """Test installation devices data retrieval when not logged in."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    mock_login_response = mock_client_instance.post.return_value.__aenter__.return_value
+    mock_login_response.status = 200
+    mock_login_response.text = AsyncMock(return_value="xxx xxx xxx")
+
+    mock_response = mock_client_instance.get.return_value.__aenter__.return_value
+    mock_response.status = 200
+    mock_response.json = AsyncMock(return_value={"test": "data"})
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api._session = mock_client_instance
+    api.logged_in = False
+
+    data = await api.async_get_installation_devices_data()
+
+    # Should call login first, then get the data
+    assert data == {"test": "data"}
+    mock_client_instance.post.assert_called()  # Login was called
+    mock_client_instance.get.assert_called()  # Data retrieval was called
