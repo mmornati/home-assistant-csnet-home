@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# Pre-commit hook that runs pre-commit and automatically stages any changes made by hooks
+
+echo "Running pre-commit hooks..."
+
+# Run pre-commit on staged files
+pre-commit run
+
+# Check if any files were modified by the hooks
+if ! git diff --quiet; then
+    echo "Files were modified by pre-commit hooks. Staging changes..."
+    git add -A
+    echo "Changes have been staged. Commit will continue."
+fi
+
+exit 0
