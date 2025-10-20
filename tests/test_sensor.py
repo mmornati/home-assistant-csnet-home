@@ -97,70 +97,98 @@ def test_installation_sensor():
     }
     common_data = {"name": "Hitachi Installation", "firmware": "1.0.0"}
 
-    # Mock installation devices data
+    # Mock installation devices data with correct structure
     installation_data = {
-        "waterSpeed": 100,
-        "waterDebit": 3.9,
-        "inWaterTemperature": 20,
-        "outWaterTemperature": 20,
-        "setWaterTemperatureTTWO": 23,
-        "waterPressure": 4.48,
-        "outExchangerWaterTemperature": 20,
-        "defrost": True,
-        "mixValvePosition": 100,
-        "externalTemperature": 14,
-        "meanExternalTemperature": 15,
-        "workingElectricHeater": "Stopped",
+        "indoors": {
+            "heatingStatus": {
+                "pumpSpeed": 100,
+                "waterFlow": 39,  # Will be divided by 10
+                "waterInletTemp": 20,
+                "waterOutletTemp": 20,
+                "waterTempSetting": 23,
+                "waterPressure": 224,  # Will be divided by 50
+                "gasTemp": 20,
+                "liquidTemp": 20,
+                "defrosting": 1,  # 1 = on, 0 = off
+                "mixingValveOpening": 100,
+                "outdoorAmbientTemp": 14,
+                "outdoorAmbientAverageTemp": 15,
+            }
+        }
     }
 
     coordinator = SimpleNamespace(
         get_installation_devices_data=lambda: installation_data,
     )
 
-    # Test water speed sensor
+    # Test pump speed sensor
     s = CSNetHomeInstallationSensor(
         coordinator,
         device_data,
         common_data,
-        "water_speed",
+        "pump_speed",
         "water_speed",
         "m/s",
-        "Water Speed",
+        "Pump Speed",
     )
     assert s.state == 1.0  # 100% converted to 1.0
     assert s.unit_of_measurement == "m/s"
-    assert s.name == "Installation Global Water Speed"
+    assert s.name == "Installation Global Pump Speed"
 
-    # Test water debit sensor
+    # Test water flow sensor
     s = CSNetHomeInstallationSensor(
         coordinator,
         device_data,
         common_data,
-        "water_debit",
+        "water_flow",
         "water_debit",
         "m³/h",
-        "Water Debit",
+        "Water Flow",
     )
-    assert s.state == 3.9
+    assert s.state == 3.9  # 39 / 10 = 3.9
     assert s.unit_of_measurement == "m³/h"
+
+    # Test water pressure sensor
+    s = CSNetHomeInstallationSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "water_pressure",
+        "pressure",
+        "bar",
+        "Water Pressure",
+    )
+    assert s.state == 4.48  # 224 / 50 = 4.48
 
     # Test defrost sensor
     s = CSNetHomeInstallationSensor(
         coordinator, device_data, common_data, "defrost", "binary", None, "Defrost"
     )
-    assert s.state == STATE_ON
+    assert s.state == STATE_ON  # defrosting = 1
 
-    # Test working electric heater sensor
+    # Test gas temperature sensor
     s = CSNetHomeInstallationSensor(
         coordinator,
         device_data,
         common_data,
-        "working_electric_heater",
-        "enum",
-        None,
-        "Working Electric Heater",
+        "gas_temperature",
+        "temperature",
+        "°C",
+        "Gas Temperature",
     )
-    assert s.state == "Stopped"
+    assert s.state == 20
+
+    # Test liquid temperature sensor
+    s = CSNetHomeInstallationSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "liquid_temperature",
+        "temperature",
+        "°C",
+        "Liquid Temperature",
+    )
+    assert s.state == 20
 
 
 def test_installation_sensor_edge_cases():
@@ -176,53 +204,70 @@ def test_installation_sensor_edge_cases():
 
     # Test with different data formats
     installation_data = {
-        "water_speed": 50,  # Different key name
-        "water_debit": 2.5,
-        "inlet_temp": 18,  # Different key name
-        "outlet_temp": 22,  # Different key name
-        "pressure": 3.2,  # Different key name
-        "defrost": False,
-        "valve_position": 75,  # Different key name
-        "outdoor_temp": 12,  # Different key name
-        "avg_outdoor_temp": 13,  # Different key name
-        "electric_heater_status": "Running",  # Different key name
+        "indoors": {
+            "heatingStatus": {
+                "pumpSpeed": 50,  # Will be converted to 0.5
+                "waterFlow": 25,  # Will be divided by 10 = 2.5
+                "waterInletTemp": 18,
+                "waterOutletTemp": 22,
+                "waterPressure": 160,  # Will be divided by 50 = 3.2
+                "defrosting": 0,  # 0 = off
+                "mixingValveOpening": 75,  # Will be converted to 0.75
+                "outdoorAmbientTemp": 12,
+                "outdoorAmbientAverageTemp": 13,
+                "gasTemp": 15,
+                "liquidTemp": 17,
+            }
+        }
     }
 
     coordinator = SimpleNamespace(
         get_installation_devices_data=lambda: installation_data,
     )
 
-    # Test water speed with different key name
+    # Test pump speed with conversion
     s = CSNetHomeInstallationSensor(
         coordinator,
         device_data,
         common_data,
-        "water_speed",
+        "pump_speed",
         "water_speed",
         "m/s",
-        "Water Speed",
+        "Pump Speed",
     )
     assert s.state == 0.5  # 50% converted to 0.5
 
-    # Test defrost with False value
+    # Test water flow with division
+    s = CSNetHomeInstallationSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "water_flow",
+        "water_debit",
+        "m³/h",
+        "Water Flow",
+    )
+    assert s.state == 2.5  # 25 / 10 = 2.5
+
+    # Test water pressure with division
+    s = CSNetHomeInstallationSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "water_pressure",
+        "pressure",
+        "bar",
+        "Water Pressure",
+    )
+    assert s.state == 3.2  # 160 / 50 = 3.2
+
+    # Test defrost with 0 value (off)
     s = CSNetHomeInstallationSensor(
         coordinator, device_data, common_data, "defrost", "binary", None, "Defrost"
     )
     assert s.state == STATE_OFF
 
-    # Test working electric heater with string value
-    s = CSNetHomeInstallationSensor(
-        coordinator,
-        device_data,
-        common_data,
-        "working_electric_heater",
-        "enum",
-        None,
-        "Working Electric Heater",
-    )
-    assert s.state == "Running"
-
-    # Test mix valve position with different key name
+    # Test mix valve position with conversion
     s = CSNetHomeInstallationSensor(
         coordinator,
         device_data,
@@ -292,28 +337,29 @@ def test_installation_sensor_nested_data():
 
     # Test with nested devices structure
     installation_data = {
-        "devices": [
-            {
-                "waterSpeed": 80,
-                "defrost": True,
-                "workingElectricHeater": "Running",
+        "indoors": {
+            "heatingStatus": {
+                "pumpSpeed": 80,
+                "defrosting": 1,
+                "waterFlow": 30,
+                "waterPressure": 200,
             }
-        ]
+        }
     }
 
     coordinator = SimpleNamespace(
         get_installation_devices_data=lambda: installation_data,
     )
 
-    # Test water speed from nested data
+    # Test pump speed from nested data
     s = CSNetHomeInstallationSensor(
         coordinator,
         device_data,
         common_data,
-        "water_speed",
+        "pump_speed",
         "water_speed",
         "m/s",
-        "Water Speed",
+        "Pump Speed",
     )
     assert s.state == 0.8  # 80% converted to 0.8
 
@@ -321,19 +367,31 @@ def test_installation_sensor_nested_data():
     s = CSNetHomeInstallationSensor(
         coordinator, device_data, common_data, "defrost", "binary", None, "Defrost"
     )
-    assert s.state == STATE_ON
+    assert s.state == STATE_ON  # defrosting = 1
 
-    # Test working electric heater from nested data
+    # Test water flow from nested data
     s = CSNetHomeInstallationSensor(
         coordinator,
         device_data,
         common_data,
-        "working_electric_heater",
-        "enum",
-        None,
-        "Working Electric Heater",
+        "water_flow",
+        "water_debit",
+        "m³/h",
+        "Water Flow",
     )
-    assert s.state == "Running"
+    assert s.state == 3.0  # 30 / 10 = 3.0
+
+    # Test water pressure from nested data
+    s = CSNetHomeInstallationSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "water_pressure",
+        "pressure",
+        "bar",
+        "Water Pressure",
+    )
+    assert s.state == 4.0  # 200 / 50 = 4.0
 
 
 def test_installation_sensor_metadata():
@@ -348,17 +406,23 @@ def test_installation_sensor_metadata():
     common_data = {"name": "Hitachi Installation", "firmware": "1.0.0"}
 
     coordinator = SimpleNamespace(
-        get_installation_devices_data=lambda: {"waterSpeed": 100},
+        get_installation_devices_data=lambda: {
+            "indoors": {
+                "heatingStatus": {
+                    "pumpSpeed": 100,
+                }
+            }
+        },
     )
 
     s = CSNetHomeInstallationSensor(
         coordinator,
         device_data,
         common_data,
-        "water_speed",
+        "pump_speed",
         "water_speed",
         "m/s",
-        "Water Speed",
+        "Pump Speed",
     )
 
     # Test device info
@@ -368,10 +432,10 @@ def test_installation_sensor_metadata():
     assert device_info["sw_version"] == "1.0.0"
 
     # Test unique id
-    assert s.unique_id == "csnet_home-installation-water_speed"
+    assert s.unique_id == "csnet_home-installation-pump_speed"
 
     # Test name
-    assert s.name == "Installation Global Water Speed"
+    assert s.name == "Installation Global Pump Speed"
 
     # Test device class and unit
     assert s.device_class == "water_speed"

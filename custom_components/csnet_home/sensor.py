@@ -86,10 +86,10 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 coordinator,
                 global_device_data,
                 common_data,
-                "water_speed",
+                "pump_speed",
                 "water_speed",
                 UnitOfSpeed.METERS_PER_SECOND,
-                "Water Speed",
+                "Pump Speed",
             )
         )
         sensors.append(
@@ -97,10 +97,10 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 coordinator,
                 global_device_data,
                 common_data,
-                "water_debit",
+                "water_flow",
                 "water_debit",
                 UnitOfVolumeFlowRate.CUBIC_METERS_PER_HOUR,
-                "Water Debit",
+                "Water Flow",
             )
         )
         sensors.append(
@@ -130,10 +130,10 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 coordinator,
                 global_device_data,
                 common_data,
-                "set_water_temperature_ttwo",
+                "set_water_temperature",
                 "temperature",
                 UnitOfTemperature.CELSIUS,
-                "Set Water Temperature TTWO",
+                "Set Water Temperature",
             )
         )
         sensors.append(
@@ -152,10 +152,21 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 coordinator,
                 global_device_data,
                 common_data,
-                "out_exchanger_water_temperature",
+                "gas_temperature",
                 "temperature",
                 UnitOfTemperature.CELSIUS,
-                "Out Exchanger Water Temperature",
+                "Gas Temperature",
+            )
+        )
+        sensors.append(
+            CSNetHomeInstallationSensor(
+                coordinator,
+                global_device_data,
+                common_data,
+                "liquid_temperature",
+                "temperature",
+                UnitOfTemperature.CELSIUS,
+                "Liquid Temperature",
             )
         )
 
@@ -202,17 +213,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 "temperature",
                 UnitOfTemperature.CELSIUS,
                 "Mean External Temperature",
-            )
-        )
-        sensors.append(
-            CSNetHomeInstallationSensor(
-                coordinator,
-                global_device_data,
-                common_data,
-                "working_electric_heater",
-                "enum",
-                None,
-                "Working Electric Heater",
             )
         )
 
@@ -339,96 +339,63 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, Entity):
         """Return the current state of the sensor."""
         installation_data = self._coordinator.get_installation_devices_data()
 
-        # Map the sensor keys to potential API response keys
-        # These mappings are based on the user's description and common naming patterns
+        # Map the sensor keys to actual API response keys from indoors/heatingStatus
         key_mappings = {
-            "water_speed": ["waterSpeed", "water_speed", "speed"],
-            "water_debit": ["waterDebit", "water_debit", "debit", "flow_rate"],
-            "in_water_temperature": [
-                "inWaterTemperature",
-                "in_water_temperature",
-                "inlet_temp",
-            ],
-            "out_water_temperature": [
-                "outWaterTemperature",
-                "out_water_temperature",
-                "outlet_temp",
-            ],
-            "set_water_temperature_ttwo": [
-                "setWaterTemperatureTTWO",
-                "set_water_temperature_ttwo",
-                "ttwo_temp",
-            ],
-            "water_pressure": ["waterPressure", "water_pressure", "pressure"],
-            "out_exchanger_water_temperature": [
-                "outExchangerWaterTemperature",
-                "out_exchanger_water_temperature",
-                "exchanger_outlet_temp",
-            ],
-            "defrost": ["defrost", "defrost_mode", "defrosting"],
-            "mix_valve_position": [
-                "mixValvePosition",
-                "mix_valve_position",
-                "valve_position",
-            ],
-            "external_temperature": [
-                "externalTemperature",
-                "external_temperature",
-                "outdoor_temp",
-            ],
-            "mean_external_temperature": [
-                "meanExternalTemperature",
-                "mean_external_temperature",
-                "avg_outdoor_temp",
-            ],
-            "working_electric_heater": [
-                "workingElectricHeater",
-                "working_electric_heater",
-                "electric_heater_status",
-            ],
+            "pump_speed": ["pumpSpeed"],
+            "water_flow": ["waterFlow"],
+            "in_water_temperature": ["waterInletTemp"],
+            "out_water_temperature": ["waterOutletTemp"],
+            "set_water_temperature": ["waterTempSetting"],
+            "water_pressure": ["waterPressure"],
+            "defrost": ["defrosting"],
+            "mix_valve_position": ["mixingValveOpening"],
+            "external_temperature": ["outdoorAmbientTemp"],
+            "mean_external_temperature": ["outdoorAmbientAverageTemp"],
+            "gas_temperature": ["gasTemp"],
+            "liquid_temperature": ["liquidTemp"],
         }
 
         # Try to find the value using different possible key names
         possible_keys = key_mappings.get(self._key, [self._key])
         value = None
 
-        for possible_key in possible_keys:
-            if isinstance(installation_data, dict):
+        # Look in the indoors/heatingStatus structure
+        if isinstance(installation_data, dict):
+            # First try direct access
+            for possible_key in possible_keys:
                 value = installation_data.get(possible_key)
                 if value is not None:
                     break
-                # Also try nested objects
-                for device in installation_data.get("devices", []):
-                    if isinstance(device, dict):
-                        value = device.get(possible_key)
-                        if value is not None:
-                            break
-                    if value is not None:
-                        break
-            if value is not None:
-                break
+
+            # If not found, try in indoors/heatingStatus structure
+            if value is None:
+                indoors_data = installation_data.get("indoors", {})
+                if isinstance(indoors_data, dict):
+                    heating_status = indoors_data.get("heatingStatus", {})
+                    if isinstance(heating_status, dict):
+                        for possible_key in possible_keys:
+                            value = heating_status.get(possible_key)
+                            if value is not None:
+                                break
 
         # Handle special cases for different sensor types
         if self._key == "defrost":
-            return STATE_ON if value else STATE_OFF
-        if self._key == "working_electric_heater":
-            if isinstance(value, str):
-                return value
-            return "Stopped" if not value else "Running"
-        if self._key in ["water_speed", "mix_valve_position"]:
+            # defrosting: 0 = off, 1 = on
+            return STATE_ON if value == 1 else STATE_OFF
+        if self._key == "water_flow":
+            # waterFlow value must be divided by 10 to have the right measurement unit
+            if isinstance(value, (int, float)):
+                return value / 10
+            return value
+        if self._key == "water_pressure":
+            # waterPressure: app shows 4.48bar, value is 224, so divide by 50
+            if isinstance(value, (int, float)):
+                return value / 50
+            return value
+        if self._key in ["pump_speed", "mix_valve_position"]:
             # Convert percentage to decimal if needed
             if isinstance(value, (int, float)) and value > 1:
                 return value / 100
-            return value
-        if self._key == "water_debit":
-            # Convert to m3/h if needed (assuming the API might return in different units)
-            if isinstance(value, (int, float)):
-                return value
-            return value
-        if self._key in ["water_pressure"]:
-            # Convert to bar if needed
-            if isinstance(value, (int, float)):
-                return value
             return value
 
         return value
