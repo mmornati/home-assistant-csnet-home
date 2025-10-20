@@ -513,3 +513,96 @@ async def test_api_close_session(mock_aiohttp_client, hass):
 
     await api.close()
     mock_client_instance.close.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_api_get_installation_devices_data_success(mock_aiohttp_client, hass):
+    """Test a successful get_installation_devices_data call."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    mock_login_response = mock_client_instance.get.return_value.__aenter__.return_value
+    mock_login_response.status = 200
+    mock_login_response.text = AsyncMock(return_value="xxx xxx xxx")
+
+    mock_login_response = mock_client_instance.post.return_value.__aenter__.return_value
+    mock_login_response.status = 200
+    mock_login_response.text = AsyncMock(return_value="xxx xxx xxx")
+
+    mock_response = mock_client_instance.get.return_value.__aenter__.return_value
+    mock_response.status = 200
+    mock_response.json = AsyncMock(
+        return_value={
+            "status": "success",
+            "data": [
+                {
+                    "id": 1001,
+                    "name": "Water Device 1",
+                    "waterSpeed": 100,
+                    "waterDebit": 3.9,
+                    "waterInTemperature": 20.0,
+                    "waterOutTemperature": 20.0,
+                    "setWaterTemperature": 23.0,
+                    "pressureWaterCircuit": 4.48,
+                    "tempOutWaterExchanger": 20.0,
+                },
+                {
+                    "id": 1002,
+                    "name": "Water Device 2",
+                    "waterSpeed": 75,
+                    "waterDebit": 2.5,
+                    "waterInTemperature": 18.0,
+                    "waterOutTemperature": 22.0,
+                    "setWaterTemperature": 25.0,
+                    "pressureWaterCircuit": 3.2,
+                    "tempOutWaterExchanger": 21.0,
+                },
+            ],
+        }
+    )
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api._session = mock_client_instance
+    api.logged_in = True
+    api.cookies = {"test": "cookie"}
+
+    data = await api.async_get_installation_devices_data()
+
+    assert data is not None
+    assert len(data) == 2
+    assert 1001 in data
+    assert 1002 in data
+
+    # Check first device
+    device1 = data[1001]
+    assert device1["device_name"] == "Water Device 1"
+    assert device1["device_id"] == 1001
+    assert device1["sensors"]["water_speed"] == 100
+    assert device1["sensors"]["water_debit"] == 3.9
+    assert device1["sensors"]["water_in_temperature"] == 20.0
+    assert device1["sensors"]["water_out_temperature"] == 20.0
+    assert device1["sensors"]["set_water_temperature"] == 23.0
+    assert device1["sensors"]["pressure_water_circuit"] == 4.48
+    assert device1["sensors"]["temp_out_water_exchanger"] == 20.0
+
+    mock_client_instance.get.assert_called_with(
+        "https://www.csnetmanager.com/data/installationdevices?installationId=-1",
+        headers=ANY,
+        cookies=ANY,
+    )
+
+
+@pytest.mark.asyncio
+async def test_api_get_installation_devices_data_failure(mock_aiohttp_client, hass):
+    """Test a failed get_installation_devices_data call."""
+    mock_client_instance = mock_aiohttp_client.return_value
+    mock_response = mock_client_instance.get.return_value.__aenter__.return_value
+    mock_response.status = 500
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api._session = mock_client_instance
+    api.logged_in = True
+    api.cookies = {"test": "cookie"}
+
+    data = await api.async_get_installation_devices_data()
+
+    assert data == {}

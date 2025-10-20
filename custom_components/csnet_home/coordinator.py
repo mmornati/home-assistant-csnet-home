@@ -20,7 +20,7 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         self.hass = hass
         self.entry_id = entry_id
         self.update_interval = timedelta(seconds=update_interval)
-        self._device_data = {"sensors": [], "common_data": {}}
+        self._device_data = {"sensors": [], "common_data": {}, "water_data": {}}
         super().__init__(
             hass,
             _LOGGER,
@@ -41,7 +41,13 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
             return
 
         device_data = await cloud_api.async_get_elements_data()
-        self._device_data = device_data
+        water_data = await cloud_api.async_get_installation_devices_data()
+
+        if device_data:
+            self._device_data.update(device_data)
+        if water_data:
+            self._device_data["water_data"] = water_data
+
         return self._device_data
 
     def get_sensors_data(self):
@@ -53,3 +59,8 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         """Return common data shared between all sensors."""
 
         return self._device_data["common_data"]
+
+    def get_water_data(self):
+        """Return water data from installation devices."""
+
+        return self._device_data["water_data"]

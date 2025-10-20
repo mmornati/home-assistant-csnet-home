@@ -10,7 +10,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.components.climate.const import HVACMode
 from homeassistant.const import STATE_ON, STATE_OFF
 
-from .const import DOMAIN
+from .const import DOMAIN, WATER_SENSOR_TYPES
 from .coordinator import CSNetHomeCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -62,6 +62,23 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 coordinator, sensor_data, common_data, "doingBoost", "binary"
             )
         )
+
+    # Add water sensors from installation devices
+    water_data = coordinator.get_water_data()
+    for device_data in water_data.values():
+        for sensor_key, sensor_value in device_data["sensors"].items():
+            if sensor_value is not None:  # Only create sensors for non-null values
+                sensor_config = WATER_SENSOR_TYPES.get(sensor_key, {})
+                sensors.append(
+                    CSNetHomeWaterSensor(
+                        coordinator,
+                        device_data,
+                        sensor_key,
+                        sensor_config.get("device_class"),
+                        sensor_config.get("unit"),
+                        sensor_config.get("icon"),
+                    )
+                )
 
     async_add_entities(sensors)
 
@@ -154,3 +171,83 @@ class CSNetHomeSensor(CoordinatorEntity, Entity):
         # All entities must have a unique id.  Think carefully what you want this to be as
         # changing it later will cause HA to create new entities.
         return f"{DOMAIN}-{self._sensor_data['room_name']}-{self._key}"
+
+
+class CSNetHomeWaterSensor(CoordinatorEntity, Entity):
+    """Representation of a water sensor from the CSNet Home integration."""
+
+    def __init__(
+        self,
+        coordinator: CSNetHomeCoordinator,
+        device_data,
+        sensor_key,
+        device_class=None,
+        unit=None,
+        icon=None,
+    ):
+        """Initialize the water sensor."""
+        super().__init__(coordinator)
+        self._coordinator = coordinator
+        self._device_data = device_data
+        self._sensor_key = sensor_key
+        self._device_class = device_class
+        self._unit = unit
+        self._icon = icon
+        self._name = (
+            f"{device_data['device_name']} {sensor_key.replace('_', ' ').title()}"
+        )
+        _LOGGER.debug("Configuring Water Sensor %s", self._name)
+
+    @property
+    def state(self):
+        """Return the current sensor value."""
+        return self._device_data["sensors"].get(self._sensor_key)
+
+    @property
+    def device_class(self):
+        """Return the device class of the sensor."""
+        return self._device_class
+
+    @property
+    def unit_of_measurement(self):
+        """Return the unit of measurement for the sensor."""
+        return self._unit
+
+    @property
+    def icon(self):
+        """Return the icon for the sensor."""
+        return self._icon
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Update sensor with latest data from coordinator."""
+        water_data = self._coordinator.get_water_data()
+        device_id = self._device_data["device_id"]
+        if device_id in water_data:
+            self._device_data = water_data[device_id]
+            self.async_write_ha_state()
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device information."""
+        return DeviceInfo(
+            name=f"{self._device_data['device_name']}-Water",
+            manufacturer="Hitachi",
+            model="Water System",
+            identifiers={
+                (
+                    DOMAIN,
+                    f"{self._device_data['device_name']}-water-{self._device_data['device_id']}",
+                )
+            },
+        )
+
+    @property
+    def name(self) -> str:
+        """Return the name of the sensor."""
+        return self._name
+
+    @property
+    def unique_id(self) -> str:
+        """Return unique id."""
+        return f"{DOMAIN}-water-{self._device_data['device_id']}-{self._sensor_key}"

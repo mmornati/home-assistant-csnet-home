@@ -16,6 +16,7 @@ from custom_components.csnet_home.const import (
     DEFAULT_API_TIMEOUT,
     ELEMENTS_PATH,
     HEAT_SETTINGS_PATH,
+    INSTALLATION_DEVICES_PATH,
     LOGIN_PATH,
 )
 
@@ -193,6 +194,84 @@ class CSNetHomeAPI:
             _LOGGER.error("Error during sensor data retrieval: %s", e)
             self.logged_in = False
             return None
+
+    async def async_get_installation_devices_data(self):
+        """Get installation devices data from the cloud service."""
+        installation_devices_url = (
+            f"{self.base_url}{INSTALLATION_DEVICES_PATH}?installationId=-1"
+        )
+
+        if not self.session or not self.logged_in:
+            _LOGGER.warning("No active session found.")
+            await self.async_login()
+
+        headers = COMMON_API_HEADERS | {
+            "accept": "application/json, text/javascript, */*; q=0.01",
+            "x-requested-with": "XMLHttpRequest",
+        }
+
+        try:
+            async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+                async with self.session.get(
+                    installation_devices_url, headers=headers, cookies=self.cookies
+                ) as response:
+                    data = await self.check_api_response(response)
+                    if data is not None and data.get("status") == "success":
+                        _LOGGER.debug(
+                            "Installation devices data retrieved: %s", data["data"]
+                        )
+
+                        # Parse the installation devices data from the API response
+                        installation_data = data.get("data", [])
+                        water_data = {}
+
+                        # Extract water-related data from installation devices
+                        for device in installation_data:
+                            device_id = device.get("id")
+                            device_name = device.get("name", f"Device-{device_id}")
+
+                            # Extract water sensor data if available
+                            water_sensors = {
+                                "water_speed": device.get("waterSpeed"),
+                                "water_debit": device.get("waterDebit"),
+                                "water_in_temperature": device.get(
+                                    "waterInTemperature"
+                                ),
+                                "water_out_temperature": device.get(
+                                    "waterOutTemperature"
+                                ),
+                                "set_water_temperature": device.get(
+                                    "setWaterTemperature"
+                                ),
+                                "pressure_water_circuit": device.get(
+                                    "pressureWaterCircuit"
+                                ),
+                                "temp_out_water_exchanger": device.get(
+                                    "tempOutWaterExchanger"
+                                ),
+                            }
+
+                            # Only add device if it has water data
+                            if any(
+                                value is not None for value in water_sensors.values()
+                            ):
+                                water_data[device_id] = {
+                                    "device_name": device_name,
+                                    "device_id": device_id,
+                                    "sensors": water_sensors,
+                                }
+
+                        _LOGGER.debug("Retrieved Water Data: %s", water_data)
+                        return water_data
+
+                    _LOGGER.error(
+                        "Error in installation devices API response, status not 'success'"
+                    )
+                    return {}
+        except Exception as e:
+            _LOGGER.error("Error during installation devices data retrieval: %s", e)
+            self.logged_in = False
+            return {}
 
     def get_current_temperature(self, element):
         """Return target/setting temperature normalized per element type.
