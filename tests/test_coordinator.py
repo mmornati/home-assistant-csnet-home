@@ -1,6 +1,6 @@
 """Test Coordinator configuration."""
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -15,33 +15,129 @@ def mock_api():
         yield mock
 
 
-@pytest.fixture(name="hass")
-async def test_coordinator_initialization(hass: HomeAssistant, mock_api):
+@pytest.mark.asyncio
+async def test_coordinator_initialization(hass: HomeAssistant):
     """Test the initialization of the coordinator."""
-    coordinator = CSNetHomeCoordinator(hass=hass)
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test")
     assert coordinator.hass == hass
+    assert coordinator.entry_id == "test"
 
 
-@pytest.fixture(name="hass")
-async def test_coordinator_update_success(hass: HomeAssistant, mock_api):
+@pytest.mark.asyncio
+async def test_coordinator_update_success(hass: HomeAssistant):
     """Test a successful data update."""
-    mock_api_instance = mock_api.return_value
-    mock_api_instance.get_data = AsyncMock(return_value={"key": "value"})
+    mock_api = MagicMock()
+    mock_api.async_get_elements_data = AsyncMock(
+        return_value={
+            "common_data": {"name": "Test Home", "device_status": {}},
+            "sensors": [{"device_id": 1, "room_name": "Test Room"}],
+        }
+    )
+    mock_api.async_get_installation_devices_data = AsyncMock(
+        return_value={"waterSpeed": 100, "defrost": True}
+    )
 
-    coordinator = CSNetHomeCoordinator(hass=hass)
-    await coordinator.async_config_entry_first_refresh()
+    hass.data["csnet_home"] = {"test": {"api": mock_api}}
 
-    assert coordinator.data == {"key": "value"}
-    mock_api_instance.get_data.assert_called_once()
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test")
+    result = await coordinator._async_update_data()
+
+    assert result is not None
+    assert "common_data" in result
+    assert "sensors" in result
+    assert "installation_devices" in result["common_data"]
+    assert result["common_data"]["installation_devices"] == {
+        "waterSpeed": 100,
+        "defrost": True,
+    }
+    mock_api.async_get_elements_data.assert_called_once()
+    mock_api.async_get_installation_devices_data.assert_called_once()
 
 
-@pytest.fixture(name="hass")
-async def test_coordinator_update_failure(hass: HomeAssistant, mock_api):
-    """Test a data update failure."""
-    mock_api_instance = mock_api.return_value
-    mock_api_instance.get_data = AsyncMock(side_effect=Exception("API error"))
+@pytest.mark.asyncio
+async def test_coordinator_update_elements_data_only(hass: HomeAssistant):
+    """Test data update when only elements data is available."""
+    mock_api = MagicMock()
+    mock_api.async_get_elements_data = AsyncMock(
+        return_value={
+            "common_data": {"name": "Test Home", "device_status": {}},
+            "sensors": [{"device_id": 1, "room_name": "Test Room"}],
+        }
+    )
+    mock_api.async_get_installation_devices_data = AsyncMock(return_value=None)
 
-    coordinator = CSNetHomeCoordinator(hass=hass)
+    hass.data["csnet_home"] = {"test": {"api": mock_api}}
 
-    with pytest.raises(Exception, match="API error"):
-        await coordinator._async_update_data()
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test")
+    result = await coordinator._async_update_data()
+
+    assert result is not None
+    assert "common_data" in result
+    assert "sensors" in result
+    assert "installation_devices" not in result["common_data"]
+
+
+@pytest.mark.asyncio
+async def test_coordinator_update_no_api(hass: HomeAssistant):
+    """Test data update when no API is available."""
+    hass.data["csnet_home"] = {"test": {"api": None}}
+
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test")
+    result = await coordinator._async_update_data()
+
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_coordinator_get_sensors_data(hass: HomeAssistant):
+    """Test getting sensors data."""
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test")
+    coordinator._device_data = {
+        "sensors": [{"device_id": 1, "room_name": "Test Room"}],
+        "common_data": {"name": "Test Home"},
+    }
+
+    sensors = coordinator.get_sensors_data()
+    assert sensors == [{"device_id": 1, "room_name": "Test Room"}]
+
+
+@pytest.mark.asyncio
+async def test_coordinator_get_common_data(hass: HomeAssistant):
+    """Test getting common data."""
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test")
+    coordinator._device_data = {
+        "sensors": [],
+        "common_data": {"name": "Test Home", "device_status": {}},
+    }
+
+    common_data = coordinator.get_common_data()
+    assert common_data == {"name": "Test Home", "device_status": {}}
+
+
+@pytest.mark.asyncio
+async def test_coordinator_get_installation_devices_data(hass: HomeAssistant):
+    """Test getting installation devices data."""
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test")
+    coordinator._device_data = {
+        "sensors": [],
+        "common_data": {
+            "name": "Test Home",
+            "installation_devices": {"waterSpeed": 100, "defrost": True},
+        },
+    }
+
+    installation_data = coordinator.get_installation_devices_data()
+    assert installation_data == {"waterSpeed": 100, "defrost": True}
+
+
+@pytest.mark.asyncio
+async def test_coordinator_get_installation_devices_data_empty(hass: HomeAssistant):
+    """Test getting installation devices data when not available."""
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test")
+    coordinator._device_data = {
+        "sensors": [],
+        "common_data": {"name": "Test Home"},
+    }
+
+    installation_data = coordinator.get_installation_devices_data()
+    assert installation_data == {}
