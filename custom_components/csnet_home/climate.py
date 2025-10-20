@@ -186,7 +186,11 @@ class CSNetHomeClimate(ClimateEntity):
         """Set new preset mode."""
         cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
         response = await cloud_api.set_preset_modes(
-            self._sensor_data["zone_id"], self._sensor_data["parent_id"], preset_mode
+            self._sensor_data["zone_id"],
+            self._sensor_data["parent_id"],
+            preset_mode,
+            current_mode=self._sensor_data.get("mode"),
+            on_off=self._sensor_data.get("on_off"),
         )
         if response:
             self._sensor_data["ecocomfort"] = 1 if preset_mode == "eco" else 0

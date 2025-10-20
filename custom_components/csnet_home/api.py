@@ -363,7 +363,9 @@ class CSNetHomeAPI:
             _LOGGER.error("Error setting hvac_mode=%s: %s", hvac_mode, err)
             return False
 
-    async def set_preset_modes(self, zone_id, parent_id, preset_mode):
+    async def set_preset_modes(
+        self, zone_id, parent_id, preset_mode, current_mode=None, on_off=None
+    ):
         """Set the eco/comfort mode for a zone."""
         settings_url = f"{self.base_url}{HEAT_SETTINGS_PATH}"
 
@@ -381,6 +383,15 @@ class CSNetHomeAPI:
             "indoorId": parent_id,
             "_csrf": self.xsrf_token,
         }
+
+        # Include current HVAC mode and run/stop status if provided
+        if current_mode is not None:
+            data["mode"] = str(current_mode)
+        if on_off is not None:
+            data[f"runStopC{zone_id}"] = str(on_off)
+            data[f"runStopC{zone_id}Air"] = str(on_off)
+
+        # Set the eco/comfort mode
         if preset_mode == "eco":
             data[f"ecoModeC{zone_id}"] = "0"
         else:
