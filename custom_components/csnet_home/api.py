@@ -342,18 +342,21 @@ class CSNetHomeAPI:
             "_csrf": self.xsrf_token,
         }
 
+        # For zone_id 5 (fixed temp circuit), use C1 in parameter names
+        circuit_id = 1 if zone_id == 5 else zone_id
+        
         if hvac_mode_lower == "heat":
             data["mode"] = "1"
-            data[f"runStopC{zone_id}"] = "1"
-            data[f"runStopC{zone_id}Air"] = "1"
+            data[f"runStopC{circuit_id}"] = "1"
+            data[f"runStopC{circuit_id}Air"] = "1"
         elif hvac_mode_lower == "cool":
             data["mode"] = "0"
-            data[f"runStopC{zone_id}"] = "1"
-            data[f"runStopC{zone_id}Air"] = "1"
+            data[f"runStopC{circuit_id}"] = "1"
+            data[f"runStopC{circuit_id}Air"] = "1"
         elif hvac_mode_lower == "off":
             # only stop — do not send "mode" to preserve last setting
-            data[f"runStopC{zone_id}"] = "0"
-            data[f"runStopC{zone_id}Air"] = "0"
+            data[f"runStopC{circuit_id}"] = "0"
+            data[f"runStopC{circuit_id}Air"] = "0"
         else:
             _LOGGER.warning("Unsupported hvac_mode=%s ignored", hvac_mode)
             return True
@@ -411,18 +414,21 @@ class CSNetHomeAPI:
             "_csrf": self.xsrf_token,
         }
 
+        # For zone_id 5 (fixed temp circuit), use C1 in parameter names
+        circuit_id = 1 if zone_id == 5 else zone_id
+
         # Include current HVAC mode and run/stop status if provided
         if current_mode is not None:
             data["mode"] = str(current_mode)
         if on_off is not None:
-            data[f"runStopC{zone_id}"] = str(on_off)
-            data[f"runStopC{zone_id}Air"] = str(on_off)
+            data[f"runStopC{circuit_id}"] = str(on_off)
+            data[f"runStopC{circuit_id}Air"] = str(on_off)
 
         # Set the eco/comfort mode
         if preset_mode == "eco":
-            data[f"ecoModeC{zone_id}"] = "0"
+            data[f"ecoModeC{circuit_id}"] = "0"
         else:
-            data[f"ecoModeC{zone_id}"] = "1"
+            data[f"ecoModeC{circuit_id}"] = "1"
 
         cookies = {
             "XSRF-TOKEN": self.xsrf_token,

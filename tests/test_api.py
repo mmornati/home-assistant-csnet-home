@@ -645,3 +645,95 @@ async def test_api_get_installation_devices_data_not_logged_in(
     assert data == {"test": "data"}
     mock_client_instance.post.assert_called()  # Login was called
     mock_client_instance.get.assert_called()  # Data retrieval was called
+
+
+@pytest.mark.asyncio
+async def test_api_set_hvac_mode_zone5_uses_circuit1(mock_aiohttp_client, hass):
+    """Test that zone_id 5 uses C1 in runStop parameter names."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    mock_response = mock_client_instance.post.return_value.__aenter__.return_value
+    mock_response.status = 200
+    mock_response.text = AsyncMock(return_value='{"status":"success"}')
+    mock_response.raise_for_status = AsyncMock()
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api._session = mock_client_instance
+    api.logged_in = True
+    api.xsrf_token = "test-token"
+    api.cookies = {"test": "cookie"}
+
+    # Test with zone_id 5 turning on heat
+    result = await api.async_set_hvac_mode(5, 2486, "heat")
+
+    assert result is True
+    # Check that the call was made with C1 parameters, not C5
+    call_args = mock_client_instance.post.call_args
+    assert call_args is not None
+    data_sent = call_args[1]["data"]
+    assert "runStopC1" in data_sent
+    assert "runStopC1Air" in data_sent
+    assert data_sent["runStopC1"] == "1"
+    assert data_sent["runStopC1Air"] == "1"
+    # Should not have C5 parameters
+    assert "runStopC5" not in data_sent
+    assert "runStopC5Air" not in data_sent
+
+
+@pytest.mark.asyncio
+async def test_api_set_hvac_mode_zone1_uses_circuit1(mock_aiohttp_client, hass):
+    """Test that zone_id 1 uses C1 in runStop parameter names (normal case)."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    mock_response = mock_client_instance.post.return_value.__aenter__.return_value
+    mock_response.status = 200
+    mock_response.text = AsyncMock(return_value='{"status":"success"}')
+    mock_response.raise_for_status = AsyncMock()
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api._session = mock_client_instance
+    api.logged_in = True
+    api.xsrf_token = "test-token"
+    api.cookies = {"test": "cookie"}
+
+    # Test with zone_id 1 turning on heat (should still use C1)
+    result = await api.async_set_hvac_mode(1, 1706, "heat")
+
+    assert result is True
+    call_args = mock_client_instance.post.call_args
+    assert call_args is not None
+    data_sent = call_args[1]["data"]
+    assert "runStopC1" in data_sent
+    assert "runStopC1Air" in data_sent
+    assert data_sent["runStopC1"] == "1"
+    assert data_sent["runStopC1Air"] == "1"
+
+
+@pytest.mark.asyncio
+async def test_api_set_preset_mode_zone5_uses_circuit1(mock_aiohttp_client, hass):
+    """Test that zone_id 5 uses C1 in preset mode parameter names."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    mock_response = mock_client_instance.post.return_value.__aenter__.return_value
+    mock_response.status = 200
+    mock_response.text = AsyncMock(return_value='{"status":"success"}')
+    mock_response.raise_for_status = AsyncMock()
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api._session = mock_client_instance
+    api.logged_in = True
+    api.xsrf_token = "test-token"
+    api.cookies = {"test": "cookie"}
+
+    # Test with zone_id 5 setting eco mode
+    result = await api.set_preset_modes(5, 2486, "eco", current_mode=1, on_off=1)
+
+    assert result is True
+    call_args = mock_client_instance.post.call_args
+    assert call_args is not None
+    data_sent = call_args[1]["data"]
+    assert "ecoModeC1" in data_sent
+    assert "runStopC1" in data_sent
+    assert "runStopC1Air" in data_sent
+    # Should not have C5 parameters
+    assert "ecoModeC5" not in data_sent
