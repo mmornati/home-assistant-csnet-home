@@ -3,6 +3,7 @@
 from unittest.mock import ANY, AsyncMock, patch
 
 import pytest
+from aiohttp import CookieJar
 
 from custom_components.csnet_home.api import CSNetHomeAPI
 
@@ -573,6 +574,69 @@ async def test_api_get_installation_devices_data_success(mock_aiohttp_client, ha
         headers=ANY,
         cookies=ANY,
     )
+
+
+@pytest.mark.asyncio
+async def test_api_translate_alarm_code_found(mock_aiohttp_client, hass):
+    """Test alarm code translation when code is found."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.translations = {
+        "alarm_42": "Test alarm message",
+        "alarm_042": "Test alarm message formatted",
+    }
+
+    result = api.translate_alarm(42)
+    assert result == "Test alarm message"
+
+    result = api.translate_alarm(42)
+    assert result == "Test alarm message"
+
+
+@pytest.mark.asyncio
+async def test_api_translate_alarm_code_not_found(mock_aiohttp_client, hass):
+    """Test alarm code translation when code is not found."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.translations = {
+        "alarm_42": "Test alarm message",
+    }
+
+    result = api.translate_alarm(99)
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_api_translate_alarm_no_translations(mock_aiohttp_client, hass):
+    """Test alarm code translation when no translations are loaded."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.translations = {}
+
+    result = api.translate_alarm(42)
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_api_extract_cookie_value_found(mock_aiohttp_client, hass):
+    """Test cookie value extraction when cookie is found."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    # Create a mock cookie jar with a test cookie
+    jar = CookieJar()
+    jar.update_cookies({"test_cookie": "test_value"})
+
+    result = api.extract_cookie_value(jar, "test_cookie")
+    assert result == "test_value"
+
+
+@pytest.mark.asyncio
+async def test_api_extract_cookie_value_not_found(mock_aiohttp_client, hass):
+    """Test cookie value extraction when cookie is not found."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    # Create an empty cookie jar
+    jar = CookieJar()
+
+    result = api.extract_cookie_value(jar, "nonexistent_cookie")
+    assert result is None
 
 
 @pytest.mark.asyncio

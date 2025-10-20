@@ -53,6 +53,7 @@ async def test_coordinator_update_success(hass: HomeAssistant):
     }
     mock_api.async_get_elements_data.assert_called_once()
     mock_api.async_get_installation_devices_data.assert_called_once()
+    mock_api.load_translations.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -143,3 +144,73 @@ async def test_coordinator_get_installation_devices_data_empty(hass: HomeAssista
 
     installation_data = coordinator.get_installation_devices_data()
     assert installation_data == {}
+
+
+@pytest.mark.asyncio
+async def test_coordinator_alarm_tracking(hass: HomeAssistant):
+    """Test alarm code tracking functionality."""
+    mock_api = MagicMock()
+    mock_api.load_translations = AsyncMock()
+    mock_api.async_get_elements_data = AsyncMock(
+        return_value={
+            "common_data": {"name": "Test Home"},
+            "sensors": [
+                {
+                    "device_id": 123,
+                    "room_id": 456,
+                    "zone_id": 789,
+                    "device_name": "Test Device",
+                    "room_name": "Test Room",
+                    "alarm_code": 42,
+                    "alarm_message": "Test alarm message",
+                }
+            ],
+        }
+    )
+    mock_api.async_get_installation_devices_data = AsyncMock(return_value=None)
+
+    hass.data["csnet_home"] = {"test": {"api": mock_api}}
+
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test")
+
+    # Test that alarm codes are tracked
+    await coordinator._async_update_data()
+
+    # Verify alarm code was stored
+    assert coordinator._last_alarm_codes["123-456-789"] == 42
+
+
+@pytest.mark.asyncio
+async def test_coordinator_alarm_clearing(hass: HomeAssistant):
+    """Test alarm code clearing functionality."""
+    mock_api = MagicMock()
+    mock_api.load_translations = AsyncMock()
+    mock_api.async_get_elements_data = AsyncMock(
+        return_value={
+            "common_data": {"name": "Test Home"},
+            "sensors": [
+                {
+                    "device_id": 123,
+                    "room_id": 456,
+                    "zone_id": 789,
+                    "device_name": "Test Device",
+                    "room_name": "Test Room",
+                    "alarm_code": 0,
+                    "alarm_message": None,
+                }
+            ],
+        }
+    )
+    mock_api.async_get_installation_devices_data = AsyncMock(return_value=None)
+
+    hass.data["csnet_home"] = {"test": {"api": mock_api}}
+
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test")
+
+    # Pre-populate with an alarm
+    coordinator._last_alarm_codes["123-456-789"] = 42
+
+    await coordinator._async_update_data()
+
+    # Verify alarm code was cleared from storage
+    assert "123-456-789" not in coordinator._last_alarm_codes
