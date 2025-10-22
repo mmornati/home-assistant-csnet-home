@@ -658,7 +658,7 @@ async def test_api_set_hvac_mode_zone5_uses_circuit1(mock_aiohttp_client, hass):
     mock_response.raise_for_status = AsyncMock()
 
     api = CSNetHomeAPI(hass, "user", "pass")
-    api._session = mock_client_instance
+    api.session = mock_client_instance
     api.logged_in = True
     api.xsrf_token = "test-token"
     api.cookies = {"test": "cookie"}
@@ -691,7 +691,7 @@ async def test_api_set_hvac_mode_zone1_uses_circuit1(mock_aiohttp_client, hass):
     mock_response.raise_for_status = AsyncMock()
 
     api = CSNetHomeAPI(hass, "user", "pass")
-    api._session = mock_client_instance
+    api.session = mock_client_instance
     api.logged_in = True
     api.xsrf_token = "test-token"
     api.cookies = {"test": "cookie"}
@@ -720,7 +720,7 @@ async def test_api_set_preset_mode_zone5_uses_circuit1(mock_aiohttp_client, hass
     mock_response.raise_for_status = AsyncMock()
 
     api = CSNetHomeAPI(hass, "user", "pass")
-    api._session = mock_client_instance
+    api.session = mock_client_instance
     api.logged_in = True
     api.xsrf_token = "test-token"
     api.cookies = {"test": "cookie"}
