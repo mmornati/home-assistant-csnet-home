@@ -150,3 +150,40 @@ def test_unique_id_contains_device_id(hass):
     entity = build_entity(hass)
     uid = entity.unique_id
     assert "1234" in uid
+
+
+@pytest.mark.asyncio
+async def test_async_update_handles_missing_sensor_data(hass):
+    """Test that async_update handles when sensor data becomes None gracefully."""
+    entity = build_entity(hass, mode=1, on_off=1, cur=19.5, setp=20.0)
+
+    # Modify coordinator to return empty list (simulating room not found)
+    coordinator = hass.data[DOMAIN][entity.entry.entry_id]["coordinator"]
+    coordinator.get_sensors_data = lambda: []
+
+    # This should not raise TypeError even though sensor_data becomes None
+    await entity.async_update()
+
+    # Verify entity handles None sensor_data gracefully
+    assert entity.current_temperature is None
+    assert entity.target_temperature is None
+    assert entity.hvac_mode == HVACMode.OFF
+    assert entity.preset_mode == "comfort"
+    assert entity.extra_state_attributes == {}
+    assert entity.hvac_action == HVACAction.IDLE
+    assert entity.is_heating() is False
+    assert entity.is_cooling() is False
+
+
+@pytest.mark.asyncio
+async def test_async_update_preserves_sensor_data_when_found(hass):
+    """Test that async_update works correctly when sensor data is found."""
+    entity = build_entity(hass, mode=1, on_off=1, cur=19.5, setp=20.0)
+
+    # Update should preserve the sensor data
+    await entity.async_update()
+
+    # Verify entity still has valid data
+    assert entity.current_temperature == 19.5
+    assert entity.target_temperature == 20.0
+    assert entity.hvac_mode == HVACMode.HEAT
