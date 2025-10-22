@@ -84,7 +84,7 @@ class CSNetHomeWaterHeater(WaterHeaterEntity):
         self._attr_device_info = DeviceInfo(
             name=f"{sensor_data.get('device_name', 'Unknown')}-{sensor_data.get('room_name', 'Unknown')}",
             manufacturer="Hitachi",
-            model=f"{common_data.get('name', 'Unknown')} ATW-IOT-01",
+            model=f"{common_data.get('name', 'Unknown')} Remote Controller",
             sw_version=common_data.get("firmware"),
             identifiers={
                 (

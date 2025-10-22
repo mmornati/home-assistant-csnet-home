@@ -73,9 +73,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
     if installation_devices_data:
         # Create a global device for installation-level sensors
         global_device_data = {
-            "device_name": "Installation",
+            "device_name": "System",
             "device_id": "global",
-            "room_name": "Global",
+            "room_name": "Controller",
             "parent_id": "global",
             "room_id": "global",
         }
@@ -332,7 +332,7 @@ class CSNetHomeSensor(CoordinatorEntity, Entity):
         return DeviceInfo(
             name=f"{self._sensor_data['device_name']}-{self._sensor_data['room_name']}",
             manufacturer="Hitachi",
-            model=f"{self._common_data['name']} ATW-IOT-01",
+            model=f"{self._common_data['name']} Remote Controller",
             sw_version=self._common_data["firmware"],
             identifiers={
                 (
@@ -553,7 +553,7 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, Entity):
         return DeviceInfo(
             name=f"{self._device_data['device_name']}-{self._device_data['room_name']}",
             manufacturer="Hitachi",
-            model=f"{self._common_data.get('name', 'Unknown')} Installation",
+            model="HVAC System",
             sw_version=self._common_data.get("firmware"),
             identifiers={
                 (

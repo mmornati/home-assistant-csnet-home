@@ -89,9 +89,9 @@ def test_handle_coordinator_update():
 def test_installation_sensor():
     """Test installation sensor functionality."""
     device_data = {
-        "device_name": "Installation",
+        "device_name": "System",
         "device_id": "global",
-        "room_name": "Global",
+        "room_name": "Controller",
         "parent_id": "global",
         "room_id": "global",
     }
@@ -139,7 +139,7 @@ def test_installation_sensor():
     )
     assert s.state == 1.0  # 100% converted to 1.0
     assert s.unit_of_measurement == "m/s"
-    assert s.name == "Installation Global Pump Speed"
+    assert s.name == "System Controller Pump Speed"
 
     # Test water flow sensor
     s = CSNetHomeInstallationSensor(
@@ -200,9 +200,9 @@ def test_installation_sensor():
 def test_installation_sensor_edge_cases():
     """Test installation sensor edge cases and data conversion."""
     device_data = {
-        "device_name": "Installation",
+        "device_name": "System",
         "device_id": "global",
-        "room_name": "Global",
+        "room_name": "Controller",
         "parent_id": "global",
         "room_id": "global",
     }
@@ -295,9 +295,9 @@ def test_installation_sensor_edge_cases():
 def test_installation_sensor_no_data():
     """Test installation sensor when no data is available."""
     device_data = {
-        "device_name": "Installation",
+        "device_name": "System",
         "device_id": "global",
-        "room_name": "Global",
+        "room_name": "Controller",
         "parent_id": "global",
         "room_id": "global",
     }
@@ -339,9 +339,9 @@ def test_installation_sensor_no_data():
 def test_installation_sensor_nested_data():
     """Test installation sensor with nested device data."""
     device_data = {
-        "device_name": "Installation",
+        "device_name": "System",
         "device_id": "global",
-        "room_name": "Global",
+        "room_name": "Controller",
         "parent_id": "global",
         "room_id": "global",
     }
@@ -415,9 +415,9 @@ def test_installation_sensor_nested_data():
 def test_installation_sensor_metadata():
     """Test installation sensor metadata and properties."""
     device_data = {
-        "device_name": "Installation",
+        "device_name": "System",
         "device_id": "global",
-        "room_name": "Global",
+        "room_name": "Controller",
         "parent_id": "global",
         "room_id": "global",
     }
@@ -452,14 +452,14 @@ def test_installation_sensor_metadata():
     # Test device info
     device_info = s.device_info
     assert device_info["manufacturer"] == "Hitachi"
-    assert device_info["model"] == "Hitachi Installation Installation"
+    assert device_info["model"] == "HVAC System"
     assert device_info["sw_version"] == "1.0.0"
 
     # Test unique id
     assert s.unique_id == "csnet_home-installation-pump_speed"
 
     # Test name
-    assert s.name == "Installation Global Pump Speed"
+    assert s.name == "System Controller Pump Speed"
 
     # Test device class and unit
     assert s.device_class == "water_speed"
@@ -469,9 +469,9 @@ def test_installation_sensor_metadata():
 def test_central_config_sensor():
     """Test central config sensor with different values."""
     device_data = {
-        "device_name": "Installation",
+        "device_name": "System",
         "device_id": "global",
-        "room_name": "Global",
+        "room_name": "Controller",
         "parent_id": "global",
         "room_id": "global",
     }
@@ -529,9 +529,9 @@ def test_central_config_sensor():
 def test_lcd_software_version_sensor():
     """Test LCD software version sensor."""
     device_data = {
-        "device_name": "Installation",
+        "device_name": "System",
         "device_id": "global",
-        "room_name": "Global",
+        "room_name": "Controller",
         "parent_id": "global",
         "room_id": "global",
     }
@@ -579,9 +579,9 @@ def test_lcd_software_version_sensor():
 def test_unit_model_sensor():
     """Test unit model sensor with different model codes."""
     device_data = {
-        "device_name": "Installation",
+        "device_name": "System",
         "device_id": "global",
-        "room_name": "Global",
+        "room_name": "Controller",
         "parent_id": "global",
         "room_id": "global",
     }
@@ -637,9 +637,9 @@ def test_unit_model_sensor():
 def test_central_control_enabled_sensor():
     """Test central control enabled binary sensor."""
     device_data = {
-        "device_name": "Installation",
+        "device_name": "System",
         "device_id": "global",
-        "room_name": "Global",
+        "room_name": "Controller",
         "parent_id": "global",
         "room_id": "global",
     }
@@ -710,9 +710,9 @@ def test_central_control_enabled_sensor():
 def test_central_control_enabled_no_data():
     """Test central control enabled sensor with missing data."""
     device_data = {
-        "device_name": "Installation",
+        "device_name": "System",
         "device_id": "global",
-        "room_name": "Global",
+        "room_name": "Controller",
         "parent_id": "global",
         "room_id": "global",
     }
@@ -768,9 +768,9 @@ def test_central_control_enabled_no_data():
 def test_central_control_sensors_metadata():
     """Test metadata for new central control sensors."""
     device_data = {
-        "device_name": "Installation",
+        "device_name": "System",
         "device_id": "global",
-        "room_name": "Global",
+        "room_name": "Controller",
         "parent_id": "global",
         "room_id": "global",
     }
@@ -806,7 +806,7 @@ def test_central_control_sensors_metadata():
         None,
         "Central Config",
     )
-    assert s.name == "Installation Global Central Config"
+    assert s.name == "System Controller Central Config"
     assert s.unique_id == "csnet_home-installation-central_config"
     assert s.device_class == "enum"
 
@@ -820,7 +820,7 @@ def test_central_control_sensors_metadata():
         None,
         "LCD Software Version",
     )
-    assert s.name == "Installation Global LCD Software Version"
+    assert s.name == "System Controller LCD Software Version"
     assert s.unique_id == "csnet_home-installation-lcd_software_version"
 
     # Test unit model sensor metadata
@@ -833,7 +833,7 @@ def test_central_control_sensors_metadata():
         None,
         "Unit Model",
     )
-    assert s.name == "Installation Global Unit Model"
+    assert s.name == "System Controller Unit Model"
     assert s.unique_id == "csnet_home-installation-unit_model"
     assert s.device_class == "enum"
 
@@ -847,6 +847,6 @@ def test_central_control_sensors_metadata():
         None,
         "Central Control Enabled",
     )
-    assert s.name == "Installation Global Central Control Enabled"
+    assert s.name == "System Controller Central Control Enabled"
     assert s.unique_id == "csnet_home-installation-central_control_enabled"
     assert s.device_class == "binary"

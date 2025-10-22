@@ -442,7 +442,7 @@ async def test_api_get_elements_data_empty_names(mock_aiohttp_client, hass):
         },
         "sensors": [
             {
-                "device_name": "ATW-IOT-01",
+                "device_name": "Remote",
                 "doingBoost": False,
                 "device_id": 9876,
                 "room_name": "Room-1234-0",
@@ -462,7 +462,7 @@ async def test_api_get_elements_data_empty_names(mock_aiohttp_client, hass):
                 "zone_id": 1,
             },
             {
-                "device_name": "ATW-IOT-01",
+                "device_name": "Remote",
                 "doingBoost": False,
                 "device_id": 9876,
                 "room_name": "Room-1234-1",
