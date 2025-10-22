@@ -25,6 +25,7 @@ def build_context():
         "doingBoost": False,
         "current_temperature": 19.5,
         "setting_temperature": 20.0,
+        "alarm_message": None,
     }
     common = {"name": "Hitachi PAC", "firmware": "1.0.0"}
     coordinator = SimpleNamespace(
@@ -84,6 +85,26 @@ def test_handle_coordinator_update():
     sensor_data["setting_temperature"] = 21.0
     s._handle_coordinator_update()
     assert s.state == 21.0
+
+
+def test_alarm_code_and_active():
+    """Expose alarm_code value and compute alarm_active binary state."""
+    coordinator, sensor_data, common = build_context()
+    sensor_data["alarm_code"] = 0
+
+    alarm_code = CSNetHomeSensor(coordinator, sensor_data, common, "alarm_code", "enum")
+    alarm_active = CSNetHomeSensor(
+        coordinator, sensor_data, common, "alarm_active", "binary"
+    )
+
+    # no alarm
+    assert alarm_code.state == 0
+    assert alarm_active.state == STATE_OFF
+
+    # set an alarm
+    sensor_data["alarm_code"] = 42
+    assert alarm_code.state == 42
+    assert alarm_active.state == STATE_ON
 
 
 def test_installation_sensor():

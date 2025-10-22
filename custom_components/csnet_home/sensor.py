@@ -67,6 +67,20 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 coordinator, sensor_data, common_data, "doingBoost", "binary"
             )
         )
+        # expose alarm information
+        sensors.append(
+            CSNetHomeSensor(coordinator, sensor_data, common_data, "alarm_code", "enum")
+        )
+        sensors.append(
+            CSNetHomeSensor(
+                coordinator, sensor_data, common_data, "alarm_active", "binary"
+            )
+        )
+        sensors.append(
+            CSNetHomeSensor(
+                coordinator, sensor_data, common_data, "alarm_message", "enum"
+            )
+        )
 
     # Add installation devices sensors
     installation_devices_data = coordinator.get_installation_devices_data()
@@ -300,6 +314,10 @@ class CSNetHomeSensor(CoordinatorEntity, Entity):
             return HVACMode.OFF
         if self._key == "on_off":
             return STATE_ON if value == 1 else STATE_OFF
+        if self._key == "alarm_active":
+            # computed from alarm_code
+            alarm_code = self._sensor_data.get("alarm_code")
+            return STATE_ON if alarm_code not in (None, 0) else STATE_OFF
         return value
 
     @property

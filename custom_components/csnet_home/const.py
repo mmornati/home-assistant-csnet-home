@@ -5,6 +5,7 @@ API_URL = "https://www.csnetmanager.com"
 LOGIN_PATH = "/login"
 ELEMENTS_PATH = "/data/elements"
 INSTALLATION_DEVICES_PATH = "/data/installationdevices"
+INSTALLATION_ALARMS_PATH = "/data/installationalarms"
 HEAT_SETTINGS_PATH = "/data/indoor/heat_setting"
 CONF_ENABLE_DEVICE_LOGGING = "enable_device_logging"
 COMMON_API_HEADERS = {
@@ -21,3 +22,11 @@ WATER_HEATER_MIN_TEMPERATURE = 30
 
 HEATING_MAX_TEMPERATURE = 55
 HEATING_MIN_TEMPERATURE = 8
+
+# Localization
+CONF_LANGUAGE = "language"
+DEFAULT_LANGUAGE = "en"
+LANGUAGE_FILES = {
+    "en": "english.json",
+    "fr": "french.json",
+}

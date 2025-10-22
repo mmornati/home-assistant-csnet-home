@@ -3,6 +3,7 @@
 from unittest.mock import ANY, AsyncMock, patch
 
 import pytest
+from aiohttp import CookieJar
 
 from custom_components.csnet_home.api import CSNetHomeAPI
 
@@ -278,6 +279,7 @@ async def test_api_get_elements_data_success(mock_aiohttp_client, hass):
                 "on_off": 1,
                 "timer_running": False,
                 "alarm_code": 0,
+                "alarm_message": None,
                 "c1_demand": True,
                 "c2_demand": True,
                 "ecocomfort": 1,
@@ -298,6 +300,7 @@ async def test_api_get_elements_data_success(mock_aiohttp_client, hass):
                 "on_off": 1,
                 "timer_running": False,
                 "alarm_code": 0,
+                "alarm_message": None,
                 "c1_demand": True,
                 "c2_demand": True,
                 "ecocomfort": 1,
@@ -454,6 +457,7 @@ async def test_api_get_elements_data_empty_names(mock_aiohttp_client, hass):
                 "on_off": 1,
                 "timer_running": False,
                 "alarm_code": 0,
+                "alarm_message": None,
                 "c1_demand": True,
                 "c2_demand": True,
                 "ecocomfort": 1,
@@ -474,6 +478,7 @@ async def test_api_get_elements_data_empty_names(mock_aiohttp_client, hass):
                 "on_off": 1,
                 "timer_running": False,
                 "alarm_code": 0,
+                "alarm_message": None,
                 "c1_demand": True,
                 "c2_demand": True,
                 "ecocomfort": 1,
@@ -572,6 +577,69 @@ async def test_api_get_installation_devices_data_success(mock_aiohttp_client, ha
 
 
 @pytest.mark.asyncio
+async def test_api_translate_alarm_code_found(mock_aiohttp_client, hass):
+    """Test alarm code translation when code is found."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.translations = {
+        "alarm_42": "Test alarm message",
+        "alarm_042": "Test alarm message formatted",
+    }
+
+    result = api.translate_alarm(42)
+    assert result == "Test alarm message"
+
+    result = api.translate_alarm(42)
+    assert result == "Test alarm message"
+
+
+@pytest.mark.asyncio
+async def test_api_translate_alarm_code_not_found(mock_aiohttp_client, hass):
+    """Test alarm code translation when code is not found."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.translations = {
+        "alarm_42": "Test alarm message",
+    }
+
+    result = api.translate_alarm(99)
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_api_translate_alarm_no_translations(mock_aiohttp_client, hass):
+    """Test alarm code translation when no translations are loaded."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.translations = {}
+
+    result = api.translate_alarm(42)
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_api_extract_cookie_value_found(mock_aiohttp_client, hass):
+    """Test cookie value extraction when cookie is found."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    # Create a mock cookie jar with a test cookie
+    jar = CookieJar()
+    jar.update_cookies({"test_cookie": "test_value"})
+
+    result = api.extract_cookie_value(jar, "test_cookie")
+    assert result == "test_value"
+
+
+@pytest.mark.asyncio
+async def test_api_extract_cookie_value_not_found(mock_aiohttp_client, hass):
+    """Test cookie value extraction when cookie is not found."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    # Create an empty cookie jar
+    jar = CookieJar()
+
+    result = api.extract_cookie_value(jar, "nonexistent_cookie")
+    assert result is None
+
+
+@pytest.mark.asyncio
 async def test_api_get_installation_devices_data_failure(mock_aiohttp_client, hass):
     """Test installation devices data retrieval failure."""
     mock_client_instance = mock_aiohttp_client.return_value
@@ -645,3 +713,85 @@ async def test_api_get_installation_devices_data_not_logged_in(
     assert data == {"test": "data"}
     mock_client_instance.post.assert_called()  # Login was called
     mock_client_instance.get.assert_called()  # Data retrieval was called
+
+
+@pytest.mark.asyncio
+async def test_api_get_installation_alarms_success(mock_aiohttp_client, hass):
+    """Test a successful installation alarms data call."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    mock_response = mock_client_instance.get.return_value.__aenter__.return_value
+    mock_response.status = 200
+    mock_response.json = AsyncMock(
+        return_value={
+            "alarms": [
+                {
+                    "id": 123,
+                    "code": 42,
+                    "message": "Test alarm",
+                    "deviceId": 1234,
+                    "timestamp": 1234567890,
+                }
+            ]
+        }
+    )
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api._session = mock_client_instance
+    api.logged_in = True
+    api.cookies = {"test": "cookie"}
+    api.installation_id = 4529
+    api.xsrf_token = "test-token"
+
+    data = await api.async_get_installation_alarms()
+
+    assert data == {
+        "alarms": [
+            {
+                "id": 123,
+                "code": 42,
+                "message": "Test alarm",
+                "deviceId": 1234,
+                "timestamp": 1234567890,
+            }
+        ]
+    }
+    mock_client_instance.get.assert_called_with(
+        "https://www.csnetmanager.com/data/installationalarms?installationId=4529&_csrf=test-token",
+        headers=ANY,
+        cookies=ANY,
+    )
+
+
+@pytest.mark.asyncio
+async def test_api_get_installation_alarms_no_installation_id(
+    mock_aiohttp_client, hass
+):
+    """Test installation alarms retrieval when no installation ID is available."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.installation_id = None
+
+    data = await api.async_get_installation_alarms()
+
+    assert data is None
+
+
+@pytest.mark.asyncio
+async def test_api_get_installation_alarms_failure(mock_aiohttp_client, hass):
+    """Test installation alarms data retrieval failure."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    mock_response = mock_client_instance.get.return_value.__aenter__.return_value
+    mock_response.status = 200
+    mock_response.json = AsyncMock(return_value=None)
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api._session = mock_client_instance
+    api.logged_in = True
+    api.cookies = {"test": "cookie"}
+    api.installation_id = 4529
+    api.xsrf_token = "test-token"
+
+    data = await api.async_get_installation_alarms()
+
+    assert data is None
