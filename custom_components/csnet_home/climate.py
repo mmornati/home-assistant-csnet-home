@@ -71,12 +71,16 @@ class CSNetHomeClimate(ClimateEntity):
     @property
     def current_temperature(self):
         """Return the current temperature."""
+        if self._sensor_data is None:
+            return None
         return self._sensor_data["current_temperature"]
 
     @property
     def hvac_mode(self):
         """Return the current operation mode."""
         # Operation mode can be COOL, HEAT, OFF (AUTO not reliably settable)
+        if self._sensor_data is None:
+            return HVACMode.OFF
         if self._sensor_data.get("on_off") == 0:
             return HVACMode.OFF
         mode = self._sensor_data.get("mode")
@@ -89,6 +93,8 @@ class CSNetHomeClimate(ClimateEntity):
     @property
     def preset_mode(self):
         """Return the current preset mode."""
+        if self._sensor_data is None:
+            return "comfort"
         eco_comfort = self._sensor_data.get("ecocomfort")
         if eco_comfort == 0:
             return "eco"
@@ -100,6 +106,8 @@ class CSNetHomeClimate(ClimateEntity):
     @property
     def target_temperature(self):
         """Return the target temperature set by the user."""
+        if self._sensor_data is None:
+            return None
         return self._sensor_data["setting_temperature"]
 
     @property
@@ -136,6 +144,8 @@ class CSNetHomeClimate(ClimateEntity):
     @property
     def extra_state_attributes(self):
         """Return additional attributes from elements API."""
+        if self._sensor_data is None:
+            return {}
         return {
             "real_mode": self._sensor_data.get("real_mode"),
             "operation_status": self._sensor_data.get("operation_status"),
@@ -197,6 +207,8 @@ class CSNetHomeClimate(ClimateEntity):
 
     def is_heating(self):
         """Return true if the thermostat is currently heating."""
+        if self._sensor_data is None:
+            return False
         return (
             self._sensor_data.get("on_off") == 1
             and self._sensor_data.get("mode") == 1
@@ -206,6 +218,8 @@ class CSNetHomeClimate(ClimateEntity):
 
     def is_cooling(self):
         """Return true if the thermostat is currently cooling."""
+        if self._sensor_data is None:
+            return False
         return (
             self._sensor_data.get("on_off") == 1
             and self._sensor_data.get("mode") == 0
@@ -216,7 +230,7 @@ class CSNetHomeClimate(ClimateEntity):
     async def async_update(self):
         """Update the thermostat data from the API."""
         _LOGGER.debug(
-            "Updating CSNet Home refresh request %s", self._sensor_data["room_name"]
+            "Updating CSNet Home refresh request %s", self._attr_name
         )
         coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
         if not coordinator:
@@ -230,4 +244,9 @@ class CSNetHomeClimate(ClimateEntity):
             ),
             None,
         )
+        if self._sensor_data is None:
+            _LOGGER.warning(
+                "No sensor data found for room %s after coordinator refresh",
+                self._attr_name,
+            )
         self._common_data = coordinator.get_common_data()
