@@ -452,7 +452,7 @@ def test_installation_sensor_metadata():
     # Test device info
     device_info = s.device_info
     assert device_info["manufacturer"] == "Hitachi"
-    assert device_info["model"] == "Hitachi Installation Installation"
+    assert device_info["model"] == "HVAC System"
     assert device_info["sw_version"] == "1.0.0"
 
     # Test unique id

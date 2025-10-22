@@ -154,7 +154,7 @@ class CSNetHomeAPI:
                         for index, element in enumerate(elements):
                             sensor = {
                                 "device_name": element.get("deviceName")
-                                or "ATW-IOT-01",
+                                or "Remote",
                                 "device_id": element.get("deviceId"),
                                 "room_name": element.get("parentName")
                                 or f"Room-{element.get('parentId')}-{index}",

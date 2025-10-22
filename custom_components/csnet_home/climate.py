@@ -121,7 +121,7 @@ class CSNetHomeClimate(ClimateEntity):
         return DeviceInfo(
             name=f"{self._sensor_data['device_name']}-{self._sensor_data['room_name']}",
             manufacturer="Hitachi",
-            model=f"{self._common_data['name']} ATW-IOT-01",
+            model=f"{self._common_data['name']} Remote Controller",
             sw_version=self._common_data["firmware"],
             identifiers={
                 (
