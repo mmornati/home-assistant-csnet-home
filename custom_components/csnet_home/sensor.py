@@ -73,9 +73,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
     if installation_devices_data:
         # Create a global device for installation-level sensors
         global_device_data = {
-            "device_name": "Installation",
+            "device_name": "System",
             "device_id": "global",
-            "room_name": "Global",
+            "room_name": "Controller",
             "parent_id": "global",
             "room_id": "global",
         }
