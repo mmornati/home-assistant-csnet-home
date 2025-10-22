@@ -44,11 +44,12 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         # ensure translations are loaded before elements to enrich alarm messages
         await cloud_api.load_translations()
 
-        # Fetch both elements data and installation devices data
+        # Fetch elements data, installation devices data, and alarms
         elements_data = await cloud_api.async_get_elements_data()
         installation_devices_data = (
             await cloud_api.async_get_installation_devices_data()
         )
+        installation_alarms_data = await cloud_api.async_get_installation_alarms()
 
         if elements_data:
             self._device_data = elements_data
@@ -60,6 +61,12 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
             self._device_data["common_data"][
                 "installation_devices"
             ] = installation_devices_data
+
+        # Add installation alarms data to common_data
+        if installation_alarms_data and self._device_data.get("common_data"):
+            self._device_data["common_data"][
+                "installation_alarms"
+            ] = installation_alarms_data
 
         # Raise notification if new alarm codes appear
         try:
@@ -113,3 +120,8 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         """Return installation devices data."""
 
         return self._device_data.get("common_data", {}).get("installation_devices", {})
+
+    def get_installation_alarms_data(self):
+        """Return installation alarms data."""
+
+        return self._device_data.get("common_data", {}).get("installation_alarms", {})

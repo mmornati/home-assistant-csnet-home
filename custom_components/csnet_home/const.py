@@ -5,6 +5,7 @@ API_URL = "https://www.csnetmanager.com"
 LOGIN_PATH = "/login"
 ELEMENTS_PATH = "/data/elements"
 INSTALLATION_DEVICES_PATH = "/data/installationdevices"
+INSTALLATION_ALARMS_PATH = "/data/installationalarms"
 HEAT_SETTINGS_PATH = "/data/indoor/heat_setting"
 CONF_ENABLE_DEVICE_LOGGING = "enable_device_logging"
 COMMON_API_HEADERS = {

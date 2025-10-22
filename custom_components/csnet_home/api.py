@@ -16,6 +16,7 @@ from custom_components.csnet_home.const import (
     DEFAULT_API_TIMEOUT,
     ELEMENTS_PATH,
     INSTALLATION_DEVICES_PATH,
+    INSTALLATION_ALARMS_PATH,
     HEAT_SETTINGS_PATH,
     LOGIN_PATH,
     LANGUAGE_FILES,
@@ -40,6 +41,7 @@ class CSNetHomeAPI:
         self.logged_in = False
         self.xsrf_token = None
         self.translations = {}
+        self.installation_id = None
 
     async def get_xsrf_token(self):
         """Get the XSRF token from the cloud service."""
@@ -135,6 +137,10 @@ class CSNetHomeAPI:
                         # Parse the sensor data from the API response
                         elements = data.get("data", {}).get("elements", [])
                         sensors = []
+
+                        # Store installation ID for alarm API calls
+                        self.installation_id = data.get("data", {}).get("installation")
+
                         common_data = {
                             "name": data.get("data", {}).get("name"),
                             "latitude": data.get("data", {}).get("latitude"),
@@ -228,6 +234,42 @@ class CSNetHomeAPI:
                     return None
         except Exception as e:
             _LOGGER.error("Error during installation devices data retrieval: %s", e)
+            self.logged_in = False
+            return None
+
+    async def async_get_installation_alarms(self):
+        """Get installation alarms data from the cloud service."""
+        if not self.installation_id:
+            _LOGGER.debug("No installation ID available, skipping alarm fetch")
+            return None
+
+        installation_alarms_url = (
+            f"{self.base_url}{INSTALLATION_ALARMS_PATH}"
+            f"?installationId={self.installation_id}&_csrf={self.xsrf_token}"
+        )
+
+        if not self.session or not self.logged_in:
+            _LOGGER.warning("No active session found.")
+            await self.async_login()
+
+        headers = COMMON_API_HEADERS | {
+            "accept": "*/*",
+            "x-requested-with": "XMLHttpRequest",
+        }
+
+        try:
+            async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+                async with self.session.get(
+                    installation_alarms_url, headers=headers, cookies=self.cookies
+                ) as response:
+                    data = await self.check_api_response(response)
+                    if data is not None:
+                        _LOGGER.debug("Installation alarms data retrieved: %s", data)
+                        return data
+                    _LOGGER.error("Error in installation alarms API response")
+                    return None
+        except Exception as e:
+            _LOGGER.error("Error during installation alarms data retrieval: %s", e)
             self.logged_in = False
             return None
 
