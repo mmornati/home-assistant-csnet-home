@@ -411,6 +411,14 @@ class CSNetHomeAPI:
             else:
                 # Air circuits: only set runStopC{X}Air, not water
                 data[f"runStopC{circuit_id}Air"] = "1"
+        elif hvac_mode_lower == "heat_cool":
+            data["mode"] = "2"
+            if is_water_circuit:
+                # Water circuits: only set runStopC{X}, not Air
+                data[f"runStopC{circuit_id}"] = "1"
+            else:
+                # Air circuits: only set runStopC{X}Air, not water
+                data[f"runStopC{circuit_id}Air"] = "1"
         elif hvac_mode_lower == "off":
             # only stop — do not send "mode" to preserve last setting
             if is_water_circuit:
