@@ -8,9 +8,13 @@
 #   - Creates and pushes git tag (safe if tag already exists)
 #   - Creates GitHub release (safe if release already exists)
 #
-# Stage 2 (build_and_upload_zip - triggered by release publish):
+# Stage 2 (build_and_upload_zip - triggered by release publish OR manual):
 #   - Builds integration zip from the tagged commit
 #   - Uploads zip to the GitHub release
+#
+# Manual Triggers:
+#   - Full release: Set version, leave build_zip_only unchecked
+#   - Zip only: Set version, check build_zip_only (for existing releases)
 #
 # Safety Features:
 #   ✅ Idempotent - safe to re-run for the same version
@@ -18,6 +22,7 @@
 #   ✅ Handles existing tags gracefully
 #   ✅ Handles existing releases gracefully
 #   ✅ Two-stage process prevents git conflicts
+#   ✅ Can manually build zip for existing releases
 #
 name: Release Workflow
 
@@ -28,6 +33,11 @@ name: Release Workflow
         description: 'Version number (e.g., v1.4.3)'
         required: true
         type: string
+      build_zip_only:
+        description: 'Only build and upload zip (skip release creation)'
+        required: false
+        type: boolean
+        default: false
   release:
     types: [published]
 
@@ -38,7 +48,7 @@ permissions:
 jobs:
   # This job runs when manually triggered to prepare a release
   prepare_release:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && !inputs.build_zip_only
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -140,29 +150,41 @@ jobs:
             console.log(`Created release ${release.html_url}`);
 
   # This job runs when a release is published to create and upload the zip
+  # OR when manually triggered with build_zip_only option
   build_and_upload_zip:
-    if: github.event_name == 'release' && github.event.release.draft == false
+    if: |
+      (github.event_name == 'release' && github.event.release.draft == false) ||
+      (github.event_name == 'workflow_dispatch' && inputs.build_zip_only)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v5.0.0
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.version }}
           fetch-depth: 0
 
       - name: Debug Release Info
         run: |
           echo "Event: ${{ github.event_name }}"
-          echo "Tag: ${{ github.event.release.tag_name }}"
-          echo "Target: ${{ github.event.release.target_commitish }}"
-          echo "Draft: ${{ github.event.release.draft }}"
-          echo "Prerelease: ${{ github.event.release.prerelease }}"
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "Tag: ${{ github.event.release.tag_name }}"
+            echo "Target: ${{ github.event.release.target_commitish }}"
+            echo "Draft: ${{ github.event.release.draft }}"
+            echo "Prerelease: ${{ github.event.release.prerelease }}"
+          else
+            echo "Manual trigger for version: ${{ inputs.version }}"
+          fi
 
       - name: Verify Manifest Version
         run: |
           MANIFEST_VERSION=$(grep -o '"version": "[^"]*"' \
             ./custom_components/csnet_home/manifest.json | cut -d'"' -f4)
-          TAG_VERSION="${{ github.event.release.tag_name }}"
+
+          if [ "${{ github.event_name }}" = "release" ]; then
+            TAG_VERSION="${{ github.event.release.tag_name }}"
+          else
+            TAG_VERSION="${{ inputs.version }}"
+          fi
           TAG_VERSION_NO_V="${TAG_VERSION#v}"
 
           echo "Manifest version: ${MANIFEST_VERSION}"
@@ -198,7 +220,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: ./custom_components/csnet_home/hass-custom-csnet-home.zip
-          tag_name: ${{ github.event.release.tag_name }}
+          tag_name: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.version }}
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -206,7 +228,7 @@ jobs:
       - name: Upload Zip as Artifact
         uses: actions/upload-artifact@v4.6.2
         with:
-          name: hass-custom-csnet-home-${{ github.event.release.tag_name }}
+          name: hass-custom-csnet-home-${{ github.event_name == 'release' && github.event.release.tag_name || inputs.version }}
           path: ./custom_components/csnet_home/hass-custom-csnet-home.zip
           if-no-files-found: error
           retention-days: 90
