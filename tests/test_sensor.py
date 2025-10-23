@@ -10,6 +10,8 @@ from custom_components.csnet_home.sensor import (
     CSNetHomeSensor,
     CSNetHomeInstallationSensor,
     CSNetHomeDeviceSensor,
+    CSNetHomeAlarmHistorySensor,
+    CSNetHomeAlarmStatisticsSensor,
 )
 
 
@@ -1416,3 +1418,238 @@ def test_wifi_signal_different_values():
     # Test with medium signal
     common_data["device_status"][1709]["rssi"] = -70
     assert s.state == -70
+
+
+def test_enhanced_alarm_sensors():
+    """Test enhanced alarm sensors (alarm_code_formatted, alarm_origin, unit_type)."""
+    coordinator, sensor_data, common = build_context()
+
+    # Add enhanced alarm fields to sensor_data
+    sensor_data["alarm_code"] = 62
+    sensor_data["alarm_code_formatted"] = "62"
+    sensor_data["alarm_origin"] = "Indoor Unit"
+    sensor_data["unit_type"] = "yutaki"
+
+    # Test alarm_code_formatted sensor
+    s_formatted = CSNetHomeSensor(
+        coordinator, sensor_data, common, "alarm_code_formatted", "enum"
+    )
+    assert s_formatted.state == "62"
+
+    # Test alarm_origin sensor
+    s_origin = CSNetHomeSensor(coordinator, sensor_data, common, "alarm_origin", "enum")
+    assert s_origin.state == "Indoor Unit"
+
+    # Test unit_type sensor
+    s_type = CSNetHomeSensor(coordinator, sensor_data, common, "unit_type", "enum")
+    assert s_type.state == "yutaki"
+
+    # Test with BCD alarm code
+    sensor_data["alarm_code"] = 0x0162
+    sensor_data["alarm_code_formatted"] = "62"
+    s_formatted = CSNetHomeSensor(
+        coordinator, sensor_data, common, "alarm_code_formatted", "enum"
+    )
+    assert s_formatted.state == "62"
+
+
+def test_alarm_history_sensor():
+    """Test alarm history sensor."""
+    common_data = {
+        "name": "Test Installation",
+        "firmware": "1.0.0",
+    }
+
+    # Mock coordinator with alarm history
+    coordinator = SimpleNamespace(
+        get_common_data=lambda: common_data,
+        get_installation_alarms_data=lambda: {
+            "alarms": [
+                {
+                    "code": "62",
+                    "description": "Test Alarm 1",
+                    "timestamp": "2024-01-01T12:00:00",
+                    "device": "Device1",
+                },
+                {
+                    "code": "100",
+                    "description": "Test Alarm 2",
+                    "timestamp": "2024-01-01T13:00:00",
+                    "device": "Device2",
+                },
+            ],
+            "last_updated": "2024-01-01T14:00:00",
+        },
+    )
+
+    s = CSNetHomeAlarmHistorySensor(coordinator, common_data)
+
+    # Test state (number of alarms)
+    assert s.state == 2
+
+    # Test attributes
+    attrs = s.extra_state_attributes
+    assert "recent_alarms" in attrs
+    assert len(attrs["recent_alarms"]) == 2
+    assert attrs["total_alarms"] == 2
+    assert attrs["last_updated"] == "2024-01-01T14:00:00"
+    assert attrs["recent_alarms"][0]["code"] == "62"
+    assert attrs["recent_alarms"][1]["code"] == "100"
+
+
+def test_alarm_history_sensor_empty():
+    """Test alarm history sensor with no alarms."""
+    common_data = {
+        "name": "Test Installation",
+        "firmware": "1.0.0",
+    }
+
+    # Mock coordinator with no alarm history
+    coordinator = SimpleNamespace(
+        get_common_data=lambda: common_data,
+        get_installation_alarms_data=lambda: None,
+    )
+
+    s = CSNetHomeAlarmHistorySensor(coordinator, common_data)
+
+    # Test state (no alarms)
+    assert s.state == 0
+
+    # Test attributes
+    attrs = s.extra_state_attributes
+    assert attrs == {}
+
+
+def test_alarm_statistics_sensor_total_count():
+    """Test alarm statistics sensor for total alarm count."""
+    common_data = {
+        "name": "Test Installation",
+        "firmware": "1.0.0",
+    }
+
+    sensors_data = [
+        {
+            "device_name": "Device1",
+            "room_name": "Room1",
+            "alarm_code": 62,
+            "alarm_code_formatted": "62",
+        },
+        {
+            "device_name": "Device2",
+            "room_name": "Room2",
+            "alarm_code": 100,
+            "alarm_code_formatted": "100",
+        },
+        {
+            "device_name": "Device3",
+            "room_name": "Room3",
+            "alarm_code": 0,  # No alarm
+            "alarm_code_formatted": "0",
+        },
+    ]
+
+    # Mock coordinator
+    coordinator = SimpleNamespace(
+        get_common_data=lambda: common_data,
+        get_sensors_data=lambda: sensors_data,
+    )
+
+    s = CSNetHomeAlarmStatisticsSensor(
+        coordinator, common_data, "total_alarm_count", "Total Alarms"
+    )
+
+    # Test state (count of active alarms)
+    assert s.state == 2
+
+    # Test attributes
+    attrs = s.extra_state_attributes
+    assert "active_devices" in attrs
+    assert len(attrs["active_devices"]) == 2
+    assert attrs["active_devices"][0]["device"] == "Device1"
+    assert attrs["active_devices"][0]["code"] == 62
+
+
+def test_alarm_statistics_sensor_by_origin():
+    """Test alarm statistics sensor for alarms by origin."""
+    common_data = {
+        "name": "Test Installation",
+        "firmware": "1.0.0",
+    }
+
+    sensors_data = [
+        {
+            "device_name": "Device1",
+            "room_name": "Room1",
+            "alarm_code": 62,
+            "alarm_origin": "Indoor Unit",
+        },
+        {
+            "device_name": "Device2",
+            "room_name": "Room2",
+            "alarm_code": 100,
+            "alarm_origin": "Indoor Unit",
+        },
+        {
+            "device_name": "Device3",
+            "room_name": "Room3",
+            "alarm_code": 101,
+            "alarm_origin": "2nd Cycle",
+        },
+    ]
+
+    # Mock coordinator
+    coordinator = SimpleNamespace(
+        get_common_data=lambda: common_data,
+        get_sensors_data=lambda: sensors_data,
+    )
+
+    s = CSNetHomeAlarmStatisticsSensor(
+        coordinator, common_data, "alarm_by_origin", "Alarms by Origin"
+    )
+
+    # Test state (count of most common origin)
+    assert s.state == 2  # "Indoor Unit" appears twice
+
+    # Test attributes
+    attrs = s.extra_state_attributes
+    assert "origin_distribution" in attrs
+    assert attrs["origin_distribution"]["Indoor Unit"] == 2
+    assert attrs["origin_distribution"]["2nd Cycle"] == 1
+    assert attrs["most_common_origin"] == "Indoor Unit"
+
+
+def test_alarm_statistics_sensor_no_alarms():
+    """Test alarm statistics sensor with no active alarms."""
+    common_data = {
+        "name": "Test Installation",
+        "firmware": "1.0.0",
+    }
+
+    sensors_data = [
+        {
+            "device_name": "Device1",
+            "room_name": "Room1",
+            "alarm_code": 0,
+        },
+        {
+            "device_name": "Device2",
+            "room_name": "Room2",
+            "alarm_code": 0,
+        },
+    ]
+
+    # Mock coordinator
+    coordinator = SimpleNamespace(
+        get_common_data=lambda: common_data,
+        get_sensors_data=lambda: sensors_data,
+    )
+
+    s_total = CSNetHomeAlarmStatisticsSensor(
+        coordinator, common_data, "total_alarm_count", "Total Alarms"
+    )
+    assert s_total.state == 0
+
+    s_origin = CSNetHomeAlarmStatisticsSensor(
+        coordinator, common_data, "alarm_by_origin", "Alarms by Origin"
+    )
+    assert s_origin.state == 0

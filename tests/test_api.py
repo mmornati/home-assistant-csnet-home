@@ -299,6 +299,9 @@ async def test_api_get_elements_data_success(mock_aiohttp_client, hass):
                 "zone_id": 1,
                 "fan1_speed": None,
                 "fan2_speed": None,
+                "unit_type": "standard",
+                "alarm_code_formatted": "0",
+                "alarm_origin": "",
             },
             {
                 "device_name": "Hitachi PAC",
@@ -323,6 +326,9 @@ async def test_api_get_elements_data_success(mock_aiohttp_client, hass):
                 "zone_id": 2,
                 "fan1_speed": None,
                 "fan2_speed": None,
+                "unit_type": "standard",
+                "alarm_code_formatted": "0",
+                "alarm_origin": "",
             },
         ],
     }
@@ -492,6 +498,9 @@ async def test_api_get_elements_data_empty_names(mock_aiohttp_client, hass):
                 "zone_id": 1,
                 "fan1_speed": None,
                 "fan2_speed": None,
+                "unit_type": "standard",
+                "alarm_code_formatted": "0",
+                "alarm_origin": "",
             },
             {
                 "device_name": "Remote",
@@ -516,6 +525,9 @@ async def test_api_get_elements_data_empty_names(mock_aiohttp_client, hass):
                 "zone_id": 2,
                 "fan1_speed": None,
                 "fan2_speed": None,
+                "unit_type": "standard",
+                "alarm_code_formatted": "0",
+                "alarm_origin": "",
             },
         ],
     }
@@ -1811,3 +1823,326 @@ async def test_api_get_elements_data_with_fan_speeds(mock_aiohttp_client, hass):
     assert len(data["sensors"]) == 1
     assert data["sensors"][0]["fan1_speed"] == 2
     assert data["sensors"][0]["fan2_speed"] == 1
+
+
+# Enhanced Alarm Handling Tests
+
+
+def test_has_alarm_letter(hass):
+    """Test BCD alarm code detection."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    # Test with BCD alarm code (high byte set)
+    assert api.has_alarm_letter(0x0162) is True
+    assert api.has_alarm_letter(0xFF62) is True
+
+    # Test with non-BCD alarm code (high byte not set)
+    assert api.has_alarm_letter(0x0062) is False
+    assert api.has_alarm_letter(62) is False
+    assert api.has_alarm_letter(100) is False
+
+    # Test edge cases
+    assert api.has_alarm_letter(None) is False
+    assert api.has_alarm_letter(0) is False
+
+
+def test_reverse_bcd(hass):
+    """Test reverse BCD conversion."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    # Test BCD conversion examples from JavaScript
+    # reverseBCD(62) = (6-1)*16 + (2+10) = 5*16 + 12 = 80 + 12 = 92
+    assert api.reverse_bcd(62) == 92
+
+    # reverseBCD(91) = (9-1)*16 + (1+10) = 8*16 + 11 = 128 + 11 = 139
+    assert api.reverse_bcd(91) == 139
+
+    # reverseBCD(92) = (9-1)*16 + (2+10) = 8*16 + 12 = 128 + 12 = 140
+    assert api.reverse_bcd(92) == 140
+
+
+def test_get_alarm_code_formatted(hass):
+    """Test alarm code formatting."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    # Test with None and 0
+    assert api.get_alarm_code_formatted(None) == "0"
+    assert api.get_alarm_code_formatted(0) == "0"
+
+    # Test with non-BCD alarm code (should return decimal string)
+    assert api.get_alarm_code_formatted(62) == "62"
+    assert api.get_alarm_code_formatted(100) == "100"
+
+    # Test with BCD alarm code (should return hex string of the low byte)
+    # 0x0162: has letter=True, parsed=0x62, hex=62
+    assert api.get_alarm_code_formatted(0x0162) == "62"
+
+    # 0xFF62: has letter=True, parsed=0x62, hex=62
+    assert api.get_alarm_code_formatted(0xFF62) == "62"
+
+
+def test_get_correct_rad_hex_error_code(hass):
+    """Test RAD unit alarm code correction."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    # Test special cases (61, 63 are returned as-is)
+    assert api.get_correct_rad_hex_error_code(61) == 61
+    assert api.get_correct_rad_hex_error_code(63) == 63
+
+    # Test negative and zero (returned as-is)
+    assert api.get_correct_rad_hex_error_code(0) == 0
+    assert api.get_correct_rad_hex_error_code(-1) == -1
+
+    # Test range < 113 (subtract 0x0A = 10)
+    assert api.get_correct_rad_hex_error_code(100) == 90
+    assert api.get_correct_rad_hex_error_code(112) == 102
+
+    # Test range 113-129 (subtract 0x70 = 112)
+    assert api.get_correct_rad_hex_error_code(113) == 1
+    assert api.get_correct_rad_hex_error_code(120) == 8
+    assert api.get_correct_rad_hex_error_code(129) == 17
+
+    # Test range >= 130 (subtract 0x1C = 28)
+    assert api.get_correct_rad_hex_error_code(130) == 102
+    assert api.get_correct_rad_hex_error_code(150) == 122
+
+    # Test None
+    assert api.get_correct_rad_hex_error_code(None) == 0
+
+
+def test_get_unit_type(hass):
+    """Test unit type detection."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    # Test water heater (zone_id == 3)
+    sensor_data = {"zone_id": 3}
+    assert api.get_unit_type(sensor_data, None) == "water_heater"
+
+    # Test yutaki (zone_id == 5)
+    sensor_data = {"zone_id": 5}
+    assert api.get_unit_type(sensor_data, None) == "yutaki"
+
+    # Test fan coil detection from installation data
+    sensor_data = {"zone_id": 1}
+    installation_data = {
+        "heatingStatus": {"systemConfigBits": 0x2000}  # Fan coil bit set
+    }
+    assert api.get_unit_type(sensor_data, installation_data) == "fan_coil"
+
+    # Test standard unit (default)
+    sensor_data = {"zone_id": 1}
+    assert api.get_unit_type(sensor_data, None) == "standard"
+
+    # Test standard unit with installation data but no fan coil bit
+    installation_data = {"heatingStatus": {"systemConfigBits": 0x0000}}
+    assert api.get_unit_type(sensor_data, installation_data) == "standard"
+
+
+def test_is_yutaki(hass):
+    """Test Yutaki system detection."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    # Test with yutaki zone
+    sensor_data = {"zone_id": 5}
+    assert api.is_yutaki(sensor_data, None) is True
+
+    # Test with water heater zone
+    sensor_data = {"zone_id": 3}
+    assert api.is_yutaki(sensor_data, None) is True
+
+    # Test with standard zone
+    sensor_data = {"zone_id": 1}
+    assert api.is_yutaki(sensor_data, None) is False
+
+
+def test_get_alarm_origin(hass):
+    """Test alarm origin detection."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    # Load mock translations
+    api.translations = {
+        "STR_ORIGIN_INVERTER": "Inverter",
+        "STR_ORIGIN_COMPRESSOR": "Compressor",
+        "STR_ORIGIN_OUTDOOR_FAN": "Outdoor Fan",
+        "STR_REFRIGERANT_CYCLE": "Refrigerant Cycle",
+        "STR_ORIGIN_TRANSMISSION": "Transmission",
+        "STR_ORIGIN_POWER_SUPPLY": "Power Supply",
+        "STR_ORIGIN_INDOOR": "Indoor Unit",
+        "STR_ORIGIN_2ND_CYCLE": "2nd Cycle",
+        "STR_ORIGIN_COMUNICATION": "Communication",
+    }
+
+    # Test with non-yutaki unit (should return empty string)
+    assert api.get_alarm_origin(100, "standard", None) == ""
+
+    # Test with yutaki unit and None alarm code
+    assert api.get_alarm_origin(None, "yutaki", None) == ""
+    assert api.get_alarm_origin(0, "yutaki", None) == ""
+
+    # Test with standard alarm codes (non-BCD)
+    assert api.get_alarm_origin(2, "yutaki", None) == "Refrigerant Cycle"
+    assert api.get_alarm_origin(3, "yutaki", None) == "Transmission"
+    assert api.get_alarm_origin(5, "yutaki", None) == "Power Supply"
+    assert api.get_alarm_origin(10, "yutaki", None) == "Indoor Unit"
+    assert api.get_alarm_origin(60, "yutaki", None) == "Communication"
+
+    # Test with grouped alarm codes
+    assert api.get_alarm_origin(11, "yutaki", None) == "Indoor Unit"
+    assert api.get_alarm_origin(13, "yutaki", None) == "Indoor Unit"
+    assert api.get_alarm_origin(101, "yutaki", None) == "2nd Cycle"
+    assert api.get_alarm_origin(105, "yutaki", None) == "2nd Cycle"
+
+    # Test with water_heater unit type
+    assert api.get_alarm_origin(2, "water_heater", None) == "Refrigerant Cycle"
+
+
+def test_get_alarm_origin_bcd(hass):
+    """Test alarm origin detection with BCD alarm codes."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    # Load mock translations
+    api.translations = {
+        "STR_ORIGIN_INVERTER": "Inverter",
+        "STR_ORIGIN_COMPRESSOR": "Compressor",
+        "STR_ORIGIN_OUTDOOR_FAN": "Outdoor Fan",
+    }
+
+    # Test BCD alarm codes
+    # 0x0162: BCD format, value=0x62, reverse_bcd(62)=92, but BCD check happens first
+    # For BCD alarms, we check the reversed value first in BCD-specific section
+    # Actually, in the code, for BCD alarms we extract value then reverse it
+    # Let me check: is_bcd=True, value=0x62, reversed_value=92
+    # But in get_alarm_origin, if is_bcd, we check value==62 directly for BCD-specific origins
+
+    # Test BCD-specific origins (checked before reversing)
+    # The code checks the raw BCD value (62, 91, 92, 238) in BCD-specific section
+    assert api.get_alarm_origin(0x0162, "yutaki", None) == "Inverter"  # BCD value 62
+    assert api.get_alarm_origin(0xFF62, "yutaki", None) == "Inverter"  # BCD value 62
+
+
+@pytest.mark.asyncio
+async def test_async_get_elements_data_with_enhanced_alarm_fields(
+    mock_aiohttp_client, hass
+):
+    """Test that async_get_elements_data includes enhanced alarm fields."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    mock_response = mock_client_instance.get.return_value.__aenter__.return_value
+    mock_response.status = 200
+    mock_response.json = AsyncMock(
+        return_value={
+            "status": "success",
+            "data": {
+                "name": "My Home",
+                "installation": 12345,
+                "elements": [
+                    {
+                        "deviceName": "Device1",
+                        "deviceId": "dev1",
+                        "parentName": "Room1",
+                        "parentId": "parent1",
+                        "roomId": "room1",
+                        "operationStatus": 1,
+                        "mode": 1,
+                        "realMode": 1,
+                        "onOff": 1,
+                        "timerRunning": 0,
+                        "alarmCode": 62,  # Test alarm code
+                        "c1Demand": 50,
+                        "c2Demand": 30,
+                        "ecocomfort": 1,
+                        "doingBoost": 0,
+                        "silentMode": 0,
+                        "currentTemperature": 20.5,
+                        "settingTemperature": 22.0,
+                        "elementType": 5,  # Yutaki type
+                        "fan1Speed": 2,
+                        "fan2Speed": 1,
+                    }
+                ],
+                "device_status": [],
+            },
+        }
+    )
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.session = mock_client_instance
+    api.logged_in = True
+    api.translations = {"alarm_62": "Test Alarm Message"}
+
+    data = await api.async_get_elements_data()
+
+    assert data is not None
+    assert len(data["sensors"]) == 1
+    sensor = data["sensors"][0]
+
+    # Check enhanced alarm fields
+    assert "alarm_code" in sensor
+    assert sensor["alarm_code"] == 62
+    assert "alarm_code_formatted" in sensor
+    assert sensor["alarm_code_formatted"] == "62"  # Non-BCD alarm
+    assert "unit_type" in sensor
+    assert sensor["unit_type"] == "yutaki"  # Zone 5 is yutaki
+    assert "alarm_origin" in sensor
+    # alarm_origin should be populated for yutaki units
+    assert isinstance(sensor["alarm_origin"], str)
+
+
+@pytest.mark.asyncio
+async def test_async_get_elements_data_with_bcd_alarm(mock_aiohttp_client, hass):
+    """Test async_get_elements_data with BCD-encoded alarm code."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    mock_response = mock_client_instance.get.return_value.__aenter__.return_value
+    mock_response.status = 200
+    mock_response.json = AsyncMock(
+        return_value={
+            "status": "success",
+            "data": {
+                "name": "My Home",
+                "installation": 12345,
+                "elements": [
+                    {
+                        "deviceName": "Device1",
+                        "deviceId": "dev1",
+                        "parentName": "Room1",
+                        "parentId": "parent1",
+                        "roomId": "room1",
+                        "operationStatus": 1,
+                        "mode": 1,
+                        "realMode": 1,
+                        "onOff": 1,
+                        "timerRunning": 0,
+                        "alarmCode": 0x0162,  # BCD alarm code
+                        "c1Demand": 50,
+                        "c2Demand": 30,
+                        "ecocomfort": 1,
+                        "doingBoost": 0,
+                        "silentMode": 0,
+                        "currentTemperature": 20.5,
+                        "settingTemperature": 22.0,
+                        "elementType": 5,  # Yutaki type
+                        "fan1Speed": 2,
+                        "fan2Speed": 1,
+                    }
+                ],
+                "device_status": [],
+            },
+        }
+    )
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.session = mock_client_instance
+    api.logged_in = True
+    api.translations = {}
+
+    data = await api.async_get_elements_data()
+
+    assert data is not None
+    assert len(data["sensors"]) == 1
+    sensor = data["sensors"][0]
+
+    # Check BCD alarm code formatting
+    assert sensor["alarm_code"] == 0x0162
+    assert sensor["alarm_code_formatted"] == "62"  # BCD format: 0x62
+    assert sensor["unit_type"] == "yutaki"

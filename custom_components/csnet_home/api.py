@@ -165,6 +165,7 @@ class CSNetHomeAPI:
                             },
                         }
                         for index, element in enumerate(elements):
+                            alarm_code = element.get("alarmCode")
                             sensor = {
                                 "device_name": element.get("deviceName") or "Remote",
                                 "device_id": element.get("deviceId"),
@@ -179,10 +180,8 @@ class CSNetHomeAPI:
                                 "real_mode": element.get("realMode"),
                                 "on_off": element.get("onOff"),  # 0 = Off, 1 = On
                                 "timer_running": element.get("timerRunning"),
-                                "alarm_code": element.get("alarmCode"),
-                                "alarm_message": self.translate_alarm(
-                                    element.get("alarmCode")
-                                ),
+                                "alarm_code": alarm_code,
+                                "alarm_message": self.translate_alarm(alarm_code),
                                 "c1_demand": element.get("c1Demand"),
                                 "c2_demand": element.get("c2Demand"),
                                 "ecocomfort": element.get(
@@ -206,6 +205,18 @@ class CSNetHomeAPI:
                                     "fan2Speed"
                                 ),  # Fan speed for C2 circuit
                             }
+
+                            # Add enhanced alarm fields
+                            # Note: installation_devices_data is not available here,
+                            # but coordinator can enrich with this data later if needed
+                            sensor["unit_type"] = self.get_unit_type(sensor, None)
+                            sensor[
+                                "alarm_code_formatted"
+                            ] = self.get_alarm_code_formatted(alarm_code)
+                            sensor["alarm_origin"] = self.get_alarm_origin(
+                                alarm_code, sensor["unit_type"], None
+                            )
+
                             sensors.append(sensor)
                         _LOGGER.debug("Retrieved Sensors: %s", sensors)
                         data_elements = {"common_data": common_data, "sensors": sensors}
@@ -925,6 +936,218 @@ class CSNetHomeAPI:
                             self.translations.update(data or {})
             except Exception as e:
                 _LOGGER.debug("Translation load failed for %s: %s", ep, e)
+
+    def has_alarm_letter(self, alarm_code: int) -> bool:
+        """Check if alarm code has letter format (BCD encoded)."""
+        if alarm_code is None:
+            return False
+        return (alarm_code & 0xFF00) > 0
+
+    def reverse_bcd(self, val: int) -> int:
+        """Reverse BCD conversion for alarm codes."""
+        aux1 = (val // 10) - 1
+        aux2 = (val % 10) + 10
+        return (aux1 * 16) + aux2
+
+    def get_alarm_code_formatted(self, alarm_code: int) -> str:
+        """Format alarm code as hex (if BCD) or decimal."""
+        if alarm_code is None or alarm_code == 0:
+            return "0"
+
+        if self.has_alarm_letter(alarm_code):
+            # Extract low byte and convert it to hex directly (BCD format)
+            code_parsed = alarm_code & 0x00FF
+            return format(code_parsed, "X")
+        return str(alarm_code)
+
+    def get_correct_rad_hex_error_code(self, alarm_code: int) -> int:
+        """Apply RAD unit alarm code correction."""
+        if alarm_code is None:
+            return 0
+        if alarm_code == 61 or alarm_code == 63:
+            return alarm_code
+        if alarm_code <= 0:
+            return alarm_code
+        if alarm_code < 113:
+            return alarm_code - 0x0A
+        if alarm_code < 130:
+            return alarm_code - 0x70
+        return alarm_code - 0x1C
+
+    def get_unit_type(
+        self, sensor_data: dict, installation_devices_data: dict = None
+    ) -> str:
+        """Detect unit type based on sensor data and installation configuration."""
+        zone_id = sensor_data.get("zone_id")
+
+        # Zone 3 is typically DHW (water heater)
+        if zone_id == 3:
+            return "water_heater"
+
+        # Zone 5 is typically water circuit (Yutaki/Hydro)
+        if zone_id == 5:
+            return "yutaki"
+
+        # Check installation_devices_data for more specific type detection
+        if installation_devices_data:
+            heating_status = installation_devices_data.get("heatingStatus", {})
+            system_config_bits = heating_status.get("systemConfigBits", 0)
+
+            # Check for fan coil system (bit 0x2000)
+            if (system_config_bits & 0x2000) > 0:
+                return "fan_coil"
+
+        # Default to standard air unit
+        return "standard"
+
+    def is_yutaki(
+        self, sensor_data: dict, installation_devices_data: dict = None
+    ) -> bool:
+        """Check if unit is a Yutaki (water module) system."""
+        unit_type = self.get_unit_type(sensor_data, installation_devices_data)
+        return unit_type in ["yutaki", "water_heater"]
+
+    def get_alarm_origin(
+        self, alarm_code: int, unit_type: str, installation_devices_data: dict = None
+    ) -> str:
+        """Get alarm origin description based on code and unit type."""
+        # Only provide origin for Yutaki/water systems
+        if unit_type not in ["yutaki", "water_heater"]:
+            return ""
+
+        if alarm_code is None or alarm_code == 0:
+            return ""
+
+        is_bcd = self.has_alarm_letter(alarm_code)
+
+        # Extract the raw byte value first (before reversing)
+        raw_value = (alarm_code & 0x00FF) if is_bcd else alarm_code
+
+        # Determine R290 and other unit characteristics from installation data
+        # For now, use simplified logic without R290/mirror detection
+        r290 = False
+        is_mirror = False
+
+        # Map alarm codes to origin keys based on JavaScript implementation
+        origin_key = None
+
+        # BCD-specific origins (check raw value BEFORE reversing)
+        # Note: raw_value is the hex byte value (e.g., 0x62 = 98 decimal)
+        if is_bcd:
+            if raw_value == 0x62:
+                origin_key = "STR_ORIGIN_INVERTER"
+            elif raw_value in [0x5B, 0x5C]:  # 91, 92 in hex
+                origin_key = "STR_ORIGIN_OUTDOOR_FAN"
+            elif raw_value == 0xEE:  # 238 in hex
+                origin_key = "STR_ORIGIN_COMPRESSOR"
+
+        # If we found a BCD-specific origin, return it
+        if origin_key and origin_key in self.translations:
+            return self.translations[origin_key]
+
+        # Now reverse the value for standard lookup
+        if is_bcd:
+            value = self.reverse_bcd(raw_value)
+        else:
+            value = alarm_code
+
+        # Standard alarm code origins
+        if not origin_key:
+            origin_map = {
+                2: "STR_REFRIGERANT_CYCLE",
+                3: "STR_ORIGIN_TRANSMISSION",
+                4: "STR_ORIGIN_TRANSMISSION",
+                5: "STR_ORIGIN_POWER_SUPPLY",
+                6: "STR_ORIGIN_VOLTAGE",
+                7: "STR_REFRIGERANT_CYCLE",
+                8: "STR_REFRIGERANT_CYCLE",
+                10: "STR_ORIGIN_INDOOR",
+                23: "STR_ORIGIN_2ND_CYCLE",
+                27: "STR_ORIGIN_OUTDOOR",
+                31: "STR_ORIGIN_SYSTEM",
+                35: "STR_ORIGIN_SYSTEM",
+                36: "STR_ORIGIN_SYSTEM",
+                41: "STR_ORIGIN_INDOOR",
+                42: "STR_REFRIGERANT_CYCLE",
+                43: "STR_REFRIGERANT_CYCLE",
+                44: "STR_REFRIGERANT_CYCLE",
+                45: "STR_REFRIGERANT_CYCLE",
+                46: "STR_REFRIGERANT_CYCLE",
+                47: "STR_REFRIGERANT_CYCLE",
+                48: "STR_ORIGIN_INVERTER",
+                49: "STR_REFRIGERANT_CYCLE",
+                51: "STR_ORIGIN_INVERTER",
+                53: "STR_ORIGIN_INVERTER",
+                54: "STR_ORIGIN_INVERTER",
+                55: "STR_ORIGIN_INVERTER",
+                57: "STR_ORIGIN_OUTDOOR_FAN",
+                60: "STR_ORIGIN_COMUNICATION",
+                61: "STR_ORIGIN_COMUNICATION",
+                77: "STR_ORIGIN_INDOOR_UNIT_CONTROLLER",
+                78: "STR_ORIGIN_INDOOR_UNIT_CONTROLLER",
+                79: "STR_ORIGIN_SYSTEM",
+                80: "STR_ORIGIN_INDOOR_UNIT_CONTROLLER",
+                81: "STR_ORIGIN_INDOOR",
+                85: "STR_ORIGIN_INDOOR",
+                91: "STR_ORIGIN_OUTDOOR_FAN",
+                92: "STR_ORIGIN_OUTDOOR_FAN",
+                238: "STR_ORIGIN_COMPRESSOR",
+            }
+
+            # Group mappings for similar origins
+            if value in [11, 12, 13, 14, 75, 76, 83]:
+                origin_key = "STR_ORIGIN_INDOOR"
+            elif value in [15, 16, 17, 18, 19, 25, 33, 34, 40, 72, 73, 74]:
+                origin_key = "STR_ORIGIN_INDOOR"
+            elif value in [20, 21, 22, 24, 28, 29, 38, 59]:
+                origin_key = "STR_ORIGIN_OUTDOOR"
+            elif value == 26:
+                origin_key = "STR_ORIGIN_INDOOR"
+            elif value in [70, 71, 84, 90]:
+                origin_key = "STR_ORIGIN_INDOOR"
+            elif value in [
+                101,
+                102,
+                103,
+                104,
+                105,
+                106,
+                124,
+                125,
+                126,
+                127,
+                128,
+                129,
+                130,
+                132,
+                134,
+                135,
+                136,
+                151,
+                152,
+                153,
+                154,
+                155,
+                156,
+                157,
+            ]:
+                origin_key = "STR_ORIGIN_2ND_CYCLE"
+            elif value in [202, 203, 204, 205]:
+                origin_key = "STR_ORIGIN_INDOOR"
+            elif value in [208, 209]:
+                origin_key = "STR_ORIGIN_CASCADE_CONTROLLER"
+            elif value in [211, 212, 213, 214, 215, 216, 217, 218]:
+                origin_key = "STR_ORIGIN_CASCADE_MODULE"
+            elif value == 220:
+                origin_key = "STR_ORIGIN_UNIT_CONTROLLER"
+            else:
+                origin_key = origin_map.get(value)
+
+        # Translate the origin key if found
+        if origin_key and origin_key in self.translations:
+            return self.translations[origin_key]
+
+        return ""
 
     def translate_alarm(self, code):
         """Return localized alarm message for a numeric code if available."""
