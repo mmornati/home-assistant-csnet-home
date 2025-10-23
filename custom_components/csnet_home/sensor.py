@@ -970,9 +970,9 @@ class CSNetHomeAlarmStatisticsSensor(CoordinatorEntity, Entity):
             origin_counts = Counter(origins)
             return {
                 "origin_distribution": dict(origin_counts),
-                "most_common_origin": origin_counts.most_common(1)[0][0]
-                if origin_counts
-                else None,
+                "most_common_origin": (
+                    origin_counts.most_common(1)[0][0] if origin_counts else None
+                ),
             }
 
         return {}
