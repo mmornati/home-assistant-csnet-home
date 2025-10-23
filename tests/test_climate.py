@@ -9,7 +9,11 @@ from homeassistant.components.climate import HVACAction, HVACMode, FAN_AUTO, FAN
 from homeassistant.components.climate.const import ClimateEntityFeature
 
 from custom_components.csnet_home.climate import CSNetHomeClimate
-from custom_components.csnet_home.const import DOMAIN
+from custom_components.csnet_home.const import (
+    DOMAIN,
+    HEATING_MIN_TEMPERATURE,
+    HEATING_MAX_TEMPERATURE,
+)
 
 
 def build_entity(
@@ -407,11 +411,6 @@ def test_dynamic_temperature_limits_fallback_to_defaults(hass):
     hass.data[DOMAIN][entity.entry.entry_id]["coordinator"] = mock_coordinator
 
     # Test that defaults are used
-    from custom_components.csnet_home.const import (
-        HEATING_MIN_TEMPERATURE,
-        HEATING_MAX_TEMPERATURE,
-    )
-
     assert entity.min_temp == HEATING_MIN_TEMPERATURE
     assert entity.max_temp == HEATING_MAX_TEMPERATURE
 
