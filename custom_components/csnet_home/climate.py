@@ -91,7 +91,7 @@ class CSNetHomeClimate(ClimateEntity):
     @property
     def hvac_mode(self):
         """Return the current operation mode."""
-        # Operation mode can be COOL, HEAT, OFF (AUTO not reliably settable)
+        # Operation mode can be COOL (0), HEAT (1), AUTO (2), or OFF
         if self._sensor_data is None:
             return HVACMode.OFF
         if self._sensor_data.get("on_off") == 0:
@@ -101,6 +101,8 @@ class CSNetHomeClimate(ClimateEntity):
             return HVACMode.COOL
         if mode == 1:
             return HVACMode.HEAT
+        if mode == 2:
+            return HVACMode.HEAT_COOL
         return HVACMode.OFF
 
     @property
@@ -208,9 +210,15 @@ class CSNetHomeClimate(ClimateEntity):
         desired_mode = self.hvac_mode
         if desired_mode == HVACMode.OFF:
             # fallback to last known mode or HEAT
-            desired_mode = (
-                HVACMode.HEAT if self._sensor_data.get("mode") != 0 else HVACMode.COOL
-            )
+            mode = self._sensor_data.get("mode")
+            if mode == 0:
+                desired_mode = HVACMode.COOL
+            elif mode == 1:
+                desired_mode = HVACMode.HEAT
+            elif mode == 2:
+                desired_mode = HVACMode.HEAT_COOL
+            else:
+                desired_mode = HVACMode.HEAT
         await self.async_set_hvac_mode(desired_mode)
 
     async def async_turn_off(self) -> None:

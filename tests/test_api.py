@@ -789,6 +789,70 @@ async def test_api_set_hvac_mode_zone1_uses_circuit1(mock_aiohttp_client, hass):
 
 
 @pytest.mark.asyncio
+async def test_api_set_hvac_mode_auto_zone1_air(mock_aiohttp_client, hass):
+    """Test setting AUTO mode (heat_cool) for zone 1 (air circuit)."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    mock_response = mock_client_instance.post.return_value.__aenter__.return_value
+    mock_response.status = 200
+    mock_response.text = AsyncMock(return_value='{"status":"success"}')
+    mock_response.raise_for_status = AsyncMock()
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.session = mock_client_instance
+    api.logged_in = True
+    api.xsrf_token = "test-token"
+    api.cookies = {"test": "cookie"}
+
+    # Test with zone_id 1 setting AUTO mode
+    result = await api.async_set_hvac_mode(1, 1706, "heat_cool")
+
+    assert result is True
+    call_args = mock_client_instance.post.call_args
+    assert call_args is not None
+    data_sent = call_args[1]["data"]
+    # AUTO mode should set mode to "2"
+    assert data_sent["mode"] == "2"
+    # Zone 1 is air circuit, should only have runStopC1Air, not runStopC1
+    assert "runStopC1Air" in data_sent
+    assert data_sent["runStopC1Air"] == "1"
+    # Should NOT have water parameter for air circuits
+    assert "runStopC1" not in data_sent
+
+
+@pytest.mark.asyncio
+async def test_api_set_hvac_mode_auto_zone5_water(mock_aiohttp_client, hass):
+    """Test setting AUTO mode (heat_cool) for zone 5 (water circuit)."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    mock_response = mock_client_instance.post.return_value.__aenter__.return_value
+    mock_response.status = 200
+    mock_response.text = AsyncMock(return_value='{"status":"success"}')
+    mock_response.raise_for_status = AsyncMock()
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.session = mock_client_instance
+    api.logged_in = True
+    api.xsrf_token = "test-token"
+    api.cookies = {"test": "cookie"}
+
+    # Test with zone_id 5 setting AUTO mode
+    result = await api.async_set_hvac_mode(5, 2486, "heat_cool")
+
+    assert result is True
+    call_args = mock_client_instance.post.call_args
+    assert call_args is not None
+    data_sent = call_args[1]["data"]
+    # AUTO mode should set mode to "2"
+    assert data_sent["mode"] == "2"
+    # Zone 5 is water circuit, should only have runStopC1, not runStopC1Air
+    assert "runStopC1" in data_sent
+    assert data_sent["runStopC1"] == "1"
+    # Should NOT have Air parameter for water circuits
+    assert "runStopC1Air" not in data_sent
+
+
+@pytest.mark.asyncio
 async def test_api_set_preset_mode_zone5_uses_circuit1(mock_aiohttp_client, hass):
     """Test that zone_id 5 uses C1 in preset mode parameter names."""
     mock_client_instance = mock_aiohttp_client.return_value

@@ -81,6 +81,12 @@ def test_hvac_mode_mapping_cool(hass):
     assert entity.hvac_mode == HVACMode.COOL
 
 
+def test_hvac_mode_mapping_auto(hass):
+    """Return HEAT_COOL when on and mode=2."""
+    entity = build_entity(hass, mode=2, on_off=1)
+    assert entity.hvac_mode == HVACMode.HEAT_COOL
+
+
 def test_preset_mode(hass):
     """Map ecocomfort 0->eco and 1->comfort."""
     assert build_entity(hass, ecocomfort=0).preset_mode == "eco"
@@ -126,7 +132,7 @@ async def test_turn_off_calls_api(hass):
 
 @pytest.mark.asyncio
 async def test_turn_on_preserves_mode(hass):
-    """Restore last mode when turning on (heat/cool)."""
+    """Restore last mode when turning on (heat/cool/auto)."""
     # When last mode is heat
     entity = build_entity(hass, mode=1, on_off=0)
     api = hass.data[DOMAIN][entity.entry.entry_id]["api"]
@@ -140,6 +146,13 @@ async def test_turn_on_preserves_mode(hass):
     await entity.async_turn_on()
     called_args = api.async_set_hvac_mode.call_args[0]
     assert called_args[2] == HVACMode.COOL
+
+    # When last mode is auto
+    entity = build_entity(hass, mode=2, on_off=0)
+    api = hass.data[DOMAIN][entity.entry.entry_id]["api"]
+    await entity.async_turn_on()
+    called_args = api.async_set_hvac_mode.call_args[0]
+    assert called_args[2] == HVACMode.HEAT_COOL
 
 
 @pytest.mark.asyncio
