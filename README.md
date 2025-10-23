@@ -117,6 +117,8 @@ Please also consider commenting in the discussion that tracks additional paramet
 
 ## Development and testing locally
 
+### Python Tests
+
 This repo ships a basic test suite you can run without Home Assistant Supervisor:
 
 ```bash
@@ -130,6 +132,24 @@ What the tests cover:
 - API parsing of the `/data/elements` response
 - Coordinator update wiring
 - Climate entity behavior (hvac modes, presets, hvac_action, attributes, on/off, set temperature)
+
+### Workflow Testing
+
+Test GitHub Actions workflows locally before pushing:
+
+```bash
+./scripts/test-workflows.sh
+```
+
+This validates:
+- Workflow syntax and structure
+- YAML formatting
+- Shell scripts in workflows
+- Zip creation process
+
+See [Local Testing Guide](.github/LOCAL_TESTING.md) for detailed instructions and tool installation.
+
+### End-to-End Testing
 
 If you want to validate end-to-end in your HA instance:
 - Install the integration (HACS or manual)

@@ -37,7 +37,7 @@ jobs:
           # Remove 'v' prefix if present for manifest
           VERSION_NO_V="${VERSION#v}"
           sed -i "s/\"version\": \".*\"/\"version\": \"${VERSION_NO_V}\"/" ./custom_components/csnet_home/manifest.json
-          
+
       - name: Commit Version Update
         run: |
           git add custom_components/csnet_home/manifest.json
@@ -88,28 +88,42 @@ jobs:
           MANIFEST_VERSION=$(grep -Po '(?<="version": ")[^"]*' ./custom_components/csnet_home/manifest.json)
           TAG_VERSION="${{ github.event.release.tag_name }}"
           TAG_VERSION_NO_V="${TAG_VERSION#v}"
-          
+
           echo "Manifest version: ${MANIFEST_VERSION}"
           echo "Tag version: ${TAG_VERSION_NO_V}"
-          
+
           if [ "${MANIFEST_VERSION}" != "${TAG_VERSION_NO_V}" ]; then
             echo "ERROR: Manifest version (${MANIFEST_VERSION}) does not match tag version (${TAG_VERSION_NO_V})"
             exit 1
           fi
 
       - name: Create Zip Archive
-        uses: thedoctor0/zip-release@0.7.6
-        with:
-          type: 'zip'
-          filename: 'hass-custom-csnet-home.zip'
-          directory: ./custom_components/csnet_home
-          exclusions: '*.git* __pycache__/* *.pyc'
+        run: |
+          cd custom_components/csnet_home
+          # Remove any existing zip
+          rm -f hass-custom-csnet-home.zip
+          # Create zip with all files except git, cache, and python bytecode
+          zip -r hass-custom-csnet-home.zip . \
+            -x "*.git*" \
+            -x "*__pycache__*" \
+            -x "*.pyc" \
+            -x "*.pyo" \
+            -x "*.DS_Store" \
+            -x "*.pytest_cache*"
+          # Verify zip was created
+          if [ ! -f "hass-custom-csnet-home.zip" ]; then
+            echo "ERROR: Failed to create zip file"
+            exit 1
+          fi
+          echo "✅ Zip created successfully: $(ls -lh hass-custom-csnet-home.zip)"
+          zipinfo hass-custom-csnet-home.zip | head -20
 
       - name: Upload Zip to Release
         uses: softprops/action-gh-release@v2
         with:
           files: ./custom_components/csnet_home/hass-custom-csnet-home.zip
           tag_name: ${{ github.event.release.tag_name }}
+          fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -120,3 +134,4 @@ jobs:
           path: ./custom_components/csnet_home/hass-custom-csnet-home.zip
           if-no-files-found: error
           retention-days: 90
+          compression-level: 0
