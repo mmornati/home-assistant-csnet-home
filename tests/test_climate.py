@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from homeassistant.components.climate import HVACAction, HVACMode, FAN_AUTO, FAN_ON
+from homeassistant.components.climate.const import ClimateEntityFeature
 
 from custom_components.csnet_home.climate import CSNetHomeClimate
 from custom_components.csnet_home.const import DOMAIN
@@ -173,7 +174,7 @@ async def test_async_update_handles_missing_sensor_data(hass):
     assert entity.target_temperature is None
     assert entity.hvac_mode == HVACMode.OFF
     assert entity.preset_mode == "comfort"
-    assert entity.extra_state_attributes == {}
+    assert not entity.extra_state_attributes
     assert entity.hvac_action == HVACAction.IDLE
     assert entity.is_heating() is False
     assert entity.is_cooling() is False
@@ -267,6 +268,4 @@ def test_fan_modes_available(hass):
 def test_supported_features_includes_fan_mode(hass):
     """Verify FAN_MODE is in supported features."""
     entity = build_entity(hass)
-    from homeassistant.components.climate.const import ClimateEntityFeature
-
     assert entity.supported_features & ClimateEntityFeature.FAN_MODE
