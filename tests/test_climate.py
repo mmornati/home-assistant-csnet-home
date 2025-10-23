@@ -13,6 +13,18 @@ from custom_components.csnet_home.const import (
     DOMAIN,
     HEATING_MIN_TEMPERATURE,
     HEATING_MAX_TEMPERATURE,
+    OPST_OFF,
+    OPST_COOL_D_OFF,
+    OPST_COOL_T_OFF,
+    OPST_COOL_T_ON,
+    OPST_HEAT_D_OFF,
+    OPST_HEAT_T_OFF,
+    OPST_HEAT_T_ON,
+    OPST_DHW_OFF,
+    OPST_DHW_ON,
+    OPST_SWP_OFF,
+    OPST_SWP_ON,
+    OPST_ALARM,
 )
 
 
@@ -28,7 +40,8 @@ def build_entity(
     fan1_speed=None,
     fan2_speed=None,
     is_fan_coil=False,
-    zone_id=1
+    zone_id=1,
+    operation_status=5
 ):
     """Create a CSNetHomeClimate with minimal surroundings."""
     sensor_data = {
@@ -37,7 +50,7 @@ def build_entity(
         "room_name": "Living",
         "parent_id": 1706,
         "room_id": 395,
-        "operation_status": 5,
+        "operation_status": operation_status,
         "mode": mode,
         "real_mode": mode,
         "on_off": on_off,
@@ -653,3 +666,117 @@ def test_extra_state_attributes_for_non_fan_coil(hass):
     # Should not have fan speed attributes
     assert "fan1_speed" not in attrs or attrs["fan1_speed"] is None
     assert "fan2_speed" not in attrs or attrs["fan2_speed"] is None
+
+
+# Operation Status Decoding Tests
+def test_operation_status_off(hass):
+    """Test operation status decoding for OFF state."""
+    entity = build_entity(hass, operation_status=OPST_OFF)
+    attrs = entity.extra_state_attributes
+    assert attrs["operation_status"] == OPST_OFF
+    assert attrs["operation_status_text"] == "Off"
+
+
+def test_operation_status_cool_d_off(hass):
+    """Test operation status decoding for Cooling Demand Off."""
+    entity = build_entity(hass, operation_status=OPST_COOL_D_OFF)
+    attrs = entity.extra_state_attributes
+    assert attrs["operation_status"] == OPST_COOL_D_OFF
+    assert attrs["operation_status_text"] == "Cooling Demand Off"
+
+
+def test_operation_status_cool_t_off(hass):
+    """Test operation status decoding for Cooling Thermostat Off."""
+    entity = build_entity(hass, operation_status=OPST_COOL_T_OFF)
+    attrs = entity.extra_state_attributes
+    assert attrs["operation_status"] == OPST_COOL_T_OFF
+    assert attrs["operation_status_text"] == "Cooling Thermostat Off"
+
+
+def test_operation_status_cool_t_on(hass):
+    """Test operation status decoding for Cooling Thermostat On."""
+    entity = build_entity(hass, operation_status=OPST_COOL_T_ON)
+    attrs = entity.extra_state_attributes
+    assert attrs["operation_status"] == OPST_COOL_T_ON
+    assert attrs["operation_status_text"] == "Cooling Thermostat On"
+
+
+def test_operation_status_heat_d_off(hass):
+    """Test operation status decoding for Heating Demand Off."""
+    entity = build_entity(hass, operation_status=OPST_HEAT_D_OFF)
+    attrs = entity.extra_state_attributes
+    assert attrs["operation_status"] == OPST_HEAT_D_OFF
+    assert attrs["operation_status_text"] == "Heating Demand Off"
+
+
+def test_operation_status_heat_t_off(hass):
+    """Test operation status decoding for Heating Thermostat Off."""
+    entity = build_entity(hass, operation_status=OPST_HEAT_T_OFF)
+    attrs = entity.extra_state_attributes
+    assert attrs["operation_status"] == OPST_HEAT_T_OFF
+    assert attrs["operation_status_text"] == "Heating Thermostat Off"
+
+
+def test_operation_status_heat_t_on(hass):
+    """Test operation status decoding for Heating Thermostat On."""
+    entity = build_entity(hass, operation_status=OPST_HEAT_T_ON)
+    attrs = entity.extra_state_attributes
+    assert attrs["operation_status"] == OPST_HEAT_T_ON
+    assert attrs["operation_status_text"] == "Heating Thermostat On"
+
+
+def test_operation_status_dhw_off(hass):
+    """Test operation status decoding for Domestic Hot Water Off."""
+    entity = build_entity(hass, operation_status=OPST_DHW_OFF)
+    attrs = entity.extra_state_attributes
+    assert attrs["operation_status"] == OPST_DHW_OFF
+    assert attrs["operation_status_text"] == "Domestic Hot Water Off"
+
+
+def test_operation_status_dhw_on(hass):
+    """Test operation status decoding for Domestic Hot Water On."""
+    entity = build_entity(hass, operation_status=OPST_DHW_ON)
+    attrs = entity.extra_state_attributes
+    assert attrs["operation_status"] == OPST_DHW_ON
+    assert attrs["operation_status_text"] == "Domestic Hot Water On"
+
+
+def test_operation_status_swp_off(hass):
+    """Test operation status decoding for Swimming Pool Off."""
+    entity = build_entity(hass, operation_status=OPST_SWP_OFF)
+    attrs = entity.extra_state_attributes
+    assert attrs["operation_status"] == OPST_SWP_OFF
+    assert attrs["operation_status_text"] == "Swimming Pool Off"
+
+
+def test_operation_status_swp_on(hass):
+    """Test operation status decoding for Swimming Pool On."""
+    entity = build_entity(hass, operation_status=OPST_SWP_ON)
+    attrs = entity.extra_state_attributes
+    assert attrs["operation_status"] == OPST_SWP_ON
+    assert attrs["operation_status_text"] == "Swimming Pool On"
+
+
+def test_operation_status_alarm(hass):
+    """Test operation status decoding for Alarm state."""
+    entity = build_entity(hass, operation_status=OPST_ALARM)
+    attrs = entity.extra_state_attributes
+    assert attrs["operation_status"] == OPST_ALARM
+    assert attrs["operation_status_text"] == "Alarm"
+
+
+def test_operation_status_unknown(hass):
+    """Test operation status decoding for unknown status code."""
+    entity = build_entity(hass, operation_status=99)
+    attrs = entity.extra_state_attributes
+    assert attrs["operation_status"] == 99
+    assert attrs["operation_status_text"] == "Unknown (99)"
+
+
+def test_operation_status_text_in_attributes(hass):
+    """Verify operation_status_text is included in extra attributes."""
+    entity = build_entity(hass, operation_status=OPST_HEAT_T_ON)
+    attrs = entity.extra_state_attributes
+    assert "operation_status" in attrs
+    assert "operation_status_text" in attrs
+    assert attrs["operation_status_text"] == "Heating Thermostat On"

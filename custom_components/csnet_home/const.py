@@ -43,6 +43,36 @@ FAN_SPEED_REVERSE_MAP = {
     3: "auto",
 }
 
+# Operation Status Constants
+OPST_OFF = 0
+OPST_COOL_D_OFF = 1
+OPST_COOL_T_OFF = 2
+OPST_COOL_T_ON = 3
+OPST_HEAT_D_OFF = 4
+OPST_HEAT_T_OFF = 5
+OPST_HEAT_T_ON = 6
+OPST_DHW_OFF = 7
+OPST_DHW_ON = 8
+OPST_SWP_OFF = 9
+OPST_SWP_ON = 10
+OPST_ALARM = 11
+
+# Operation Status Description Map
+OPERATION_STATUS_MAP = {
+    OPST_OFF: "Off",
+    OPST_COOL_D_OFF: "Cooling Demand Off",
+    OPST_COOL_T_OFF: "Cooling Thermostat Off",
+    OPST_COOL_T_ON: "Cooling Thermostat On",
+    OPST_HEAT_D_OFF: "Heating Demand Off",
+    OPST_HEAT_T_OFF: "Heating Thermostat Off",
+    OPST_HEAT_T_ON: "Heating Thermostat On",
+    OPST_DHW_OFF: "Domestic Hot Water Off",
+    OPST_DHW_ON: "Domestic Hot Water On",
+    OPST_SWP_OFF: "Swimming Pool Off",
+    OPST_SWP_ON: "Swimming Pool On",
+    OPST_ALARM: "Alarm",
+}
+
 # Localization
 CONF_LANGUAGE = "language"
 DEFAULT_LANGUAGE = "en"
