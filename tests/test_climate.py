@@ -456,6 +456,8 @@ def test_dynamic_temperature_limits_zone2(hass):
         async_set_temperature=AsyncMock(return_value=True),
         set_preset_modes=AsyncMock(return_value=True),
         async_set_silent_mode=AsyncMock(return_value=True),
+        is_fan_coil_compatible=lambda data: False,
+        get_fan_control_availability=lambda circuit, mode, data: False,
     )
     mock_coordinator = SimpleNamespace(
         get_installation_devices_data=lambda: {
