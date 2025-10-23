@@ -1,0 +1,107 @@
+---
+name: Workflow Validation
+
+'on':
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+      - '.github/actions/**'
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/**'
+      - '.github/actions/**'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  actionlint:
+    name: Lint GitHub Actions Workflows
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5.0.0
+
+      - name: Download actionlint
+        run: |
+          bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          echo "${PWD}" >> "$GITHUB_PATH"
+
+      - name: Run actionlint
+        run: |
+          actionlint -color -verbose
+
+      - name: Comment PR with Results
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: '⚠️ Workflow validation failed. Please check the logs for details.'
+            });
+
+  yaml-lint:
+    name: YAML Linting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5.0.0
+
+      - name: Setup Python
+        uses: actions/setup-python@v6.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Install yamllint
+        run: pip install yamllint
+
+      - name: Run yamllint
+        run: |
+          yamllint -d "{extends: default, rules: {line-length: \
+            {max: 120}, comments: {min-spaces-from-content: 1}}}" \
+            .github/workflows/
+
+  shell-check:
+    name: Shell Script Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5.0.0
+
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: '.github'
+          severity: warning
+
+  workflow-summary:
+    name: Workflow Summary
+    runs-on: ubuntu-latest
+    needs: [actionlint, yaml-lint, shell-check]
+    if: always()
+    steps:
+      - name: Check Results
+        run: |
+          echo "## Workflow Validation Results" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ needs.actionlint.result }}" == "success" ]; then
+            echo "✅ ActionLint: Passed" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "❌ ActionLint: Failed" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ "${{ needs.yaml-lint.result }}" == "success" ]; then
+            echo "✅ YAML Lint: Passed" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "❌ YAML Lint: Failed" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ "${{ needs.shell-check.result }}" == "success" ]; then
+            echo "✅ Shell Check: Passed" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "❌ Shell Check: Failed" >> "$GITHUB_STEP_SUMMARY"
+          fi

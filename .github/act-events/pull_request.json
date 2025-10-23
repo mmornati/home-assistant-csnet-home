@@ -1,0 +1,13 @@
+{
+  "pull_request": {
+    "number": 999,
+    "title": "Test PR for local validation",
+    "head": {
+      "ref": "test-branch",
+      "sha": "abc123def456"
+    },
+    "base": {
+      "ref": "main"
+    }
+  }
+}

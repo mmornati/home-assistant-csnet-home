@@ -16,8 +16,10 @@ from custom_components.csnet_home.const import (
     DEFAULT_API_TIMEOUT,
     ELEMENTS_PATH,
     INSTALLATION_DEVICES_PATH,
+    INSTALLATION_ALARMS_PATH,
     HEAT_SETTINGS_PATH,
     LOGIN_PATH,
+    LANGUAGE_FILES,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -38,6 +40,8 @@ class CSNetHomeAPI:
         self.cookies = None
         self.logged_in = False
         self.xsrf_token = None
+        self.translations = {}
+        self.installation_id = None
 
     async def get_xsrf_token(self):
         """Get the XSRF token from the cloud service."""
@@ -133,6 +137,10 @@ class CSNetHomeAPI:
                         # Parse the sensor data from the API response
                         elements = data.get("data", {}).get("elements", [])
                         sensors = []
+
+                        # Store installation ID for alarm API calls
+                        self.installation_id = data.get("data", {}).get("installation")
+
                         common_data = {
                             "name": data.get("data", {}).get("name"),
                             "latitude": data.get("data", {}).get("latitude"),
@@ -153,8 +161,7 @@ class CSNetHomeAPI:
                         }
                         for index, element in enumerate(elements):
                             sensor = {
-                                "device_name": element.get("deviceName")
-                                or "ATW-IOT-01",
+                                "device_name": element.get("deviceName") or "Remote",
                                 "device_id": element.get("deviceId"),
                                 "room_name": element.get("parentName")
                                 or f"Room-{element.get('parentId')}-{index}",
@@ -168,6 +175,9 @@ class CSNetHomeAPI:
                                 "on_off": element.get("onOff"),  # 0 = Off, 1 = On
                                 "timer_running": element.get("timerRunning"),
                                 "alarm_code": element.get("alarmCode"),
+                                "alarm_message": self.translate_alarm(
+                                    element.get("alarmCode")
+                                ),
                                 "c1_demand": element.get("c1Demand"),
                                 "c2_demand": element.get("c2Demand"),
                                 "ecocomfort": element.get(
@@ -223,6 +233,42 @@ class CSNetHomeAPI:
                     return None
         except Exception as e:
             _LOGGER.error("Error during installation devices data retrieval: %s", e)
+            self.logged_in = False
+            return None
+
+    async def async_get_installation_alarms(self):
+        """Get installation alarms data from the cloud service."""
+        if not self.installation_id:
+            _LOGGER.debug("No installation ID available, skipping alarm fetch")
+            return None
+
+        installation_alarms_url = (
+            f"{self.base_url}{INSTALLATION_ALARMS_PATH}"
+            f"?installationId={self.installation_id}&_csrf={self.xsrf_token}"
+        )
+
+        if not self.session or not self.logged_in:
+            _LOGGER.warning("No active session found.")
+            await self.async_login()
+
+        headers = COMMON_API_HEADERS | {
+            "accept": "*/*",
+            "x-requested-with": "XMLHttpRequest",
+        }
+
+        try:
+            async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+                async with self.session.get(
+                    installation_alarms_url, headers=headers, cookies=self.cookies
+                ) as response:
+                    data = await self.check_api_response(response)
+                    if data is not None:
+                        _LOGGER.debug("Installation alarms data retrieved: %s", data)
+                        return data
+                    _LOGGER.error("Error in installation alarms API response")
+                    return None
+        except Exception as e:
+            _LOGGER.error("Error during installation alarms data retrieval: %s", e)
             self.logged_in = False
             return None
 
@@ -344,7 +390,7 @@ class CSNetHomeAPI:
 
         # For zone_id 5 (fixed temp circuit), use C1 in parameter names
         circuit_id = 1 if zone_id == 5 else zone_id
-        
+
         # Determine if this is a water circuit or air circuit
         # Zone 5 is fixed temperature water circuit, zones 1,2,4 are typically air/room thermostats
         is_water_circuit = zone_id == 5
@@ -432,7 +478,7 @@ class CSNetHomeAPI:
 
         # For zone_id 5 (fixed temp circuit), use C1 in parameter names
         circuit_id = 1 if zone_id == 5 else zone_id
-        
+
         # Determine if this is a water circuit or air circuit
         # Zone 5 is fixed temperature water circuit, zones 1,2,4 are typically air/room thermostats
         is_water_circuit = zone_id == 5
@@ -595,4 +641,50 @@ class CSNetHomeAPI:
                     "Found cookie %s with value %s", cookie_name, cookie.value
                 )
                 return cookie.value
+        return None
+
+    async def load_translations(self):
+        """Load translations dictionaries for alarm messages (lazy)."""
+        if self.translations:
+            return
+        # load preferred language first, then fallback
+        endpoints = []
+        preferred = getattr(self, "preferred_language", None)
+        if preferred and preferred in LANGUAGE_FILES:
+            endpoints.append(LANGUAGE_FILES[preferred])
+        # ensure both are loaded to maximize hit rate
+        for key, file in LANGUAGE_FILES.items():
+            if file not in endpoints:
+                _LOGGER.debug("Adding language file for %s", key)
+                endpoints.append(file)
+        headers = COMMON_API_HEADERS | {
+            "accept": "*/*",
+            "x-requested-with": "XMLHttpRequest",
+        }
+        for ep in endpoints:
+            url = f"{self.base_url}/translations/{ep}"
+            try:
+                async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+                    async with self.session.get(url, headers=headers) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            # merge/overwrite keeping last language wins for same key
+                            self.translations.update(data or {})
+            except Exception as e:
+                _LOGGER.debug("Translation load failed for %s: %s", ep, e)
+
+    def translate_alarm(self, code):
+        """Return localized alarm message for a numeric code if available."""
+        if not code:
+            return None
+        # Keys observed on website are like 'alarm_XX' or 'alarm_XXX'
+        # Provide multiple candidates; first match wins
+        key_candidates = [
+            f"alarm_{code}",
+            f"alarm_{int(code):02d}",
+            f"alarm_{int(code):03d}",
+        ]
+        for key in key_candidates:
+            if key in self.translations:
+                return self.translations[key]
         return None

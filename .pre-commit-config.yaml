@@ -41,6 +41,11 @@ repos:
       - id: check-executables-have-shebangs
         stages: [manual]
       - id: check-json
+      # Automatically stage files modified by other hooks (like black)
+      - id: trailing-whitespace
+        exclude: '\.md$'
+      - id: end-of-file-fixer
+        exclude: '\.md$'
   - repo: https://github.com/adrienverge/yamllint.git
     rev: v1.28.0
     hooks:

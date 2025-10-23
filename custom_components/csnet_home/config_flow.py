@@ -7,7 +7,7 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_USERNAME
 
-from .const import DOMAIN
+from .const import DOMAIN, CONF_LANGUAGE, DEFAULT_LANGUAGE
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -40,6 +40,7 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_USERNAME: self._username,
                     CONF_PASSWORD: self._password,
                     CONF_SCAN_INTERVAL: self._scan_interval,
+                    CONF_LANGUAGE: user_input.get(CONF_LANGUAGE, DEFAULT_LANGUAGE),
                 },
             )
 
@@ -52,6 +53,9 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Optional(
                         CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL
                     ): int,
+                    vol.Optional(CONF_LANGUAGE, default=DEFAULT_LANGUAGE): vol.In(
+                        ["en", "fr"]
+                    ),
                 }
             ),
         )

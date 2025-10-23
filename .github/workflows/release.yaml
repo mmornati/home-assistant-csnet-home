@@ -1,66 +1,214 @@
-name: Update Version and Create Zip on Release
-on:
+---
+# Release Workflow
+#
+# This workflow handles the complete release process in two stages:
+#
+# Stage 1 (prepare_release - manual trigger):
+#   - Checks if manifest version needs updating (idempotent)
+#   - Updates manifest.json only if version is different
+#   - Creates and pushes git tag (safe if tag already exists)
+#   - Creates GitHub release (safe if release already exists)
+#
+# Stage 2 (build_and_upload_zip - triggered by release publish):
+#   - Builds integration zip from the tagged commit
+#   - Uploads zip to the GitHub release
+#
+# Safety Features:
+#   ✅ Idempotent - safe to re-run for the same version
+#   ✅ Skips manifest commit if version is already correct
+#   ✅ Handles existing tags gracefully
+#   ✅ Handles existing releases gracefully
+#   ✅ Two-stage process prevents git conflicts
+#
+name: Release Workflow
+
+'on':
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., v1.4.3)'
+        required: true
+        type: string
   release:
-    types: [published, edited]
+    types: [published]
+
+permissions:
+  contents: write
+  id-token: write
 
 jobs:
-  update_version_and_create_zip:
-    permissions:
-      id-token: write
-      contents: write
-      repository-projects: write
+  # This job runs when manually triggered to prepare a release
+  prepare_release:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v5.0.0
         with:
-          persist-credentials: false
           fetch-depth: 0
-      - name: Debug Variables
-        run: |
-            echo "github.event_name: ${{ github.event_name }}"
-            echo "github.ref_name: ${{ github.ref_name }}"
-            echo "github.event.repository.default_branch: ${{ github.event.repository.default_branch }}"
-            echo "github.event.release.target_commitish: ${{ github.event.release.target_commitish }}"
-            echo "github.event.release.prerelease: ${{ github.event.release.prerelease }}"
-            echo "github.event.release.draft: ${{ github.event.release.draft }}"
-      - name: Update Version in Manifest
-        if: ${{ github.event_name == 'release' && github.event.release.draft == false }}
-        run: |
-          sed -i 's/\"version\"\s*\:\s*\".*\"/\"version\"\:\"${{ github.ref_name }}\"/g' ./custom_components/csnet_home/manifest.json
-      - name: Commit & Push Version Changes
-        if: ${{ github.event_name == 'release' && github.event.release.draft == false && github.event.release.prerelease == false  }}
-        uses: actions-js/push@master
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          branch: ${{ github.event.release.target_commitish }}
-          message: 'Updating to version ${{ github.ref_name }}'
-      - name: Update Release with Version Changes Commit
-        if: ${{ github.event_name == 'release' && github.event.release.draft == false && github.event.release.prerelease == false  }}
-        run: |
-          git config --global user.name 'Github Actions'
-          git config --global user.email 'mmornati@users.noreply.github.com'
-          git tag -f ${{ github.ref_name }}
-          git push -f -f https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/mmornati/home-assistant-csnet-home.git ${{ github.ref_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create Zip
-        uses: thedoctor0/zip-release@0.7.6
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Check and Update Version in Manifest
+        id: version_check
+        run: |
+          VERSION="${{ inputs.version }}"
+          # Remove 'v' prefix if present for manifest
+          VERSION_NO_V="${VERSION#v}"
+
+          # Get current version from manifest
+          CURRENT_VERSION=$(grep -o '"version": "[^"]*"' ./custom_components/csnet_home/manifest.json | cut -d'"' -f4)
+
+          echo "Current version in manifest: ${CURRENT_VERSION}"
+          echo "Requested version: ${VERSION_NO_V}"
+
+          if [ "${CURRENT_VERSION}" = "${VERSION_NO_V}" ]; then
+            echo "Version is already correct in manifest, skipping update"
+            echo "needs_update=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Updating manifest from ${CURRENT_VERSION} to ${VERSION_NO_V}"
+            sed -i "s/\"version\": \".*\"/\"version\": \"${VERSION_NO_V}\"/" \
+              ./custom_components/csnet_home/manifest.json
+            echo "needs_update=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit Version Update
+        if: steps.version_check.outputs.needs_update == 'true'
+        run: |
+          git add custom_components/csnet_home/manifest.json
+          git commit -m "Updating to version ${{ inputs.version }}"
+          git push origin main
+
+      - name: Create and Push Tag
+        run: |
+          # Check if tag already exists locally
+          if git rev-parse "${{ inputs.version }}" >/dev/null 2>&1; then
+            echo "Tag ${{ inputs.version }} already exists locally, skipping creation"
+          else
+            git tag ${{ inputs.version }}
+            echo "Created tag ${{ inputs.version }}"
+          fi
+
+          # Push tag (will succeed if tag exists remotely and points to same commit)
+          git push origin ${{ inputs.version }} || {
+            echo "Tag ${{ inputs.version }} may already exist remotely"
+            # Verify the tag exists
+            if git ls-remote --tags origin | grep -q "refs/tags/${{ inputs.version }}"; then
+              echo "Tag exists remotely, continuing..."
+            else
+              echo "Failed to push tag and it doesn't exist remotely"
+              exit 1
+            fi
+          }
+
+      - name: Create Release
+        uses: actions/github-script@v8
         with:
-          type: 'zip'
-          filename: 'hass-custom-csnet-home.zip'
-          directory: ./custom_components/csnet_home
+          script: |
+            const tagName = '${{ inputs.version }}';
+
+            // Check if release already exists
+            try {
+              const { data: existingRelease } = await github.rest.repos.getReleaseByTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag: tagName
+              });
+              console.log(`Release ${tagName} already exists: ${existingRelease.html_url}`);
+              console.log('Skipping release creation');
+              return;
+            } catch (error) {
+              if (error.status !== 404) {
+                throw error;
+              }
+              // Release doesn't exist, continue to create it
+            }
+
+            // Create the release
+            const { data: release } = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: tagName,
+              name: tagName,
+              draft: false,
+              prerelease: false,
+              generate_release_notes: true
+            });
+            console.log(`Created release ${release.html_url}`);
+
+  # This job runs when a release is published to create and upload the zip
+  build_and_upload_zip:
+    if: github.event_name == 'release' && github.event.release.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5.0.0
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          fetch-depth: 0
+
+      - name: Debug Release Info
+        run: |
+          echo "Event: ${{ github.event_name }}"
+          echo "Tag: ${{ github.event.release.tag_name }}"
+          echo "Target: ${{ github.event.release.target_commitish }}"
+          echo "Draft: ${{ github.event.release.draft }}"
+          echo "Prerelease: ${{ github.event.release.prerelease }}"
+
+      - name: Verify Manifest Version
+        run: |
+          MANIFEST_VERSION=$(grep -o '"version": "[^"]*"' \
+            ./custom_components/csnet_home/manifest.json | cut -d'"' -f4)
+          TAG_VERSION="${{ github.event.release.tag_name }}"
+          TAG_VERSION_NO_V="${TAG_VERSION#v}"
+
+          echo "Manifest version: ${MANIFEST_VERSION}"
+          echo "Tag version: ${TAG_VERSION_NO_V}"
+
+          if [ "${MANIFEST_VERSION}" != "${TAG_VERSION_NO_V}" ]; then
+            echo "ERROR: Manifest version (${MANIFEST_VERSION}) does not match tag version (${TAG_VERSION_NO_V})"
+            exit 1
+          fi
+
+      - name: Create Zip Archive
+        run: |
+          cd custom_components/csnet_home
+          # Remove any existing zip
+          rm -f hass-custom-csnet-home.zip
+          # Create zip with all files except git, cache, and python bytecode
+          zip -r hass-custom-csnet-home.zip . \
+            -x "*.git*" \
+            -x "*__pycache__*" \
+            -x "*.pyc" \
+            -x "*.pyo" \
+            -x "*.DS_Store" \
+            -x "*.pytest_cache*"
+          # Verify zip was created
+          if [ ! -f "hass-custom-csnet-home.zip" ]; then
+            echo "ERROR: Failed to create zip file"
+            exit 1
+          fi
+          echo "✅ Zip created successfully: $(ls -lh hass-custom-csnet-home.zip)"
+          zipinfo hass-custom-csnet-home.zip | head -20
+
       - name: Upload Zip to Release
-        if: ${{ github.event_name == 'release' && github.event.release.draft == false }}
-        uses: Roang-zero1/github-upload-release-artifacts-action@v3.0.0
+        uses: softprops/action-gh-release@v2
         with:
-          args: ./custom_components/csnet_home/hass-custom-csnet-home.zip
+          files: ./custom_components/csnet_home/hass-custom-csnet-home.zip
+          tag_name: ${{ github.event.release.tag_name }}
+          fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Add Zip to Action
-        if: ${{ github.event_name == 'workflow_dispatch' }}
+
+      - name: Upload Zip as Artifact
         uses: actions/upload-artifact@v4.6.2
         with:
-          name: csnet_home
+          name: hass-custom-csnet-home-${{ github.event.release.tag_name }}
           path: ./custom_components/csnet_home/hass-custom-csnet-home.zip
           if-no-files-found: error
+          retention-days: 90
+          compression-level: 0
