@@ -125,3 +125,32 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         """Return installation alarms data."""
 
         return self._device_data.get("common_data", {}).get("installation_alarms", {})
+
+    def get_holiday_mode_units(self):
+        """Return list of units with their holiday mode status.
+
+        Returns:
+            list: List of dicts with unit info and holiday mode data
+        """
+        units = []
+        installation_devices = self.get_installation_devices_data()
+
+        if not installation_devices or "data" not in installation_devices:
+            return units
+
+        for outdoor in installation_devices.get("data", []):
+            for indoor in outdoor.get("indoors", []):
+                unit_id = indoor.get("id")
+                if not unit_id:
+                    continue
+
+                unit_data = {
+                    "unit_id": unit_id,
+                    "unit_name": indoor.get("name", f"Unit {unit_id}"),
+                    "outdoor_id": outdoor.get("id"),
+                    "outdoor_name": outdoor.get("name", "Outdoor Unit"),
+                    "holiday_mode": indoor.get("holidayMode"),
+                }
+                units.append(unit_data)
+
+        return units

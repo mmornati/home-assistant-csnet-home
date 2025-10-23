@@ -255,3 +255,115 @@ async def test_coordinator_alarm_clearing(hass: HomeAssistant):
 
     # Verify alarm code was cleared from storage
     assert "123-456-789" not in coordinator._last_alarm_codes
+
+
+@pytest.mark.asyncio
+async def test_coordinator_get_holiday_mode_units(hass: HomeAssistant):
+    """Test getting holiday mode units."""
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test")
+    coordinator._device_data = {
+        "sensors": [],
+        "common_data": {
+            "installation_devices": {
+                "data": [
+                    {
+                        "id": 100,
+                        "name": "Outdoor Unit 1",
+                        "indoors": [
+                            {
+                                "id": 201,
+                                "name": "Living Room",
+                                "holidayMode": {
+                                    "year": 2025,
+                                    "month": 12,
+                                    "day": 25,
+                                    "hour": 14,
+                                    "minute": 30,
+                                },
+                            },
+                            {
+                                "id": 202,
+                                "name": "Bedroom",
+                                "holidayMode": {
+                                    "year": 2025,
+                                    "month": 1,
+                                    "day": 10,
+                                    "hour": 10,
+                                    "minute": 0,
+                                },
+                            },
+                        ],
+                    }
+                ]
+            }
+        },
+    }
+
+    units = coordinator.get_holiday_mode_units()
+    assert len(units) == 2
+    assert units[0]["unit_id"] == 201
+    assert units[0]["unit_name"] == "Living Room"
+    assert units[0]["outdoor_id"] == 100
+    assert units[0]["outdoor_name"] == "Outdoor Unit 1"
+    assert units[0]["holiday_mode"]["year"] == 2025
+    assert units[0]["holiday_mode"]["month"] == 12
+
+    assert units[1]["unit_id"] == 202
+    assert units[1]["unit_name"] == "Bedroom"
+
+
+@pytest.mark.asyncio
+async def test_coordinator_get_holiday_mode_units_empty(hass: HomeAssistant):
+    """Test getting holiday mode units when no installation devices."""
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test")
+    coordinator._device_data = {
+        "sensors": [],
+        "common_data": {},
+    }
+
+    units = coordinator.get_holiday_mode_units()
+    assert units == []
+
+
+@pytest.mark.asyncio
+async def test_coordinator_get_holiday_mode_units_no_data_key(hass: HomeAssistant):
+    """Test getting holiday mode units when installation devices has no data key."""
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test")
+    coordinator._device_data = {
+        "sensors": [],
+        "common_data": {"installation_devices": {"some_other_key": "value"}},
+    }
+
+    units = coordinator.get_holiday_mode_units()
+    assert units == []
+
+
+@pytest.mark.asyncio
+async def test_coordinator_get_holiday_mode_units_no_holiday_mode(hass: HomeAssistant):
+    """Test getting holiday mode units when units have no holiday mode."""
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test")
+    coordinator._device_data = {
+        "sensors": [],
+        "common_data": {
+            "installation_devices": {
+                "data": [
+                    {
+                        "id": 100,
+                        "name": "Outdoor Unit 1",
+                        "indoors": [
+                            {
+                                "id": 201,
+                                "name": "Living Room",
+                                # No holidayMode key
+                            }
+                        ],
+                    }
+                ]
+            }
+        },
+    }
+
+    units = coordinator.get_holiday_mode_units()
+    assert len(units) == 1
+    assert units[0]["unit_id"] == 201
+    assert units[0]["holiday_mode"] is None

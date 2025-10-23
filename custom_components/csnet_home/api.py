@@ -17,6 +17,9 @@ from custom_components.csnet_home.const import (
     ELEMENTS_PATH,
     INSTALLATION_DEVICES_PATH,
     INSTALLATION_ALARMS_PATH,
+    HOLIDAY_EDIT_PATH,
+    HOLIDAY_STOP_PATH,
+    HOLIDAY_STOP_ALL_PATH,
     HEAT_SETTINGS_PATH,
     LOGIN_PATH,
     LANGUAGE_FILES,
@@ -584,6 +587,178 @@ class CSNetHomeAPI:
                     return True
         except (aiohttp.ClientError, asyncio.TimeoutError) as err:
             _LOGGER.error("Error setting preset_mode for %s: %s", zone_id, err)
+            return False
+
+    async def async_set_holiday_mode(
+        self, unit_id: int, year: int, month: int, day: int, hour: int, minute: int
+    ):
+        """Set holiday mode for a specific unit with return date/time.
+
+        Args:
+            unit_id: The unit ID to set holiday mode for
+            year: Year for holiday mode end date
+            month: Month for holiday mode end date (1-12)
+            day: Day for holiday mode end date
+            hour: Hour for holiday mode end time (0-23)
+            minute: Minute for holiday mode end time (0-59)
+
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        if not self.installation_id:
+            _LOGGER.error("No installation ID available, cannot set holiday mode")
+            return False
+
+        holiday_url = f"{self.base_url}{HOLIDAY_EDIT_PATH}"
+
+        headers = COMMON_API_HEADERS | {
+            "accept": "*/*",
+            "x-requested-with": "XMLHttpRequest",
+            "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "origin": self.base_url,
+        }
+
+        # Format date and time as the API expects (based on JS analysis)
+        # holidayDate format: YYYY-MM-DD
+        # holidayTime format: HH:MM
+        holiday_date = f"{year:04d}-{month:02d}-{day:02d}"
+        holiday_time = f"{hour:02d}:{minute:02d}"
+
+        data = {
+            "holidayDate": holiday_date,
+            "holidayTime": holiday_time,
+            f"holidaySelected{unit_id}": "on",  # Select the specific unit
+            "installationId": self.installation_id,
+            "_csrf": self.xsrf_token,
+        }
+
+        cookies = {
+            "XSRF-TOKEN": self.xsrf_token,
+            "acceptedCookies": "yes",
+        }
+
+        try:
+            async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+                async with self.session.post(
+                    holiday_url, headers=headers, cookies=cookies, data=data
+                ) as response:
+                    if response.status != 200:
+                        response_text = await response.text()
+                        _LOGGER.warning(
+                            "Failed to set holiday mode: HTTP %s, response=%s",
+                            response.status,
+                            response_text,
+                        )
+                        return False
+                    _LOGGER.debug(
+                        "Holiday mode set for unit %s until %s %s",
+                        unit_id,
+                        holiday_date,
+                        holiday_time,
+                    )
+                    return True
+        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+            _LOGGER.error("Error setting holiday mode for unit %s: %s", unit_id, err)
+            return False
+
+    async def async_stop_holiday_mode(self, unit_id: int):
+        """Stop holiday mode for a specific unit.
+
+        Args:
+            unit_id: The unit ID to stop holiday mode for
+
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        if not self.installation_id:
+            _LOGGER.error("No installation ID available, cannot stop holiday mode")
+            return False
+
+        stop_url = f"{self.base_url}{HOLIDAY_STOP_PATH}"
+
+        headers = COMMON_API_HEADERS | {
+            "accept": "*/*",
+            "x-requested-with": "XMLHttpRequest",
+            "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "origin": self.base_url,
+        }
+
+        data = {
+            "installationId": self.installation_id,
+            "unitId": unit_id,
+            "_csrf": self.xsrf_token,
+        }
+
+        cookies = {
+            "XSRF-TOKEN": self.xsrf_token,
+            "acceptedCookies": "yes",
+        }
+
+        try:
+            async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+                async with self.session.post(
+                    stop_url, headers=headers, cookies=cookies, data=data
+                ) as response:
+                    if response.status != 200:
+                        response_text = await response.text()
+                        _LOGGER.warning(
+                            "Failed to stop holiday mode: HTTP %s, response=%s",
+                            response.status,
+                            response_text,
+                        )
+                        return False
+                    _LOGGER.debug("Holiday mode stopped for unit %s", unit_id)
+                    return True
+        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+            _LOGGER.error("Error stopping holiday mode for unit %s: %s", unit_id, err)
+            return False
+
+    async def async_stop_all_holiday_modes(self):
+        """Stop holiday mode for all units in the installation.
+
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        if not self.installation_id:
+            _LOGGER.error("No installation ID available, cannot stop all holiday modes")
+            return False
+
+        stop_all_url = f"{self.base_url}{HOLIDAY_STOP_ALL_PATH}"
+
+        headers = COMMON_API_HEADERS | {
+            "accept": "*/*",
+            "x-requested-with": "XMLHttpRequest",
+            "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "origin": self.base_url,
+        }
+
+        data = {
+            "installationId": self.installation_id,
+            "_csrf": self.xsrf_token,
+        }
+
+        cookies = {
+            "XSRF-TOKEN": self.xsrf_token,
+            "acceptedCookies": "yes",
+        }
+
+        try:
+            async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+                async with self.session.post(
+                    stop_all_url, headers=headers, cookies=cookies, data=data
+                ) as response:
+                    if response.status != 200:
+                        response_text = await response.text()
+                        _LOGGER.warning(
+                            "Failed to stop all holiday modes: HTTP %s, response=%s",
+                            response.status,
+                            response_text,
+                        )
+                        return False
+                    _LOGGER.debug("All holiday modes stopped")
+                    return True
+        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+            _LOGGER.error("Error stopping all holiday modes: %s", err)
             return False
 
     async def close(self):
