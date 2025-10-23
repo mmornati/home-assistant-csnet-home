@@ -137,6 +137,7 @@ What the tests cover:
 
 Test GitHub Actions workflows locally before pushing:
 
+#### Static Validation (Fast)
 ```bash
 ./scripts/test-workflows.sh
 ```
@@ -147,7 +148,25 @@ This validates:
 - Shell scripts in workflows
 - Zip creation process
 
-See [Local Testing Guide](.github/LOCAL_TESTING.md) for detailed instructions and tool installation.
+#### Integration Testing (Comprehensive)
+
+Run workflows locally with Docker using `act`:
+
+```bash
+# Install act
+brew install act  # macOS
+# or: curl -s https://raw.githubusercontent.com/nektos/act/master/install.sh | bash
+
+# Test validation workflow
+act pull_request -W .github/workflows/validate.yaml
+
+# Test with event payload
+act pull_request -e .github/act-events/pull_request.json
+```
+
+See comprehensive guides:
+- [Local Testing Guide](.github/LOCAL_TESTING.md) - Static validation tools
+- [Integration Testing Guide](.github/INTEGRATION_TESTING.md) - Full workflow testing with `act`
 
 ### End-to-End Testing
 

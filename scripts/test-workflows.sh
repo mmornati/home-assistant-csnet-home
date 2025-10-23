@@ -110,7 +110,8 @@ run_yamllint() {
 run_shellcheck() {
     print_header "Running ShellCheck"
 
-    local shell_files=$(find .github scripts -type f -name "*.sh" 2>/dev/null)
+    local shell_files
+    shell_files=$(find .github scripts -type f -name "*.sh" 2>/dev/null)
 
     if [ -z "$shell_files" ]; then
         print_status "${YELLOW}" "⚠️  No shell scripts found"
@@ -137,6 +138,13 @@ run_shellcheck() {
 # Validate workflow syntax
 validate_syntax() {
     print_header "Validating Workflow Syntax"
+
+    # Check if Python yaml module is available
+    if ! python3 -c "import yaml" 2>/dev/null; then
+        print_status "${YELLOW}" "⚠️  Python yaml module not available, skipping basic syntax check"
+        print_status "${BLUE}" "   (yamllint will perform comprehensive validation)"
+        return 0
+    fi
 
     for workflow in .github/workflows/*.yaml; do
         echo "Validating $workflow..."
@@ -168,7 +176,9 @@ test_zip_creation() {
         -x "*test-hass-custom-csnet-home.zip" > /dev/null 2>&1; then
 
         print_status "${GREEN}" "✅ Zip creation successful"
-        print_status "${BLUE}" "   Size: $(ls -lh test-hass-custom-csnet-home.zip | awk '{print $5}')"
+        local zip_size
+        zip_size=$(stat -f%z test-hass-custom-csnet-home.zip 2>/dev/null || stat -c%s test-hass-custom-csnet-home.zip 2>/dev/null)
+        print_status "${BLUE}" "   Size: $((zip_size / 1024))K"
         print_status "${BLUE}" "   Files: $(zipinfo -t test-hass-custom-csnet-home.zip | grep 'files' | awk '{print $1}')"
 
         # Cleanup

@@ -171,3 +171,8 @@ cython_debug/
 .pypirc
 
 .DS_Store
+
+# GitHub Actions local testing
+.secrets
+.actrc
+test-hass-custom-csnet-home.zip

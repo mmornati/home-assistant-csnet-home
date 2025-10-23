@@ -1,6 +1,7 @@
+---
 name: Workflow Validation
 
-on:
+'on':
   pull_request:
     paths:
       - '.github/workflows/**'
@@ -27,7 +28,7 @@ jobs:
       - name: Download actionlint
         run: |
           bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
-          echo "${PWD}" >> $GITHUB_PATH
+          echo "${PWD}" >> "$GITHUB_PATH"
 
       - name: Run actionlint
         run: |
@@ -62,7 +63,9 @@ jobs:
 
       - name: Run yamllint
         run: |
-          yamllint -d "{extends: default, rules: {line-length: {max: 120}, comments: {min-spaces-from-content: 1}}}" .github/workflows/
+          yamllint -d "{extends: default, rules: {line-length: \
+            {max: 120}, comments: {min-spaces-from-content: 1}}}" \
+            .github/workflows/
 
   shell-check:
     name: Shell Script Validation
@@ -85,20 +88,20 @@ jobs:
     steps:
       - name: Check Results
         run: |
-          echo "## Workflow Validation Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Workflow Validation Results" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
           if [ "${{ needs.actionlint.result }}" == "success" ]; then
-            echo "✅ ActionLint: Passed" >> $GITHUB_STEP_SUMMARY
+            echo "✅ ActionLint: Passed" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "❌ ActionLint: Failed" >> $GITHUB_STEP_SUMMARY
+            echo "❌ ActionLint: Failed" >> "$GITHUB_STEP_SUMMARY"
           fi
           if [ "${{ needs.yaml-lint.result }}" == "success" ]; then
-            echo "✅ YAML Lint: Passed" >> $GITHUB_STEP_SUMMARY
+            echo "✅ YAML Lint: Passed" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "❌ YAML Lint: Failed" >> $GITHUB_STEP_SUMMARY
+            echo "❌ YAML Lint: Failed" >> "$GITHUB_STEP_SUMMARY"
           fi
           if [ "${{ needs.shell-check.result }}" == "success" ]; then
-            echo "✅ Shell Check: Passed" >> $GITHUB_STEP_SUMMARY
+            echo "✅ Shell Check: Passed" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "❌ Shell Check: Failed" >> $GITHUB_STEP_SUMMARY
+            echo "❌ Shell Check: Failed" >> "$GITHUB_STEP_SUMMARY"
           fi

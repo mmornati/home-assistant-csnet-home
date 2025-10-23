@@ -1,6 +1,7 @@
+---
 name: Release Workflow
 
-on:
+'on':
   workflow_dispatch:
     inputs:
       version:

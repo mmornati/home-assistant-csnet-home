@@ -1,6 +1,7 @@
+---
 name: PR Preview Zip
 
-on:
+'on':
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
@@ -24,10 +25,14 @@ jobs:
 
       - name: Get PR Info
         id: pr_info
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
-          echo "pr_number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
-          echo "pr_title=${{ github.event.pull_request.title }}" >> $GITHUB_OUTPUT
-          echo "pr_sha=${GITHUB_SHA:0:7}" >> $GITHUB_OUTPUT
+          {
+            echo "pr_number=${{ github.event.pull_request.number }}"
+            echo "pr_title=${PR_TITLE}"
+            echo "pr_sha=${GITHUB_SHA:0:7}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Create PR Preview Zip
         run: |
@@ -75,7 +80,8 @@ jobs:
             - ⏱️ Retention: 30 days
 
             **Download:**
-            - [Download from workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            - [Download from workflow run](${{ github.server_url }}/${{
+              github.repository }}/actions/runs/${{ github.run_id }})
 
             **Installation:**
             1. Stop Home Assistant
