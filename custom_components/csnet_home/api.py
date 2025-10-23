@@ -210,9 +210,9 @@ class CSNetHomeAPI:
                             # Note: installation_devices_data is not available here,
                             # but coordinator can enrich with this data later if needed
                             sensor["unit_type"] = self.get_unit_type(sensor, None)
-                            sensor[
-                                "alarm_code_formatted"
-                            ] = self.get_alarm_code_formatted(alarm_code)
+                            sensor["alarm_code_formatted"] = (
+                                self.get_alarm_code_formatted(alarm_code)
+                            )
                             sensor["alarm_origin"] = self.get_alarm_origin(
                                 alarm_code, sensor["unit_type"], None
                             )

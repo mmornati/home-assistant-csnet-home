@@ -152,13 +152,13 @@ class CSNetHomeClimate(ClimateEntity):
             if fan_speed is not None and fan_speed >= 0:
                 return FAN_SPEED_REVERSE_MAP.get(fan_speed, "auto")
             return "auto"
-        else:
-            # For non-fan coil systems, return silent mode status
-            silent_mode = self._sensor_data.get("silent_mode")
-            # silent_mode: 0 = Off (auto), 1 = On (silent)
-            if silent_mode == 1:
-                return FAN_ON
-            return FAN_AUTO
+
+        # For non-fan coil systems, return silent mode status
+        silent_mode = self._sensor_data.get("silent_mode")
+        # silent_mode: 0 = Off (auto), 1 = On (silent)
+        if silent_mode == 1:
+            return FAN_ON
+        return FAN_AUTO
 
     @property
     def target_temperature(self):

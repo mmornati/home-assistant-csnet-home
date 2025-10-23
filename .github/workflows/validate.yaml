@@ -49,7 +49,7 @@ jobs:
           cache: 'pip'
 
       - name: Install Black
-        run: python3 -m pip install black
+        run: python3 -m pip install black==25.9.0
 
       - name: Check formatting with Black
         run: black --check --diff .
