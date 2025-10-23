@@ -287,6 +287,19 @@ async def async_setup_entry(hass, entry, async_add_entities):
             )
         )
 
+        # Weather sensor from cloud service (Issue #79)
+        sensors.append(
+            CSNetHomeInstallationSensor(
+                coordinator,
+                global_device_data,
+                common_data,
+                "weather_temperature",
+                "temperature",
+                UnitOfTemperature.CELSIUS,
+                "Weather Temperature",
+            )
+        )
+
         # Central Control Configuration sensors
         sensors.append(
             CSNetHomeInstallationSensor(
@@ -524,6 +537,11 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, Entity):
     @property
     def state(self):
         """Return the current state of the sensor."""
+        # Special handling for weather_temperature from cloud service (Issue #79)
+        if self._key == "weather_temperature":
+            common_data = self._coordinator.get_common_data()
+            return common_data.get("weather_temperature")
+
         installation_data = self._coordinator.get_installation_devices_data()
 
         # Map the sensor keys to actual API response keys from indoors/heatingStatus
