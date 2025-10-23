@@ -56,8 +56,7 @@ class CSNetHomeClimate(ClimateEntity):
         self._common_data = common_data
         self._attr_name = self._sensor_data["room_name"]
         self.entry = entry
-        self._attr_min_temp = HEATING_MIN_TEMPERATURE
-        self._attr_max_temp = HEATING_MAX_TEMPERATURE
+        # Temperature limits will be computed dynamically based on mode
         self._attr_temperature_unit = UnitOfTemperature.CELSIUS
         # Expose all modes supported by the API
         self._attr_hvac_modes = [
@@ -135,6 +134,52 @@ class CSNetHomeClimate(ClimateEntity):
         if self._sensor_data is None:
             return None
         return self._sensor_data["setting_temperature"]
+
+    @property
+    def min_temp(self):
+        """Return the minimum temperature based on current mode and API data."""
+        if self._sensor_data is None:
+            return HEATING_MIN_TEMPERATURE
+
+        # Get the current mode to determine temperature limits
+        mode = self._sensor_data.get("mode", 1)  # Default to heat mode
+        zone_id = self._sensor_data.get("zone_id")
+
+        # Get installation devices data from coordinator
+        coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
+        installation_devices_data = coordinator.get_installation_devices_data()
+
+        # Get temperature limits from API
+        cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
+        min_limit, _ = cloud_api.get_temperature_limits(
+            zone_id, mode, installation_devices_data
+        )
+
+        # Return API limit if available, otherwise use static default
+        return min_limit if min_limit is not None else HEATING_MIN_TEMPERATURE
+
+    @property
+    def max_temp(self):
+        """Return the maximum temperature based on current mode and API data."""
+        if self._sensor_data is None:
+            return HEATING_MAX_TEMPERATURE
+
+        # Get the current mode to determine temperature limits
+        mode = self._sensor_data.get("mode", 1)  # Default to heat mode
+        zone_id = self._sensor_data.get("zone_id")
+
+        # Get installation devices data from coordinator
+        coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
+        installation_devices_data = coordinator.get_installation_devices_data()
+
+        # Get temperature limits from API
+        cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
+        _, max_limit = cloud_api.get_temperature_limits(
+            zone_id, mode, installation_devices_data
+        )
+
+        # Return API limit if available, otherwise use static default
+        return max_limit if max_limit is not None else HEATING_MAX_TEMPERATURE
 
     @property
     def unique_id(self) -> str:

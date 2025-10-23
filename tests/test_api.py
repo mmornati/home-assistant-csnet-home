@@ -1247,3 +1247,184 @@ async def test_api_set_silent_mode_timeout_error(mock_aiohttp_client, hass):
     result = await api.async_set_silent_mode(1, 1706, True)
 
     assert result is False
+
+
+def test_get_temperature_limits_zone1_heating(hass):
+    """Test temperature limits extraction for zone 1 in heating mode."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    installation_devices_data = {
+        "heatingStatus": {
+            "heatAirMinC1": 11,
+            "heatAirMaxC1": 30,
+            "coolAirMinC1": 16,
+            "coolAirMaxC1": 30,
+        }
+    }
+
+    # Zone 1, heating mode (mode=1)
+    min_temp, max_temp = api.get_temperature_limits(1, 1, installation_devices_data)
+
+    assert min_temp == 11
+    assert max_temp == 30
+
+
+def test_get_temperature_limits_zone1_cooling(hass):
+    """Test temperature limits extraction for zone 1 in cooling mode."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    installation_devices_data = {
+        "heatingStatus": {
+            "heatAirMinC1": 11,
+            "heatAirMaxC1": 30,
+            "coolAirMinC1": 16,
+            "coolAirMaxC1": 30,
+        }
+    }
+
+    # Zone 1, cooling mode (mode=0)
+    min_temp, max_temp = api.get_temperature_limits(1, 0, installation_devices_data)
+
+    assert min_temp == 16
+    assert max_temp == 30
+
+
+def test_get_temperature_limits_zone2_heating(hass):
+    """Test temperature limits extraction for zone 2 in heating mode."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    installation_devices_data = {
+        "heatingStatus": {
+            "heatAirMinC2": 12,
+            "heatAirMaxC2": 28,
+            "coolAirMinC2": 18,
+            "coolAirMaxC2": 26,
+        }
+    }
+
+    # Zone 2, heating mode (mode=1)
+    min_temp, max_temp = api.get_temperature_limits(2, 1, installation_devices_data)
+
+    assert min_temp == 12
+    assert max_temp == 28
+
+
+def test_get_temperature_limits_zone2_cooling(hass):
+    """Test temperature limits extraction for zone 2 in cooling mode."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    installation_devices_data = {
+        "heatingStatus": {
+            "heatAirMinC2": 12,
+            "heatAirMaxC2": 28,
+            "coolAirMinC2": 18,
+            "coolAirMaxC2": 26,
+        }
+    }
+
+    # Zone 2, cooling mode (mode=0)
+    min_temp, max_temp = api.get_temperature_limits(2, 0, installation_devices_data)
+
+    assert min_temp == 18
+    assert max_temp == 26
+
+
+def test_get_temperature_limits_zone5_heating(hass):
+    """Test temperature limits extraction for zone 5 (water circuit) in heating mode."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    installation_devices_data = {
+        "heatingStatus": {
+            "heatMinC1": 25,
+            "heatMaxC1": 55,
+            "coolMinC1": 15,
+            "coolMaxC1": 22,
+        }
+    }
+
+    # Zone 5, heating mode (mode=1)
+    min_temp, max_temp = api.get_temperature_limits(5, 1, installation_devices_data)
+
+    assert min_temp == 25
+    assert max_temp == 55
+
+
+def test_get_temperature_limits_zone5_cooling(hass):
+    """Test temperature limits extraction for zone 5 (water circuit) in cooling mode."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    installation_devices_data = {
+        "heatingStatus": {
+            "heatMinC1": 25,
+            "heatMaxC1": 55,
+            "coolMinC1": 15,
+            "coolMaxC1": 22,
+        }
+    }
+
+    # Zone 5, cooling mode (mode=0)
+    min_temp, max_temp = api.get_temperature_limits(5, 0, installation_devices_data)
+
+    assert min_temp == 15
+    assert max_temp == 22
+
+
+def test_get_temperature_limits_zone3_dhw(hass):
+    """Test temperature limits extraction for zone 3 (DHW/water heater)."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    installation_devices_data = {
+        "heatingStatus": {
+            "dhwMax": 60,
+        }
+    }
+
+    # Zone 3 (DHW), heating mode (mode=1)
+    min_temp, max_temp = api.get_temperature_limits(3, 1, installation_devices_data)
+
+    assert min_temp is None  # DHW min is not provided by API
+    assert max_temp == 60
+
+
+def test_get_temperature_limits_no_data(hass):
+    """Test temperature limits extraction when no installation devices data is available."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    # No installation devices data
+    min_temp, max_temp = api.get_temperature_limits(1, 1, None)
+
+    assert min_temp is None
+    assert max_temp is None
+
+
+def test_get_temperature_limits_no_heating_status(hass):
+    """Test temperature limits extraction when heatingStatus is missing."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    installation_devices_data = {
+        "otherData": "value"
+    }
+
+    # Missing heatingStatus
+    min_temp, max_temp = api.get_temperature_limits(1, 1, installation_devices_data)
+
+    assert min_temp is None
+    assert max_temp is None
+
+
+def test_get_temperature_limits_partial_data(hass):
+    """Test temperature limits extraction when only some limits are available."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    installation_devices_data = {
+        "heatingStatus": {
+            "heatAirMinC1": 11,
+            # heatAirMaxC1 is missing
+        }
+    }
+
+    # Zone 1, heating mode (mode=1)
+    min_temp, max_temp = api.get_temperature_limits(1, 1, installation_devices_data)
+
+    assert min_temp == 11
+    assert max_temp is None  # Max not available
