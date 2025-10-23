@@ -381,3 +381,168 @@ def test_switch_available():
 
     coordinator.last_update_success = False
     assert switch.available is False
+
+
+@pytest.mark.asyncio
+async def test_switch_setup_entry_no_coordinator(hass):
+    """Test setting up holiday mode switches when no coordinator available."""
+    entry = MagicMock()
+    entry.entry_id = "test_entry"
+
+    hass.data = {
+        "csnet_home": {
+            "test_entry": {
+                "coordinator": None,
+                "api": MagicMock(),
+            }
+        }
+    }
+
+    async_add_entities = MagicMock()
+
+    await async_setup_entry(hass, entry, async_add_entities)
+
+    assert not async_add_entities.called
+
+
+@pytest.mark.asyncio
+async def test_switch_setup_entry_no_api(hass):
+    """Test setting up holiday mode switches when no API available."""
+    coordinator = MagicMock()
+    entry = MagicMock()
+    entry.entry_id = "test_entry"
+
+    hass.data = {
+        "csnet_home": {
+            "test_entry": {
+                "coordinator": coordinator,
+                "api": None,
+            }
+        }
+    }
+
+    async_add_entities = MagicMock()
+
+    await async_setup_entry(hass, entry, async_add_entities)
+
+    assert not async_add_entities.called
+
+
+def test_switch_state_invalid_date():
+    """Test switch state when holiday mode has invalid date data."""
+    hass = MagicMock()
+    entry = MagicMock()
+    coordinator = MagicMock()
+    coordinator.get_holiday_mode_units = MagicMock(return_value=[])
+    api = MagicMock()
+
+    unit_data = {
+        "unit_id": 201,
+        "unit_name": "Living Room",
+        "outdoor_id": 100,
+        "outdoor_name": "Outdoor Unit",
+        "holiday_mode": {
+            "year": "invalid",  # Invalid year
+            "month": 12,
+            "day": 25,
+            "hour": 14,
+            "minute": 30,
+        },
+    }
+
+    switch = HolidayModeSwitch(hass, entry, coordinator, api, unit_data)
+
+    # Should handle the error gracefully
+    assert switch._attr_is_on is False
+    assert switch._attr_extra_state_attributes == {}
+
+
+@pytest.mark.asyncio
+async def test_switch_turn_on_invalid_date_format():
+    """Test turning on holiday mode with invalid date format."""
+    hass = MagicMock()
+    entry = MagicMock()
+    coordinator = MagicMock()
+    coordinator.get_holiday_mode_units = MagicMock(return_value=[])
+    coordinator.async_request_refresh = AsyncMock()
+
+    api = MagicMock()
+    api.async_set_holiday_mode = AsyncMock(return_value=True)
+
+    unit_data = {
+        "unit_id": 201,
+        "unit_name": "Living Room",
+        "outdoor_id": 100,
+        "outdoor_name": "Outdoor Unit",
+        "holiday_mode": None,
+    }
+
+    switch = HolidayModeSwitch(hass, entry, coordinator, api, unit_data)
+
+    # Try with invalid date format
+    await switch.async_turn_on(return_date="invalid-date", return_time="15:30")
+
+    # Should not call API with invalid date
+    api.async_set_holiday_mode.assert_not_called()
+    coordinator.async_request_refresh.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_switch_async_update():
+    """Test the async_update method."""
+    hass = MagicMock()
+    entry = MagicMock()
+
+    # Initially return no holiday mode
+    coordinator = MagicMock()
+    coordinator.get_holiday_mode_units = MagicMock(
+        return_value=[
+            {
+                "unit_id": 201,
+                "unit_name": "Living Room",
+                "outdoor_id": 100,
+                "outdoor_name": "Outdoor Unit",
+                "holiday_mode": None,
+            }
+        ]
+    )
+    api = MagicMock()
+
+    unit_data = {
+        "unit_id": 201,
+        "unit_name": "Living Room",
+        "outdoor_id": 100,
+        "outdoor_name": "Outdoor Unit",
+        "holiday_mode": None,
+    }
+
+    switch = HolidayModeSwitch(hass, entry, coordinator, api, unit_data)
+
+    # Initially should be off (no holiday mode)
+    assert switch._attr_is_on is False
+
+    # Update coordinator to return active holiday mode
+    coordinator.get_holiday_mode_units = MagicMock(
+        return_value=[
+            {
+                "unit_id": 201,
+                "unit_name": "Living Room",
+                "outdoor_id": 100,
+                "outdoor_name": "Outdoor Unit",
+                "holiday_mode": {
+                    "year": 2030,
+                    "month": 12,
+                    "day": 25,
+                    "hour": 14,
+                    "minute": 30,
+                },
+            }
+        ]
+    )
+
+    # Call async_update which should update from coordinator
+    await switch.async_update()
+
+    # Now should be on (updated from coordinator with future date)
+    assert switch._attr_is_on is True
+    assert "return_date" in switch._attr_extra_state_attributes
