@@ -2,8 +2,13 @@
 
 import logging
 
-from homeassistant.components.climate import ClimateEntity, HVACMode, HVACAction
-from homeassistant.components.climate.const import ClimateEntityFeature
+from homeassistant.components.climate import (
+    ClimateEntity,
+    HVACMode,
+    HVACAction,
+    FAN_AUTO,
+)
+from homeassistant.components.climate.const import ClimateEntityFeature, FAN_ON
 from homeassistant.const import UnitOfTemperature
 from homeassistant.helpers.device_registry import DeviceInfo
 
@@ -54,18 +59,26 @@ class CSNetHomeClimate(ClimateEntity):
         self._attr_min_temp = HEATING_MIN_TEMPERATURE
         self._attr_max_temp = HEATING_MAX_TEMPERATURE
         self._attr_temperature_unit = UnitOfTemperature.CELSIUS
-        # Expose only modes we can reliably set via the API
-        self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT, HVACMode.COOL]
+        # Expose all modes supported by the API
+        self._attr_hvac_modes = [
+            HVACMode.OFF,
+            HVACMode.HEAT,
+            HVACMode.COOL,
+            HVACMode.HEAT_COOL,
+        ]
         self._attr_preset_modes = ["comfort", "eco"]
         if self._sensor_data["ecocomfort"] and self._sensor_data["ecocomfort"] == 0:
             self._attr_preset_mode = "eco"
         else:
             self._attr_preset_mode = "comfort"
+        # Fan modes: auto (normal) and on (silent/quiet mode)
+        self._attr_fan_modes = [FAN_AUTO, FAN_ON]
         self._attr_supported_features = (
             ClimateEntityFeature.PRESET_MODE
             | ClimateEntityFeature.TARGET_TEMPERATURE
             | ClimateEntityFeature.TURN_ON
             | ClimateEntityFeature.TURN_OFF
+            | ClimateEntityFeature.FAN_MODE
         )
 
     @property
@@ -102,6 +115,17 @@ class CSNetHomeClimate(ClimateEntity):
             return "comfort"
         # If not available (-1) default to comfort
         return "comfort"
+
+    @property
+    def fan_mode(self):
+        """Return the current fan mode (silent mode)."""
+        if self._sensor_data is None:
+            return FAN_AUTO
+        silent_mode = self._sensor_data.get("silent_mode")
+        # silent_mode: 0 = Off (auto), 1 = On (silent)
+        if silent_mode == 1:
+            return FAN_ON
+        return FAN_AUTO
 
     @property
     def target_temperature(self):
@@ -154,6 +178,7 @@ class CSNetHomeClimate(ClimateEntity):
             "c1_demand": self._sensor_data.get("c1_demand"),
             "c2_demand": self._sensor_data.get("c2_demand"),
             "doingBoost": self._sensor_data.get("doingBoost"),
+            "silent_mode": self._sensor_data.get("silent_mode"),
         }
 
     async def async_set_temperature(self, **kwargs):
@@ -204,6 +229,20 @@ class CSNetHomeClimate(ClimateEntity):
         )
         if response:
             self._sensor_data["ecocomfort"] = 1 if preset_mode == "eco" else 0
+
+    async def async_set_fan_mode(self, fan_mode: str) -> None:
+        """Set new fan mode (silent mode)."""
+        cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
+        # Map fan mode to silent mode boolean
+        # FAN_ON = silent mode on, FAN_AUTO = silent mode off
+        silent_mode = fan_mode == FAN_ON
+        response = await cloud_api.async_set_silent_mode(
+            self._sensor_data["zone_id"],
+            self._sensor_data["parent_id"],
+            silent_mode,
+        )
+        if response:
+            self._sensor_data["silent_mode"] = 1 if silent_mode else 0
 
     def is_heating(self):
         """Return true if the thermostat is currently heating."""

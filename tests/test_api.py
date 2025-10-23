@@ -1,5 +1,6 @@
 """Test API module to check contracts."""
 
+import asyncio
 from unittest.mock import ANY, AsyncMock, patch
 
 import pytest
@@ -211,6 +212,7 @@ async def test_api_get_elements_data_success(mock_aiohttp_client, hass):
                         "doingBoost": False,
                         "timerRunning": False,
                         "fixAvailable": False,
+                        "silentMode": 0,
                     },
                     {
                         "parentId": 1234,
@@ -240,6 +242,7 @@ async def test_api_get_elements_data_success(mock_aiohttp_client, hass):
                         "doingBoost": False,
                         "timerRunning": False,
                         "fixAvailable": False,
+                        "silentMode": 1,
                     },
                 ],
                 "name": "My Home",
@@ -283,6 +286,7 @@ async def test_api_get_elements_data_success(mock_aiohttp_client, hass):
                 "c1_demand": True,
                 "c2_demand": True,
                 "ecocomfort": 1,
+                "silent_mode": 0,
                 "current_temperature": 19.5,
                 "setting_temperature": 19.0,
                 "zone_id": 1,
@@ -304,6 +308,7 @@ async def test_api_get_elements_data_success(mock_aiohttp_client, hass):
                 "c1_demand": True,
                 "c2_demand": True,
                 "ecocomfort": 1,
+                "silent_mode": 1,
                 "current_temperature": 17.5,
                 "setting_temperature": 19.0,
                 "zone_id": 2,
@@ -389,6 +394,7 @@ async def test_api_get_elements_data_empty_names(mock_aiohttp_client, hass):
                         "doingBoost": False,
                         "timerRunning": False,
                         "fixAvailable": False,
+                        "silentMode": 0,
                     },
                     {
                         "parentId": 1234,
@@ -418,6 +424,7 @@ async def test_api_get_elements_data_empty_names(mock_aiohttp_client, hass):
                         "doingBoost": False,
                         "timerRunning": False,
                         "fixAvailable": False,
+                        "silentMode": 0,
                     },
                 ],
                 "name": "My Home",
@@ -461,6 +468,7 @@ async def test_api_get_elements_data_empty_names(mock_aiohttp_client, hass):
                 "c1_demand": True,
                 "c2_demand": True,
                 "ecocomfort": 1,
+                "silent_mode": 0,
                 "current_temperature": 19.5,
                 "setting_temperature": 19.0,
                 "zone_id": 1,
@@ -482,6 +490,7 @@ async def test_api_get_elements_data_empty_names(mock_aiohttp_client, hass):
                 "c1_demand": True,
                 "c2_demand": True,
                 "ecocomfort": 1,
+                "silent_mode": 0,
                 "current_temperature": 17.5,
                 "setting_temperature": 19.0,
                 "zone_id": 2,
@@ -1019,3 +1028,158 @@ async def test_api_get_installation_alarms_failure(mock_aiohttp_client, hass):
     data = await api.async_get_installation_alarms()
 
     assert data is None
+
+
+@pytest.mark.asyncio
+async def test_api_set_silent_mode_on(mock_aiohttp_client, hass):
+    """Test setting silent mode on for a zone."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    mock_response = mock_client_instance.post.return_value.__aenter__.return_value
+    mock_response.status = 200
+    mock_response.text = AsyncMock(return_value='{"status":"success"}')
+    mock_response.raise_for_status = AsyncMock()
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.session = mock_client_instance
+    api.logged_in = True
+    api.xsrf_token = "test-token"
+    api.cookies = {"test": "cookie"}
+
+    # Test with zone_id 1 turning silent mode on
+    result = await api.async_set_silent_mode(1, 1706, True)
+
+    assert result is True
+    call_args = mock_client_instance.post.call_args
+    assert call_args is not None
+    data_sent = call_args[1]["data"]
+    assert "silentModeC1" in data_sent
+    assert data_sent["silentModeC1"] == "1"
+    assert data_sent["indoorId"] == 1706
+    assert data_sent["orderStatus"] == "PENDING"
+
+
+@pytest.mark.asyncio
+async def test_api_set_silent_mode_off(mock_aiohttp_client, hass):
+    """Test setting silent mode off for a zone."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    mock_response = mock_client_instance.post.return_value.__aenter__.return_value
+    mock_response.status = 200
+    mock_response.text = AsyncMock(return_value='{"status":"success"}')
+    mock_response.raise_for_status = AsyncMock()
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.session = mock_client_instance
+    api.logged_in = True
+    api.xsrf_token = "test-token"
+    api.cookies = {"test": "cookie"}
+
+    # Test with zone_id 1 turning silent mode off
+    result = await api.async_set_silent_mode(1, 1706, False)
+
+    assert result is True
+    call_args = mock_client_instance.post.call_args
+    assert call_args is not None
+    data_sent = call_args[1]["data"]
+    assert "silentModeC1" in data_sent
+    assert data_sent["silentModeC1"] == "0"
+
+
+@pytest.mark.asyncio
+async def test_api_set_silent_mode_zone5_uses_circuit1(mock_aiohttp_client, hass):
+    """Test that zone_id 5 uses C1 in silent mode parameter names."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    mock_response = mock_client_instance.post.return_value.__aenter__.return_value
+    mock_response.status = 200
+    mock_response.text = AsyncMock(return_value='{"status":"success"}')
+    mock_response.raise_for_status = AsyncMock()
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.session = mock_client_instance
+    api.logged_in = True
+    api.xsrf_token = "test-token"
+    api.cookies = {"test": "cookie"}
+
+    # Test with zone_id 5 setting silent mode
+    result = await api.async_set_silent_mode(5, 2486, True)
+
+    assert result is True
+    call_args = mock_client_instance.post.call_args
+    assert call_args is not None
+    data_sent = call_args[1]["data"]
+    # Zone 5 should use C1 parameters
+    assert "silentModeC1" in data_sent
+    assert data_sent["silentModeC1"] == "1"
+    # Should not have C5 parameters
+    assert "silentModeC5" not in data_sent
+
+
+@pytest.mark.asyncio
+async def test_api_set_silent_mode_zone2_uses_circuit2(mock_aiohttp_client, hass):
+    """Test that zone_id 2 uses C2 in silent mode parameter names."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    mock_response = mock_client_instance.post.return_value.__aenter__.return_value
+    mock_response.status = 200
+    mock_response.text = AsyncMock(return_value='{"status":"success"}')
+    mock_response.raise_for_status = AsyncMock()
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.session = mock_client_instance
+    api.logged_in = True
+    api.xsrf_token = "test-token"
+    api.cookies = {"test": "cookie"}
+
+    # Test with zone_id 2 setting silent mode
+    result = await api.async_set_silent_mode(2, 1706, True)
+
+    assert result is True
+    call_args = mock_client_instance.post.call_args
+    assert call_args is not None
+    data_sent = call_args[1]["data"]
+    assert "silentModeC2" in data_sent
+    assert data_sent["silentModeC2"] == "1"
+
+
+@pytest.mark.asyncio
+async def test_api_set_silent_mode_http_error(mock_aiohttp_client, hass):
+    """Test silent mode API call with HTTP error."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    mock_response = mock_client_instance.post.return_value.__aenter__.return_value
+    mock_response.status = 500
+    mock_response.text = AsyncMock(return_value='{"error":"Internal server error"}')
+    mock_response.raise_for_status = AsyncMock()
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.session = mock_client_instance
+    api.logged_in = True
+    api.xsrf_token = "test-token"
+    api.cookies = {"test": "cookie"}
+
+    # Test with zone_id 1 - should fail
+    result = await api.async_set_silent_mode(1, 1706, True)
+
+    assert result is False
+
+
+@pytest.mark.asyncio
+async def test_api_set_silent_mode_timeout_error(mock_aiohttp_client, hass):
+    """Test silent mode API call with timeout error."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    # Mock post to raise TimeoutError
+    mock_client_instance.post.return_value.__aenter__.side_effect = asyncio.TimeoutError
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.session = mock_client_instance
+    api.logged_in = True
+    api.xsrf_token = "test-token"
+    api.cookies = {"test": "cookie"}
+
+    # Test with zone_id 1 - should fail
+    result = await api.async_set_silent_mode(1, 1706, True)
+
+    assert result is False

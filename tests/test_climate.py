@@ -5,13 +5,15 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from homeassistant.components.climate import HVACAction, HVACMode
+from homeassistant.components.climate import HVACAction, HVACMode, FAN_AUTO, FAN_ON
 
 from custom_components.csnet_home.climate import CSNetHomeClimate
 from custom_components.csnet_home.const import DOMAIN
 
 
-def build_entity(hass, *, mode=1, on_off=1, cur=19.5, setp=20.0, ecocomfort=1):
+def build_entity(
+    hass, *, mode=1, on_off=1, cur=19.5, setp=20.0, ecocomfort=1, silent_mode=0
+):
     """Create a CSNetHomeClimate with minimal surroundings."""
     sensor_data = {
         "device_name": "Hitachi PAC",
@@ -28,6 +30,7 @@ def build_entity(hass, *, mode=1, on_off=1, cur=19.5, setp=20.0, ecocomfort=1):
         "c1_demand": True,
         "c2_demand": False,
         "ecocomfort": ecocomfort,
+        "silent_mode": silent_mode,
         "current_temperature": cur,
         "setting_temperature": setp,
         "zone_id": 1,
@@ -47,6 +50,7 @@ def build_entity(hass, *, mode=1, on_off=1, cur=19.5, setp=20.0, ecocomfort=1):
         async_set_hvac_mode=AsyncMock(return_value=True),
         async_set_temperature=AsyncMock(return_value=True),
         set_preset_modes=AsyncMock(return_value=True),
+        async_set_silent_mode=AsyncMock(return_value=True),
     )
     hass.data[DOMAIN][entry.entry_id]["coordinator"] = SimpleNamespace(
         get_sensors_data=lambda: [sensor_data],
@@ -187,3 +191,82 @@ async def test_async_update_preserves_sensor_data_when_found(hass):
     assert entity.current_temperature == 19.5
     assert entity.target_temperature == 20.0
     assert entity.hvac_mode == HVACMode.HEAT
+
+
+def test_fan_mode_mapping_silent_off(hass):
+    """Return FAN_AUTO when silent_mode is 0."""
+    entity = build_entity(hass, silent_mode=0)
+    assert entity.fan_mode == FAN_AUTO
+
+
+def test_fan_mode_mapping_silent_on(hass):
+    """Return FAN_ON when silent_mode is 1."""
+    entity = build_entity(hass, silent_mode=1)
+    assert entity.fan_mode == FAN_ON
+
+
+def test_fan_mode_mapping_silent_none(hass):
+    """Return FAN_AUTO when silent_mode is None."""
+    entity = build_entity(hass)
+    # Remove silent_mode to test None case
+    entity._sensor_data["silent_mode"] = None
+    assert entity.fan_mode == FAN_AUTO
+
+
+@pytest.mark.asyncio
+async def test_set_fan_mode_to_silent(hass):
+    """Test setting fan mode to silent (FAN_ON)."""
+    entity = build_entity(hass, silent_mode=0)
+    api = hass.data[DOMAIN][entity.entry.entry_id]["api"]
+
+    await entity.async_set_fan_mode(FAN_ON)
+
+    api.async_set_silent_mode.assert_awaited()
+    called_args = api.async_set_silent_mode.call_args[0]
+    # args: zone_id, parent_id, silent_mode
+    assert called_args[0] == 1  # zone_id
+    assert called_args[1] == 1706  # parent_id
+    assert called_args[2] is True  # silent_mode enabled
+    # Check local state updated
+    assert entity._sensor_data["silent_mode"] == 1
+
+
+@pytest.mark.asyncio
+async def test_set_fan_mode_to_normal(hass):
+    """Test setting fan mode to normal (FAN_AUTO)."""
+    entity = build_entity(hass, silent_mode=1)
+    api = hass.data[DOMAIN][entity.entry.entry_id]["api"]
+
+    await entity.async_set_fan_mode(FAN_AUTO)
+
+    api.async_set_silent_mode.assert_awaited()
+    called_args = api.async_set_silent_mode.call_args[0]
+    assert called_args[0] == 1  # zone_id
+    assert called_args[1] == 1706  # parent_id
+    assert called_args[2] is False  # silent_mode disabled
+    # Check local state updated
+    assert entity._sensor_data["silent_mode"] == 0
+
+
+def test_extra_state_attributes_includes_silent_mode(hass):
+    """Verify silent_mode is included in extra attributes."""
+    entity = build_entity(hass, silent_mode=1)
+    attrs = entity.extra_state_attributes
+    assert "silent_mode" in attrs
+    assert attrs["silent_mode"] == 1
+
+
+def test_fan_modes_available(hass):
+    """Verify fan modes are available."""
+    entity = build_entity(hass)
+    assert entity.fan_modes is not None
+    assert FAN_AUTO in entity.fan_modes
+    assert FAN_ON in entity.fan_modes
+
+
+def test_supported_features_includes_fan_mode(hass):
+    """Verify FAN_MODE is in supported features."""
+    entity = build_entity(hass)
+    from homeassistant.components.climate.const import ClimateEntityFeature
+
+    assert entity.supported_features & ClimateEntityFeature.FAN_MODE

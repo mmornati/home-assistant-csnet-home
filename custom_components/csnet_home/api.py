@@ -184,6 +184,9 @@ class CSNetHomeAPI:
                                     "ecocomfort"
                                 ),  # 0 = Eco, 1 = Comfort, -1 = No available mode
                                 "doingBoost": element.get("doingBoost"),
+                                "silent_mode": element.get(
+                                    "silentMode"
+                                ),  # 0 = Off, 1 = On
                                 "current_temperature": element.get(
                                     "currentTemperature"
                                 ),
@@ -584,6 +587,62 @@ class CSNetHomeAPI:
                     return True
         except (aiohttp.ClientError, asyncio.TimeoutError) as err:
             _LOGGER.error("Error setting preset_mode for %s: %s", zone_id, err)
+            return False
+
+    async def async_set_silent_mode(self, zone_id, parent_id, silent_mode: bool):
+        """Set silent/quiet mode for a zone."""
+        settings_url = f"{self.base_url}{HEAT_SETTINGS_PATH}"
+
+        headers = COMMON_API_HEADERS | {
+            "accept": "*/*",
+            "x-requested-with": "XMLHttpRequest",
+            "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "origin": self.base_url,
+        }
+
+        # For zone_id 5 (fixed temp circuit), use C1 in parameter names
+        circuit_id = 1 if zone_id == 5 else zone_id
+
+        data = {
+            "id": f"{parent_id}{zone_id}",  # device id + zone id
+            "updatedOn": str(int(time.time() * 1000)),  # current timestamp in ms
+            "orderStatus": "PENDING",
+            "indoorId": parent_id,
+            f"silentModeC{circuit_id}": "1" if silent_mode else "0",
+            "_csrf": self.xsrf_token,
+        }
+
+        cookies = {
+            "XSRF-TOKEN": self.xsrf_token,
+            "acceptedCookies": "yes",
+        }
+
+        try:
+            async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+                async with self.session.post(
+                    settings_url, headers=headers, cookies=cookies, data=data
+                ) as response:
+                    response_text = await response.text()
+                    _LOGGER.debug(
+                        "Set silent_mode=%s for zone=%s with payload=%s, status=%s, response=%s",
+                        silent_mode,
+                        zone_id,
+                        data,
+                        response.status,
+                        response_text,
+                    )
+                    if response.status != 200:
+                        _LOGGER.warning(
+                            "HTTP %s for silent_mode=%s: %s",
+                            response.status,
+                            silent_mode,
+                            response_text,
+                        )
+                        return False
+                    response.raise_for_status()
+                    return True
+        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+            _LOGGER.error("Error setting silent_mode for %s: %s", zone_id, err)
             return False
 
     async def close(self):
