@@ -500,13 +500,7 @@ def test_central_config_sensor():
 
     # Test with centralConfig = 0 (Unit Only)
     installation_data = {
-        "data": [
-            {
-                "indoors": [
-                    {"heatingStatus": {"centralConfig": 0}}
-                ]
-            }
-        ]
+        "data": [{"indoors": [{"heatingStatus": {"centralConfig": 0}}]}]
     }
 
     coordinator = SimpleNamespace(
@@ -559,15 +553,7 @@ def test_lcd_software_version_sensor():
     common_data = {"name": "Hitachi Installation", "firmware": "1.0.0"}
 
     # Test with version 0x0222 (546 decimal)
-    installation_data = {
-        "data": [
-            {
-                "indoors": [
-                    {"heatingStatus": {"lcdSoft": 546}}
-                ]
-            }
-        ]
-    }
+    installation_data = {"data": [{"indoors": [{"heatingStatus": {"lcdSoft": 546}}]}]}
 
     coordinator = SimpleNamespace(
         get_installation_devices_data=lambda: installation_data,
@@ -608,15 +594,7 @@ def test_unit_model_sensor():
     }
     common_data = {"name": "Hitachi Installation", "firmware": "1.0.0"}
 
-    installation_data = {
-        "data": [
-            {
-                "indoors": [
-                    {"heatingStatus": {"unitModel": 0}}
-                ]
-            }
-        ]
-    }
+    installation_data = {"data": [{"indoors": [{"heatingStatus": {"unitModel": 0}}]}]}
 
     coordinator = SimpleNamespace(
         get_installation_devices_data=lambda: installation_data,
@@ -700,8 +678,12 @@ def test_central_control_enabled_sensor():
 
     # Test with centralConfig < 3 but non-S80 model and recent firmware (should be ON)
     installation_data["data"][0]["indoors"][0]["heatingStatus"]["centralConfig"] = 2
-    installation_data["data"][0]["indoors"][0]["heatingStatus"]["unitModel"] = 0  # Yutaki S
-    installation_data["data"][0]["indoors"][0]["heatingStatus"]["lcdSoft"] = 546  # >= 0x0222
+    installation_data["data"][0]["indoors"][0]["heatingStatus"][
+        "unitModel"
+    ] = 0  # Yutaki S
+    installation_data["data"][0]["indoors"][0]["heatingStatus"][
+        "lcdSoft"
+    ] = 546  # >= 0x0222
     assert s.state == STATE_ON
 
     # Test with centralConfig < 3, non-S80, and lcdSoft = 0 (should be ON - not configured yet)
@@ -713,12 +695,16 @@ def test_central_control_enabled_sensor():
     # Test with centralConfig < 3, non-S80, old firmware (should be OFF)
     installation_data["data"][0]["indoors"][0]["heatingStatus"]["centralConfig"] = 2
     installation_data["data"][0]["indoors"][0]["heatingStatus"]["unitModel"] = 0
-    installation_data["data"][0]["indoors"][0]["heatingStatus"]["lcdSoft"] = 500  # < 0x0222
+    installation_data["data"][0]["indoors"][0]["heatingStatus"][
+        "lcdSoft"
+    ] = 500  # < 0x0222
     assert s.state == STATE_OFF
 
     # Test with centralConfig < 3 and S80 model (should be OFF)
     installation_data["data"][0]["indoors"][0]["heatingStatus"]["centralConfig"] = 2
-    installation_data["data"][0]["indoors"][0]["heatingStatus"]["unitModel"] = 2  # Yutaki S80
+    installation_data["data"][0]["indoors"][0]["heatingStatus"][
+        "unitModel"
+    ] = 2  # Yutaki S80
     installation_data["data"][0]["indoors"][0]["heatingStatus"]["lcdSoft"] = 546
     assert s.state == STATE_OFF
 

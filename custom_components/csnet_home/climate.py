@@ -229,9 +229,7 @@ class CSNetHomeClimate(ClimateEntity):
 
     async def async_update(self):
         """Update the thermostat data from the API."""
-        _LOGGER.debug(
-            "Updating CSNet Home refresh request %s", self._attr_name
-        )
+        _LOGGER.debug("Updating CSNet Home refresh request %s", self._attr_name)
         coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
         if not coordinator:
             _LOGGER.error("No coordinator instance found!")

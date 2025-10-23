@@ -471,7 +471,7 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, Entity):
             if isinstance(value, (int, float)) and value > 1:
                 return value / 100
             return value
-        
+
         # Central control configuration sensors
         if self._key == "unit_model":
             # Decode unit model codes
@@ -484,13 +484,13 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, Entity):
                 5: "Yutampo",
             }
             return unit_models.get(value, f"Unknown ({value})")
-        
+
         if self._key == "lcd_software_version":
             # Format as hex version (e.g., 0x0222 = v2.34)
             if isinstance(value, int) and value > 0:
                 return f"0x{value:04X}"
             return value
-        
+
         if self._key == "central_config":
             # Decode central config values
             config_names = {
@@ -504,13 +504,13 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, Entity):
             if value is not None and value < 3:
                 decoded += " ⚠️"  # Warning for insufficient control
             return decoded
-        
+
         if self._key == "central_control_enabled":
             # Calculate if central control is properly configured
             # Based on JavaScript function isCentralWellConfigured()
             if not isinstance(installation_data, dict):
                 return STATE_OFF
-            
+
             heating_status = None
             data_array = installation_data.get("data", [])
             if isinstance(data_array, list) and len(data_array) > 0:
@@ -521,31 +521,31 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, Entity):
                         first_indoors = indoors_array[0]
                         if isinstance(first_indoors, dict):
                             heating_status = first_indoors.get("heatingStatus", {})
-            
+
             if not heating_status:
                 return STATE_OFF
-            
+
             central_config = heating_status.get("centralConfig", 0)
-            
+
             # Central config >= 3 means "Total" control is enabled
             if central_config >= 3:
                 return STATE_ON
-            
+
             # For non-S80 models, check LCD software version
             unit_model = heating_status.get("unitModel", 0)
             CODE_YUTAKI_S80 = 2
-            
+
             if unit_model != CODE_YUTAKI_S80:
                 lcd_soft = heating_status.get("lcdSoft", 0)
-                
+
                 # lcdSoft == 0 means not configured yet (during wizard)
                 if lcd_soft == 0:
                     return STATE_ON
-                
+
                 # Version >= 0x0222 (546 decimal) allows control
                 if lcd_soft >= 0x0222:
                     return STATE_ON
-            
+
             return STATE_OFF
 
         return value
