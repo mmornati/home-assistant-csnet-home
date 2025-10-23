@@ -1653,3 +1653,277 @@ def test_alarm_statistics_sensor_no_alarms():
         coordinator, common_data, "alarm_by_origin", "Alarms by Origin"
     )
     assert s_origin.state == 0
+
+
+def test_system_config_sensors():
+    """Test system configuration diagnostic sensors (Issue #78)."""
+    device_data = {
+        "device_name": "System",
+        "device_id": "global",
+        "room_name": "Controller",
+        "parent_id": "global",
+        "room_id": "global",
+    }
+    common_data = {"name": "Hitachi Installation", "firmware": "1.0.0"}
+
+    # Mock installation devices data with systemConfigBits
+    # Test all bits: 0x1000 (cascade), 0x2000 (fan coil), 0x40 (C1), 0x80 (C2)
+    installation_data = {
+        "data": [
+            {
+                "indoors": [
+                    {
+                        "heatingStatus": {
+                            "systemConfigBits": 0x3000 | 0x40 | 0x80,  # All bits set
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+
+    coordinator = SimpleNamespace(
+        get_installation_devices_data=lambda: installation_data,
+    )
+
+    # Test cascade slave mode sensor (bit 0x1000)
+    s = CSNetHomeInstallationSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "cascade_slave_mode",
+        "binary",
+        None,
+        "Cascade Slave Mode",
+    )
+    assert s.state == STATE_ON
+    assert s.name == "System Controller Cascade Slave Mode"
+
+    # Test fan coil compatible sensor (bit 0x2000)
+    s = CSNetHomeInstallationSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "fan_coil_compatible",
+        "binary",
+        None,
+        "Fan Coil Compatible",
+    )
+    assert s.state == STATE_ON
+
+    # Test C1 thermostat present sensor (bit 0x40)
+    s = CSNetHomeInstallationSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "c1_thermostat_present",
+        "binary",
+        None,
+        "C1 Thermostat Present",
+    )
+    assert s.state == STATE_ON
+
+    # Test C2 thermostat present sensor (bit 0x80)
+    s = CSNetHomeInstallationSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "c2_thermostat_present",
+        "binary",
+        None,
+        "C2 Thermostat Present",
+    )
+    assert s.state == STATE_ON
+
+
+def test_system_config_sensors_no_bits_set():
+    """Test system configuration sensors when no bits are set."""
+    device_data = {
+        "device_name": "System",
+        "device_id": "global",
+        "room_name": "Controller",
+        "parent_id": "global",
+        "room_id": "global",
+    }
+    common_data = {"name": "Hitachi Installation", "firmware": "1.0.0"}
+
+    # Mock installation devices data with systemConfigBits = 0
+    installation_data = {
+        "data": [
+            {
+                "indoors": [
+                    {
+                        "heatingStatus": {
+                            "systemConfigBits": 0,  # No bits set
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+
+    coordinator = SimpleNamespace(
+        get_installation_devices_data=lambda: installation_data,
+    )
+
+    # Test cascade slave mode sensor (bit 0x1000)
+    s = CSNetHomeInstallationSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "cascade_slave_mode",
+        "binary",
+        None,
+        "Cascade Slave Mode",
+    )
+    assert s.state == STATE_OFF
+
+    # Test fan coil compatible sensor (bit 0x2000)
+    s = CSNetHomeInstallationSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "fan_coil_compatible",
+        "binary",
+        None,
+        "Fan Coil Compatible",
+    )
+    assert s.state == STATE_OFF
+
+    # Test C1 thermostat present sensor (bit 0x40)
+    s = CSNetHomeInstallationSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "c1_thermostat_present",
+        "binary",
+        None,
+        "C1 Thermostat Present",
+    )
+    assert s.state == STATE_OFF
+
+    # Test C2 thermostat present sensor (bit 0x80)
+    s = CSNetHomeInstallationSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "c2_thermostat_present",
+        "binary",
+        None,
+        "C2 Thermostat Present",
+    )
+    assert s.state == STATE_OFF
+
+
+def test_system_config_sensors_partial_bits():
+    """Test system configuration sensors with only some bits set."""
+    device_data = {
+        "device_name": "System",
+        "device_id": "global",
+        "room_name": "Controller",
+        "parent_id": "global",
+        "room_id": "global",
+    }
+    common_data = {"name": "Hitachi Installation", "firmware": "1.0.0"}
+
+    # Mock installation devices data with only fan coil and C1 bits set
+    installation_data = {
+        "data": [
+            {
+                "indoors": [
+                    {
+                        "heatingStatus": {
+                            "systemConfigBits": 0x2000 | 0x40,  # Fan coil + C1 only
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+
+    coordinator = SimpleNamespace(
+        get_installation_devices_data=lambda: installation_data,
+    )
+
+    # Test cascade slave mode sensor - should be OFF
+    s = CSNetHomeInstallationSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "cascade_slave_mode",
+        "binary",
+        None,
+        "Cascade Slave Mode",
+    )
+    assert s.state == STATE_OFF
+
+    # Test fan coil compatible sensor - should be ON
+    s = CSNetHomeInstallationSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "fan_coil_compatible",
+        "binary",
+        None,
+        "Fan Coil Compatible",
+    )
+    assert s.state == STATE_ON
+
+    # Test C1 thermostat present sensor - should be ON
+    s = CSNetHomeInstallationSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "c1_thermostat_present",
+        "binary",
+        None,
+        "C1 Thermostat Present",
+    )
+    assert s.state == STATE_ON
+
+    # Test C2 thermostat present sensor - should be OFF
+    s = CSNetHomeInstallationSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "c2_thermostat_present",
+        "binary",
+        None,
+        "C2 Thermostat Present",
+    )
+    assert s.state == STATE_OFF
+
+
+def test_system_config_sensors_no_data():
+    """Test system configuration sensors when no installation data available."""
+    device_data = {
+        "device_name": "System",
+        "device_id": "global",
+        "room_name": "Controller",
+        "parent_id": "global",
+        "room_id": "global",
+    }
+    common_data = {"name": "Hitachi Installation", "firmware": "1.0.0"}
+
+    # Mock with empty/no data
+    coordinator = SimpleNamespace(
+        get_installation_devices_data=lambda: {},
+    )
+
+    # All sensors should return STATE_OFF when no data is available
+    for key, name in [
+        ("cascade_slave_mode", "Cascade Slave Mode"),
+        ("fan_coil_compatible", "Fan Coil Compatible"),
+        ("c1_thermostat_present", "C1 Thermostat Present"),
+        ("c2_thermostat_present", "C2 Thermostat Present"),
+    ]:
+        s = CSNetHomeInstallationSensor(
+            coordinator,
+            device_data,
+            common_data,
+            key,
+            "binary",
+            None,
+            name,
+        )
+        assert s.state == STATE_OFF
