@@ -290,6 +290,8 @@ async def test_api_get_elements_data_success(mock_aiohttp_client, hass):
                 "current_temperature": 19.5,
                 "setting_temperature": 19.0,
                 "zone_id": 1,
+                "fan1_speed": None,
+                "fan2_speed": None,
             },
             {
                 "device_name": "Hitachi PAC",
@@ -312,6 +314,8 @@ async def test_api_get_elements_data_success(mock_aiohttp_client, hass):
                 "current_temperature": 17.5,
                 "setting_temperature": 19.0,
                 "zone_id": 2,
+                "fan1_speed": None,
+                "fan2_speed": None,
             },
         ],
     }
@@ -472,6 +476,8 @@ async def test_api_get_elements_data_empty_names(mock_aiohttp_client, hass):
                 "current_temperature": 19.5,
                 "setting_temperature": 19.0,
                 "zone_id": 1,
+                "fan1_speed": None,
+                "fan2_speed": None,
             },
             {
                 "device_name": "Remote",
@@ -494,6 +500,8 @@ async def test_api_get_elements_data_empty_names(mock_aiohttp_client, hass):
                 "current_temperature": 17.5,
                 "setting_temperature": 19.0,
                 "zone_id": 2,
+                "fan1_speed": None,
+                "fan2_speed": None,
             },
         ],
     }
@@ -1426,3 +1434,366 @@ def test_get_temperature_limits_partial_data(hass):
 
     assert min_temp == 11
     assert max_temp is None  # Max not available
+
+
+# Fan Speed Control Tests
+@pytest.mark.asyncio
+async def test_api_set_fan_speed_c1_low(mock_aiohttp_client, hass):
+    """Test setting fan speed to low for circuit 1."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    mock_response = mock_client_instance.post.return_value.__aenter__.return_value
+    mock_response.status = 200
+    mock_response.text = AsyncMock(return_value='{"status":"success"}')
+    mock_response.raise_for_status = AsyncMock()
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.session = mock_client_instance
+    api.logged_in = True
+    api.xsrf_token = "test-token"
+    api.cookies = {"test": "cookie"}
+
+    # Test with zone_id 1, circuit 1, fan speed low (1)
+    result = await api.async_set_fan_speed(1, 1706, 1, 1)
+
+    assert result is True
+    call_args = mock_client_instance.post.call_args
+    assert call_args is not None
+    data_sent = call_args[1]["data"]
+    assert "fan1Speed" in data_sent
+    assert data_sent["fan1Speed"] == "1"
+    assert data_sent["indoorId"] == 1706
+    assert data_sent["orderStatus"] == "PENDING"
+
+
+@pytest.mark.asyncio
+async def test_api_set_fan_speed_c2_medium(mock_aiohttp_client, hass):
+    """Test setting fan speed to medium for circuit 2."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    mock_response = mock_client_instance.post.return_value.__aenter__.return_value
+    mock_response.status = 200
+    mock_response.text = AsyncMock(return_value='{"status":"success"}')
+    mock_response.raise_for_status = AsyncMock()
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.session = mock_client_instance
+    api.logged_in = True
+    api.xsrf_token = "test-token"
+    api.cookies = {"test": "cookie"}
+
+    # Test with zone_id 2, circuit 2, fan speed medium (2)
+    result = await api.async_set_fan_speed(2, 1706, 2, 2)
+
+    assert result is True
+    call_args = mock_client_instance.post.call_args
+    assert call_args is not None
+    data_sent = call_args[1]["data"]
+    assert "fan2Speed" in data_sent
+    assert data_sent["fan2Speed"] == "2"
+
+
+@pytest.mark.asyncio
+async def test_api_set_fan_speed_auto(mock_aiohttp_client, hass):
+    """Test setting fan speed to auto."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    mock_response = mock_client_instance.post.return_value.__aenter__.return_value
+    mock_response.status = 200
+    mock_response.text = AsyncMock(return_value='{"status":"success"}')
+    mock_response.raise_for_status = AsyncMock()
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.session = mock_client_instance
+    api.logged_in = True
+    api.xsrf_token = "test-token"
+    api.cookies = {"test": "cookie"}
+
+    # Test with fan speed auto (3)
+    result = await api.async_set_fan_speed(1, 1706, 3, 1)
+
+    assert result is True
+    call_args = mock_client_instance.post.call_args
+    assert call_args is not None
+    data_sent = call_args[1]["data"]
+    assert "fan1Speed" in data_sent
+    assert data_sent["fan1Speed"] == "3"
+
+
+@pytest.mark.asyncio
+async def test_api_set_fan_speed_off(mock_aiohttp_client, hass):
+    """Test setting fan speed to off."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    mock_response = mock_client_instance.post.return_value.__aenter__.return_value
+    mock_response.status = 200
+    mock_response.text = AsyncMock(return_value='{"status":"success"}')
+    mock_response.raise_for_status = AsyncMock()
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.session = mock_client_instance
+    api.logged_in = True
+    api.xsrf_token = "test-token"
+    api.cookies = {"test": "cookie"}
+
+    # Test with fan speed off (0)
+    result = await api.async_set_fan_speed(1, 1706, 0, 1)
+
+    assert result is True
+    call_args = mock_client_instance.post.call_args
+    assert call_args is not None
+    data_sent = call_args[1]["data"]
+    assert "fan1Speed" in data_sent
+    assert data_sent["fan1Speed"] == "0"
+
+
+@pytest.mark.asyncio
+async def test_api_set_fan_speed_http_error(mock_aiohttp_client, hass):
+    """Test fan speed API call with HTTP error."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    mock_response = mock_client_instance.post.return_value.__aenter__.return_value
+    mock_response.status = 500
+    mock_response.text = AsyncMock(return_value='{"error":"Internal server error"}')
+    mock_response.raise_for_status = AsyncMock()
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.session = mock_client_instance
+    api.logged_in = True
+    api.xsrf_token = "test-token"
+    api.cookies = {"test": "cookie"}
+
+    # Test with zone_id 1 - should fail
+    result = await api.async_set_fan_speed(1, 1706, 1, 1)
+
+    assert result is False
+
+
+@pytest.mark.asyncio
+async def test_api_set_fan_speed_timeout_error(mock_aiohttp_client, hass):
+    """Test fan speed API call with timeout error."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    # Mock post to raise TimeoutError
+    mock_client_instance.post.return_value.__aenter__.side_effect = asyncio.TimeoutError
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.session = mock_client_instance
+    api.logged_in = True
+    api.xsrf_token = "test-token"
+    api.cookies = {"test": "cookie"}
+
+    # Test with zone_id 1 - should fail
+    result = await api.async_set_fan_speed(1, 1706, 1, 1)
+
+    assert result is False
+
+
+def test_is_fan_coil_compatible_true(hass):
+    """Test fan coil compatibility check when systemConfigBits has 0x2000 bit set."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    installation_data = {
+        "heatingStatus": {"systemConfigBits": 0x2000}  # Fan coil compatible
+    }
+
+    assert api.is_fan_coil_compatible(installation_data) is True
+
+
+def test_is_fan_coil_compatible_false(hass):
+    """Test fan coil compatibility check when systemConfigBits does not have 0x2000 bit."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    installation_data = {
+        "heatingStatus": {"systemConfigBits": 0x1000}  # Not fan coil compatible
+    }
+
+    assert api.is_fan_coil_compatible(installation_data) is False
+
+
+def test_is_fan_coil_compatible_missing_data(hass):
+    """Test fan coil compatibility check with missing data."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    # Test with None
+    assert api.is_fan_coil_compatible(None) is False
+
+    # Test with empty dict
+    assert api.is_fan_coil_compatible({}) is False
+
+    # Test with missing heatingStatus
+    assert api.is_fan_coil_compatible({"other": "data"}) is False
+
+
+def test_get_fan_control_availability_c1_heat_mode(hass):
+    """Test fan control availability for C1 in heat mode."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    installation_data = {
+        "heatingStatus": {
+            "systemConfigBits": 0x2000,  # Fan coil compatible
+            "fan1ControlledOnLCD": 1,  # Heating only
+        }
+    }
+
+    # Heat mode (1) should be available
+    assert api.get_fan_control_availability(1, 1, installation_data) is True
+
+    # Cool mode (0) should not be available
+    assert api.get_fan_control_availability(1, 0, installation_data) is False
+
+    # Auto mode (2) should not be available
+    assert api.get_fan_control_availability(1, 2, installation_data) is False
+
+
+def test_get_fan_control_availability_c1_cool_mode(hass):
+    """Test fan control availability for C1 in cool mode."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    installation_data = {
+        "heatingStatus": {
+            "systemConfigBits": 0x2000,  # Fan coil compatible
+            "fan1ControlledOnLCD": 2,  # Cooling only
+        }
+    }
+
+    # Heat mode (1) should not be available
+    assert api.get_fan_control_availability(1, 1, installation_data) is False
+
+    # Cool mode (0) should be available
+    assert api.get_fan_control_availability(1, 0, installation_data) is True
+
+    # Auto mode (2) should not be available
+    assert api.get_fan_control_availability(1, 2, installation_data) is False
+
+
+def test_get_fan_control_availability_c1_both_modes(hass):
+    """Test fan control availability for C1 in both heat and cool modes."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    installation_data = {
+        "heatingStatus": {
+            "systemConfigBits": 0x2000,  # Fan coil compatible
+            "fan1ControlledOnLCD": 3,  # Heating + Cooling
+        }
+    }
+
+    # Heat mode (1) should be available
+    assert api.get_fan_control_availability(1, 1, installation_data) is True
+
+    # Cool mode (0) should be available
+    assert api.get_fan_control_availability(1, 0, installation_data) is True
+
+    # Auto mode (2) should be available
+    assert api.get_fan_control_availability(1, 2, installation_data) is True
+
+
+def test_get_fan_control_availability_c2(hass):
+    """Test fan control availability for C2."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    installation_data = {
+        "heatingStatus": {
+            "systemConfigBits": 0x2000,  # Fan coil compatible
+            "fan2ControlledOnLCD": 3,  # Heating + Cooling
+        }
+    }
+
+    # Circuit 2 with heat mode
+    assert api.get_fan_control_availability(2, 1, installation_data) is True
+
+    # Circuit 2 with cool mode
+    assert api.get_fan_control_availability(2, 0, installation_data) is True
+
+
+def test_get_fan_control_availability_not_compatible(hass):
+    """Test fan control availability when system is not fan coil compatible."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    installation_data = {
+        "heatingStatus": {
+            "systemConfigBits": 0x1000,  # Not fan coil compatible
+            "fan1ControlledOnLCD": 3,
+        }
+    }
+
+    # Should return False even though fan1ControlledOnLCD is set
+    assert api.get_fan_control_availability(1, 1, installation_data) is False
+
+
+def test_get_fan_control_availability_missing_data(hass):
+    """Test fan control availability with missing data."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    # Test with None
+    assert api.get_fan_control_availability(1, 1, None) is False
+
+    # Test with empty dict
+    assert api.get_fan_control_availability(1, 1, {}) is False
+
+    # Test with missing heatingStatus
+    assert api.get_fan_control_availability(1, 1, {"other": "data"}) is False
+
+
+@pytest.mark.asyncio
+async def test_api_get_elements_data_with_fan_speeds(mock_aiohttp_client, hass):
+    """Test that fan speeds are extracted from elements data."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    mock_response = mock_client_instance.get.return_value.__aenter__.return_value
+    mock_response.status = 200
+    mock_response.json = AsyncMock(
+        return_value={
+            "status": "success",
+            "data": {
+                "device_status": [
+                    {
+                        "id": 1709,
+                        "name": "Hitachi PAC",
+                        "status": 1,
+                        "firmware": "1234",
+                    }
+                ],
+                "weatherTemperature": 9,
+                "latitude": "50.123456",
+                "longitude": "3.12",
+                "installation": 1234,
+                "elements": [
+                    {
+                        "parentId": 1234,
+                        "elementType": 1,
+                        "parentName": "Room1",
+                        "mode": 1,
+                        "realMode": 1,
+                        "onOff": 1,
+                        "settingTemperature": 19.0,
+                        "currentTemperature": 19.5,
+                        "deviceId": 1234,
+                        "deviceName": "Hitachi PAC",
+                        "roomId": 395,
+                        "ecocomfort": 1,
+                        "operationStatus": 5,
+                        "c1Demand": True,
+                        "c2Demand": True,
+                        "doingBoost": False,
+                        "timerRunning": False,
+                        "silentMode": 0,
+                        "alarmCode": 0,
+                        "fan1Speed": 2,  # Medium speed
+                        "fan2Speed": 1,  # Low speed
+                    },
+                ],
+                "name": "My Home",
+            },
+        }
+    )
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api._session = mock_client_instance
+
+    data = await api.async_get_elements_data()
+
+    assert data is not None
+    assert len(data["sensors"]) == 1
+    assert data["sensors"][0]["fan1_speed"] == 2
+    assert data["sensors"][0]["fan2_speed"] == 1

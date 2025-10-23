@@ -13,7 +13,18 @@ from custom_components.csnet_home.const import DOMAIN
 
 
 def build_entity(
-    hass, *, mode=1, on_off=1, cur=19.5, setp=20.0, ecocomfort=1, silent_mode=0
+    hass,
+    *,
+    mode=1,
+    on_off=1,
+    cur=19.5,
+    setp=20.0,
+    ecocomfort=1,
+    silent_mode=0,
+    fan1_speed=None,
+    fan2_speed=None,
+    is_fan_coil=False,
+    zone_id=1
 ):
     """Create a CSNetHomeClimate with minimal surroundings."""
     sensor_data = {
@@ -34,7 +45,9 @@ def build_entity(
         "silent_mode": silent_mode,
         "current_temperature": cur,
         "setting_temperature": setp,
-        "zone_id": 1,
+        "zone_id": zone_id,
+        "fan1_speed": fan1_speed,
+        "fan2_speed": fan2_speed,
     }
     common_data = {"name": "Hitachi PAC", "firmware": "1.0.0"}
     entry = SimpleNamespace(entry_id="test-entry")
@@ -46,16 +59,33 @@ def build_entity(
         hass.data[DOMAIN] = {}
     if entry.entry_id not in hass.data[DOMAIN]:
         hass.data[DOMAIN][entry.entry_id] = {}
+
+    # Setup installation devices data for fan coil compatibility check
+    installation_devices_data = {}
+    if is_fan_coil:
+        installation_devices_data = {
+            "heatingStatus": {
+                "systemConfigBits": 0x2000,  # Fan coil compatible
+                "fan1ControlledOnLCD": 3,  # Heating + Cooling
+                "fan2ControlledOnLCD": 3,  # Heating + Cooling
+            }
+        }
+
     # Inject a fake API; will be overridden in tests that call it
     hass.data[DOMAIN][entry.entry_id]["api"] = SimpleNamespace(
         async_set_hvac_mode=AsyncMock(return_value=True),
         async_set_temperature=AsyncMock(return_value=True),
         set_preset_modes=AsyncMock(return_value=True),
         async_set_silent_mode=AsyncMock(return_value=True),
+        async_set_fan_speed=AsyncMock(return_value=True),
+        is_fan_coil_compatible=lambda data: is_fan_coil,
+        get_fan_control_availability=lambda circuit, mode, data: is_fan_coil,
+        get_temperature_limits=lambda zone_id, mode, data: (None, None),
     )
     hass.data[DOMAIN][entry.entry_id]["coordinator"] = SimpleNamespace(
         get_sensors_data=lambda: [sensor_data],
         get_common_data=lambda: {"device_status": {1234: common_data}},
+        get_installation_devices_data=lambda: installation_devices_data,
         async_request_refresh=AsyncMock(return_value=None),
     )
 
@@ -447,3 +477,178 @@ def test_dynamic_temperature_limits_zone2(hass):
     # Test min and max temperature for zone 2
     assert entity.min_temp == 12
     assert entity.max_temp == 28
+
+
+# Fan Coil System Tests
+def test_fan_coil_system_detection(hass):
+    """Verify fan coil system is detected correctly."""
+    # Non-fan coil system
+    entity = build_entity(hass, is_fan_coil=False)
+    assert entity._is_fan_coil is False
+
+    # Fan coil system
+    entity = build_entity(hass, is_fan_coil=True)
+    assert entity._is_fan_coil is True
+
+
+def test_fan_modes_for_fan_coil_system(hass):
+    """Verify fan modes for fan coil systems include speed options."""
+    entity = build_entity(hass, is_fan_coil=True)
+    assert entity.fan_modes is not None
+    assert "off" in entity.fan_modes
+    assert "low" in entity.fan_modes
+    assert "medium" in entity.fan_modes
+    assert "auto" in entity.fan_modes
+    # Should not have silent mode options
+    assert FAN_AUTO not in entity.fan_modes or entity.fan_modes != [FAN_AUTO, FAN_ON]
+
+
+def test_fan_modes_for_non_fan_coil_system(hass):
+    """Verify fan modes for non-fan coil systems use silent mode."""
+    entity = build_entity(hass, is_fan_coil=False)
+    assert entity.fan_modes is not None
+    assert FAN_AUTO in entity.fan_modes
+    assert FAN_ON in entity.fan_modes
+
+
+def test_fan_mode_reading_for_fan_coil_c1(hass):
+    """Test reading fan mode for fan coil circuit 1."""
+    entity = build_entity(hass, is_fan_coil=True, zone_id=1, fan1_speed=2)
+    assert entity.fan_mode == "medium"
+
+
+def test_fan_mode_reading_for_fan_coil_c2(hass):
+    """Test reading fan mode for fan coil circuit 2."""
+    entity = build_entity(hass, is_fan_coil=True, zone_id=2, fan2_speed=1)
+    assert entity.fan_mode == "low"
+
+
+def test_fan_mode_reading_auto_for_fan_coil(hass):
+    """Test reading fan mode auto for fan coil."""
+    entity = build_entity(hass, is_fan_coil=True, zone_id=1, fan1_speed=3)
+    assert entity.fan_mode == "auto"
+
+
+def test_fan_mode_reading_off_for_fan_coil(hass):
+    """Test reading fan mode off for fan coil."""
+    entity = build_entity(hass, is_fan_coil=True, zone_id=1, fan1_speed=0)
+    assert entity.fan_mode == "off"
+
+
+def test_fan_mode_reading_none_for_fan_coil(hass):
+    """Test reading fan mode when None for fan coil."""
+    entity = build_entity(hass, is_fan_coil=True, zone_id=1, fan1_speed=None)
+    assert entity.fan_mode == "auto"
+
+
+@pytest.mark.asyncio
+async def test_set_fan_mode_for_fan_coil_low(hass):
+    """Test setting fan mode to low for fan coil system."""
+    entity = build_entity(hass, is_fan_coil=True, zone_id=1, fan1_speed=3)
+    api = hass.data[DOMAIN][entity.entry.entry_id]["api"]
+
+    await entity.async_set_fan_mode("low")
+
+    api.async_set_fan_speed.assert_awaited()
+    called_args = api.async_set_fan_speed.call_args[0]
+    # args: zone_id, parent_id, fan_speed, circuit
+    assert called_args[0] == 1  # zone_id
+    assert called_args[1] == 1706  # parent_id
+    assert called_args[2] == 1  # fan speed low
+    assert called_args[3] == 1  # circuit 1
+    # Check local state updated
+    assert entity._sensor_data["fan1_speed"] == 1
+
+
+@pytest.mark.asyncio
+async def test_set_fan_mode_for_fan_coil_medium(hass):
+    """Test setting fan mode to medium for fan coil system."""
+    entity = build_entity(hass, is_fan_coil=True, zone_id=1, fan1_speed=0)
+    api = hass.data[DOMAIN][entity.entry.entry_id]["api"]
+
+    await entity.async_set_fan_mode("medium")
+
+    api.async_set_fan_speed.assert_awaited()
+    called_args = api.async_set_fan_speed.call_args[0]
+    assert called_args[2] == 2  # fan speed medium
+    assert entity._sensor_data["fan1_speed"] == 2
+
+
+@pytest.mark.asyncio
+async def test_set_fan_mode_for_fan_coil_auto(hass):
+    """Test setting fan mode to auto for fan coil system."""
+    entity = build_entity(hass, is_fan_coil=True, zone_id=1, fan1_speed=1)
+    api = hass.data[DOMAIN][entity.entry.entry_id]["api"]
+
+    await entity.async_set_fan_mode("auto")
+
+    api.async_set_fan_speed.assert_awaited()
+    called_args = api.async_set_fan_speed.call_args[0]
+    assert called_args[2] == 3  # fan speed auto
+    assert entity._sensor_data["fan1_speed"] == 3
+
+
+@pytest.mark.asyncio
+async def test_set_fan_mode_for_fan_coil_off(hass):
+    """Test setting fan mode to off for fan coil system."""
+    entity = build_entity(hass, is_fan_coil=True, zone_id=1, fan1_speed=2)
+    api = hass.data[DOMAIN][entity.entry.entry_id]["api"]
+
+    await entity.async_set_fan_mode("off")
+
+    api.async_set_fan_speed.assert_awaited()
+    called_args = api.async_set_fan_speed.call_args[0]
+    assert called_args[2] == 0  # fan speed off
+    assert entity._sensor_data["fan1_speed"] == 0
+
+
+@pytest.mark.asyncio
+async def test_set_fan_mode_for_fan_coil_c2(hass):
+    """Test setting fan mode for fan coil circuit 2."""
+    entity = build_entity(hass, is_fan_coil=True, zone_id=2, fan2_speed=0)
+    api = hass.data[DOMAIN][entity.entry.entry_id]["api"]
+
+    await entity.async_set_fan_mode("low")
+
+    api.async_set_fan_speed.assert_awaited()
+    called_args = api.async_set_fan_speed.call_args[0]
+    assert called_args[0] == 2  # zone_id 2
+    assert called_args[3] == 2  # circuit 2
+    assert entity._sensor_data["fan2_speed"] == 1
+
+
+@pytest.mark.asyncio
+async def test_set_fan_mode_invalid_for_fan_coil(hass):
+    """Test setting invalid fan mode for fan coil system does nothing."""
+    entity = build_entity(hass, is_fan_coil=True, zone_id=1, fan1_speed=2)
+    api = hass.data[DOMAIN][entity.entry.entry_id]["api"]
+
+    await entity.async_set_fan_mode("invalid_mode")
+
+    # Should not call the API
+    api.async_set_fan_speed.assert_not_awaited()
+
+
+def test_extra_state_attributes_for_fan_coil(hass):
+    """Verify fan coil attributes are included in extra state attributes."""
+    entity = build_entity(hass, is_fan_coil=True, fan1_speed=2, fan2_speed=1)
+    attrs = entity.extra_state_attributes
+    assert "is_fan_coil_compatible" in attrs
+    assert attrs["is_fan_coil_compatible"] is True
+    assert "fan1_speed" in attrs
+    assert attrs["fan1_speed"] == 2
+    assert "fan2_speed" in attrs
+    assert attrs["fan2_speed"] == 1
+    assert "fan1_control_available" in attrs
+    assert "fan2_control_available" in attrs
+
+
+def test_extra_state_attributes_for_non_fan_coil(hass):
+    """Verify fan coil attributes indicate non-compatibility."""
+    entity = build_entity(hass, is_fan_coil=False)
+    attrs = entity.extra_state_attributes
+    assert "is_fan_coil_compatible" in attrs
+    assert attrs["is_fan_coil_compatible"] is False
+    # Should not have fan speed attributes
+    assert "fan1_speed" not in attrs or attrs["fan1_speed"] is None
+    assert "fan2_speed" not in attrs or attrs["fan2_speed"] is None
