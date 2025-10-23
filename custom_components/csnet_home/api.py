@@ -964,7 +964,7 @@ class CSNetHomeAPI:
         """Apply RAD unit alarm code correction."""
         if alarm_code is None:
             return 0
-        if alarm_code == 61 or alarm_code == 63:
+        if alarm_code in (61, 63):
             return alarm_code
         if alarm_code <= 0:
             return alarm_code
@@ -1023,10 +1023,8 @@ class CSNetHomeAPI:
         # Extract the raw byte value first (before reversing)
         raw_value = (alarm_code & 0x00FF) if is_bcd else alarm_code
 
-        # Determine R290 and other unit characteristics from installation data
-        # For now, use simplified logic without R290/mirror detection
-        r290 = False
-        is_mirror = False
+        # Note: R290 and mirror unit detection would be done here if
+        # installation_devices_data is expanded in the future
 
         # Map alarm codes to origin keys based on JavaScript implementation
         origin_key = None

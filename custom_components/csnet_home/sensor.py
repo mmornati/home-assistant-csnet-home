@@ -1,7 +1,6 @@
 """Support for CSNet Home sensors."""
 
 import logging
-import json
 from datetime import datetime, timezone
 from collections import Counter
 

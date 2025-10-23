@@ -1517,7 +1517,7 @@ def test_alarm_history_sensor_empty():
 
     # Test attributes
     attrs = s.extra_state_attributes
-    assert attrs == {}
+    assert not attrs
 
 
 def test_alarm_statistics_sensor_total_count():
