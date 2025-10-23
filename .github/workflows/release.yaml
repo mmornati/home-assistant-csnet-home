@@ -1,4 +1,25 @@
 ---
+# Release Workflow
+#
+# This workflow handles the complete release process in two stages:
+#
+# Stage 1 (prepare_release - manual trigger):
+#   - Checks if manifest version needs updating (idempotent)
+#   - Updates manifest.json only if version is different
+#   - Creates and pushes git tag (safe if tag already exists)
+#   - Creates GitHub release (safe if release already exists)
+#
+# Stage 2 (build_and_upload_zip - triggered by release publish):
+#   - Builds integration zip from the tagged commit
+#   - Uploads zip to the GitHub release
+#
+# Safety Features:
+#   ✅ Idempotent - safe to re-run for the same version
+#   ✅ Skips manifest commit if version is already correct
+#   ✅ Handles existing tags gracefully
+#   ✅ Handles existing releases gracefully
+#   ✅ Two-stage process prevents git conflicts
+#
 name: Release Workflow
 
 'on':
@@ -32,14 +53,31 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Update Version in Manifest
+      - name: Check and Update Version in Manifest
+        id: version_check
         run: |
           VERSION="${{ inputs.version }}"
           # Remove 'v' prefix if present for manifest
           VERSION_NO_V="${VERSION#v}"
-          sed -i "s/\"version\": \".*\"/\"version\": \"${VERSION_NO_V}\"/" ./custom_components/csnet_home/manifest.json
+
+          # Get current version from manifest
+          CURRENT_VERSION=$(grep -o '"version": "[^"]*"' ./custom_components/csnet_home/manifest.json | cut -d'"' -f4)
+
+          echo "Current version in manifest: ${CURRENT_VERSION}"
+          echo "Requested version: ${VERSION_NO_V}"
+
+          if [ "${CURRENT_VERSION}" = "${VERSION_NO_V}" ]; then
+            echo "Version is already correct in manifest, skipping update"
+            echo "needs_update=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Updating manifest from ${CURRENT_VERSION} to ${VERSION_NO_V}"
+            sed -i "s/\"version\": \".*\"/\"version\": \"${VERSION_NO_V}\"/" \
+              ./custom_components/csnet_home/manifest.json
+            echo "needs_update=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Commit Version Update
+        if: steps.version_check.outputs.needs_update == 'true'
         run: |
           git add custom_components/csnet_home/manifest.json
           git commit -m "Updating to version ${{ inputs.version }}"
@@ -47,18 +85,55 @@ jobs:
 
       - name: Create and Push Tag
         run: |
-          git tag ${{ inputs.version }}
-          git push origin ${{ inputs.version }}
+          # Check if tag already exists locally
+          if git rev-parse "${{ inputs.version }}" >/dev/null 2>&1; then
+            echo "Tag ${{ inputs.version }} already exists locally, skipping creation"
+          else
+            git tag ${{ inputs.version }}
+            echo "Created tag ${{ inputs.version }}"
+          fi
+
+          # Push tag (will succeed if tag exists remotely and points to same commit)
+          git push origin ${{ inputs.version }} || {
+            echo "Tag ${{ inputs.version }} may already exist remotely"
+            # Verify the tag exists
+            if git ls-remote --tags origin | grep -q "refs/tags/${{ inputs.version }}"; then
+              echo "Tag exists remotely, continuing..."
+            else
+              echo "Failed to push tag and it doesn't exist remotely"
+              exit 1
+            fi
+          }
 
       - name: Create Release
         uses: actions/github-script@v7
         with:
           script: |
+            const tagName = '${{ inputs.version }}';
+
+            // Check if release already exists
+            try {
+              const { data: existingRelease } = await github.rest.repos.getReleaseByTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag: tagName
+              });
+              console.log(`Release ${tagName} already exists: ${existingRelease.html_url}`);
+              console.log('Skipping release creation');
+              return;
+            } catch (error) {
+              if (error.status !== 404) {
+                throw error;
+              }
+              // Release doesn't exist, continue to create it
+            }
+
+            // Create the release
             const { data: release } = await github.rest.repos.createRelease({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              tag_name: '${{ inputs.version }}',
-              name: '${{ inputs.version }}',
+              tag_name: tagName,
+              name: tagName,
               draft: false,
               prerelease: false,
               generate_release_notes: true

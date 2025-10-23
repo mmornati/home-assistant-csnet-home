@@ -4,6 +4,16 @@
 
 This repository uses an automated release workflow that ensures version consistency and creates release artifacts automatically.
 
+## Safety Features
+
+The release workflow is designed to be **idempotent** and safe to re-run:
+
+- ✅ **Smart Version Updates**: Only commits manifest changes if the version is different
+- ✅ **Tag Protection**: Handles existing tags gracefully, won't fail if tag exists
+- ✅ **Release Protection**: Checks for existing releases, won't duplicate
+- ✅ **No Git Conflicts**: Two-stage process prevents non-fast-forward errors
+- ✅ **Safe Re-runs**: You can safely re-run the workflow for the same version
+
 ## How to Create a New Release
 
 ### Option 1: Manual Workflow Dispatch (Recommended)
@@ -48,6 +58,50 @@ If you prefer to create releases manually:
    - Publish the release
 
 4. The workflow will automatically build and upload the zip file
+
+## Re-running Failed Releases
+
+Thanks to the workflow's idempotent design, you can safely re-run a release for the same version:
+
+### Scenario 1: Workflow Failed After Manifest Update
+
+If the workflow failed after updating the manifest but before creating the tag:
+
+1. Go to **Actions** → **Release Workflow**
+2. Click **"Run workflow"**
+3. Enter the **same version number** (e.g., `v1.4.2`)
+4. Click **"Run workflow"**
+
+The workflow will:
+- ✅ Detect the version is already correct in manifest
+- ✅ Skip the commit step (no git conflicts!)
+- ✅ Create and push the tag
+- ✅ Create the release
+- ✅ Build and upload the zip
+
+### Scenario 2: Tag Exists but Release Failed
+
+If the tag was created but the release creation failed:
+
+1. Re-run the workflow with the same version
+2. The workflow will:
+   - ✅ Skip manifest update (already correct)
+   - ✅ Detect tag exists and continue
+   - ✅ Check if release exists, create if needed
+   - ✅ Build and upload the zip
+
+### Scenario 3: Complete Re-run
+
+Even if everything partially succeeded, you can always re-run:
+
+```bash
+# The workflow handles all these cases automatically:
+# - Manifest already has correct version → Skip commit
+# - Tag already exists → Continue without error
+# - Release already exists → Skip creation, upload artifact
+```
+
+**No manual cleanup needed!** The workflow is smart enough to handle all scenarios.
 
 ## Release Workflow Details
 
