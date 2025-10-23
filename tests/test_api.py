@@ -265,7 +265,14 @@ async def test_api_get_elements_data_success(mock_aiohttp_client, hass):
             "longitude": "3.12",
             "weather_temperature": 9,
             "device_status": {
-                1709: {"name": "Hitachi PAC", "status": 1, "firmware": "1234"}
+                1709: {
+                    "name": "Hitachi PAC",
+                    "status": 1,
+                    "firmware": "1234",
+                    "lastComm": 1736193442000,
+                    "rssi": -70,
+                    "currentTimeMillis": 1736193448768,
+                }
             },
         },
         "sensors": [
@@ -451,7 +458,14 @@ async def test_api_get_elements_data_empty_names(mock_aiohttp_client, hass):
             "longitude": "3.12",
             "weather_temperature": 9,
             "device_status": {
-                1709: {"name": "Hitachi PAC", "status": 1, "firmware": "1234"}
+                1709: {
+                    "name": "Hitachi PAC",
+                    "status": 1,
+                    "firmware": "1234",
+                    "lastComm": 1736193442000,
+                    "rssi": -70,
+                    "currentTimeMillis": 1736193448768,
+                }
             },
         },
         "sensors": [

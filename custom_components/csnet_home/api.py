@@ -153,6 +153,11 @@ class CSNetHomeAPI:
                                     "name": device.get("name"),
                                     "status": device.get("status"),
                                     "firmware": device.get("firmware"),
+                                    "lastComm": device.get("lastComm"),
+                                    "rssi": device.get("rssi"),
+                                    "currentTimeMillis": device.get(
+                                        "currentTimeMillis"
+                                    ),
                                 }
                                 for device in data.get("data", {}).get(
                                     "device_status", []
