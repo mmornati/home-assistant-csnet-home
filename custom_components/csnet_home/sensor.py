@@ -333,6 +333,52 @@ async def async_setup_entry(hass, entry, async_add_entities):
             )
         )
 
+        # System Configuration Diagnostic sensors (Issue #78)
+        sensors.append(
+            CSNetHomeInstallationSensor(
+                coordinator,
+                global_device_data,
+                common_data,
+                "cascade_slave_mode",
+                "binary",
+                None,
+                "Cascade Slave Mode",
+            )
+        )
+        sensors.append(
+            CSNetHomeInstallationSensor(
+                coordinator,
+                global_device_data,
+                common_data,
+                "fan_coil_compatible",
+                "binary",
+                None,
+                "Fan Coil Compatible",
+            )
+        )
+        sensors.append(
+            CSNetHomeInstallationSensor(
+                coordinator,
+                global_device_data,
+                common_data,
+                "c1_thermostat_present",
+                "binary",
+                None,
+                "C1 Thermostat Present",
+            )
+        )
+        sensors.append(
+            CSNetHomeInstallationSensor(
+                coordinator,
+                global_device_data,
+                common_data,
+                "c2_thermostat_present",
+                "binary",
+                None,
+                "C2 Thermostat Present",
+            )
+        )
+
     # Add alarm history sensor (shows recent alarms from installation alarms API)
     sensors.append(CSNetHomeAlarmHistorySensor(coordinator, common_data))
 
@@ -624,6 +670,44 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, Entity):
                     return STATE_ON
 
             return STATE_OFF
+
+        # System Configuration Diagnostic sensors (Issue #78)
+        # Extract systemConfigBits from heatingStatus
+        if self._key in [
+            "cascade_slave_mode",
+            "fan_coil_compatible",
+            "c1_thermostat_present",
+            "c2_thermostat_present",
+        ]:
+            heating_status = None
+            data_array = installation_data.get("data", [])
+            if isinstance(data_array, list) and len(data_array) > 0:
+                first_device = data_array[0]
+                if isinstance(first_device, dict):
+                    indoors_array = first_device.get("indoors", [])
+                    if isinstance(indoors_array, list) and len(indoors_array) > 0:
+                        first_indoors = indoors_array[0]
+                        if isinstance(first_indoors, dict):
+                            heating_status = first_indoors.get("heatingStatus", {})
+
+            if not heating_status:
+                return STATE_OFF
+
+            system_config_bits = heating_status.get("systemConfigBits", 0)
+
+            # Decode the specific bit based on the sensor key
+            if self._key == "cascade_slave_mode":
+                # Bit 0x1000 (4096) indicates cascade slave mode
+                return STATE_ON if (system_config_bits & 0x1000) > 0 else STATE_OFF
+            if self._key == "fan_coil_compatible":
+                # Bit 0x2000 (8192) indicates fan coil compatibility
+                return STATE_ON if (system_config_bits & 0x2000) > 0 else STATE_OFF
+            if self._key == "c1_thermostat_present":
+                # Bit 0x40 (64) indicates C1 thermostat present
+                return STATE_ON if (system_config_bits & 0x40) > 0 else STATE_OFF
+            if self._key == "c2_thermostat_present":
+                # Bit 0x80 (128) indicates C2 thermostat present
+                return STATE_ON if (system_config_bits & 0x80) > 0 else STATE_OFF
 
         return value
 
