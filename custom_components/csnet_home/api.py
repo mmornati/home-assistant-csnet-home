@@ -843,9 +843,9 @@ class CSNetHomeAPI:
         # fanXControlledOnLCD values: 0=No, 1=Heating, 2=Cooling, 3=Heating+Cooling
         if mode == 1:  # Heat mode
             return fan_controlled in [1, 3]
-        elif mode == 0:  # Cool mode
+        if mode == 0:  # Cool mode
             return fan_controlled in [2, 3]
-        elif mode == 2:  # Auto mode
+        if mode == 2:  # Auto mode
             return fan_controlled == 3
 
         return False

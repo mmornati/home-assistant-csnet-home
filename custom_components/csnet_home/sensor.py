@@ -610,9 +610,9 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, Entity):
 
             # For non-S80 models, check LCD software version
             unit_model = heating_status.get("unitModel", 0)
-            CODE_YUTAKI_S80 = 2
+            code_yutaki_s80 = 2
 
-            if unit_model != CODE_YUTAKI_S80:
+            if unit_model != code_yutaki_s80:
                 lcd_soft = heating_status.get("lcdSoft", 0)
 
                 # lcdSoft == 0 means not configured yet (during wizard)
@@ -905,7 +905,7 @@ class CSNetHomeAlarmStatisticsSensor(CoordinatorEntity, Entity):
                 if sensor.get("alarm_code") and sensor.get("alarm_code") != 0
             )
 
-        elif self._statistic_type == "active_alarm_count":
+        if self._statistic_type == "active_alarm_count":
             # Count currently active alarms
             return sum(
                 1
@@ -913,7 +913,7 @@ class CSNetHomeAlarmStatisticsSensor(CoordinatorEntity, Entity):
                 if sensor.get("alarm_code") and sensor.get("alarm_code") != 0
             )
 
-        elif self._statistic_type == "alarm_by_origin":
+        if self._statistic_type == "alarm_by_origin":
             # Count alarms by origin
             origins = [
                 sensor.get("alarm_origin")
@@ -953,7 +953,7 @@ class CSNetHomeAlarmStatisticsSensor(CoordinatorEntity, Entity):
                 ]
             }
 
-        elif self._statistic_type == "active_alarm_count":
+        if self._statistic_type == "active_alarm_count":
             return {
                 "devices_with_alarms": [
                     f"{sensor.get('device_name')} - {sensor.get('room_name')}"
@@ -961,7 +961,7 @@ class CSNetHomeAlarmStatisticsSensor(CoordinatorEntity, Entity):
                 ]
             }
 
-        elif self._statistic_type == "alarm_by_origin":
+        if self._statistic_type == "alarm_by_origin":
             origins = [
                 sensor.get("alarm_origin")
                 for sensor in active_alarms
