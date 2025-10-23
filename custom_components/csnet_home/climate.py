@@ -18,6 +18,7 @@ from .const import (
     HEATING_MIN_TEMPERATURE,
     FAN_SPEED_MAP,
     FAN_SPEED_REVERSE_MAP,
+    OPERATION_STATUS_MAP,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -249,9 +250,17 @@ class CSNetHomeClimate(ClimateEntity):
         """Return additional attributes from elements API."""
         if self._sensor_data is None:
             return {}
+
+        # Decode operation_status to human-readable format
+        operation_status = self._sensor_data.get("operation_status")
+        operation_status_text = OPERATION_STATUS_MAP.get(
+            operation_status, f"Unknown ({operation_status})"
+        )
+
         attrs = {
             "real_mode": self._sensor_data.get("real_mode"),
-            "operation_status": self._sensor_data.get("operation_status"),
+            "operation_status": operation_status,
+            "operation_status_text": operation_status_text,
             "timer_running": self._sensor_data.get("timer_running"),
             "alarm_code": self._sensor_data.get("alarm_code"),
             "c1_demand": self._sensor_data.get("c1_demand"),
