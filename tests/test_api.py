@@ -1019,3 +1019,174 @@ async def test_api_get_installation_alarms_failure(mock_aiohttp_client, hass):
     data = await api.async_get_installation_alarms()
 
     assert data is None
+
+
+@pytest.mark.asyncio
+async def test_api_set_holiday_mode_success(mock_aiohttp_client, hass):
+    """Test successfully setting holiday mode."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    mock_response = mock_client_instance.post.return_value.__aenter__.return_value
+    mock_response.status = 200
+    mock_response.text = AsyncMock(return_value='{"status":"success"}')
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.session = mock_client_instance
+    api.logged_in = True
+    api.xsrf_token = "test-token"
+    api.installation_id = 1234
+
+    result = await api.async_set_holiday_mode(
+        unit_id=5678,
+        year=2025,
+        month=12,
+        day=25,
+        hour=14,
+        minute=30,
+    )
+
+    assert result is True
+    call_args = mock_client_instance.post.call_args
+    assert call_args is not None
+    data_sent = call_args[1]["data"]
+    assert data_sent["holidayDate"] == "2025-12-25"
+    assert data_sent["holidayTime"] == "14:30"
+    assert data_sent["holidaySelected5678"] == "on"
+    assert data_sent["installationId"] == 1234
+    assert data_sent["_csrf"] == "test-token"
+
+
+@pytest.mark.asyncio
+async def test_api_set_holiday_mode_no_installation_id(mock_aiohttp_client, hass):
+    """Test setting holiday mode without installation ID."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.session = mock_client_instance
+    api.logged_in = True
+    api.xsrf_token = "test-token"
+    api.installation_id = None  # No installation ID
+
+    result = await api.async_set_holiday_mode(
+        unit_id=5678,
+        year=2025,
+        month=12,
+        day=25,
+        hour=14,
+        minute=30,
+    )
+
+    assert result is False
+    mock_client_instance.post.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_api_set_holiday_mode_http_error(mock_aiohttp_client, hass):
+    """Test setting holiday mode with HTTP error."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    mock_response = mock_client_instance.post.return_value.__aenter__.return_value
+    mock_response.status = 500
+    mock_response.text = AsyncMock(return_value="Server error")
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.session = mock_client_instance
+    api.logged_in = True
+    api.xsrf_token = "test-token"
+    api.installation_id = 1234
+
+    result = await api.async_set_holiday_mode(
+        unit_id=5678,
+        year=2025,
+        month=12,
+        day=25,
+        hour=14,
+        minute=30,
+    )
+
+    assert result is False
+
+
+@pytest.mark.asyncio
+async def test_api_stop_holiday_mode_success(mock_aiohttp_client, hass):
+    """Test successfully stopping holiday mode."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    mock_response = mock_client_instance.post.return_value.__aenter__.return_value
+    mock_response.status = 200
+    mock_response.text = AsyncMock(return_value='{"status":"success"}')
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.session = mock_client_instance
+    api.logged_in = True
+    api.xsrf_token = "test-token"
+    api.installation_id = 1234
+
+    result = await api.async_stop_holiday_mode(unit_id=5678)
+
+    assert result is True
+    call_args = mock_client_instance.post.call_args
+    assert call_args is not None
+    data_sent = call_args[1]["data"]
+    assert data_sent["installationId"] == 1234
+    assert data_sent["unitId"] == 5678
+    assert data_sent["_csrf"] == "test-token"
+
+
+@pytest.mark.asyncio
+async def test_api_stop_holiday_mode_no_installation_id(mock_aiohttp_client, hass):
+    """Test stopping holiday mode without installation ID."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.session = mock_client_instance
+    api.logged_in = True
+    api.xsrf_token = "test-token"
+    api.installation_id = None
+
+    result = await api.async_stop_holiday_mode(unit_id=5678)
+
+    assert result is False
+    mock_client_instance.post.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_api_stop_all_holiday_modes_success(mock_aiohttp_client, hass):
+    """Test successfully stopping all holiday modes."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    mock_response = mock_client_instance.post.return_value.__aenter__.return_value
+    mock_response.status = 200
+    mock_response.text = AsyncMock(return_value='{"status":"success"}')
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.session = mock_client_instance
+    api.logged_in = True
+    api.xsrf_token = "test-token"
+    api.installation_id = 1234
+
+    result = await api.async_stop_all_holiday_modes()
+
+    assert result is True
+    call_args = mock_client_instance.post.call_args
+    assert call_args is not None
+    data_sent = call_args[1]["data"]
+    assert data_sent["installationId"] == 1234
+    assert data_sent["_csrf"] == "test-token"
+
+
+@pytest.mark.asyncio
+async def test_api_stop_all_holiday_modes_no_installation_id(mock_aiohttp_client, hass):
+    """Test stopping all holiday modes without installation ID."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.session = mock_client_instance
+    api.logged_in = True
+    api.xsrf_token = "test-token"
+    api.installation_id = None
+
+    result = await api.async_stop_all_holiday_modes()
+
+    assert result is False
+    mock_client_instance.post.assert_not_called()
