@@ -83,13 +83,36 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
                     # store and notify
                     self._last_alarm_codes[key] = alarm_code
                     title = "Hitachi Device Alarm"
+
+                    # Build enhanced notification message
                     message_parts = [
                         f"Device: {sensor.get('device_name')} | Room: {sensor.get('room_name')}",
-                        f"Code: {alarm_code}",
                     ]
+
+                    # Add formatted alarm code
+                    alarm_code_formatted = sensor.get("alarm_code_formatted")
+                    if alarm_code_formatted and alarm_code_formatted != "0":
+                        message_parts.append(
+                            f"Code: {alarm_code_formatted} (raw: {alarm_code})"
+                        )
+                    else:
+                        message_parts.append(f"Code: {alarm_code}")
+
+                    # Add alarm origin if available
+                    alarm_origin = sensor.get("alarm_origin")
+                    if alarm_origin:
+                        message_parts.append(f"Origin: {alarm_origin}")
+
+                    # Add alarm message
                     alarm_msg = sensor.get("alarm_message")
                     if alarm_msg:
                         message_parts.append(f"Message: {alarm_msg}")
+
+                    # Add unit type for context
+                    unit_type = sensor.get("unit_type")
+                    if unit_type and unit_type != "standard":
+                        message_parts.append(f"Unit Type: {unit_type}")
+
                     message = "\n".join(message_parts)
                     await self.hass.services.async_call(
                         "persistent_notification",

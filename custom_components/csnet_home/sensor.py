@@ -2,6 +2,7 @@
 
 import logging
 from datetime import datetime, timezone
+from collections import Counter
 
 from homeassistant.const import (
     UnitOfTemperature,
@@ -83,6 +84,20 @@ async def async_setup_entry(hass, entry, async_add_entities):
             CSNetHomeSensor(
                 coordinator, sensor_data, common_data, "alarm_message", "enum"
             )
+        )
+        # Enhanced alarm information
+        sensors.append(
+            CSNetHomeSensor(
+                coordinator, sensor_data, common_data, "alarm_code_formatted", "enum"
+            )
+        )
+        sensors.append(
+            CSNetHomeSensor(
+                coordinator, sensor_data, common_data, "alarm_origin", "enum"
+            )
+        )
+        sensors.append(
+            CSNetHomeSensor(coordinator, sensor_data, common_data, "unit_type", "enum")
         )
 
         # Add WiFi signal strength sensor
@@ -317,6 +332,26 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 "Central Control Enabled",
             )
         )
+
+    # Add alarm history sensor (shows recent alarms from installation alarms API)
+    sensors.append(CSNetHomeAlarmHistorySensor(coordinator, common_data))
+
+    # Add alarm statistics sensors (total count, by origin, by device)
+    sensors.append(
+        CSNetHomeAlarmStatisticsSensor(
+            coordinator, common_data, "total_alarm_count", "Total Alarms"
+        )
+    )
+    sensors.append(
+        CSNetHomeAlarmStatisticsSensor(
+            coordinator, common_data, "active_alarm_count", "Active Alarms"
+        )
+    )
+    sensors.append(
+        CSNetHomeAlarmStatisticsSensor(
+            coordinator, common_data, "alarm_by_origin", "Alarms by Origin"
+        )
+    )
 
     async_add_entities(sensors)
 
@@ -575,9 +610,9 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, Entity):
 
             # For non-S80 models, check LCD software version
             unit_model = heating_status.get("unitModel", 0)
-            CODE_YUTAKI_S80 = 2
+            code_yutaki_s80 = 2
 
-            if unit_model != CODE_YUTAKI_S80:
+            if unit_model != code_yutaki_s80:
                 lcd_soft = heating_status.get("lcdSoft", 0)
 
                 # lcdSoft == 0 means not configured yet (during wizard)
@@ -760,3 +795,210 @@ class CSNetHomeDeviceSensor(CoordinatorEntity, Entity):
     def unique_id(self) -> str:
         """Return unique id."""
         return f"{DOMAIN}-{self._sensor_data.get('room_name', 'unknown')}-{self._key}"
+
+
+class CSNetHomeAlarmHistorySensor(CoordinatorEntity, Entity):
+    """Sensor showing alarm history from installation alarms API."""
+
+    def __init__(self, coordinator: CSNetHomeCoordinator, common_data):
+        """Initialize the alarm history sensor."""
+        super().__init__(coordinator)
+        self._coordinator = coordinator
+        self._common_data = common_data
+        self._name = "Alarm History"
+
+    @property
+    def state(self):
+        """Return the number of alarms in history."""
+        alarms_data = self._coordinator.get_installation_alarms_data()
+        if not alarms_data:
+            return 0
+
+        # Count alarms in the data
+        alarms = alarms_data.get("alarms", [])
+        return len(alarms)
+
+    @property
+    def extra_state_attributes(self):
+        """Return alarm history details as attributes."""
+        alarms_data = self._coordinator.get_installation_alarms_data()
+        if not alarms_data:
+            return {}
+
+        alarms = alarms_data.get("alarms", [])
+
+        # Limit to most recent 10 alarms
+        recent_alarms = alarms[:10] if len(alarms) > 10 else alarms
+
+        # Format alarm history for display
+        alarm_list = []
+        for alarm in recent_alarms:
+            alarm_entry = {
+                "code": alarm.get("code"),
+                "description": alarm.get("description"),
+                "timestamp": alarm.get("timestamp"),
+                "device": alarm.get("device"),
+            }
+            alarm_list.append(alarm_entry)
+
+        return {
+            "recent_alarms": alarm_list,
+            "total_alarms": len(alarms),
+            "last_updated": alarms_data.get("last_updated"),
+        }
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Update sensor with latest data from coordinator."""
+        self._common_data = self._coordinator.get_common_data()
+        self.async_write_ha_state()
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device information."""
+        return DeviceInfo(
+            name="Installation Alarms",
+            manufacturer="Hitachi",
+            model="CSNet Home Installation",
+            identifiers={(DOMAIN, "installation_alarms")},
+        )
+
+    @property
+    def name(self) -> str:
+        """Return the name of the sensor."""
+        return self._name
+
+    @property
+    def unique_id(self) -> str:
+        """Return unique id."""
+        return f"{DOMAIN}-installation-alarm-history"
+
+
+class CSNetHomeAlarmStatisticsSensor(CoordinatorEntity, Entity):
+    """Sensor showing alarm statistics."""
+
+    def __init__(
+        self,
+        coordinator: CSNetHomeCoordinator,
+        common_data,
+        statistic_type: str,
+        friendly_name: str,
+    ):
+        """Initialize the alarm statistics sensor."""
+        super().__init__(coordinator)
+        self._coordinator = coordinator
+        self._common_data = common_data
+        self._statistic_type = statistic_type
+        self._name = friendly_name
+
+    @property
+    def state(self):
+        """Return the statistic value."""
+        sensors = self._coordinator.get_sensors_data()
+
+        if self._statistic_type == "total_alarm_count":
+            # Count all sensors that have ever had an alarm (alarm_code != 0)
+            # This is the current active alarm count
+            return sum(
+                1
+                for sensor in sensors
+                if sensor.get("alarm_code") and sensor.get("alarm_code") != 0
+            )
+
+        if self._statistic_type == "active_alarm_count":
+            # Count currently active alarms
+            return sum(
+                1
+                for sensor in sensors
+                if sensor.get("alarm_code") and sensor.get("alarm_code") != 0
+            )
+
+        if self._statistic_type == "alarm_by_origin":
+            # Count alarms by origin
+            origins = [
+                sensor.get("alarm_origin")
+                for sensor in sensors
+                if sensor.get("alarm_code")
+                and sensor.get("alarm_code") != 0
+                and sensor.get("alarm_origin")
+            ]
+            if not origins:
+                return 0
+            # Return count of most common origin
+            origin_counts = Counter(origins)
+            return origin_counts.most_common(1)[0][1] if origin_counts else 0
+
+        return 0
+
+    @property
+    def extra_state_attributes(self):
+        """Return detailed statistics as attributes."""
+        sensors = self._coordinator.get_sensors_data()
+        active_alarms = [
+            sensor
+            for sensor in sensors
+            if sensor.get("alarm_code") and sensor.get("alarm_code") != 0
+        ]
+
+        if self._statistic_type == "total_alarm_count":
+            return {
+                "active_devices": [
+                    {
+                        "device": sensor.get("device_name"),
+                        "room": sensor.get("room_name"),
+                        "code": sensor.get("alarm_code"),
+                        "formatted_code": sensor.get("alarm_code_formatted"),
+                    }
+                    for sensor in active_alarms
+                ]
+            }
+
+        if self._statistic_type == "active_alarm_count":
+            return {
+                "devices_with_alarms": [
+                    f"{sensor.get('device_name')} - {sensor.get('room_name')}"
+                    for sensor in active_alarms
+                ]
+            }
+
+        if self._statistic_type == "alarm_by_origin":
+            origins = [
+                sensor.get("alarm_origin")
+                for sensor in active_alarms
+                if sensor.get("alarm_origin")
+            ]
+            origin_counts = Counter(origins)
+            return {
+                "origin_distribution": dict(origin_counts),
+                "most_common_origin": (
+                    origin_counts.most_common(1)[0][0] if origin_counts else None
+                ),
+            }
+
+        return {}
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Update sensor with latest data from coordinator."""
+        self._common_data = self._coordinator.get_common_data()
+        self.async_write_ha_state()
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device information."""
+        return DeviceInfo(
+            name="Alarm Statistics",
+            manufacturer="Hitachi",
+            model="CSNet Home Statistics",
+            identifiers={(DOMAIN, "alarm_statistics")},
+        )
+
+    @property
+    def name(self) -> str:
+        """Return the name of the sensor."""
+        return self._name
+
+    @property
+    def unique_id(self) -> str:
+        """Return unique id."""
+        return f"{DOMAIN}-{self._statistic_type}"

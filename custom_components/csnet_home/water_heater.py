@@ -144,13 +144,6 @@ class CSNetHomeWaterHeater(WaterHeaterEntity):
     def min_temp(self):
         """Return the minimum temperature for DHW from API data."""
         # DHW zone_id is 3, mode is always 1 (heat) for water heater
-        zone_id = 3
-        mode = 1
-
-        # Get installation devices data from coordinator
-        coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
-        installation_devices_data = coordinator.get_installation_devices_data()
-
         # Get temperature limits from API (DHW min is typically constant at 30)
         # The API doesn't return a dhwMin, so use the static constant
         return WATER_HEATER_MIN_TEMPERATURE
