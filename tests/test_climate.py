@@ -282,3 +282,168 @@ def test_supported_features_includes_fan_mode(hass):
     """Verify FAN_MODE is in supported features."""
     entity = build_entity(hass)
     assert entity.supported_features & ClimateEntityFeature.FAN_MODE
+
+
+def test_dynamic_temperature_limits_heating_mode(hass):
+    """Test that min/max temp are dynamically set based on heating mode."""
+    entity = build_entity(hass, mode=1)  # Heating mode
+
+    # Mock the API and coordinator to return temperature limits
+    mock_api = SimpleNamespace(
+        get_temperature_limits=lambda zone_id, mode, data: (11, 30),
+        async_set_hvac_mode=AsyncMock(return_value=True),
+        async_set_temperature=AsyncMock(return_value=True),
+        set_preset_modes=AsyncMock(return_value=True),
+        async_set_silent_mode=AsyncMock(return_value=True),
+    )
+    mock_coordinator = SimpleNamespace(
+        get_installation_devices_data=lambda: {
+            "heatingStatus": {
+                "heatAirMinC1": 11,
+                "heatAirMaxC1": 30,
+            }
+        },
+        get_sensors_data=lambda: [entity._sensor_data],
+        get_common_data=lambda: {
+            "device_status": {1234: {"name": "Hitachi PAC", "firmware": "1.0.0"}}
+        },
+        async_request_refresh=AsyncMock(return_value=None),
+    )
+
+    hass.data[DOMAIN][entity.entry.entry_id]["api"] = mock_api
+    hass.data[DOMAIN][entity.entry.entry_id]["coordinator"] = mock_coordinator
+
+    # Test min and max temperature
+    assert entity.min_temp == 11
+    assert entity.max_temp == 30
+
+
+def test_dynamic_temperature_limits_cooling_mode(hass):
+    """Test that min/max temp are dynamically set based on cooling mode."""
+    entity = build_entity(hass, mode=0)  # Cooling mode
+
+    # Mock the API and coordinator to return temperature limits for cooling
+    mock_api = SimpleNamespace(
+        get_temperature_limits=lambda zone_id, mode, data: (16, 30),
+        async_set_hvac_mode=AsyncMock(return_value=True),
+        async_set_temperature=AsyncMock(return_value=True),
+        set_preset_modes=AsyncMock(return_value=True),
+        async_set_silent_mode=AsyncMock(return_value=True),
+    )
+    mock_coordinator = SimpleNamespace(
+        get_installation_devices_data=lambda: {
+            "heatingStatus": {
+                "coolAirMinC1": 16,
+                "coolAirMaxC1": 30,
+            }
+        },
+        get_sensors_data=lambda: [entity._sensor_data],
+        get_common_data=lambda: {
+            "device_status": {1234: {"name": "Hitachi PAC", "firmware": "1.0.0"}}
+        },
+        async_request_refresh=AsyncMock(return_value=None),
+    )
+
+    hass.data[DOMAIN][entity.entry.entry_id]["api"] = mock_api
+    hass.data[DOMAIN][entity.entry.entry_id]["coordinator"] = mock_coordinator
+
+    # Test min and max temperature for cooling mode
+    assert entity.min_temp == 16
+    assert entity.max_temp == 30
+
+
+def test_dynamic_temperature_limits_fallback_to_defaults(hass):
+    """Test that min/max temp fall back to defaults when API data is missing."""
+    entity = build_entity(hass, mode=1)
+
+    # Mock the API to return None (no data available)
+    mock_api = SimpleNamespace(
+        get_temperature_limits=lambda zone_id, mode, data: (None, None),
+        async_set_hvac_mode=AsyncMock(return_value=True),
+        async_set_temperature=AsyncMock(return_value=True),
+        set_preset_modes=AsyncMock(return_value=True),
+        async_set_silent_mode=AsyncMock(return_value=True),
+    )
+    mock_coordinator = SimpleNamespace(
+        get_installation_devices_data=lambda: {},
+        get_sensors_data=lambda: [entity._sensor_data],
+        get_common_data=lambda: {
+            "device_status": {1234: {"name": "Hitachi PAC", "firmware": "1.0.0"}}
+        },
+        async_request_refresh=AsyncMock(return_value=None),
+    )
+
+    hass.data[DOMAIN][entity.entry.entry_id]["api"] = mock_api
+    hass.data[DOMAIN][entity.entry.entry_id]["coordinator"] = mock_coordinator
+
+    # Test that defaults are used
+    from custom_components.csnet_home.const import (
+        HEATING_MIN_TEMPERATURE,
+        HEATING_MAX_TEMPERATURE,
+    )
+
+    assert entity.min_temp == HEATING_MIN_TEMPERATURE
+    assert entity.max_temp == HEATING_MAX_TEMPERATURE
+
+
+def test_dynamic_temperature_limits_zone2(hass):
+    """Test temperature limits for zone 2 (C2 circuit)."""
+    sensor_data = {
+        "device_name": "Hitachi PAC",
+        "device_id": 1234,
+        "room_name": "Bedroom",
+        "parent_id": 1706,
+        "room_id": 396,
+        "operation_status": 5,
+        "mode": 1,  # Heat mode
+        "real_mode": 1,
+        "on_off": 1,
+        "timer_running": False,
+        "alarm_code": 0,
+        "c1_demand": False,
+        "c2_demand": True,
+        "ecocomfort": 1,
+        "silent_mode": 0,
+        "current_temperature": 18.0,
+        "setting_temperature": 20.0,
+        "zone_id": 2,  # Zone 2
+    }
+    common_data = {"name": "Hitachi PAC", "firmware": "1.0.0"}
+    entry = SimpleNamespace(entry_id="test-entry")
+
+    # Setup hass data
+    if not hasattr(hass, "data"):
+        hass.data = {}
+    if DOMAIN not in hass.data:
+        hass.data[DOMAIN] = {}
+    if entry.entry_id not in hass.data[DOMAIN]:
+        hass.data[DOMAIN][entry.entry_id] = {}
+
+    # Mock the API to return zone 2 temperature limits
+    mock_api = SimpleNamespace(
+        get_temperature_limits=lambda zone_id, mode, data: (12, 28),
+        async_set_hvac_mode=AsyncMock(return_value=True),
+        async_set_temperature=AsyncMock(return_value=True),
+        set_preset_modes=AsyncMock(return_value=True),
+        async_set_silent_mode=AsyncMock(return_value=True),
+    )
+    mock_coordinator = SimpleNamespace(
+        get_installation_devices_data=lambda: {
+            "heatingStatus": {
+                "heatAirMinC2": 12,
+                "heatAirMaxC2": 28,
+            }
+        },
+        get_sensors_data=lambda: [sensor_data],
+        get_common_data=lambda: {"device_status": {1234: common_data}},
+        async_request_refresh=AsyncMock(return_value=None),
+    )
+
+    hass.data[DOMAIN][entry.entry_id]["api"] = mock_api
+    hass.data[DOMAIN][entry.entry_id]["coordinator"] = mock_coordinator
+
+    entity = CSNetHomeClimate(hass, entry, sensor_data, common_data)
+
+    # Test min and max temperature for zone 2
+    assert entity.min_temp == 12
+    assert entity.max_temp == 28

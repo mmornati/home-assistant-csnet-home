@@ -57,8 +57,7 @@ class CSNetHomeWaterHeater(WaterHeaterEntity):
         self._available = True
 
         self._attr_name = sensor_data.get("room_name", "Unknown Water Heater")
-        self._attr_min_temp = WATER_HEATER_MIN_TEMPERATURE
-        self._attr_max_temp = WATER_HEATER_MAX_TEMPERATURE
+        # Temperature limits will be computed dynamically from API data
         self._attr_temperature_unit = UnitOfTemperature.CELSIUS
         self._attr_supported_features = (
             WaterHeaterEntityFeature.TARGET_TEMPERATURE
@@ -140,6 +139,41 @@ class CSNetHomeWaterHeater(WaterHeaterEntity):
     def precision(self) -> float:
         """Return the precision of the system. Use whole degrees only."""
         return PRECISION_WHOLE
+
+    @property
+    def min_temp(self):
+        """Return the minimum temperature for DHW from API data."""
+        # DHW zone_id is 3, mode is always 1 (heat) for water heater
+        zone_id = 3
+        mode = 1
+
+        # Get installation devices data from coordinator
+        coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
+        installation_devices_data = coordinator.get_installation_devices_data()
+
+        # Get temperature limits from API (DHW min is typically constant at 30)
+        # The API doesn't return a dhwMin, so use the static constant
+        return WATER_HEATER_MIN_TEMPERATURE
+
+    @property
+    def max_temp(self):
+        """Return the maximum temperature for DHW from API data."""
+        # DHW zone_id is 3, mode is always 1 (heat) for water heater
+        zone_id = 3
+        mode = 1
+
+        # Get installation devices data from coordinator
+        coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
+        installation_devices_data = coordinator.get_installation_devices_data()
+
+        # Get temperature limits from API
+        cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
+        _, max_limit = cloud_api.get_temperature_limits(
+            zone_id, mode, installation_devices_data
+        )
+
+        # Return API limit if available, otherwise use static default
+        return max_limit if max_limit is not None else WATER_HEATER_MAX_TEMPERATURE
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
         """Set new target temperature."""

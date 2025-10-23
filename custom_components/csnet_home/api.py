@@ -286,6 +286,63 @@ class CSNetHomeAPI:
             return element.get("settingTemperature") * 10
         return element.get("settingTemperature")
 
+    def get_temperature_limits(self, zone_id, mode, installation_devices_data):
+        """Extract temperature limits from installation devices data.
+
+        Args:
+            zone_id: The zone/element type (1, 2, 5, etc.)
+            mode: The HVAC mode (0=cool, 1=heat, 2=auto)
+            installation_devices_data: The installation devices API response
+
+        Returns:
+            Tuple of (min_temp, max_temp) or (None, None) if not available
+        """
+        if not installation_devices_data:
+            return (None, None)
+
+        heating_status = installation_devices_data.get("heatingStatus", {})
+        if not heating_status:
+            return (None, None)
+
+        # Determine if we're in heating or cooling mode
+        is_heating = mode == 1  # mode 1 is heat, mode 0 is cool
+
+        # Zone mapping based on JavaScript code analysis:
+        # zone_id 1, 2, 4 = air circuits (C1_AIR, C2_AIR)
+        # zone_id 5 = water circuit (C1_WATER)
+        # zone_id 3 = DHW (water heater)
+
+        min_temp = None
+        max_temp = None
+
+        if zone_id == 1:  # Air circuit 1
+            if is_heating:
+                min_temp = heating_status.get("heatAirMinC1")
+                max_temp = heating_status.get("heatAirMaxC1")
+            else:
+                min_temp = heating_status.get("coolAirMinC1")
+                max_temp = heating_status.get("coolAirMaxC1")
+        elif zone_id == 2:  # Air circuit 2
+            if is_heating:
+                min_temp = heating_status.get("heatAirMinC2")
+                max_temp = heating_status.get("heatAirMaxC2")
+            else:
+                min_temp = heating_status.get("coolAirMinC2")
+                max_temp = heating_status.get("coolAirMaxC2")
+        elif zone_id == 5:  # Water circuit 1 (fixed temperature)
+            if is_heating:
+                min_temp = heating_status.get("heatMinC1")
+                max_temp = heating_status.get("heatMaxC1")
+            else:
+                min_temp = heating_status.get("coolMinC1")
+                max_temp = heating_status.get("coolMaxC1")
+        elif zone_id == 3:  # DHW (water heater)
+            # DHW typically only has a max limit, min is constant
+            max_temp = heating_status.get("dhwMax")
+            # Min is typically 30 for DHW
+
+        return (min_temp, max_temp)
+
     async def async_set_temperature(self, zone_id, parent_id, mode, **kwargs):
         """Set the target temperature for a room."""
         settings_url = f"{self.base_url}{HEAT_SETTINGS_PATH}"
