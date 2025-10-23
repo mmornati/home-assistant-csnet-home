@@ -1401,9 +1401,7 @@ def test_get_temperature_limits_no_heating_status(hass):
     """Test temperature limits extraction when heatingStatus is missing."""
     api = CSNetHomeAPI(hass, "user", "pass")
 
-    installation_devices_data = {
-        "otherData": "value"
-    }
+    installation_devices_data = {"otherData": "value"}
 
     # Missing heatingStatus
     min_temp, max_temp = api.get_temperature_limits(1, 1, installation_devices_data)

@@ -304,7 +304,9 @@ def test_dynamic_temperature_limits_heating_mode(hass):
             }
         },
         get_sensors_data=lambda: [entity._sensor_data],
-        get_common_data=lambda: {"device_status": {1234: {"name": "Hitachi PAC", "firmware": "1.0.0"}}},
+        get_common_data=lambda: {
+            "device_status": {1234: {"name": "Hitachi PAC", "firmware": "1.0.0"}}
+        },
         async_request_refresh=AsyncMock(return_value=None),
     )
 
@@ -336,7 +338,9 @@ def test_dynamic_temperature_limits_cooling_mode(hass):
             }
         },
         get_sensors_data=lambda: [entity._sensor_data],
-        get_common_data=lambda: {"device_status": {1234: {"name": "Hitachi PAC", "firmware": "1.0.0"}}},
+        get_common_data=lambda: {
+            "device_status": {1234: {"name": "Hitachi PAC", "firmware": "1.0.0"}}
+        },
         async_request_refresh=AsyncMock(return_value=None),
     )
 
@@ -363,7 +367,9 @@ def test_dynamic_temperature_limits_fallback_to_defaults(hass):
     mock_coordinator = SimpleNamespace(
         get_installation_devices_data=lambda: {},
         get_sensors_data=lambda: [entity._sensor_data],
-        get_common_data=lambda: {"device_status": {1234: {"name": "Hitachi PAC", "firmware": "1.0.0"}}},
+        get_common_data=lambda: {
+            "device_status": {1234: {"name": "Hitachi PAC", "firmware": "1.0.0"}}
+        },
         async_request_refresh=AsyncMock(return_value=None),
     )
 
@@ -375,6 +381,7 @@ def test_dynamic_temperature_limits_fallback_to_defaults(hass):
         HEATING_MIN_TEMPERATURE,
         HEATING_MAX_TEMPERATURE,
     )
+
     assert entity.min_temp == HEATING_MIN_TEMPERATURE
     assert entity.max_temp == HEATING_MAX_TEMPERATURE
 
