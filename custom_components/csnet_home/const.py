@@ -23,6 +23,26 @@ WATER_HEATER_MIN_TEMPERATURE = 30
 HEATING_MAX_TEMPERATURE = 55
 HEATING_MIN_TEMPERATURE = 8
 
+# Fan Speed Control (for fan coil systems)
+FAN_SPEED_OFF = "0"
+FAN_SPEED_LOW = "1"
+FAN_SPEED_MEDIUM = "2"
+FAN_SPEED_AUTO = "3"
+
+FAN_SPEED_MAP = {
+    "off": 0,
+    "low": 1,
+    "medium": 2,
+    "auto": 3,
+}
+
+FAN_SPEED_REVERSE_MAP = {
+    0: "off",
+    1: "low",
+    2: "medium",
+    3: "auto",
+}
+
 # Localization
 CONF_LANGUAGE = "language"
 DEFAULT_LANGUAGE = "en"

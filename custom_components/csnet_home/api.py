@@ -194,6 +194,12 @@ class CSNetHomeAPI:
                                     element
                                 ),
                                 "zone_id": element.get("elementType"),
+                                "fan1_speed": element.get(
+                                    "fan1Speed"
+                                ),  # Fan speed for C1 circuit
+                                "fan2_speed": element.get(
+                                    "fan2Speed"
+                                ),  # Fan speed for C2 circuit
                             }
                             sensors.append(sensor)
                         _LOGGER.debug("Retrieved Sensors: %s", sensors)
@@ -709,6 +715,124 @@ class CSNetHomeAPI:
         except (aiohttp.ClientError, asyncio.TimeoutError) as err:
             _LOGGER.error("Error setting silent_mode for %s: %s", zone_id, err)
             return False
+
+    async def async_set_fan_speed(
+        self, zone_id, parent_id, fan_speed: int, circuit: int = 1
+    ):
+        """Set fan speed for a fan coil circuit.
+
+        Args:
+            zone_id: The zone/element type
+            parent_id: The parent device ID
+            fan_speed: Fan speed value (0=off, 1=low, 2=medium, 3=auto)
+            circuit: Circuit number (1 for C1, 2 for C2)
+        """
+        settings_url = f"{self.base_url}{HEAT_SETTINGS_PATH}"
+
+        headers = COMMON_API_HEADERS | {
+            "accept": "*/*",
+            "x-requested-with": "XMLHttpRequest",
+            "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "origin": self.base_url,
+        }
+
+        data = {
+            "id": f"{parent_id}{zone_id}",  # device id + zone id
+            "updatedOn": str(int(time.time() * 1000)),  # current timestamp in ms
+            "orderStatus": "PENDING",
+            "indoorId": parent_id,
+            f"fan{circuit}Speed": str(fan_speed),
+            "_csrf": self.xsrf_token,
+        }
+
+        cookies = {
+            "XSRF-TOKEN": self.xsrf_token,
+            "acceptedCookies": "yes",
+        }
+
+        try:
+            async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+                async with self.session.post(
+                    settings_url, headers=headers, cookies=cookies, data=data
+                ) as response:
+                    response_text = await response.text()
+                    _LOGGER.debug(
+                        "Set fan_speed=%s for zone=%s circuit=%s with payload=%s, status=%s, response=%s",
+                        fan_speed,
+                        zone_id,
+                        circuit,
+                        data,
+                        response.status,
+                        response_text,
+                    )
+                    if response.status != 200:
+                        _LOGGER.warning(
+                            "HTTP %s for fan_speed=%s: %s",
+                            response.status,
+                            fan_speed,
+                            response_text,
+                        )
+                        return False
+                    response.raise_for_status()
+                    return True
+        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+            _LOGGER.error(
+                "Error setting fan_speed for %s circuit %s: %s", zone_id, circuit, err
+            )
+            return False
+
+    def is_fan_coil_compatible(self, installation_devices_data):
+        """Check if the system supports fan coil control.
+
+        Args:
+            installation_devices_data: The installation devices API response
+
+        Returns:
+            bool: True if fan coil compatible (systemConfigBits & 0x2000)
+        """
+        if not installation_devices_data:
+            return False
+
+        heating_status = installation_devices_data.get("heatingStatus", {})
+        if not heating_status:
+            return False
+
+        system_config_bits = heating_status.get("systemConfigBits", 0)
+        return (system_config_bits & 0x2000) > 0
+
+    def get_fan_control_availability(
+        self, circuit: int, mode: int, installation_devices_data
+    ):
+        """Check if fan control is available for a specific circuit and mode.
+
+        Args:
+            circuit: Circuit number (1 for C1, 2 for C2)
+            mode: HVAC mode (0=cool, 1=heat, 2=auto)
+            installation_devices_data: The installation devices API response
+
+        Returns:
+            bool: True if fan control is available
+        """
+        if not self.is_fan_coil_compatible(installation_devices_data):
+            return False
+
+        heating_status = installation_devices_data.get("heatingStatus", {})
+        if not heating_status:
+            return False
+
+        # Get the fan control flag for the circuit
+        fan_control_key = f"fan{circuit}ControlledOnLCD"
+        fan_controlled = heating_status.get(fan_control_key, 0)
+
+        # fanXControlledOnLCD values: 0=No, 1=Heating, 2=Cooling, 3=Heating+Cooling
+        if mode == 1:  # Heat mode
+            return fan_controlled in [1, 3]
+        elif mode == 0:  # Cool mode
+            return fan_controlled in [2, 3]
+        elif mode == 2:  # Auto mode
+            return fan_controlled == 3
+
+        return False
 
     async def close(self):
         """Close the session after usage."""

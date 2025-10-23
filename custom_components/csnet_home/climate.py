@@ -16,6 +16,8 @@ from .const import (
     DOMAIN,
     HEATING_MAX_TEMPERATURE,
     HEATING_MIN_TEMPERATURE,
+    FAN_SPEED_MAP,
+    FAN_SPEED_REVERSE_MAP,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -70,8 +72,21 @@ class CSNetHomeClimate(ClimateEntity):
             self._attr_preset_mode = "eco"
         else:
             self._attr_preset_mode = "comfort"
-        # Fan modes: auto (normal) and on (silent/quiet mode)
-        self._attr_fan_modes = [FAN_AUTO, FAN_ON]
+
+        # Determine if this is a fan coil compatible system
+        coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
+        installation_devices_data = coordinator.get_installation_devices_data()
+        cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
+        self._is_fan_coil = cloud_api.is_fan_coil_compatible(installation_devices_data)
+
+        # Set fan modes based on system type
+        if self._is_fan_coil:
+            # Fan coil systems use fan speed control
+            self._attr_fan_modes = list(FAN_SPEED_MAP.keys())
+        else:
+            # Non-fan coil systems use silent mode (auto = normal, on = silent)
+            self._attr_fan_modes = [FAN_AUTO, FAN_ON]
+
         self._attr_supported_features = (
             ClimateEntityFeature.PRESET_MODE
             | ClimateEntityFeature.TARGET_TEMPERATURE
@@ -119,14 +134,31 @@ class CSNetHomeClimate(ClimateEntity):
 
     @property
     def fan_mode(self):
-        """Return the current fan mode (silent mode)."""
+        """Return the current fan mode (fan speed for fan coil, silent mode otherwise)."""
         if self._sensor_data is None:
+            return FAN_AUTO if not self._is_fan_coil else "auto"
+
+        if self._is_fan_coil:
+            # For fan coil systems, return the fan speed
+            # Determine which circuit to use based on zone_id
+            zone_id = self._sensor_data.get("zone_id")
+            # Zone 1 uses C1, Zone 2 uses C2
+            circuit = 1 if zone_id == 1 else 2
+
+            # Get fan speed from sensor data
+            fan_speed_key = f"fan{circuit}_speed"
+            fan_speed = self._sensor_data.get(fan_speed_key)
+
+            if fan_speed is not None and fan_speed >= 0:
+                return FAN_SPEED_REVERSE_MAP.get(fan_speed, "auto")
+            return "auto"
+        else:
+            # For non-fan coil systems, return silent mode status
+            silent_mode = self._sensor_data.get("silent_mode")
+            # silent_mode: 0 = Off (auto), 1 = On (silent)
+            if silent_mode == 1:
+                return FAN_ON
             return FAN_AUTO
-        silent_mode = self._sensor_data.get("silent_mode")
-        # silent_mode: 0 = Off (auto), 1 = On (silent)
-        if silent_mode == 1:
-            return FAN_ON
-        return FAN_AUTO
 
     @property
     def target_temperature(self):
@@ -217,7 +249,7 @@ class CSNetHomeClimate(ClimateEntity):
         """Return additional attributes from elements API."""
         if self._sensor_data is None:
             return {}
-        return {
+        attrs = {
             "real_mode": self._sensor_data.get("real_mode"),
             "operation_status": self._sensor_data.get("operation_status"),
             "timer_running": self._sensor_data.get("timer_running"),
@@ -227,6 +259,29 @@ class CSNetHomeClimate(ClimateEntity):
             "doingBoost": self._sensor_data.get("doingBoost"),
             "silent_mode": self._sensor_data.get("silent_mode"),
         }
+
+        # Add fan speed information for fan coil systems
+        if self._is_fan_coil:
+            attrs["is_fan_coil_compatible"] = True
+            attrs["fan1_speed"] = self._sensor_data.get("fan1_speed")
+            attrs["fan2_speed"] = self._sensor_data.get("fan2_speed")
+
+            # Add fan control availability info
+            coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
+            installation_devices_data = coordinator.get_installation_devices_data()
+            cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
+            mode = self._sensor_data.get("mode", 1)
+
+            attrs["fan1_control_available"] = cloud_api.get_fan_control_availability(
+                1, mode, installation_devices_data
+            )
+            attrs["fan2_control_available"] = cloud_api.get_fan_control_availability(
+                2, mode, installation_devices_data
+            )
+        else:
+            attrs["is_fan_coil_compatible"] = False
+
+        return attrs
 
     async def async_set_temperature(self, **kwargs):
         """Set the target temperature for a room."""
@@ -284,18 +339,56 @@ class CSNetHomeClimate(ClimateEntity):
             self._sensor_data["ecocomfort"] = 1 if preset_mode == "eco" else 0
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
-        """Set new fan mode (silent mode)."""
+        """Set new fan mode (fan speed for fan coil, silent mode otherwise)."""
         cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
-        # Map fan mode to silent mode boolean
-        # FAN_ON = silent mode on, FAN_AUTO = silent mode off
-        silent_mode = fan_mode == FAN_ON
-        response = await cloud_api.async_set_silent_mode(
-            self._sensor_data["zone_id"],
-            self._sensor_data["parent_id"],
-            silent_mode,
-        )
-        if response:
-            self._sensor_data["silent_mode"] = 1 if silent_mode else 0
+
+        if self._is_fan_coil:
+            # For fan coil systems, set the fan speed
+            if fan_mode not in FAN_SPEED_MAP:
+                _LOGGER.warning("Invalid fan mode %s for fan coil system", fan_mode)
+                return
+
+            fan_speed = FAN_SPEED_MAP[fan_mode]
+
+            # Determine which circuit to use based on zone_id
+            zone_id = self._sensor_data.get("zone_id")
+            # Zone 1 uses C1, Zone 2 uses C2
+            circuit = 1 if zone_id == 1 else 2
+
+            # Check if fan control is available for this circuit
+            coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
+            installation_devices_data = coordinator.get_installation_devices_data()
+            mode = self._sensor_data.get("mode", 1)
+
+            if not cloud_api.get_fan_control_availability(
+                circuit, mode, installation_devices_data
+            ):
+                _LOGGER.warning(
+                    "Fan control not available for circuit %s in mode %s", circuit, mode
+                )
+                return
+
+            response = await cloud_api.async_set_fan_speed(
+                self._sensor_data["zone_id"],
+                self._sensor_data["parent_id"],
+                fan_speed,
+                circuit,
+            )
+            if response:
+                fan_speed_key = f"fan{circuit}_speed"
+                self._sensor_data[fan_speed_key] = fan_speed
+        else:
+            # For non-fan coil systems, set silent mode
+            # Map fan mode to silent mode boolean
+            # FAN_ON = silent mode on, FAN_AUTO = silent mode off
+            silent_mode = fan_mode == FAN_ON
+            response = await cloud_api.async_set_silent_mode(
+                self._sensor_data["zone_id"],
+                self._sensor_data["parent_id"],
+                silent_mode,
+            )
+            if response:
+                self._sensor_data["silent_mode"] = 1 if silent_mode else 0
 
     def is_heating(self):
         """Return true if the thermostat is currently heating."""
