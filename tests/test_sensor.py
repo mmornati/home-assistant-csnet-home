@@ -9,6 +9,7 @@ from homeassistant.const import STATE_OFF, STATE_ON, UnitOfTemperature
 from custom_components.csnet_home.sensor import (
     CSNetHomeSensor,
     CSNetHomeInstallationSensor,
+    CSNetHomeDeviceSensor,
 )
 
 
@@ -857,3 +858,561 @@ def test_central_control_sensors_metadata():
     assert s.name == "System Controller Central Control Enabled"
     assert s.unique_id == "csnet_home-installation-central_control_enabled"
     assert s.device_class == "binary"
+
+
+def test_wifi_signal_sensor():
+    """Test WiFi signal strength sensor."""
+    sensor_data = {
+        "device_name": "Hitachi PAC",
+        "device_id": 1709,
+        "room_name": "Living",
+        "parent_id": 1706,
+        "room_id": 395,
+    }
+    common_data = {
+        "name": "Hitachi PAC",
+        "firmware": "1.0.0",
+        "device_status": {
+            1709: {
+                "name": "Hitachi PAC",
+                "status": 1,
+                "firmware": "1234",
+                "rssi": -70,
+                "lastComm": 1736193442000,
+                "currentTimeMillis": 1736193448768,
+            }
+        },
+    }
+
+    coordinator = SimpleNamespace(
+        get_sensors_data=lambda: [sensor_data],
+        get_common_data=lambda: common_data,
+    )
+
+    s = CSNetHomeDeviceSensor(
+        coordinator,
+        sensor_data,
+        common_data,
+        "wifi_signal",
+        "signal_strength",
+        "dBm",
+        "WiFi Signal",
+    )
+
+    # Test WiFi signal strength
+    assert s.state == -70
+    assert s.unit_of_measurement == "dBm"
+    assert s.device_class == "signal_strength"
+    assert s.name == "Hitachi PAC WiFi Signal"
+    assert "wifi_signal" in s.unique_id
+
+
+def test_wifi_signal_sensor_no_data():
+    """Test WiFi signal sensor when RSSI data is missing."""
+    sensor_data = {
+        "device_name": "Hitachi PAC",
+        "device_id": 1709,
+        "room_name": "Living",
+        "parent_id": 1706,
+        "room_id": 395,
+    }
+    common_data = {
+        "name": "Hitachi PAC",
+        "firmware": "1.0.0",
+        "device_status": {
+            1709: {
+                "name": "Hitachi PAC",
+                "status": 1,
+                "firmware": "1234",
+                # rssi is missing
+            }
+        },
+    }
+
+    coordinator = SimpleNamespace(
+        get_sensors_data=lambda: [sensor_data],
+        get_common_data=lambda: common_data,
+    )
+
+    s = CSNetHomeDeviceSensor(
+        coordinator,
+        sensor_data,
+        common_data,
+        "wifi_signal",
+        "signal_strength",
+        "dBm",
+        "WiFi Signal",
+    )
+
+    # Should return None when rssi is missing
+    assert s.state is None
+
+
+def test_connectivity_sensor_online():
+    """Test connectivity sensor when device is online."""
+    sensor_data = {
+        "device_name": "Hitachi PAC",
+        "device_id": 1709,
+        "room_name": "Living",
+        "parent_id": 1706,
+        "room_id": 395,
+    }
+    # Device last communicated 5 minutes ago (5 * 60 * 1000 ms = 300000 ms)
+    common_data = {
+        "name": "Hitachi PAC",
+        "firmware": "1.0.0",
+        "device_status": {
+            1709: {
+                "name": "Hitachi PAC",
+                "status": 1,
+                "firmware": "1234",
+                "lastComm": 1736193148768,  # 5 minutes ago
+                "currentTimeMillis": 1736193448768,
+            }
+        },
+    }
+
+    coordinator = SimpleNamespace(
+        get_sensors_data=lambda: [sensor_data],
+        get_common_data=lambda: common_data,
+    )
+
+    s = CSNetHomeDeviceSensor(
+        coordinator,
+        sensor_data,
+        common_data,
+        "connectivity",
+        "binary",
+        None,
+        "Connectivity",
+    )
+
+    # Should be ON (online) when last communication was < 10 minutes ago
+    assert s.state == STATE_ON
+    assert s.device_class == "binary"
+    assert s.name == "Hitachi PAC Connectivity"
+
+
+def test_connectivity_sensor_offline():
+    """Test connectivity sensor when device is offline."""
+    sensor_data = {
+        "device_name": "Hitachi PAC",
+        "device_id": 1709,
+        "room_name": "Living",
+        "parent_id": 1706,
+        "room_id": 395,
+    }
+    # Device last communicated 15 minutes ago (15 * 60 * 1000 ms = 900000 ms)
+    common_data = {
+        "name": "Hitachi PAC",
+        "firmware": "1.0.0",
+        "device_status": {
+            1709: {
+                "name": "Hitachi PAC",
+                "status": 1,
+                "firmware": "1234",
+                "lastComm": 1736192548768,  # 15 minutes ago
+                "currentTimeMillis": 1736193448768,
+            }
+        },
+    }
+
+    coordinator = SimpleNamespace(
+        get_sensors_data=lambda: [sensor_data],
+        get_common_data=lambda: common_data,
+    )
+
+    s = CSNetHomeDeviceSensor(
+        coordinator,
+        sensor_data,
+        common_data,
+        "connectivity",
+        "binary",
+        None,
+        "Connectivity",
+    )
+
+    # Should be OFF (offline) when last communication was > 10 minutes ago
+    assert s.state == STATE_OFF
+
+
+def test_connectivity_sensor_exactly_10_minutes():
+    """Test connectivity sensor at exactly 10 minutes boundary."""
+    sensor_data = {
+        "device_name": "Hitachi PAC",
+        "device_id": 1709,
+        "room_name": "Living",
+        "parent_id": 1706,
+        "room_id": 395,
+    }
+    # Device last communicated exactly 10 minutes ago (10 * 60 * 1000 ms = 600000 ms)
+    common_data = {
+        "name": "Hitachi PAC",
+        "firmware": "1.0.0",
+        "device_status": {
+            1709: {
+                "name": "Hitachi PAC",
+                "status": 1,
+                "firmware": "1234",
+                "lastComm": 1736192848768,  # exactly 10 minutes ago
+                "currentTimeMillis": 1736193448768,
+            }
+        },
+    }
+
+    coordinator = SimpleNamespace(
+        get_sensors_data=lambda: [sensor_data],
+        get_common_data=lambda: common_data,
+    )
+
+    s = CSNetHomeDeviceSensor(
+        coordinator,
+        sensor_data,
+        common_data,
+        "connectivity",
+        "binary",
+        None,
+        "Connectivity",
+    )
+
+    # Should be ON (online) when last communication was exactly 10 minutes ago (<=10)
+    assert s.state == STATE_ON
+
+
+def test_connectivity_sensor_no_data():
+    """Test connectivity sensor when timestamp data is missing."""
+    sensor_data = {
+        "device_name": "Hitachi PAC",
+        "device_id": 1709,
+        "room_name": "Living",
+        "parent_id": 1706,
+        "room_id": 395,
+    }
+    common_data = {
+        "name": "Hitachi PAC",
+        "firmware": "1.0.0",
+        "device_status": {
+            1709: {
+                "name": "Hitachi PAC",
+                "status": 1,
+                "firmware": "1234",
+                # lastComm and currentTimeMillis are missing
+            }
+        },
+    }
+
+    coordinator = SimpleNamespace(
+        get_sensors_data=lambda: [sensor_data],
+        get_common_data=lambda: common_data,
+    )
+
+    s = CSNetHomeDeviceSensor(
+        coordinator,
+        sensor_data,
+        common_data,
+        "connectivity",
+        "binary",
+        None,
+        "Connectivity",
+    )
+
+    # Should be OFF (offline) when data is missing
+    assert s.state == STATE_OFF
+
+
+def test_last_communication_sensor():
+    """Test last communication timestamp sensor."""
+    sensor_data = {
+        "device_name": "Hitachi PAC",
+        "device_id": 1709,
+        "room_name": "Living",
+        "parent_id": 1706,
+        "room_id": 395,
+    }
+    common_data = {
+        "name": "Hitachi PAC",
+        "firmware": "1.0.0",
+        "device_status": {
+            1709: {
+                "name": "Hitachi PAC",
+                "status": 1,
+                "firmware": "1234",
+                "lastComm": 1736193442000,
+                "currentTimeMillis": 1736193448768,
+            }
+        },
+    }
+
+    coordinator = SimpleNamespace(
+        get_sensors_data=lambda: [sensor_data],
+        get_common_data=lambda: common_data,
+    )
+
+    s = CSNetHomeDeviceSensor(
+        coordinator,
+        sensor_data,
+        common_data,
+        "last_communication",
+        "timestamp",
+        None,
+        "Last Communication",
+    )
+
+    # Test timestamp conversion
+    assert s.state is not None
+    assert "2025-01-06" in s.state  # Verify it's a valid ISO timestamp
+    assert "T" in s.state  # ISO format should have T separator
+    assert s.device_class == "timestamp"
+    assert s.name == "Hitachi PAC Last Communication"
+
+
+def test_last_communication_sensor_no_data():
+    """Test last communication sensor when timestamp is missing."""
+    sensor_data = {
+        "device_name": "Hitachi PAC",
+        "device_id": 1709,
+        "room_name": "Living",
+        "parent_id": 1706,
+        "room_id": 395,
+    }
+    common_data = {
+        "name": "Hitachi PAC",
+        "firmware": "1.0.0",
+        "device_status": {
+            1709: {
+                "name": "Hitachi PAC",
+                "status": 1,
+                "firmware": "1234",
+                # lastComm is missing
+            }
+        },
+    }
+
+    coordinator = SimpleNamespace(
+        get_sensors_data=lambda: [sensor_data],
+        get_common_data=lambda: common_data,
+    )
+
+    s = CSNetHomeDeviceSensor(
+        coordinator,
+        sensor_data,
+        common_data,
+        "last_communication",
+        "timestamp",
+        None,
+        "Last Communication",
+    )
+
+    # Should return None when lastComm is missing
+    assert s.state is None
+
+
+def test_device_sensor_coordinator_update():
+    """Test device sensor updates when coordinator refreshes."""
+    sensor_data = {
+        "device_name": "Hitachi PAC",
+        "device_id": 1709,
+        "room_name": "Living",
+        "parent_id": 1706,
+        "room_id": 395,
+    }
+    common_data = {
+        "name": "Hitachi PAC",
+        "firmware": "1.0.0",
+        "device_status": {
+            1709: {
+                "name": "Hitachi PAC",
+                "status": 1,
+                "firmware": "1234",
+                "rssi": -70,
+                "lastComm": 1736193442000,
+                "currentTimeMillis": 1736193448768,
+            }
+        },
+    }
+
+    updated_sensor_data = sensor_data.copy()
+    updated_common_data = {
+        "name": "Hitachi PAC",
+        "firmware": "1.0.0",
+        "device_status": {
+            1709: {
+                "name": "Hitachi PAC",
+                "status": 1,
+                "firmware": "1234",
+                "rssi": -65,  # Updated signal strength
+                "lastComm": 1736193500000,  # Updated timestamp
+                "currentTimeMillis": 1736193500000,
+            }
+        },
+    }
+
+    coordinator = SimpleNamespace(
+        get_sensors_data=lambda: [updated_sensor_data],
+        get_common_data=lambda: updated_common_data,
+    )
+
+    s = CSNetHomeDeviceSensor(
+        coordinator,
+        sensor_data,
+        common_data,
+        "wifi_signal",
+        "signal_strength",
+        "dBm",
+        "WiFi Signal",
+    )
+
+    # Mock the async_write_ha_state method
+    s.async_write_ha_state = MagicMock()
+
+    # Initial state
+    assert s.state == -70
+
+    # Update common_data reference
+    s._common_data = updated_common_data
+
+    # Trigger coordinator update
+    s._handle_coordinator_update()
+
+    # Verify state updated
+    assert s.state == -65
+    s.async_write_ha_state.assert_called_once()
+
+
+def test_device_sensor_metadata():
+    """Test device sensor metadata and properties."""
+    sensor_data = {
+        "device_name": "Hitachi PAC",
+        "device_id": 1709,
+        "room_name": "Living",
+        "parent_id": 1706,
+        "room_id": 395,
+    }
+    common_data = {
+        "name": "Hitachi PAC",
+        "firmware": "1.0.0",
+        "device_status": {
+            1709: {
+                "name": "Hitachi PAC",
+                "status": 1,
+                "firmware": "1234",
+                "rssi": -70,
+                "lastComm": 1736193442000,
+                "currentTimeMillis": 1736193448768,
+            }
+        },
+    }
+
+    coordinator = SimpleNamespace(
+        get_sensors_data=lambda: [sensor_data],
+        get_common_data=lambda: common_data,
+    )
+
+    s = CSNetHomeDeviceSensor(
+        coordinator,
+        sensor_data,
+        common_data,
+        "wifi_signal",
+        "signal_strength",
+        "dBm",
+        "WiFi Signal",
+    )
+
+    # Test device info
+    device_info = s.device_info
+    assert device_info["manufacturer"] == "Hitachi"
+    assert "Remote Controller" in device_info["model"]
+    assert device_info["sw_version"] == "1234"
+
+    # Test unique id
+    assert "csnet_home" in s.unique_id
+    assert "Living" in s.unique_id
+    assert "wifi_signal" in s.unique_id
+
+    # Test name
+    assert s.name == "Hitachi PAC WiFi Signal"
+
+    # Test device class and unit
+    assert s.device_class == "signal_strength"
+    assert s.unit_of_measurement == "dBm"
+
+
+def test_device_sensor_no_device_status():
+    """Test device sensor when device_status is missing entirely."""
+    sensor_data = {
+        "device_name": "Hitachi PAC",
+        "device_id": 1709,
+        "room_name": "Living",
+        "parent_id": 1706,
+        "room_id": 395,
+    }
+    common_data = {
+        "name": "Hitachi PAC",
+        "firmware": "1.0.0",
+        "device_status": {},  # Empty device_status
+    }
+
+    coordinator = SimpleNamespace(
+        get_sensors_data=lambda: [sensor_data],
+        get_common_data=lambda: common_data,
+    )
+
+    s = CSNetHomeDeviceSensor(
+        coordinator,
+        sensor_data,
+        common_data,
+        "wifi_signal",
+        "signal_strength",
+        "dBm",
+        "WiFi Signal",
+    )
+
+    # Should return None when device_status is missing
+    assert s.state is None
+
+
+def test_wifi_signal_different_values():
+    """Test WiFi signal sensor with different RSSI values."""
+    sensor_data = {
+        "device_name": "Hitachi PAC",
+        "device_id": 1709,
+        "room_name": "Living",
+        "parent_id": 1706,
+        "room_id": 395,
+    }
+
+    # Test with strong signal
+    common_data = {
+        "name": "Hitachi PAC",
+        "firmware": "1.0.0",
+        "device_status": {
+            1709: {
+                "name": "Hitachi PAC",
+                "rssi": -50,  # Strong signal
+            }
+        },
+    }
+
+    coordinator = SimpleNamespace(
+        get_sensors_data=lambda: [sensor_data],
+        get_common_data=lambda: common_data,
+    )
+
+    s = CSNetHomeDeviceSensor(
+        coordinator,
+        sensor_data,
+        common_data,
+        "wifi_signal",
+        "signal_strength",
+        "dBm",
+        "WiFi Signal",
+    )
+    assert s.state == -50
+
+    # Test with weak signal
+    common_data["device_status"][1709]["rssi"] = -90
+    assert s.state == -90
+
+    # Test with medium signal
+    common_data["device_status"][1709]["rssi"] = -70
+    assert s.state == -70

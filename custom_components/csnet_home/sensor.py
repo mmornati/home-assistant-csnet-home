@@ -1,18 +1,21 @@
 """Support for CSNet Home sensors."""
 
 import logging
+from datetime import datetime, timezone
 
 from homeassistant.const import (
     UnitOfTemperature,
     UnitOfPressure,
     UnitOfVolumeFlowRate,
     UnitOfSpeed,
+    SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
 )
 from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.components.climate.const import HVACMode
+from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.const import STATE_ON, STATE_OFF
 
 from .const import DOMAIN
@@ -79,6 +82,45 @@ async def async_setup_entry(hass, entry, async_add_entities):
         sensors.append(
             CSNetHomeSensor(
                 coordinator, sensor_data, common_data, "alarm_message", "enum"
+            )
+        )
+
+        # Add WiFi signal strength sensor
+        sensors.append(
+            CSNetHomeDeviceSensor(
+                coordinator,
+                sensor_data,
+                common_data,
+                "wifi_signal",
+                SensorDeviceClass.SIGNAL_STRENGTH,
+                SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
+                "WiFi Signal",
+            )
+        )
+
+        # Add connectivity binary sensor
+        sensors.append(
+            CSNetHomeDeviceSensor(
+                coordinator,
+                sensor_data,
+                common_data,
+                "connectivity",
+                "binary",
+                None,
+                "Connectivity",
+            )
+        )
+
+        # Add last communication timestamp sensor
+        sensors.append(
+            CSNetHomeDeviceSensor(
+                coordinator,
+                sensor_data,
+                common_data,
+                "last_communication",
+                SensorDeviceClass.TIMESTAMP,
+                None,
+                "Last Communication",
             )
         )
 
@@ -590,3 +632,131 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, Entity):
     def unique_id(self) -> str:
         """Return unique id."""
         return f"{DOMAIN}-installation-{self._key}"
+
+
+class CSNetHomeDeviceSensor(CoordinatorEntity, Entity):
+    """Representation of a device-level sensor (WiFi, connectivity) from CSNet Home."""
+
+    def __init__(
+        self,
+        coordinator: CSNetHomeCoordinator,
+        sensor_data,
+        common_data,
+        key,
+        device_class=None,
+        unit=None,
+        friendly_name=None,
+    ):
+        """Initialize the device sensor."""
+        super().__init__(coordinator)
+        self._coordinator = coordinator
+        self._sensor_data = sensor_data
+        self._common_data = common_data
+        self._key = key
+        self._device_class = device_class
+        self._unit = unit
+        self._friendly_name = friendly_name or key
+        self._device_id = sensor_data.get("device_id")
+        self._name = f"{sensor_data['device_name']} {self._friendly_name}"
+        _LOGGER.debug("Configuring Device Sensor %s", self._name)
+
+    @property
+    def state(self):
+        """Return the current state of the sensor."""
+        # Get the device status from common_data
+        device_status = self._common_data.get("device_status", {}).get(self._device_id)
+
+        if not device_status:
+            return None
+
+        if self._key == "wifi_signal":
+            # Return RSSI value (WiFi signal strength in dBm)
+            return device_status.get("rssi")
+
+        if self._key == "connectivity":
+            # Calculate connectivity status based on lastComm timestamp
+            # Device is considered offline if last communication was > 10 minutes ago
+            last_comm = device_status.get("lastComm")
+            current_time = device_status.get("currentTimeMillis")
+
+            if last_comm is None or current_time is None:
+                return STATE_OFF  # Unknown status = offline
+
+            # Calculate time difference in milliseconds
+            time_diff_ms = current_time - last_comm
+            # Convert to minutes
+            time_diff_minutes = time_diff_ms / 1000 / 60
+
+            # Online if last communication was within 10 minutes
+            return STATE_ON if time_diff_minutes <= 10 else STATE_OFF
+
+        if self._key == "last_communication":
+            # Return last communication timestamp as ISO 8601 datetime
+            last_comm = device_status.get("lastComm")
+            if last_comm is None:
+                return None
+
+            # Convert from milliseconds to seconds and create datetime
+            timestamp_seconds = last_comm / 1000
+            return datetime.fromtimestamp(
+                timestamp_seconds, tz=timezone.utc
+            ).isoformat()
+
+        return None
+
+    @property
+    def device_class(self):
+        """Return the device class of the sensor."""
+        return self._device_class
+
+    @property
+    def unit_of_measurement(self):
+        """Return the unit of measurement for the sensor."""
+        return self._unit
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Update sensor with latest data from coordinator."""
+        # Update sensor_data reference
+        self._sensor_data = next(
+            (
+                x
+                for x in self._coordinator.get_sensors_data()
+                if x.get("device_id") == self._device_id
+            ),
+            None,
+        )
+
+        # Update common_data reference
+        self._common_data = self._coordinator.get_common_data()
+
+        if self._sensor_data:
+            self.async_write_ha_state()
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device information."""
+        return DeviceInfo(
+            name=f"{self._sensor_data['device_name']}-{self._sensor_data.get('room_name', 'Unknown')}",
+            manufacturer="Hitachi",
+            model=f"{self._common_data.get('device_status', {}).get(self._device_id, {}).get('name', 'Unknown')} Remote Controller",
+            sw_version=self._common_data.get("device_status", {})
+            .get(self._device_id, {})
+            .get("firmware"),
+            identifiers={
+                (
+                    DOMAIN,
+                    f"{self._sensor_data['device_name']}-{self._sensor_data.get('room_name', 'Unknown')}",
+                )
+            },
+        )
+
+    @property
+    def name(self) -> str:
+        """Return the name of the sensor."""
+        return self._name
+
+    @property
+    def unique_id(self) -> str:
+        """Return unique id."""
+        return f"{DOMAIN}-{self._sensor_data.get('room_name', 'unknown')}-{self._key}"
