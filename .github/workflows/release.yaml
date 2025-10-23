@@ -161,7 +161,8 @@ jobs:
 
       - name: Verify Manifest Version
         run: |
-          MANIFEST_VERSION=$(grep -Po '(?<="version": ")[^"]*' ./custom_components/csnet_home/manifest.json)
+          MANIFEST_VERSION=$(grep -o '"version": "[^"]*"' \
+            ./custom_components/csnet_home/manifest.json | cut -d'"' -f4)
           TAG_VERSION="${{ github.event.release.tag_name }}"
           TAG_VERSION_NO_V="${TAG_VERSION#v}"
 
