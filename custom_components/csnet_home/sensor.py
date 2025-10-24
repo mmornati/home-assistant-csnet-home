@@ -19,7 +19,11 @@ from homeassistant.components.climate.const import HVACMode
 from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.const import STATE_ON, STATE_OFF
 
-from .const import DOMAIN
+from .const import (
+    DOMAIN,
+    OTC_HEATING_TYPE_NAMES,
+    OTC_COOLING_TYPE_NAMES,
+)
 from .coordinator import CSNetHomeCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -392,6 +396,52 @@ async def async_setup_entry(hass, entry, async_add_entities):
             )
         )
 
+        # OTC (Outdoor Temperature Compensation) sensors (Issue #71)
+        sensors.append(
+            CSNetHomeInstallationSensor(
+                coordinator,
+                global_device_data,
+                common_data,
+                "otc_heating_type_c1",
+                "enum",
+                None,
+                "OTC Heating Type C1",
+            )
+        )
+        sensors.append(
+            CSNetHomeInstallationSensor(
+                coordinator,
+                global_device_data,
+                common_data,
+                "otc_cooling_type_c1",
+                "enum",
+                None,
+                "OTC Cooling Type C1",
+            )
+        )
+        sensors.append(
+            CSNetHomeInstallationSensor(
+                coordinator,
+                global_device_data,
+                common_data,
+                "otc_heating_type_c2",
+                "enum",
+                None,
+                "OTC Heating Type C2",
+            )
+        )
+        sensors.append(
+            CSNetHomeInstallationSensor(
+                coordinator,
+                global_device_data,
+                common_data,
+                "otc_cooling_type_c2",
+                "enum",
+                None,
+                "OTC Cooling Type C2",
+            )
+        )
+
     # Add alarm history sensor (shows recent alarms from installation alarms API)
     sensors.append(CSNetHomeAlarmHistorySensor(coordinator, common_data))
 
@@ -726,6 +776,53 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, Entity):
             if self._key == "c2_thermostat_present":
                 # Bit 0x80 (128) indicates C2 thermostat present
                 return STATE_ON if (system_config_bits & 0x80) > 0 else STATE_OFF
+
+        # OTC (Outdoor Temperature Compensation) sensors (Issue #71)
+        if self._key in [
+            "otc_heating_type_c1",
+            "otc_cooling_type_c1",
+            "otc_heating_type_c2",
+            "otc_cooling_type_c2",
+        ]:
+            if not installation_data:
+                return "Unknown"
+
+            heating_status = None
+            data_array = installation_data.get("data", [])
+            if isinstance(data_array, list) and len(data_array) > 0:
+                first_device = data_array[0]
+                if isinstance(first_device, dict):
+                    indoors_array = first_device.get("indoors", [])
+                    if isinstance(indoors_array, list) and len(indoors_array) > 0:
+                        first_indoors = indoors_array[0]
+                        if isinstance(first_indoors, dict):
+                            heating_status = first_indoors.get("heatingStatus", {})
+
+            if not heating_status:
+                return "Unknown"
+
+            # Map sensor key to API key
+            otc_key_map = {
+                "otc_heating_type_c1": "otcTypeHeatC1",
+                "otc_cooling_type_c1": "otcTypeCoolC1",
+                "otc_heating_type_c2": "otcTypeHeatC2",
+                "otc_cooling_type_c2": "otcTypeCoolC2",
+            }
+
+            api_key = otc_key_map.get(self._key)
+            if api_key:
+                otc_value = heating_status.get(api_key)
+                if otc_value is not None:
+                    # Return the descriptive name for the OTC type
+                    if "heating" in self._key:
+                        return OTC_HEATING_TYPE_NAMES.get(
+                            otc_value, f"Unknown ({otc_value})"
+                        )
+                    return OTC_COOLING_TYPE_NAMES.get(
+                        otc_value, f"Unknown ({otc_value})"
+                    )
+
+            return "Unknown"
 
         return value
 

@@ -80,3 +80,29 @@ LANGUAGE_FILES = {
     "en": "english.json",
     "fr": "french.json",
 }
+
+# OTC (Outdoor Temperature Compensation) Constants
+# Heating OTC Types
+OTC_HEATING_TYPE_NONE = 0
+OTC_HEATING_TYPE_POINTS = 1
+OTC_HEATING_TYPE_GRADIENT = 2
+OTC_HEATING_TYPE_FIX = 3
+
+# Cooling OTC Types
+OTC_COOLING_TYPE_NONE = 0
+OTC_COOLING_TYPE_POINTS = 1
+OTC_COOLING_TYPE_FIX = 2
+
+# OTC Type Names (for display)
+OTC_HEATING_TYPE_NAMES = {
+    OTC_HEATING_TYPE_NONE: "None",
+    OTC_HEATING_TYPE_POINTS: "Points",
+    OTC_HEATING_TYPE_GRADIENT: "Gradient",
+    OTC_HEATING_TYPE_FIX: "Fixed",
+}
+
+OTC_COOLING_TYPE_NAMES = {
+    OTC_COOLING_TYPE_NONE: "None",
+    OTC_COOLING_TYPE_POINTS: "Points",
+    OTC_COOLING_TYPE_FIX: "Fixed",
+}

@@ -25,6 +25,13 @@ from custom_components.csnet_home.const import (
     OPST_SWP_OFF,
     OPST_SWP_ON,
     OPST_ALARM,
+    OTC_HEATING_TYPE_NONE,
+    OTC_HEATING_TYPE_POINTS,
+    OTC_HEATING_TYPE_GRADIENT,
+    OTC_HEATING_TYPE_FIX,
+    OTC_COOLING_TYPE_NONE,
+    OTC_COOLING_TYPE_POINTS,
+    OTC_COOLING_TYPE_FIX,
 )
 
 
@@ -780,3 +787,353 @@ def test_operation_status_text_in_attributes(hass):
     assert "operation_status" in attrs
     assert "operation_status_text" in attrs
     assert attrs["operation_status_text"] == "Heating Thermostat On"
+
+
+# OTC (Outdoor Temperature Compensation) Tests - Issue #71
+
+
+def test_otc_attributes_zone1_heating_fix(hass):
+    """Test OTC attributes for zone 1 with heating fixed type."""
+    sensor_data = {
+        "device_name": "Hitachi PAC",
+        "device_id": 1234,
+        "room_name": "Living",
+        "parent_id": 1706,
+        "room_id": 395,
+        "operation_status": 5,
+        "mode": 1,
+        "real_mode": 1,
+        "on_off": 1,
+        "timer_running": False,
+        "alarm_code": 0,
+        "c1_demand": True,
+        "c2_demand": False,
+        "ecocomfort": 1,
+        "silent_mode": 0,
+        "current_temperature": 20.0,
+        "setting_temperature": 21.0,
+        "zone_id": 1,
+        "fan1_speed": None,
+        "fan2_speed": None,
+    }
+    common_data = {"name": "Hitachi PAC", "firmware": "1.0.0"}
+    entry = SimpleNamespace(entry_id="test-entry")
+
+    # Setup installation devices data with OTC information
+    installation_devices_data = {
+        "heatingStatus": {
+            "otcTypeHeatC1": OTC_HEATING_TYPE_FIX,
+            "otcTypeCoolC1": OTC_COOLING_TYPE_FIX,
+            "otcTypeHeatC2": OTC_HEATING_TYPE_NONE,
+            "otcTypeCoolC2": OTC_COOLING_TYPE_NONE,
+        }
+    }
+
+    if DOMAIN not in hass.data:
+        hass.data[DOMAIN] = {}
+    if entry.entry_id not in hass.data[DOMAIN]:
+        hass.data[DOMAIN][entry.entry_id] = {}
+
+    hass.data[DOMAIN][entry.entry_id]["api"] = SimpleNamespace(
+        async_set_hvac_mode=AsyncMock(return_value=True),
+        async_set_temperature=AsyncMock(return_value=True),
+        set_preset_modes=AsyncMock(return_value=True),
+        async_set_silent_mode=AsyncMock(return_value=True),
+        async_set_fan_speed=AsyncMock(return_value=True),
+        is_fan_coil_compatible=lambda data: False,
+        get_fan_control_availability=lambda circuit, mode, data: False,
+        get_temperature_limits=lambda zone_id, mode, data: (None, None),
+    )
+    hass.data[DOMAIN][entry.entry_id]["coordinator"] = SimpleNamespace(
+        get_sensors_data=lambda: [sensor_data],
+        get_common_data=lambda: {"device_status": {1234: common_data}},
+        get_installation_devices_data=lambda: installation_devices_data,
+        async_request_refresh=AsyncMock(return_value=None),
+    )
+
+    entity = CSNetHomeClimate(hass, entry, sensor_data, common_data)
+    attrs = entity.extra_state_attributes
+
+    # Verify OTC attributes are present for zone 1 (circuit 1)
+    assert "otc_heating_type" in attrs
+    assert "otc_heating_type_name" in attrs
+    assert "otc_cooling_type" in attrs
+    assert "otc_cooling_type_name" in attrs
+    assert attrs["otc_heating_type"] == OTC_HEATING_TYPE_FIX
+    assert attrs["otc_heating_type_name"] == "Fixed"
+    assert attrs["otc_cooling_type"] == OTC_COOLING_TYPE_FIX
+    assert attrs["otc_cooling_type_name"] == "Fixed"
+
+
+def test_otc_attributes_zone2_heating_gradient(hass):
+    """Test OTC attributes for zone 2 with heating gradient type."""
+    sensor_data = {
+        "device_name": "Hitachi PAC",
+        "device_id": 1234,
+        "room_name": "Bedroom",
+        "parent_id": 1706,
+        "room_id": 396,
+        "operation_status": 5,
+        "mode": 1,
+        "real_mode": 1,
+        "on_off": 1,
+        "timer_running": False,
+        "alarm_code": 0,
+        "c1_demand": False,
+        "c2_demand": True,
+        "ecocomfort": 1,
+        "silent_mode": 0,
+        "current_temperature": 19.0,
+        "setting_temperature": 20.0,
+        "zone_id": 2,
+        "fan1_speed": None,
+        "fan2_speed": None,
+    }
+    common_data = {"name": "Hitachi PAC", "firmware": "1.0.0"}
+    entry = SimpleNamespace(entry_id="test-entry")
+
+    # Setup installation devices data with OTC information for circuit 2
+    installation_devices_data = {
+        "heatingStatus": {
+            "otcTypeHeatC1": OTC_HEATING_TYPE_FIX,
+            "otcTypeCoolC1": OTC_COOLING_TYPE_FIX,
+            "otcTypeHeatC2": OTC_HEATING_TYPE_GRADIENT,
+            "otcTypeCoolC2": OTC_COOLING_TYPE_POINTS,
+        }
+    }
+
+    if DOMAIN not in hass.data:
+        hass.data[DOMAIN] = {}
+    if entry.entry_id not in hass.data[DOMAIN]:
+        hass.data[DOMAIN][entry.entry_id] = {}
+
+    hass.data[DOMAIN][entry.entry_id]["api"] = SimpleNamespace(
+        async_set_hvac_mode=AsyncMock(return_value=True),
+        async_set_temperature=AsyncMock(return_value=True),
+        set_preset_modes=AsyncMock(return_value=True),
+        async_set_silent_mode=AsyncMock(return_value=True),
+        async_set_fan_speed=AsyncMock(return_value=True),
+        is_fan_coil_compatible=lambda data: False,
+        get_fan_control_availability=lambda circuit, mode, data: False,
+        get_temperature_limits=lambda zone_id, mode, data: (None, None),
+    )
+    hass.data[DOMAIN][entry.entry_id]["coordinator"] = SimpleNamespace(
+        get_sensors_data=lambda: [sensor_data],
+        get_common_data=lambda: {"device_status": {1234: common_data}},
+        get_installation_devices_data=lambda: installation_devices_data,
+        async_request_refresh=AsyncMock(return_value=None),
+    )
+
+    entity = CSNetHomeClimate(hass, entry, sensor_data, common_data)
+    attrs = entity.extra_state_attributes
+
+    # Verify OTC attributes are present for zone 2 (circuit 2)
+    assert "otc_heating_type" in attrs
+    assert "otc_heating_type_name" in attrs
+    assert "otc_cooling_type" in attrs
+    assert "otc_cooling_type_name" in attrs
+    assert attrs["otc_heating_type"] == OTC_HEATING_TYPE_GRADIENT
+    assert attrs["otc_heating_type_name"] == "Gradient"
+    assert attrs["otc_cooling_type"] == OTC_COOLING_TYPE_POINTS
+    assert attrs["otc_cooling_type_name"] == "Points"
+
+
+def test_otc_attributes_zone5_water_circuit(hass):
+    """Test OTC attributes for zone 5 (water circuit C1)."""
+    sensor_data = {
+        "device_name": "Hitachi Yutaki",
+        "device_id": 1234,
+        "room_name": "Water Circuit",
+        "parent_id": 1706,
+        "room_id": 397,
+        "operation_status": 5,
+        "mode": 1,
+        "real_mode": 1,
+        "on_off": 1,
+        "timer_running": False,
+        "alarm_code": 0,
+        "c1_demand": True,
+        "c2_demand": False,
+        "ecocomfort": 1,
+        "silent_mode": 0,
+        "current_temperature": 45.0,
+        "setting_temperature": 50.0,
+        "zone_id": 5,  # Water circuit
+        "fan1_speed": None,
+        "fan2_speed": None,
+    }
+    common_data = {"name": "Hitachi Yutaki", "firmware": "1.0.0"}
+    entry = SimpleNamespace(entry_id="test-entry")
+
+    # Setup installation devices data with OTC information
+    installation_devices_data = {
+        "heatingStatus": {
+            "otcTypeHeatC1": OTC_HEATING_TYPE_POINTS,
+            "otcTypeCoolC1": OTC_COOLING_TYPE_FIX,
+            "otcTypeHeatC2": OTC_HEATING_TYPE_NONE,
+            "otcTypeCoolC2": OTC_COOLING_TYPE_NONE,
+        }
+    }
+
+    if DOMAIN not in hass.data:
+        hass.data[DOMAIN] = {}
+    if entry.entry_id not in hass.data[DOMAIN]:
+        hass.data[DOMAIN][entry.entry_id] = {}
+
+    hass.data[DOMAIN][entry.entry_id]["api"] = SimpleNamespace(
+        async_set_hvac_mode=AsyncMock(return_value=True),
+        async_set_temperature=AsyncMock(return_value=True),
+        set_preset_modes=AsyncMock(return_value=True),
+        async_set_silent_mode=AsyncMock(return_value=True),
+        async_set_fan_speed=AsyncMock(return_value=True),
+        is_fan_coil_compatible=lambda data: False,
+        get_fan_control_availability=lambda circuit, mode, data: False,
+        get_temperature_limits=lambda zone_id, mode, data: (None, None),
+    )
+    hass.data[DOMAIN][entry.entry_id]["coordinator"] = SimpleNamespace(
+        get_sensors_data=lambda: [sensor_data],
+        get_common_data=lambda: {"device_status": {1234: common_data}},
+        get_installation_devices_data=lambda: installation_devices_data,
+        async_request_refresh=AsyncMock(return_value=None),
+    )
+
+    entity = CSNetHomeClimate(hass, entry, sensor_data, common_data)
+    attrs = entity.extra_state_attributes
+
+    # Verify OTC attributes are present for zone 5 (circuit 1 water)
+    assert "otc_heating_type" in attrs
+    assert "otc_heating_type_name" in attrs
+    assert "otc_cooling_type" in attrs
+    assert "otc_cooling_type_name" in attrs
+    assert attrs["otc_heating_type"] == OTC_HEATING_TYPE_POINTS
+    assert attrs["otc_heating_type_name"] == "Points"
+    assert attrs["otc_cooling_type"] == OTC_COOLING_TYPE_FIX
+    assert attrs["otc_cooling_type_name"] == "Fixed"
+
+
+def test_otc_attributes_no_installation_data(hass):
+    """Test OTC attributes when no installation data is available."""
+    sensor_data = {
+        "device_name": "Hitachi PAC",
+        "device_id": 1234,
+        "room_name": "Living",
+        "parent_id": 1706,
+        "room_id": 395,
+        "operation_status": 5,
+        "mode": 1,
+        "real_mode": 1,
+        "on_off": 1,
+        "timer_running": False,
+        "alarm_code": 0,
+        "c1_demand": True,
+        "c2_demand": False,
+        "ecocomfort": 1,
+        "silent_mode": 0,
+        "current_temperature": 20.0,
+        "setting_temperature": 21.0,
+        "zone_id": 1,
+        "fan1_speed": None,
+        "fan2_speed": None,
+    }
+    common_data = {"name": "Hitachi PAC", "firmware": "1.0.0"}
+    entry = SimpleNamespace(entry_id="test-entry")
+
+    if DOMAIN not in hass.data:
+        hass.data[DOMAIN] = {}
+    if entry.entry_id not in hass.data[DOMAIN]:
+        hass.data[DOMAIN][entry.entry_id] = {}
+
+    hass.data[DOMAIN][entry.entry_id]["api"] = SimpleNamespace(
+        async_set_hvac_mode=AsyncMock(return_value=True),
+        async_set_temperature=AsyncMock(return_value=True),
+        set_preset_modes=AsyncMock(return_value=True),
+        async_set_silent_mode=AsyncMock(return_value=True),
+        async_set_fan_speed=AsyncMock(return_value=True),
+        is_fan_coil_compatible=lambda data: False,
+        get_fan_control_availability=lambda circuit, mode, data: False,
+        get_temperature_limits=lambda zone_id, mode, data: (None, None),
+    )
+    hass.data[DOMAIN][entry.entry_id]["coordinator"] = SimpleNamespace(
+        get_sensors_data=lambda: [sensor_data],
+        get_common_data=lambda: {"device_status": {1234: common_data}},
+        get_installation_devices_data=lambda: None,  # No installation data
+        async_request_refresh=AsyncMock(return_value=None),
+    )
+
+    entity = CSNetHomeClimate(hass, entry, sensor_data, common_data)
+    attrs = entity.extra_state_attributes
+
+    # Verify OTC attributes are not present when no installation data
+    assert "otc_heating_type" not in attrs
+    assert "otc_heating_type_name" not in attrs
+    assert "otc_cooling_type" not in attrs
+    assert "otc_cooling_type_name" not in attrs
+
+
+def test_otc_attributes_zone3_dhw_no_otc(hass):
+    """Test that OTC attributes are not present for zone 3 (DHW)."""
+    sensor_data = {
+        "device_name": "Hitachi PAC",
+        "device_id": 1234,
+        "room_name": "Water Heater",
+        "parent_id": 1706,
+        "room_id": 398,
+        "operation_status": 8,
+        "mode": 1,
+        "real_mode": 1,
+        "on_off": 1,
+        "timer_running": False,
+        "alarm_code": 0,
+        "c1_demand": False,
+        "c2_demand": False,
+        "ecocomfort": 1,
+        "silent_mode": 0,
+        "current_temperature": 50.0,
+        "setting_temperature": 55.0,
+        "zone_id": 3,  # DHW - should not have OTC
+        "fan1_speed": None,
+        "fan2_speed": None,
+    }
+    common_data = {"name": "Hitachi PAC", "firmware": "1.0.0"}
+    entry = SimpleNamespace(entry_id="test-entry")
+
+    # Setup installation devices data with OTC information
+    installation_devices_data = {
+        "heatingStatus": {
+            "otcTypeHeatC1": OTC_HEATING_TYPE_FIX,
+            "otcTypeCoolC1": OTC_COOLING_TYPE_FIX,
+            "otcTypeHeatC2": OTC_HEATING_TYPE_NONE,
+            "otcTypeCoolC2": OTC_COOLING_TYPE_NONE,
+        }
+    }
+
+    if DOMAIN not in hass.data:
+        hass.data[DOMAIN] = {}
+    if entry.entry_id not in hass.data[DOMAIN]:
+        hass.data[DOMAIN][entry.entry_id] = {}
+
+    hass.data[DOMAIN][entry.entry_id]["api"] = SimpleNamespace(
+        async_set_hvac_mode=AsyncMock(return_value=True),
+        async_set_temperature=AsyncMock(return_value=True),
+        set_preset_modes=AsyncMock(return_value=True),
+        async_set_silent_mode=AsyncMock(return_value=True),
+        async_set_fan_speed=AsyncMock(return_value=True),
+        is_fan_coil_compatible=lambda data: False,
+        get_fan_control_availability=lambda circuit, mode, data: False,
+        get_temperature_limits=lambda zone_id, mode, data: (None, None),
+    )
+    hass.data[DOMAIN][entry.entry_id]["coordinator"] = SimpleNamespace(
+        get_sensors_data=lambda: [sensor_data],
+        get_common_data=lambda: {"device_status": {1234: common_data}},
+        get_installation_devices_data=lambda: installation_devices_data,
+        async_request_refresh=AsyncMock(return_value=None),
+    )
+
+    entity = CSNetHomeClimate(hass, entry, sensor_data, common_data)
+    attrs = entity.extra_state_attributes
+
+    # Verify OTC attributes are NOT present for zone 3 (DHW has no circuits)
+    assert "otc_heating_type" not in attrs
+    assert "otc_heating_type_name" not in attrs
+    assert "otc_cooling_type" not in attrs
+    assert "otc_cooling_type_name" not in attrs

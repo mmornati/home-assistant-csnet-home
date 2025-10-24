@@ -19,6 +19,8 @@ from .const import (
     FAN_SPEED_MAP,
     FAN_SPEED_REVERSE_MAP,
     OPERATION_STATUS_MAP,
+    OTC_HEATING_TYPE_NAMES,
+    OTC_COOLING_TYPE_NAMES,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -269,6 +271,10 @@ class CSNetHomeClimate(ClimateEntity):
             "silent_mode": self._sensor_data.get("silent_mode"),
         }
 
+        # Get installation devices data (used by both fan coil and OTC)
+        coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
+        installation_devices_data = coordinator.get_installation_devices_data()
+
         # Add fan speed information for fan coil systems
         if self._is_fan_coil:
             attrs["is_fan_coil_compatible"] = True
@@ -276,8 +282,6 @@ class CSNetHomeClimate(ClimateEntity):
             attrs["fan2_speed"] = self._sensor_data.get("fan2_speed")
 
             # Add fan control availability info
-            coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
-            installation_devices_data = coordinator.get_installation_devices_data()
             cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
             mode = self._sensor_data.get("mode", 1)
 
@@ -289,6 +293,38 @@ class CSNetHomeClimate(ClimateEntity):
             )
         else:
             attrs["is_fan_coil_compatible"] = False
+
+        # Add OTC (Outdoor Temperature Compensation) information
+        if installation_devices_data:
+            heating_status = installation_devices_data.get("heatingStatus", {})
+            zone_id = self._sensor_data.get("zone_id")
+
+            # Determine which circuit this zone belongs to
+            circuit = None
+            if zone_id in [1, 5]:  # Zone 1 or C1 Water use circuit 1
+                circuit = 1
+            elif zone_id in [2, 6]:  # Zone 2 or C2 Water use circuit 2
+                circuit = 2
+
+            if circuit:
+                # Get OTC types for this circuit
+                otc_heat_key = f"otcTypeHeatC{circuit}"
+                otc_cool_key = f"otcTypeCoolC{circuit}"
+
+                otc_heat_type = heating_status.get(otc_heat_key)
+                otc_cool_type = heating_status.get(otc_cool_key)
+
+                if otc_heat_type is not None:
+                    attrs["otc_heating_type"] = otc_heat_type
+                    attrs["otc_heating_type_name"] = OTC_HEATING_TYPE_NAMES.get(
+                        otc_heat_type, f"Unknown ({otc_heat_type})"
+                    )
+
+                if otc_cool_type is not None:
+                    attrs["otc_cooling_type"] = otc_cool_type
+                    attrs["otc_cooling_type_name"] = OTC_COOLING_TYPE_NAMES.get(
+                        otc_cool_type, f"Unknown ({otc_cool_type})"
+                    )
 
         return attrs
 
