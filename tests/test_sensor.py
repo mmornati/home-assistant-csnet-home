@@ -2131,6 +2131,60 @@ def test_outdoor_temperature_sensors_no_data():
     assert s_outdoor.state is None
 
 
+def test_otc_cooling_type_c2_sensor():
+    """Test OTC cooling type C2 sensor returns correct state."""
+    device_data = {
+        "device_name": "System",
+        "device_id": "global",
+        "room_name": "Controller",
+        "parent_id": "global",
+        "room_id": "global",
+    }
+    common_data = {"firmware": "1.0.0"}
+
+    # Test with different OTC cooling types for C2
+    installation_data = {
+        "data": [
+            {
+                "indoors": [
+                    {
+                        "heatingStatus": {
+                            "otcTypeHeatC2": OTC_HEATING_TYPE_FIX,
+                            "otcTypeCoolC2": OTC_COOLING_TYPE_FIX,
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    coordinator = SimpleNamespace(
+        get_installation_devices_data=lambda: installation_data,
+    )
+
+    sensor = CSNetHomeInstallationSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "otc_cooling_type_c2",
+        "enum",
+        None,
+        "OTC Cooling Type C2",
+    )
+    assert sensor.state == "Fixed"
+
+    # Test with NONE type
+    installation_data["data"][0]["indoors"][0]["heatingStatus"][
+        "otcTypeCoolC2"
+    ] = OTC_COOLING_TYPE_NONE
+    assert sensor.state == "None"
+
+    # Test with POINTS type
+    installation_data["data"][0]["indoors"][0]["heatingStatus"][
+        "otcTypeCoolC2"
+    ] = OTC_COOLING_TYPE_POINTS
+    assert sensor.state == "Points"
+
+
 # OTC (Outdoor Temperature Compensation) Tests - Issue #71
 
 
