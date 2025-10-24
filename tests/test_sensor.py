@@ -2047,14 +2047,22 @@ def test_outdoor_temperature_sensors_various_values():
     assert s_avg.state == -3
 
     # Test with high temperature (summer conditions)
-    installation_data["data"][0]["indoors"][0]["heatingStatus"]["outdoorAmbientTemp"] = 35
-    installation_data["data"][0]["indoors"][0]["heatingStatus"]["outdoorAmbientAverageTemp"] = 32
+    installation_data["data"][0]["indoors"][0]["heatingStatus"][
+        "outdoorAmbientTemp"
+    ] = 35
+    installation_data["data"][0]["indoors"][0]["heatingStatus"][
+        "outdoorAmbientAverageTemp"
+    ] = 32
     assert s_outdoor.state == 35
     assert s_avg.state == 32
 
     # Test with zero temperature
-    installation_data["data"][0]["indoors"][0]["heatingStatus"]["outdoorAmbientTemp"] = 0
-    installation_data["data"][0]["indoors"][0]["heatingStatus"]["outdoorAmbientAverageTemp"] = 0
+    installation_data["data"][0]["indoors"][0]["heatingStatus"][
+        "outdoorAmbientTemp"
+    ] = 0
+    installation_data["data"][0]["indoors"][0]["heatingStatus"][
+        "outdoorAmbientAverageTemp"
+    ] = 0
     assert s_outdoor.state == 0
     assert s_avg.state == 0
 
