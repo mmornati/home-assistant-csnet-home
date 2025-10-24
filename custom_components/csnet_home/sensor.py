@@ -272,7 +272,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 "external_temperature",
                 "temperature",
                 UnitOfTemperature.CELSIUS,
-                "External Temperature",
+                "Outdoor Temperature",
             )
         )
         sensors.append(
@@ -283,7 +283,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 "mean_external_temperature",
                 "temperature",
                 UnitOfTemperature.CELSIUS,
-                "Mean External Temperature",
+                "Outdoor Average Temperature",
             )
         )
 

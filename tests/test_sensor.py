@@ -1927,3 +1927,188 @@ def test_system_config_sensors_no_data():
             name,
         )
         assert s.state == STATE_OFF
+
+
+def test_outdoor_temperature_sensors():
+    """Test outdoor temperature sensors (Issue: Add Outdoor Temperature Sensor)."""
+    device_data = {
+        "device_name": "System",
+        "device_id": "global",
+        "room_name": "Controller",
+        "parent_id": "global",
+        "room_id": "global",
+    }
+    common_data = {"name": "Hitachi Installation", "firmware": "1.0.0"}
+
+    # Mock installation devices data with outdoor temperature values
+    installation_data = {
+        "data": [
+            {
+                "indoors": [
+                    {
+                        "heatingStatus": {
+                            "outdoorAmbientTemp": 14,
+                            "outdoorAmbientAverageTemp": 15,
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+
+    coordinator = SimpleNamespace(
+        get_installation_devices_data=lambda: installation_data,
+    )
+
+    # Test outdoor temperature sensor (current outdoor temperature)
+    s = CSNetHomeInstallationSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "external_temperature",
+        "temperature",
+        UnitOfTemperature.CELSIUS,
+        "Outdoor Temperature",
+    )
+    assert s.state == 14
+    assert s.unit_of_measurement == UnitOfTemperature.CELSIUS
+    assert s.device_class == "temperature"
+    assert s.name == "System Controller Outdoor Temperature"
+    assert s.unique_id == "csnet_home-installation-external_temperature"
+
+    # Test outdoor average temperature sensor (mean external temperature)
+    s = CSNetHomeInstallationSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "mean_external_temperature",
+        "temperature",
+        UnitOfTemperature.CELSIUS,
+        "Outdoor Average Temperature",
+    )
+    assert s.state == 15
+    assert s.unit_of_measurement == UnitOfTemperature.CELSIUS
+    assert s.device_class == "temperature"
+    assert s.name == "System Controller Outdoor Average Temperature"
+    assert s.unique_id == "csnet_home-installation-mean_external_temperature"
+
+
+def test_outdoor_temperature_sensors_various_values():
+    """Test outdoor temperature sensors with various temperature values."""
+    device_data = {
+        "device_name": "System",
+        "device_id": "global",
+        "room_name": "Controller",
+        "parent_id": "global",
+        "room_id": "global",
+    }
+    common_data = {"name": "Hitachi Installation", "firmware": "1.0.0"}
+
+    # Test with negative temperature (winter conditions)
+    installation_data = {
+        "data": [
+            {
+                "indoors": [
+                    {
+                        "heatingStatus": {
+                            "outdoorAmbientTemp": -5,
+                            "outdoorAmbientAverageTemp": -3,
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+
+    coordinator = SimpleNamespace(
+        get_installation_devices_data=lambda: installation_data,
+    )
+
+    s_outdoor = CSNetHomeInstallationSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "external_temperature",
+        "temperature",
+        UnitOfTemperature.CELSIUS,
+        "Outdoor Temperature",
+    )
+    assert s_outdoor.state == -5
+
+    s_avg = CSNetHomeInstallationSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "mean_external_temperature",
+        "temperature",
+        UnitOfTemperature.CELSIUS,
+        "Outdoor Average Temperature",
+    )
+    assert s_avg.state == -3
+
+    # Test with high temperature (summer conditions)
+    installation_data["data"][0]["indoors"][0]["heatingStatus"]["outdoorAmbientTemp"] = 35
+    installation_data["data"][0]["indoors"][0]["heatingStatus"]["outdoorAmbientAverageTemp"] = 32
+    assert s_outdoor.state == 35
+    assert s_avg.state == 32
+
+    # Test with zero temperature
+    installation_data["data"][0]["indoors"][0]["heatingStatus"]["outdoorAmbientTemp"] = 0
+    installation_data["data"][0]["indoors"][0]["heatingStatus"]["outdoorAmbientAverageTemp"] = 0
+    assert s_outdoor.state == 0
+    assert s_avg.state == 0
+
+
+def test_outdoor_temperature_sensors_no_data():
+    """Test outdoor temperature sensors when data is missing."""
+    device_data = {
+        "device_name": "System",
+        "device_id": "global",
+        "room_name": "Controller",
+        "parent_id": "global",
+        "room_id": "global",
+    }
+    common_data = {"name": "Hitachi Installation", "firmware": "1.0.0"}
+
+    # Test with empty installation data
+    coordinator = SimpleNamespace(
+        get_installation_devices_data=lambda: {},
+    )
+
+    s_outdoor = CSNetHomeInstallationSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "external_temperature",
+        "temperature",
+        UnitOfTemperature.CELSIUS,
+        "Outdoor Temperature",
+    )
+    assert s_outdoor.state is None
+
+    s_avg = CSNetHomeInstallationSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "mean_external_temperature",
+        "temperature",
+        UnitOfTemperature.CELSIUS,
+        "Outdoor Average Temperature",
+    )
+    assert s_avg.state is None
+
+    # Test with None data
+    coordinator = SimpleNamespace(
+        get_installation_devices_data=lambda: None,
+    )
+
+    s_outdoor = CSNetHomeInstallationSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "external_temperature",
+        "temperature",
+        UnitOfTemperature.CELSIUS,
+        "Outdoor Temperature",
+    )
+    assert s_outdoor.state is None
