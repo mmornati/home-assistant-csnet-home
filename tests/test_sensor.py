@@ -13,6 +13,15 @@ from custom_components.csnet_home.sensor import (
     CSNetHomeAlarmHistorySensor,
     CSNetHomeAlarmStatisticsSensor,
 )
+from custom_components.csnet_home.const import (
+    OTC_HEATING_TYPE_NONE,
+    OTC_HEATING_TYPE_POINTS,
+    OTC_HEATING_TYPE_GRADIENT,
+    OTC_HEATING_TYPE_FIX,
+    OTC_COOLING_TYPE_NONE,
+    OTC_COOLING_TYPE_POINTS,
+    OTC_COOLING_TYPE_FIX,
+)
 
 
 def build_context():
@@ -2120,3 +2129,261 @@ def test_outdoor_temperature_sensors_no_data():
         "Outdoor Temperature",
     )
     assert s_outdoor.state is None
+
+
+def test_otc_cooling_type_c2_sensor():
+    """Test OTC cooling type C2 sensor returns correct state."""
+    device_data = {
+        "device_name": "System",
+        "device_id": "global",
+        "room_name": "Controller",
+        "parent_id": "global",
+        "room_id": "global",
+    }
+    common_data = {"firmware": "1.0.0"}
+
+    # Test with different OTC cooling types for C2
+    installation_data = {
+        "data": [
+            {
+                "indoors": [
+                    {
+                        "heatingStatus": {
+                            "otcTypeHeatC2": OTC_HEATING_TYPE_FIX,
+                            "otcTypeCoolC2": OTC_COOLING_TYPE_FIX,
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    coordinator = SimpleNamespace(
+        get_installation_devices_data=lambda: installation_data,
+    )
+
+    sensor = CSNetHomeInstallationSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "otc_cooling_type_c2",
+        "enum",
+        None,
+        "OTC Cooling Type C2",
+    )
+    assert sensor.state == "Fixed"
+
+    # Test with NONE type
+    installation_data["data"][0]["indoors"][0]["heatingStatus"][
+        "otcTypeCoolC2"
+    ] = OTC_COOLING_TYPE_NONE
+    assert sensor.state == "None"
+
+    # Test with POINTS type
+    installation_data["data"][0]["indoors"][0]["heatingStatus"][
+        "otcTypeCoolC2"
+    ] = OTC_COOLING_TYPE_POINTS
+    assert sensor.state == "Points"
+
+
+# OTC (Outdoor Temperature Compensation) Tests - Issue #71
+
+
+def test_otc_heating_type_c1_sensor():
+    """Test OTC heating type C1 sensor returns correct state."""
+    device_data = {
+        "device_name": "System",
+        "device_id": "global",
+        "room_name": "Controller",
+        "parent_id": "global",
+        "room_id": "global",
+    }
+    common_data = {"firmware": "1.0.0"}
+
+    # Test with different OTC heating types for C1
+    installation_data = {
+        "data": [
+            {
+                "indoors": [
+                    {
+                        "heatingStatus": {
+                            "otcTypeHeatC1": OTC_HEATING_TYPE_FIX,
+                            "otcTypeCoolC1": OTC_COOLING_TYPE_FIX,
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    coordinator = SimpleNamespace(
+        get_installation_devices_data=lambda: installation_data,
+    )
+
+    sensor = CSNetHomeInstallationSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "otc_heating_type_c1",
+        "enum",
+        None,
+        "OTC Heating Type C1",
+    )
+    assert sensor.state == "Fixed"
+
+    # Test with NONE type
+    installation_data["data"][0]["indoors"][0]["heatingStatus"][
+        "otcTypeHeatC1"
+    ] = OTC_HEATING_TYPE_NONE
+    assert sensor.state == "None"
+
+    # Test with POINTS type
+    installation_data["data"][0]["indoors"][0]["heatingStatus"][
+        "otcTypeHeatC1"
+    ] = OTC_HEATING_TYPE_POINTS
+    assert sensor.state == "Points"
+
+    # Test with GRADIENT type
+    installation_data["data"][0]["indoors"][0]["heatingStatus"][
+        "otcTypeHeatC1"
+    ] = OTC_HEATING_TYPE_GRADIENT
+    assert sensor.state == "Gradient"
+
+
+def test_otc_cooling_type_c1_sensor():
+    """Test OTC cooling type C1 sensor returns correct state."""
+    device_data = {
+        "device_name": "System",
+        "device_id": "global",
+        "room_name": "Controller",
+        "parent_id": "global",
+        "room_id": "global",
+    }
+    common_data = {"firmware": "1.0.0"}
+
+    # Test with different OTC cooling types for C1
+    installation_data = {
+        "data": [
+            {
+                "indoors": [
+                    {
+                        "heatingStatus": {
+                            "otcTypeHeatC1": OTC_HEATING_TYPE_FIX,
+                            "otcTypeCoolC1": OTC_COOLING_TYPE_FIX,
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    coordinator = SimpleNamespace(
+        get_installation_devices_data=lambda: installation_data,
+    )
+
+    sensor = CSNetHomeInstallationSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "otc_cooling_type_c1",
+        "enum",
+        None,
+        "OTC Cooling Type C1",
+    )
+    assert sensor.state == "Fixed"
+
+    # Test with NONE type
+    installation_data["data"][0]["indoors"][0]["heatingStatus"][
+        "otcTypeCoolC1"
+    ] = OTC_COOLING_TYPE_NONE
+    assert sensor.state == "None"
+
+    # Test with POINTS type
+    installation_data["data"][0]["indoors"][0]["heatingStatus"][
+        "otcTypeCoolC1"
+    ] = OTC_COOLING_TYPE_POINTS
+    assert sensor.state == "Points"
+
+
+def test_otc_heating_type_c2_sensor():
+    """Test OTC heating type C2 sensor returns correct state."""
+    device_data = {
+        "device_name": "System",
+        "device_id": "global",
+        "room_name": "Controller",
+        "parent_id": "global",
+        "room_id": "global",
+    }
+    common_data = {"firmware": "1.0.0"}
+
+    # Test with different OTC heating types for C2
+    installation_data = {
+        "data": [
+            {
+                "indoors": [
+                    {
+                        "heatingStatus": {
+                            "otcTypeHeatC2": OTC_HEATING_TYPE_GRADIENT,
+                            "otcTypeCoolC2": OTC_COOLING_TYPE_POINTS,
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    coordinator = SimpleNamespace(
+        get_installation_devices_data=lambda: installation_data,
+    )
+
+    sensor = CSNetHomeInstallationSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "otc_heating_type_c2",
+        "enum",
+        None,
+        "OTC Heating Type C2",
+    )
+    assert sensor.state == "Gradient"
+
+    # Test with FIX type
+    installation_data["data"][0]["indoors"][0]["heatingStatus"][
+        "otcTypeHeatC2"
+    ] = OTC_HEATING_TYPE_FIX
+    assert sensor.state == "Fixed"
+
+
+def test_otc_sensors_no_installation_data():
+    """Test OTC sensors return Unknown when no installation data available."""
+    device_data = {
+        "device_name": "System",
+        "device_id": "global",
+        "room_name": "Controller",
+        "parent_id": "global",
+        "room_id": "global",
+    }
+    common_data = {"firmware": "1.0.0"}
+
+    # No installation data
+    coordinator = SimpleNamespace(
+        get_installation_devices_data=lambda: None,
+    )
+
+    sensor_heat_c1 = CSNetHomeInstallationSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "otc_heating_type_c1",
+        "enum",
+        None,
+        "OTC Heating Type C1",
+    )
+    assert sensor_heat_c1.state == "Unknown"
+
+    sensor_cool_c1 = CSNetHomeInstallationSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "otc_cooling_type_c1",
+        "enum",
+        None,
+        "OTC Cooling Type C1",
+    )
+    assert sensor_cool_c1.state == "Unknown"
