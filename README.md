@@ -50,6 +50,8 @@ This custom integration solves that problem by connecting directly to the CSNet 
 - Multi-zone climate systems
 - Domestic Hot Water (DHW) heaters
 
+> 📋 **See [SUPPORTED_DEVICES.md](SUPPORTED_DEVICES.md)** for detailed device compatibility matrix and community testing results
+
 ---
 
 ## Features
@@ -517,7 +519,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines on:
 - Pull request process
 
 **Not a developer?** You can still help!
-- Share your device configuration and elements data
+- Share your device configuration in [SUPPORTED_DEVICES.md](SUPPORTED_DEVICES.md)
 - Report what works and what doesn't
 - Answer questions in discussions
 - Improve documentation
@@ -530,6 +532,7 @@ Join our [discussions community](https://github.com/mmornati/home-assistant-csne
 
 Additional documentation is available:
 
+- **[SUPPORTED_DEVICES.md](SUPPORTED_DEVICES.md)** - Device compatibility matrix and testing results from the community
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contribution guidelines, development setup, and bug reporting
 - **[ALARM_API_IMPLEMENTATION.md](ALARM_API_IMPLEMENTATION.md)** - Technical details about the alarm API implementation
 - **[tests/README.md](tests/README.md)** - Testing documentation and development setup
