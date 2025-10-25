@@ -57,9 +57,11 @@ jobs:
           fi
 
           echo "✨ Latest HA version selected: $LATEST_VERSION"
-          echo "version=$LATEST_VERSION" >> "$GITHUB_OUTPUT"
-          echo "github_version=$GITHUB_VERSION" >> "$GITHUB_OUTPUT"
-          echo "pypi_version=$PYPI_VERSION" >> "$GITHUB_OUTPUT"
+          {
+            echo "version=$LATEST_VERSION"
+            echo "github_version=$GITHUB_VERSION"
+            echo "pypi_version=$PYPI_VERSION"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Install Latest Home Assistant
         run: |
