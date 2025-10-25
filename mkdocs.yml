@@ -1,7 +1,7 @@
 site_name: Hitachi CSNet Home Integration
 site_description: Complete user documentation for the Hitachi CSNet Home integration for Home Assistant
 site_author: Marco Mornati
-site_url: https://mmornati.github.io/home-assistant-csnet-home
+site_url: https://mmornati.github.io/home-assistant-csnet-home/
 
 repo_name: mmornati/home-assistant-csnet-home
 repo_url: https://github.com/mmornati/home-assistant-csnet-home
@@ -115,6 +115,7 @@ plugins:
         remove_comments: true
   - redirects:
       redirect_maps:
+        'index.md': 'wiki/Home.md'
 
 nav:
   - Home: wiki/Home.md
