@@ -184,11 +184,11 @@ jobs:
     strategy:
       matrix:
         version:
-          - "2025.4.0"
-          - "2025.6.0"
-          - "2025.8.0"
-          - "2025.9.0"
-          - "2025.10.0"
+          - "2024.6.4"
+          - "2024.9.3"
+          - "2024.10.4"
+          - "2024.11.3"
+          - "2024.12.5"
           - "${{ needs.get-latest-version.outputs.latest_version }}"  # 🔥 Dynamic latest!
 
     steps:
@@ -272,8 +272,8 @@ jobs:
 
           echo "## Versions Tested" >> report.md
           echo "" >> report.md
-          echo "- **Dynamic Latest**: ${{ needs.get-latest-version.outputs.latest_version }} 🔥" >> report.md
-          echo "- **Fixed Versions**: 2025.4.0, 2025.6.0, 2025.8.0, 2025.9.0, 2025.10.0" >> report.md
+                  echo "- **Dynamic Latest**: ${{ needs.get-latest-version.outputs.latest_version }} 🔥" >> report.md
+                  echo "- **Fixed Versions**: 2024.6.4, 2024.9.3, 2024.10.4, 2024.11.3, 2024.12.5" >> report.md
           echo "- **Dev Branch**: Latest development version" >> report.md
           echo "" >> report.md
 

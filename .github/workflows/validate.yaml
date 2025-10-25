@@ -83,9 +83,19 @@ jobs:
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
         ha-version:
-          - "2025.6.0"    # Mid-year stable
-          - "2025.8.0"    # Recent stable
-          - "2025.10.0"   # Latest stable
+          - "2024.9.3"    # Q3 stable
+          - "2024.11.3"   # Recent stable
+          - "2024.12.5"   # Latest 2024
+        exclude:
+          # 2025.x versions require Python 3.13.2+
+          - python-version: "3.11"
+            ha-version: "2025.1.4"
+          - python-version: "3.12"
+            ha-version: "2025.1.4"
+        include:
+          # Add 2025.1.4 for Python 3.13 only
+          - python-version: "3.13"
+            ha-version: "2025.1.4"
 
     steps:
       - name: Checkout
@@ -112,7 +122,7 @@ jobs:
           HA_VERSION: ${{ matrix.ha-version }}
 
       - name: Upload coverage to Codecov
-        if: matrix.python-version == '3.12' && matrix.ha-version == '2025.10.0'
+        if: matrix.python-version == '3.12' && matrix.ha-version == '2024.12.5'
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
