@@ -119,15 +119,15 @@ plugins:
 nav:
   - Home: wiki/Home.md
   - Getting Started:
-    - Installation Guide: wiki/Installation-Guide.md
-    - Configuration Guide: wiki/Configuration-Guide.md
+      - Installation Guide: wiki/Installation-Guide.md
+      - Configuration Guide: wiki/Configuration-Guide.md
   - Features:
-    - Climate Control: wiki/Climate-Control.md
-    - Water Heater Control: wiki/Water-Heater-Control.md
-    - Sensors Reference: wiki/Sensors-Reference.md
-    - Advanced Features: wiki/Advanced-Features.md
+      - Climate Control: wiki/Climate-Control.md
+      - Water Heater Control: wiki/Water-Heater-Control.md
+      - Sensors Reference: wiki/Sensors-Reference.md
+      - Advanced Features: wiki/Advanced-Features.md
   - Configuration:
-    - Multi-Zone Configuration: wiki/Multi-Zone-Configuration.md
+      - Multi-Zone Configuration: wiki/Multi-Zone-Configuration.md
   - Help:
-    - Troubleshooting: wiki/Troubleshooting.md
-    - FAQ: wiki/FAQ.md
+      - Troubleshooting: wiki/Troubleshooting.md
+      - FAQ: wiki/FAQ.md
