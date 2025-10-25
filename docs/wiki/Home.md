@@ -35,7 +35,6 @@ As Hitachi transitioned from the older Hi-Kumo system to the new ATW-IOT-01 modu
 
 ### 🤝 Community
 - **[Supported Devices](../SUPPORTED_DEVICES.md)** - Compatible devices and configurations
-- **[Contributing](../CONTRIBUTING.md)** - Help improve this integration
 - **[GitHub Issues](https://github.com/mmornati/home-assistant-csnet-home/issues)** - Report bugs
 - **[GitHub Discussions](https://github.com/mmornati/home-assistant-csnet-home/discussions)** - Ask questions
 

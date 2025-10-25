@@ -635,7 +635,7 @@ This integration is tested with a limited number of home installations and confi
 5. Push to your fork (`git push origin feature/amazing-feature`)
 6. Open a Pull Request
 
-See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for detailed guidelines on:
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines on:
 - Setting up your development environment
 - Running tests and linters
 - Submitting bug reports
@@ -659,7 +659,7 @@ Developer and technical documentation:
 - **[CI/CD Testing](CI_CD_TESTING.md)** - Comprehensive testing infrastructure and Home Assistant compatibility testing
 - **[Dynamic Version Testing](DYNAMIC_VERSION_TESTING.md)** - 🔥 Automatic latest HA version detection (zero maintenance!)
 - **[SUPPORTED_DEVICES.md](docs/SUPPORTED_DEVICES.md)** - Device compatibility matrix and testing results from the community
-- **[CONTRIBUTING.md](docs/CONTRIBUTING.md)** - Contribution guidelines, development setup, and bug reporting
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contribution guidelines, development setup, and bug reporting
 - **[ALARM_API_IMPLEMENTATION.md](ALARM_API_IMPLEMENTATION.md)** - Technical details about the alarm API implementation
 - **[tests/README.md](tests/README.md)** - Testing documentation and development setup
 - **[Test Fixtures](tests/fixtures/README.md)** - Guide to using and creating test fixtures
