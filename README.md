@@ -71,7 +71,7 @@ This custom integration solves that problem by connecting directly to the CSNet 
 - Multi-zone climate systems
 - Domestic Hot Water (DHW) heaters
 
-> 📋 **See [SUPPORTED_DEVICES.md](SUPPORTED_DEVICES.md)** for detailed device compatibility matrix and community testing results
+> 📋 **See [SUPPORTED_DEVICES.md](docs/SUPPORTED_DEVICES.md)** for detailed device compatibility matrix and community testing results
 
 ---
 
@@ -533,14 +533,14 @@ This integration is tested with a limited number of home installations and confi
 5. Push to your fork (`git push origin feature/amazing-feature`)
 6. Open a Pull Request
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines on:
+See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for detailed guidelines on:
 - Setting up your development environment
 - Running tests and linters
 - Submitting bug reports
 - Pull request process
 
 **Not a developer?** You can still help!
-- Share your device configuration in [SUPPORTED_DEVICES.md](SUPPORTED_DEVICES.md)
+- Share your device configuration in [SUPPORTED_DEVICES.md](docs/SUPPORTED_DEVICES.md)
 - Report what works and what doesn't
 - Answer questions in discussions
 - Improve documentation
@@ -554,8 +554,8 @@ Join our [discussions community](https://github.com/mmornati/home-assistant-csne
 Developer and technical documentation:
 
 - **[User Documentation](https://mmornati.github.io/home-assistant-csnet-home)** - Complete user guide (installation, configuration, usage)
-- **[SUPPORTED_DEVICES.md](SUPPORTED_DEVICES.md)** - Device compatibility matrix and testing results from the community
-- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contribution guidelines, development setup, and bug reporting
+- **[SUPPORTED_DEVICES.md](docs/SUPPORTED_DEVICES.md)** - Device compatibility matrix and testing results from the community
+- **[CONTRIBUTING.md](docs/CONTRIBUTING.md)** - Contribution guidelines, development setup, and bug reporting
 - **[ALARM_API_IMPLEMENTATION.md](ALARM_API_IMPLEMENTATION.md)** - Technical details about the alarm API implementation
 - **[tests/README.md](tests/README.md)** - Testing documentation and development setup
 
