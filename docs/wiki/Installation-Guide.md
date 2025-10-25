@@ -58,7 +58,7 @@ If you don't have HACS installed:
 6. Select category: **Integration**
 7. Click **Add**
 
-**[PLACEHOLDER: Screenshot of HACS custom repository dialog]**
+![HACS custom repository dialog](../images/custom_repository.png)
 
 ### Step 3: Install the Integration
 
@@ -70,7 +70,7 @@ If you don't have HACS installed:
 6. Select the latest version
 7. Click **Download** again
 
-**[PLACEHOLDER: Screenshot of HACS integration search and install]**
+![HACS integration search and install](../images/search_install.png)
 
 ### Step 4: Restart Home Assistant
 
@@ -94,7 +94,7 @@ After installation completes:
 3. Download the **`hass-custom-csnet-home.zip`** file
 4. Save it to your computer
 
-**[PLACEHOLDER: Screenshot of GitHub releases page]**
+![GitHub releases page](../images/release_page.png)
 
 ### Step 2: Locate Your Home Assistant Configuration Directory
 
@@ -223,7 +223,7 @@ You can test unreleased features or bug fixes from Pull Requests.
 4. Click the workflow link to go to GitHub Actions
 5. Download the artifact: **`csnet_home-pr-preview`**
 
-**[PLACEHOLDER: Screenshot of PR with preview artifact]**
+![PR with preview artifact](../images/pr_preview_artifact.png)
 
 ### Step 2: Extract and Install
 
@@ -268,7 +268,7 @@ After restarting, verify the integration is properly installed:
 3. Search for **"Hitachi"**
 4. You should see **"Hitachi CSNet Home"** in the results
 
-**[PLACEHOLDER: Screenshot of integration search showing Hitachi CSNet Home]**
+![integration search showing Hitachi CSNet Home](../images/integration_search.png)
 
 If you see the integration in search results, installation was successful! 🎉
 

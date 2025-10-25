@@ -23,7 +23,7 @@ Before configuring, ensure:
 4. Search for **"Hitachi"** or **"CSNet"**
 5. Click on **Hitachi CSNet Home**
 
-**[PLACEHOLDER: Screenshot of integration search showing Hitachi CSNet Home]**
+![integration search showing Hitachi CSNet Home](../images/integration_search.png)
 
 ### Step 2: Enter Your Credentials
 
@@ -243,7 +243,7 @@ After creation, you can customize entity names:
 5. Change **Name** and/or **Entity ID**
 6. Click **Update**
 
-**[PLACEHOLDER: Screenshot of entity rename dialog]**
+![Screenshot of entity rename dialog](../images/entity_rename_dialog.png)
 
 ### Organizing with Areas
 
@@ -435,7 +435,7 @@ After configuration, verify everything is working:
 4. Try changing mode (Heat/Cool)
 5. Test preset modes (Eco/Comfort)
 
-**[PLACEHOLDER: Screenshot of climate entity card with controls]**
+![climate entity card with controls](../images/climate_card_controls.png)
 
 ---
 

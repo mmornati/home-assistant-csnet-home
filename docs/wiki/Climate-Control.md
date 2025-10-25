@@ -86,7 +86,7 @@ Available modes depend on your system:
 2. Click the mode button (shows current mode)
 3. Select desired mode
 
-**[PLACEHOLDER: Screenshot of HVAC mode selector]**
+![HVAC mode selector](../images/HVAC_mode_selector.png)
 
 **Via Service Call**:
 ```yaml
@@ -419,7 +419,7 @@ type: thermostat
 entity: climate.remote_living_room
 ```
 
-**[PLACEHOLDER: Screenshot of basic thermostat card]**
+![basic thermostat card](../images/basic_thermostat_card.png)
 
 ### Detailed Climate Card
 
