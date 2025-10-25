@@ -27,7 +27,7 @@ As Hitachi transitioned from the older Hi-Kumo system to the new ATW-IOT-01 modu
 ### ⚙️ Configuration Types
 - **[Multi-Zone Configuration](Multi-Zone-Configuration.md)** - C1 and C2 circuits setup
 - **[Water Heater Setup](Water-Heater-Control.md)** - DHW integration and management
-- **[Fan Control](Advanced-Features.md#fan-speed-control)** - Fan coil system configuration
+- **[Fan Control](Advanced-Features.md#fan-speed-control-fan-coil-systems)** - Fan coil system configuration
 
 ### 🔧 Help & Support
 - **[Troubleshooting](Troubleshooting.md)** - Common issues and solutions
