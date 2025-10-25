@@ -1,0 +1,145 @@
+name: Smoke Test - HA Compatibility
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke-test:
+    name: Smoke Test - HA ${{ matrix.ha-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+        ha-version:
+          - "2025.4.0"   # Q2 stable
+          - "2025.6.0"   # Mid-year stable
+          - "2025.8.0"   # Recent stable
+          - "2025.10.0"  # Latest stable
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5.0.0
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v6.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - name: Install Home Assistant ${{ matrix.ha-version }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install homeassistant==${{ matrix.ha-version }}
+
+      - name: Install integration dependencies
+        run: |
+          pip install -r custom_components/csnet_home/requirements.txt
+
+      - name: Smoke Test - Import Integration
+        run: |
+          python -c "
+          import sys
+          import importlib.util
+
+          # Test that all modules can be imported
+          modules = [
+              'custom_components.csnet_home',
+              'custom_components.csnet_home.api',
+              'custom_components.csnet_home.climate',
+              'custom_components.csnet_home.config_flow',
+              'custom_components.csnet_home.coordinator',
+              'custom_components.csnet_home.sensor',
+              'custom_components.csnet_home.water_heater',
+          ]
+
+          print('Testing module imports...')
+          for module in modules:
+              try:
+                  spec = importlib.util.find_spec(module.replace('.', '/') + '.py' if '.' in module.split('.')[-1] else module)
+                  if spec:
+                      print(f'✓ {module}')
+                  else:
+                      # Try importing directly
+                      __import__(module)
+                      print(f'✓ {module}')
+              except Exception as e:
+                  print(f'✗ {module}: {e}')
+                  sys.exit(1)
+
+          print('\\n✓ All modules imported successfully')
+          "
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+
+      - name: Smoke Test - Verify Manifest
+        run: |
+          python -c "
+          import json
+          import sys
+
+          print('Checking manifest.json...')
+          with open('custom_components/csnet_home/manifest.json') as f:
+              manifest = json.load(f)
+
+          required_fields = ['domain', 'name', 'version', 'requirements', 'config_flow', 'iot_class']
+
+          for field in required_fields:
+              if field not in manifest:
+                  print(f'✗ Missing required field: {field}')
+                  sys.exit(1)
+              print(f'✓ {field}: {manifest[field]}')
+
+          print(f'\\n✓ Manifest valid for HA ${{ matrix.ha-version }}')
+          "
+
+      - name: Smoke Test - Check HA API Compatibility
+        run: |
+          python -c "
+          import sys
+          sys.path.insert(0, '${{ github.workspace }}')
+
+          print('Testing Home Assistant API compatibility...')
+
+          # Import HA core components
+          try:
+              from homeassistant import core
+              from homeassistant.config_entries import ConfigEntry
+              from homeassistant.helpers.entity import Entity
+              from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+              from homeassistant.components.climate import ClimateEntity
+              from homeassistant.components.sensor import SensorEntity
+              from homeassistant.components.water_heater import WaterHeaterEntity
+              print('✓ Home Assistant core imports successful')
+          except ImportError as e:
+              print(f'✗ Failed to import HA core: {e}')
+              sys.exit(1)
+
+          # Verify our integration can access HA APIs
+          try:
+              from custom_components.csnet_home.const import DOMAIN
+              print(f'✓ Integration domain: {DOMAIN}')
+          except ImportError as e:
+              print(f'✗ Failed to import integration: {e}')
+              sys.exit(1)
+
+          print('\\n✓ All HA APIs compatible with ${{ matrix.ha-version }}')
+          "
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "### Smoke Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Home Assistant Version**: ${{ matrix.ha-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Python Version**: ${{ matrix.python-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY

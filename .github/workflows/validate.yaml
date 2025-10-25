@@ -76,11 +76,17 @@ jobs:
         continue-on-error: true
 
   pytest:
-    name: Run Tests
+    name: Tests - HA ${{ matrix.ha-version }} / Python ${{ matrix.python-version }}
     runs-on: "ubuntu-latest"
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.11", "3.12", "3.13"]
+        ha-version:
+          - "2025.6.0"    # Mid-year stable
+          - "2025.8.0"    # Recent stable
+          - "2025.10.0"   # Latest stable
+
     steps:
       - name: Checkout
         uses: "actions/checkout@v5.0.0"
@@ -91,16 +97,22 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
 
-      - name: Install dependencies
+      - name: Install Home Assistant ${{ matrix.ha-version }}
         run: |
           python3 -m pip install --upgrade pip
+          python3 -m pip install homeassistant==${{ matrix.ha-version }}
+
+      - name: Install dependencies
+        run: |
           python3 -m pip install -r custom_components/csnet_home/requirements-dev.txt
 
       - name: Run tests with coverage
         run: pytest --cov=custom_components --cov-report=xml --cov-report=term
+        env:
+          HA_VERSION: ${{ matrix.ha-version }}
 
       - name: Upload coverage to Codecov
-        if: matrix.python-version == '3.12'
+        if: matrix.python-version == '3.12' && matrix.ha-version == '2025.10.0'
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -108,6 +120,13 @@ jobs:
           flags: unittests
           name: codecov-umbrella
           fail_ci_if_error: false
+
+      - name: Test Summary
+        if: always()
+        run: |
+          echo "### Test Results - HA ${{ matrix.ha-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Python**: ${{ matrix.python-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
 
   security:
     name: Security Scan
