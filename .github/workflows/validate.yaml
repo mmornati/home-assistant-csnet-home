@@ -75,59 +75,8 @@ jobs:
         run: pylint custom_components/csnet_home
         continue-on-error: true
 
-  pytest:
-    name: Tests - HA ${{ matrix.ha-version }} / Python ${{ matrix.python-version }}
-    runs-on: "ubuntu-latest"
-    continue-on-error: true  # Has dependency conflicts; Docker tests are source of truth
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.12"]
-        ha-version:
-          - "2024.12.5"  # Latest 2024 version
-          # Note: Pytest has josepy dependency conflicts with all HA versions
-          # Docker integration tests provide real validation for all versions
-
-    steps:
-      - name: Checkout
-        uses: "actions/checkout@v5.0.0"
-
-      - name: Setup Python ${{ matrix.python-version }}
-        uses: "actions/setup-python@v6.0.0"
-        with:
-          python-version: ${{ matrix.python-version }}
-          cache: 'pip'
-
-      - name: Install Home Assistant ${{ matrix.ha-version }}
-        run: |
-          python3 -m pip install --upgrade pip
-          python3 -m pip install homeassistant==${{ matrix.ha-version }}
-
-      - name: Install dependencies
-        run: |
-          python3 -m pip install -r custom_components/csnet_home/requirements-dev.txt
-
-      - name: Run tests with coverage
-        run: pytest --cov=custom_components --cov-report=xml --cov-report=term
-        env:
-          HA_VERSION: ${{ matrix.ha-version }}
-
-      - name: Upload coverage to Codecov
-        if: matrix.python-version == '3.12' && matrix.ha-version == '2024.12.5'
-        uses: codecov/codecov-action@v5
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage.xml
-          flags: unittests
-          name: codecov-umbrella
-          fail_ci_if_error: false
-
-      - name: Test Summary
-        if: always()
-        run: |
-          echo "### Test Results - HA ${{ matrix.ha-version }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Python**: ${{ matrix.python-version }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+  # Note: pytest removed due to josepy dependency conflicts in isolated pip installs
+  # Docker integration tests provide comprehensive validation in real HA environment
 
   security:
     name: Security Scan

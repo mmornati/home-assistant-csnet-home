@@ -57,9 +57,9 @@ jobs:
           fi
 
           echo "✨ Latest HA version selected: $LATEST_VERSION"
-          echo "version=$LATEST_VERSION" >> $GITHUB_OUTPUT
-          echo "github_version=$GITHUB_VERSION" >> $GITHUB_OUTPUT
-          echo "pypi_version=$PYPI_VERSION" >> $GITHUB_OUTPUT
+          echo "version=$LATEST_VERSION" >> "$GITHUB_OUTPUT"
+          echo "github_version=$GITHUB_VERSION" >> "$GITHUB_OUTPUT"
+          echo "pypi_version=$PYPI_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Install Latest Home Assistant
         run: |
@@ -80,19 +80,21 @@ jobs:
 
       - name: Store Results
         run: |
-          echo "## Latest Stable Test Results" >> results.txt
-          echo "" >> results.txt
-          echo "- **Version Tested**: ${{ steps.ha-version.outputs.version }}" >> results.txt
-          echo "- **GitHub Latest**: ${{ steps.ha-version.outputs.github_version }}" >> results.txt
-          echo "- **PyPI Latest**: ${{ steps.ha-version.outputs.pypi_version }}" >> results.txt
-          echo "" >> results.txt
+          {
+            echo "## Latest Stable Test Results"
+            echo ""
+            echo "- **Version Tested**: ${{ steps.ha-version.outputs.version }}"
+            echo "- **GitHub Latest**: ${{ steps.ha-version.outputs.github_version }}"
+            echo "- **PyPI Latest**: ${{ steps.ha-version.outputs.pypi_version }}"
+            echo ""
+          } >> results.txt
 
           if [ "${{ steps.test-stable.outcome }}" == "success" ]; then
             echo "✅ Tests passed with HA ${{ steps.ha-version.outputs.version }}" >> results.txt
-            echo "status=success" >> $GITHUB_ENV
+            echo "status=success" >> "$GITHUB_ENV"
           else
             echo "❌ Tests failed with HA ${{ steps.ha-version.outputs.version }}" >> results.txt
-            echo "status=failure" >> $GITHUB_ENV
+            echo "status=failure" >> "$GITHUB_ENV"
           fi
 
           cat results.txt

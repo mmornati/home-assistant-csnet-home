@@ -42,15 +42,15 @@ jobs:
           HA_IMAGE="homeassistant/home-assistant:${{ matrix.ha-version }}"
 
           # Create necessary directories
-          mkdir -p ${GITHUB_WORKSPACE}/test_config
+          mkdir -p "${GITHUB_WORKSPACE}/test_config"
 
           # Start container with integration mounted
           docker run -d \
             --name ha-test \
             --network host \
-            -v ${GITHUB_WORKSPACE}/custom_components/csnet_home:/config/custom_components/csnet_home:ro \
-            -v ${GITHUB_WORKSPACE}/test_config:/config \
-            $HA_IMAGE
+            -v "${GITHUB_WORKSPACE}/custom_components/csnet_home:/config/custom_components/csnet_home:ro" \
+            -v "${GITHUB_WORKSPACE}/test_config:/config" \
+            "$HA_IMAGE"
 
           echo "Container started with image: $HA_IMAGE"
 
@@ -60,13 +60,13 @@ jobs:
           timeout=180
           elapsed=0
 
-          while [ $elapsed -lt $timeout ]; do
+          while [ "$elapsed" -lt "$timeout" ]; do
             if curl -sf http://localhost:8123 > /dev/null 2>&1; then
               echo "✓ Home Assistant is ready!"
               break
             fi
 
-            if [ $elapsed -eq 0 ]; then
+            if [ "$elapsed" -eq 0 ]; then
               echo -n "Waiting"
             else
               echo -n "."
@@ -78,7 +78,7 @@ jobs:
 
           echo ""
 
-          if [ $elapsed -ge $timeout ]; then
+          if [ "$elapsed" -ge "$timeout" ]; then
             echo "✗ Home Assistant failed to start within ${timeout}s"
             docker logs ha-test
             exit 1
@@ -205,26 +205,30 @@ jobs:
       - name: Test Summary
         if: always()
         run: |
-          echo "### Integration Test Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Home Assistant Version**: ${{ matrix.ha-version }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Integration**: CSNet Home" >> $GITHUB_STEP_SUMMARY
-          echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "### Integration Test Results"
+            echo ""
+            echo "- **Home Assistant Version**: ${{ matrix.ha-version }}"
+            echo "- **Integration**: CSNet Home"
+            echo "- **Status**: ${{ job.status }}"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
 
           # Add manifest info
           if [ -f manifest.json ]; then
             VERSION=$(python3 -c "import json; print(json.load(open('manifest.json'))['version'])")
-            echo "- **Integration Version**: $VERSION" >> $GITHUB_STEP_SUMMARY
+            echo "- **Integration Version**: $VERSION" >> "$GITHUB_STEP_SUMMARY"
           fi
 
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "#### What was tested:" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Integration files mounted successfully" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Home Assistant container started" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Manifest validation" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ No import/syntax errors" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Integration discoverable by HA" >> $GITHUB_STEP_SUMMARY
+          {
+            echo ""
+            echo "#### What was tested:"
+            echo "- ✅ Integration files mounted successfully"
+            echo "- ✅ Home Assistant container started"
+            echo "- ✅ Manifest validation"
+            echo "- ✅ No import/syntax errors"
+            echo "- ✅ Integration discoverable by HA"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Collect logs on failure
         if: failure()
