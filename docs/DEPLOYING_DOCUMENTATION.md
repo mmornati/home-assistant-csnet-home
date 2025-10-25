@@ -9,6 +9,88 @@ The documentation is automatically built and deployed to GitHub Pages using:
 - **Material for MkDocs** - Beautiful, responsive theme
 - **GitHub Actions** - Automated build and deployment
 
+## 📋 Table of Contents
+
+- [Overview](#overview)
+- [Preview Documentation (PRs)](#preview-documentation-prs)
+- [Automated Deployment](#automated-deployment)
+- [Local Development](#local-development)
+- [Troubleshooting](#troubleshooting)
+
+---
+
+## 📖 Preview Documentation (PRs)
+
+Before merging documentation changes, you can preview the built site!
+
+### Automatic PR Previews
+
+When you open a PR that modifies documentation files, the **Documentation Preview** workflow automatically:
+
+1. ✅ Builds the complete documentation site
+2. ✅ Uploads it as a downloadable artifact
+3. ✅ Posts a comment on the PR with download link
+4. ✅ Updates automatically on each new commit
+
+### How to View a Preview
+
+#### Step 1: Download the Preview
+
+After the workflow completes, you'll see a comment on your PR:
+
+1. Click the **"Download Documentation Preview"** link in the PR comment
+2. Scroll to the **Artifacts** section at the bottom of the workflow run page
+3. Download the `documentation-preview-pr###` artifact (ZIP file)
+4. Extract the ZIP file to a folder
+
+#### Step 2: View Locally
+
+**Option A: Local HTTP Server (Recommended)**
+
+```bash
+# Navigate to the extracted 'site' folder
+cd site
+
+# Start a local server (choose one):
+
+# Python 3
+python3 -m http.server 8000
+
+# Node.js
+npx serve
+
+# PHP (if installed)
+php -S localhost:8000
+```
+
+Then open **http://localhost:8000** in your browser.
+
+**Option B: Direct File Access**
+
+Simply open `site/index.html` in your browser.
+
+> ⚠️ **Note:** Search and some interactive features require a local HTTP server (Option A).
+
+### Preview Workflow Details
+
+**Workflow File**: `.github/workflows/docs-preview.yaml`
+
+**Triggers on PR changes to**:
+- `docs/wiki/**` - All documentation pages
+- `docs/images/**` - Documentation images
+- `mkdocs.yml` - Site configuration
+- `docs/requirements.txt` - Python dependencies
+
+**What's Included**:
+- ✅ Fully built static site
+- ✅ All pages and navigation
+- ✅ Images and assets
+- ✅ Search functionality
+- ✅ Dark/light theme
+- ✅ Responsive design
+
+---
+
 ## Automated Deployment
 
 ### How It Works
