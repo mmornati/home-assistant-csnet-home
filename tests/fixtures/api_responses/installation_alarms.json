@@ -1,0 +1,14 @@
+{
+  "_comment": "Installation alarms data",
+  "_sanitized": true,
+  "_source": "Test data - alarm list from system",
+  "alarms": [
+    {
+      "id": 123,
+      "code": 42,
+      "message": "Test alarm",
+      "deviceId": 1234,
+      "timestamp": 1234567890
+    }
+  ]
+}

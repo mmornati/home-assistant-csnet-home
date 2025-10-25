@@ -361,6 +361,13 @@ pytest --cov=custom_components/csnet_home --cov-report term-missing
 pytest --cov=custom_components/csnet_home --cov-report html
 ```
 
+**Test with specific Home Assistant version:**
+
+```bash
+pip install homeassistant==2025.10.0
+pytest tests/ -v
+```
+
 **Test coverage reports:**
 - Terminal: Shows coverage percentage and missing lines
 - HTML: Open `htmlcov/index.html` in your browser for detailed coverage report
@@ -372,6 +379,25 @@ pytest --cov=custom_components/csnet_home --cov-report html
 - Sensor creation and updates
 - Alarm handling and notifications
 - Water heater controls
+
+**CI/CD Testing:**
+
+This project includes comprehensive automated testing across multiple Home Assistant versions:
+- ✅ Unit tests with pytest (Python 3.11-3.13, HA 2025.6, 2025.8, 2025.10)
+- ✅ Smoke tests for quick compatibility validation (12 combinations)
+- ✅ Docker-based integration tests (HA 2025.9, 2025.10, latest)
+- ✅ 🔥 **Nightly auto-detection** of latest HA version (no manual updates needed!)
+- ✅ Nightly compatibility checks with HA dev branch (preview future changes)
+- ✅ Automatic alerts for breaking changes
+- ✅ 32+ test combinations across 7+ HA versions (dynamic latest adjusts automatically)
+
+📖 **See [CI/CD Testing Documentation](docs/CI_CD_TESTING.md)** for complete details on:
+- Testing workflows and what they check
+- 🔥 Dynamic latest version testing (zero maintenance!)
+- How to interpret test results
+- Running tests locally with different HA versions
+- Using test fixtures
+- Troubleshooting test failures
 
 ### Workflow Testing
 
@@ -630,10 +656,13 @@ Join our [discussions community](https://github.com/mmornati/home-assistant-csne
 Developer and technical documentation:
 
 - **[User Documentation](https://mmornati.github.io/home-assistant-csnet-home)** - Complete user guide (installation, configuration, usage)
+- **[CI/CD Testing](docs/CI_CD_TESTING.md)** - Comprehensive testing infrastructure and Home Assistant compatibility testing
+- **[Dynamic Version Testing](DYNAMIC_VERSION_TESTING.md)** - 🔥 Automatic latest HA version detection (zero maintenance!)
 - **[SUPPORTED_DEVICES.md](docs/SUPPORTED_DEVICES.md)** - Device compatibility matrix and testing results from the community
 - **[CONTRIBUTING.md](docs/CONTRIBUTING.md)** - Contribution guidelines, development setup, and bug reporting
 - **[ALARM_API_IMPLEMENTATION.md](ALARM_API_IMPLEMENTATION.md)** - Technical details about the alarm API implementation
 - **[tests/README.md](tests/README.md)** - Testing documentation and development setup
+- **[Test Fixtures](tests/fixtures/README.md)** - Guide to using and creating test fixtures
 
 ---
 

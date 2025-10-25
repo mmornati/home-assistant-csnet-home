@@ -1,0 +1,46 @@
+{
+  "_comment": "System with fan coil support and fan speed controls",
+  "_sanitized": true,
+  "_source": "Test data - fan coil compatible system",
+  "status": "success",
+  "data": {
+    "device_status": [
+      {
+        "id": 1709,
+        "name": "Hitachi PAC",
+        "status": 1,
+        "firmware": "1234"
+      }
+    ],
+    "weatherTemperature": 9,
+    "latitude": "50.123456",
+    "longitude": "3.12",
+    "installation": 1234,
+    "elements": [
+      {
+        "parentId": 1234,
+        "elementType": 1,
+        "parentName": "Room1",
+        "mode": 1,
+        "realMode": 1,
+        "onOff": 1,
+        "settingTemperature": 19.0,
+        "currentTemperature": 19.5,
+        "deviceId": 1234,
+        "deviceName": "Hitachi PAC",
+        "roomId": 395,
+        "ecocomfort": 1,
+        "operationStatus": 5,
+        "c1Demand": true,
+        "c2Demand": true,
+        "doingBoost": false,
+        "timerRunning": false,
+        "silentMode": 0,
+        "alarmCode": 0,
+        "fan1Speed": 2,
+        "fan2Speed": 1
+      }
+    ],
+    "name": "My Home"
+  }
+}
