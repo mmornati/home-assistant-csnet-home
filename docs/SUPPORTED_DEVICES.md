@@ -52,21 +52,21 @@ Based on the CSNet Manager system, devices are categorized by **Unit Model** and
 
 | Tester | Unit Model | Firmware | Heat Circuits | Thermostats | DHW | Integration Version | Last Updated |
 |--------|------------|----------|---------------|-------------|-----|---------------------|--------------|
-| @mmornati | Yutaki S | TBD | 2 (C1, C2 - Floor Heating) | 2 (1 per floor) | ✅ Yes | Latest | 2025-10-24 |
+| @mmornati | Yutaki S | H-0302 | 2 (C1, C2 - Floor Heating) | 2 (1 per floor) | ✅ Yes | Latest | 2025-10-24 |
 | *Add your config* | | | | | | | |
 
 ### Feature Compatibility
 
 | Tester | Climate Control | Temperature Set | HVAC Modes | Preset Modes | DHW Control | Silent Mode | Fan Control | Alarm Monitor | OTC Support | Multi-Zone |
 |--------|----------------|-----------------|------------|--------------|-------------|-------------|-------------|---------------|-------------|------------|
-| @mmornati | ✅ | ✅ | ✅ Heat/Cool/Auto/Off | ✅ Eco/Comfort | ✅ Off/Eco/Performance | ✅ | ➖ N/A | ✅ | ✅ | ✅ 2 zones/2 thermostats |
+| @mmornati | ✅ | ✅ | ✅ Heat/Cool/Auto/Off | ✅ Eco/Comfort | ➖ N/A | ❓ Unknown | ➖ N/A | ❓ Unknown | ✅ | ✅ 2 zones/2 thermostats |
 | *Add your results* | | | | | | | | | | |
 
 ### Known Issues & Notes
 
 | Tester | Issues / Notes |
 |--------|----------------|
-| @mmornati | - **Working perfectly**: C1 and C2 circuits for floor heating (1 circuit per floor)<br>- **Thermostats**: 2 separate room thermostats, one per floor<br>- **DHW**: All modes working (Off/Eco/Performance)<br>- **Temperature control**: Responsive, range 8-55°C for heating<br>- **Sensors**: All system sensors reporting correctly<br>- **Alarms**: Alarm monitoring and notifications working<br>- **OTC**: Outdoor Temperature Compensation active and functional |
+| @mmornati | - **Working perfectly**: C1 and C2 circuits for floor heating (1 circuit per floor)<br>- **Thermostats**: 2 separate room thermostats, one per floor<br>- - **Temperature control**: Responsive, range 8-55°C for heating<br>- **Sensors**: All system sensors reporting correctly |
 | *Add your notes* | |
 
 ---
