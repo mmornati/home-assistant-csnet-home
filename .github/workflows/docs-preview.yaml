@@ -112,9 +112,11 @@ jobs:
 
             ### 📥 Download Preview
 
-            **[⬇️ Download Documentation Preview](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})**
+            **[⬇️ Download Documentation Preview](${{ github.server_url }}/${{
+              github.repository }}/actions/runs/${{ github.run_id }})**
 
-            Click the link above, scroll to the **Artifacts** section at the bottom, and download `documentation-preview-pr${{ github.event.pull_request.number }}`.
+            Click the link above, scroll to the **Artifacts** section at the bottom, and download
+            `documentation-preview-pr${{ github.event.pull_request.number }}`.
 
             ### 🔍 How to View
 
@@ -162,7 +164,8 @@ jobs:
 
             ```bash
             # Check out this PR branch
-            git fetch origin pull/${{ github.event.pull_request.number }}/head:pr-${{ github.event.pull_request.number }}
+            git fetch origin pull/${{ github.event.pull_request.number }}/head:pr-${{
+              github.event.pull_request.number }}
             git checkout pr-${{ github.event.pull_request.number }}
 
             # Install dependencies
