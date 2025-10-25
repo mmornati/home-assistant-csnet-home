@@ -132,3 +132,6 @@ nav:
   - Help:
       - Troubleshooting: wiki/Troubleshooting.md
       - FAQ: wiki/FAQ.md
+  - Community:
+      - Supported Devices: SUPPORTED_DEVICES.md
+      - Contributing: CONTRIBUTING.md

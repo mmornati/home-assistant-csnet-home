@@ -15,31 +15,27 @@ As Hitachi transitioned from the older Hi-Kumo system to the new ATW-IOT-01 modu
 ## Quick Navigation
 
 ### 🚀 Getting Started
-- **[Installation Guide](Installation-Guide)** - Step-by-step installation instructions
-- **[Configuration Guide](Configuration-Guide)** - Setting up your integration
-- **[Quick Start Tutorial](Quick-Start)** - Get up and running in minutes
+- **[Installation Guide](Installation-Guide.md)** - Step-by-step installation instructions
+- **[Configuration Guide](Configuration-Guide.md)** - Setting up your integration
 
 ### 📚 Features & Usage
-- **[Climate Control](Climate-Control)** - Control your heating and cooling zones
-- **[Water Heater Control](Water-Heater-Control)** - Manage your DHW system
-- **[Sensors Reference](Sensors-Reference)** - Complete list of available sensors
-- **[Advanced Features](Advanced-Features)** - Silent mode, fan control, OTC, and more
+- **[Climate Control](Climate-Control.md)** - Control your heating and cooling zones
+- **[Water Heater Control](Water-Heater-Control.md)** - Manage your DHW system
+- **[Sensors Reference](Sensors-Reference.md)** - Complete list of available sensors
+- **[Advanced Features](Advanced-Features.md)** - Silent mode, fan control, OTC, and more
 
 ### ⚙️ Configuration Types
-- **[Standard Configuration](Standard-Configuration)** - Single zone systems
-- **[Multi-Zone Configuration](Multi-Zone-Configuration)** - C1 and C2 circuits
-- **[With Water Heater](Water-Heater-Configuration)** - DHW integration
-- **[Fan Coil Systems](Fan-Coil-Configuration)** - Fan speed control
+- **[Multi-Zone Configuration](Multi-Zone-Configuration.md)** - C1 and C2 circuits setup
+- **[Water Heater Setup](Water-Heater-Control.md)** - DHW integration and management
+- **[Fan Control](Advanced-Features.md#fan-speed-control)** - Fan coil system configuration
 
-### 🔧 Advanced Topics
-- **[Automations & Scripts](Automations-and-Scripts)** - Example automations
-- **[Lovelace UI Examples](Lovelace-UI-Examples)** - Dashboard configurations
-- **[Troubleshooting](Troubleshooting)** - Common issues and solutions
-- **[FAQ](FAQ)** - Frequently asked questions
+### 🔧 Help & Support
+- **[Troubleshooting](Troubleshooting.md)** - Common issues and solutions
+- **[FAQ](FAQ.md)** - Frequently asked questions
 
 ### 🤝 Community
-- **[Supported Devices](Supported-Devices)** - Compatible devices and configurations
-- **[Contributing](Contributing)** - Help improve this integration
+- **[Supported Devices](../SUPPORTED_DEVICES.md)** - Compatible devices and configurations
+- **[Contributing](../CONTRIBUTING.md)** - Help improve this integration
 - **[GitHub Issues](https://github.com/mmornati/home-assistant-csnet-home/issues)** - Report bugs
 - **[GitHub Discussions](https://github.com/mmornati/home-assistant-csnet-home/discussions)** - Ask questions
 
@@ -213,11 +209,11 @@ We appreciate all contributions! 🙏
 
 ## Quick Start
 
-Ready to get started? Jump to the [Installation Guide](Installation-Guide)!
+Ready to get started? Jump to the [Installation Guide](Installation-Guide.md)!
 
-Already installed? Check out the [Configuration Guide](Configuration-Guide).
+Already installed? Check out the [Configuration Guide](Configuration-Guide.md).
 
-Need help? Visit [Troubleshooting](Troubleshooting) or [FAQ](FAQ).
+Need help? Visit [Troubleshooting](Troubleshooting.md) or [FAQ](FAQ.md).
 
 ---
 
