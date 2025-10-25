@@ -52,7 +52,7 @@ Based on the CSNet Manager system, devices are categorized by **Unit Model** and
 
 | Tester | Unit Model | Firmware | Heat Circuits | Thermostats | DHW | Integration Version | Last Updated |
 |--------|------------|----------|---------------|-------------|-----|---------------------|--------------|
-| @mmornati | Yutaki S | H-0302 | 2 (C1, C2 - Floor Heating) | 2 (1 per floor) | ✅ Yes | Latest | 2025-10-24 |
+| @mmornati | Yutaki S | H-0302 | 2 (C1, C2 - Floor Heating) | 2 (1 per floor) | ➖ N/A | Latest | 2025-10-24 |
 | *Add your config* | | | | | | | |
 
 ### Feature Compatibility
