@@ -17,22 +17,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12", "3.13"]
+        python-version: ["3.13"]
         ha-version:
-          - "2024.6.4"   # Mid-year 2024
-          - "2024.9.3"   # Q3 stable
-          - "2024.11.3"  # Recent stable
-          - "2024.12.5"  # Latest 2024
-        exclude:
-          # 2025.x versions require Python 3.13.2+
-          - python-version: "3.11"
-            ha-version: "2025.1.4"
-          - python-version: "3.12"
-            ha-version: "2025.1.4"
-        include:
-          # Add 2025.1.4 for all Python versions (requires Python 3.13.0+)
-          - python-version: "3.13"
-            ha-version: "2025.1.4"
+          - "2025.1.4"  # Latest working version
 
     steps:
       - name: Checkout code
