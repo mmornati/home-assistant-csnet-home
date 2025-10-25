@@ -139,14 +139,20 @@ jobs:
       - name: Summary
         if: always()
         run: |
-          echo "### Smoke Test Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Home Assistant Version**: ${{ matrix.ha-version }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Python Version**: ${{ matrix.python-version }}" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "### Smoke Test Results"
+            echo ""
+            echo "- **Home Assistant Version**: ${{ matrix.ha-version }}"
+            echo "- **Python Version**: ${{ matrix.python-version }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
           if [ "${{ steps.import-test.outcome }}" == "failure" ]; then
-            echo "- **Import Test**: ⚠️ Some dependency conflicts" >> $GITHUB_STEP_SUMMARY
-            echo "  (see Docker integration test for real validation)" >> $GITHUB_STEP_SUMMARY
+            {
+              echo "- **Import Test**: ⚠️ Some dependency conflicts"
+              echo "  (see Docker integration test for real validation)"
+            } >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "- **Import Test**: ✓ Passed" >> $GITHUB_STEP_SUMMARY
+            echo "- **Import Test**: ✓ Passed" >> "$GITHUB_STEP_SUMMARY"
           fi
-          echo "- **Overall Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+
+          echo "- **Overall Status**: ${{ job.status }}" >> "$GITHUB_STEP_SUMMARY"

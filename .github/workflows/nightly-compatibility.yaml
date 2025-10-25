@@ -130,7 +130,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install git+https://github.com/home-assistant/core.git@dev || {
             echo "⚠️ Failed to install HA dev branch - may be temporarily broken"
-            echo "dev_install_failed=true" >> $GITHUB_ENV
+            echo "dev_install_failed=true" >> "$GITHUB_ENV"
             exit 0
           }
           pip install -r custom_components/csnet_home/requirements-dev.txt
@@ -149,10 +149,10 @@ jobs:
         run: |
           if [ "${{ steps.test-dev.outcome }}" == "success" ]; then
             echo "✅ Tests passed with HA dev branch" >> dev-results.txt
-            echo "dev_status=success" >> $GITHUB_ENV
+            echo "dev_status=success" >> "$GITHUB_ENV"
           else
             echo "❌ Tests failed with HA dev branch" >> dev-results.txt
-            echo "dev_status=failure" >> $GITHUB_ENV
+            echo "dev_status=failure" >> "$GITHUB_ENV"
             echo "This may indicate upcoming breaking changes in Home Assistant" >> dev-results.txt
           fi
 
@@ -176,7 +176,7 @@ jobs:
           # Get latest from PyPI
           LATEST=$(curl -s https://pypi.org/pypi/homeassistant/json | jq -r '.info.version')
           echo "Latest version from PyPI: $LATEST"
-          echo "version=$LATEST" >> $GITHUB_OUTPUT
+          echo "version=$LATEST" >> "$GITHUB_OUTPUT"
 
   smoke-test-multiple-versions:
     name: Smoke Test - HA ${{ matrix.version }}
@@ -267,20 +267,20 @@ jobs:
 
       - name: Generate Report
         run: |
-          echo "# 🔍 Nightly Compatibility Check Report" > report.md
-          echo "" >> report.md
-          echo "**Date**: $(date '+%Y-%m-%d %H:%M:%S UTC')" >> report.md
-          echo "" >> report.md
-
-          echo "## Versions Tested" >> report.md
-          echo "" >> report.md
-                  echo "- **Dynamic Latest**: ${{ needs.get-latest-version.outputs.latest_version }} 🔥" >> report.md
-                  echo "- **Fixed Versions**: 2024.6.4, 2024.9.3, 2024.10.4, 2024.11.3, 2024.12.5" >> report.md
-          echo "- **Dev Branch**: Latest development version" >> report.md
-          echo "" >> report.md
-
-          echo "## Test Results" >> report.md
-          echo "" >> report.md
+          {
+            echo "# 🔍 Nightly Compatibility Check Report"
+            echo ""
+            echo "**Date**: $(date '+%Y-%m-%d %H:%M:%S UTC')"
+            echo ""
+            echo "## Versions Tested"
+            echo ""
+            echo "- **Dynamic Latest**: ${{ needs.get-latest-version.outputs.latest_version }} 🔥"
+            echo "- **Fixed Versions**: 2024.6.4, 2024.9.3, 2024.10.4, 2024.11.3, 2024.12.5"
+            echo "- **Dev Branch**: Latest development version"
+            echo ""
+            echo "## Test Results"
+            echo ""
+          } > report.md
 
           # Latest stable results
           LATEST_VERSION="${{ needs.get-latest-version.outputs.latest_version }}"
@@ -309,30 +309,40 @@ jobs:
 
           # Show individual smoke test results if available
           if [ -d "artifacts" ]; then
-            echo "" >> report.md
-            echo "### Detailed Smoke Test Results" >> report.md
-            echo "" >> report.md
+            {
+              echo ""
+              echo "### Detailed Smoke Test Results"
+              echo ""
+            } >> report.md
             find artifacts -name "smoke-results.txt" -exec cat {} \; \
               >> report.md 2>/dev/null || \
               echo "No detailed results available" >> report.md
           fi
 
-          echo "" >> report.md
-          echo "## Recommendations" >> report.md
-          echo "" >> report.md
+          {
+            echo ""
+            echo "## Recommendations"
+            echo ""
+          } >> report.md
 
           if [ "${{ needs.test-dev-branch.result }}" == "failure" ]; then
-            echo "- 🔧 Review upcoming Home Assistant changes" >> report.md
-            echo "- 📝 Check HA dev branch changelog for breaking changes" >> report.md
-            echo "- 🛠️ Consider updating integration code proactively" >> report.md
+            {
+              echo "- 🔧 Review upcoming Home Assistant changes"
+              echo "- 📝 Check HA dev branch changelog for breaking changes"
+              echo "- 🛠️ Consider updating integration code proactively"
+            } >> report.md
           elif [ "${{ needs.test-latest-stable.result }}" == "failure" ]; then
-            echo "- 🚨 **Critical**: Integration failing with latest stable HA version!" >> report.md
-            echo "- 🔧 Immediate investigation recommended" >> report.md
-            echo "- 📝 Check release notes for breaking changes" >> report.md
+            {
+              echo "- 🚨 **Critical**: Integration failing with latest stable HA version!"
+              echo "- 🔧 Immediate investigation recommended"
+              echo "- 📝 Check release notes for breaking changes"
+            } >> report.md
           else
-            echo "- ✨ Integration appears compatible with all tested HA versions" >> report.md
-            echo "- 🎉 Including the absolute latest release ($LATEST_VERSION)" >> report.md
-            echo "- 📊 Continue monitoring for changes" >> report.md
+            {
+              echo "- ✨ Integration appears compatible with all tested HA versions"
+              echo "- 🎉 Including the absolute latest release ($LATEST_VERSION)"
+              echo "- 📊 Continue monitoring for changes"
+            } >> report.md
           fi
 
           cat report.md
@@ -347,7 +357,7 @@ jobs:
       - name: Add to Step Summary
         if: always()
         run: |
-          cat report.md >> $GITHUB_STEP_SUMMARY
+          cat report.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Create Issue on Failure
         if: >-
