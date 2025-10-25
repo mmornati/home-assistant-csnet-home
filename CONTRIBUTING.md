@@ -51,16 +51,66 @@ logger:
 
 To setup your development environment you can follow the documentation available in this [README](tests/README.md) file
 
-## Local tests
+## Local Testing
 
-To test your changes locally, without working in your real HomeAssistant environment, you can start a HA instance in a docker container.
+### Integration Testing (Recommended)
 
+The easiest way to test your changes locally is using our automated integration testing setup:
+
+```bash
+# Start Home Assistant with your changes
+./scripts/integration-test.sh start
+
+# View logs
+./scripts/integration-test.sh logs
+
+# Stop when done
+./scripts/integration-test.sh stop
 ```
-docker run --rm -d --name home-assistant -v /Users/mmornati/hassio-config:/config -p 8080:8123 homeassistant/home-assistant
+
+This will:
+- Start a Home Assistant instance in Docker
+- Automatically mount your custom component
+- Provide a clean test environment
+- Allow you to test the full user experience
+
+**Benefits:**
+- ✅ One command to start testing
+- ✅ Isolated from your production setup
+- ✅ Hot-reload on restart
+- ✅ Pre-configured environment
+- ✅ Easy cleanup
+
+📖 **Full documentation:** See [INTEGRATION_TESTING.md](INTEGRATION_TESTING.md) for the complete guide.
+
+### Unit Tests
+
+Always run unit tests before submitting a PR:
+
+```bash
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=custom_components/csnet_home --cov-report=html
+
+# Or using Make
+make test-unit
 ```
 
-* within the `/Users/mmornati/hassio-config` (change it accordingly to your setup) HA will create all the necessary base configuration files
-* access to Home Assistant using the `http://localhost:8080` URL. After the first startup (with the configuration folder empty) you need to go through the first HomeAssistant configuration.
+### Manual Docker Setup (Alternative)
+
+If you prefer manual setup:
+
+```bash
+docker run --rm -d --name home-assistant \
+  -v $(pwd)/custom_components/csnet_home:/config/custom_components/csnet_home \
+  -v ./test_config:/config \
+  -p 8123:8123 \
+  homeassistant/home-assistant
+```
+
+Access Home Assistant at http://localhost:8123
 
 
 ## License

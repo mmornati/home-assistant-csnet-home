@@ -1,0 +1,14 @@
+# Ignore Home Assistant generated files
+.storage/
+.cloud/
+*.db
+*.db-shm
+*.db-wal
+*.log
+deps/
+tts/
+*.uuid
+*.conf
+home-assistant.log*
+home-assistant_v2.db*
+OZW_Log.txt

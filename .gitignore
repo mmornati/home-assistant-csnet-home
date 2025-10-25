@@ -176,3 +176,17 @@ cython_debug/
 .secrets
 .actrc
 test-hass-custom-csnet-home.zip
+
+# Integration testing - Home Assistant generated files
+test_config/.storage/
+test_config/*.db
+test_config/*.db-shm
+test_config/*.db-wal
+test_config/*.log
+test_config/deps/
+test_config/tts/
+test_config/*.uuid
+test_config/*.conf
+test_config/home-assistant.log*
+test_config/OZW_Log.txt
+test_config/.cloud/
