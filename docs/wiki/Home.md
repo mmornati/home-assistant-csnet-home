@@ -2,8 +2,6 @@
 
 Welcome to the complete user documentation for the **Hitachi CSNet Home Integration** for Home Assistant!
 
-![Integration Logo](../images/logo.png)
-
 ## About This Integration
 
 This custom integration connects your Hitachi heat pump and air conditioning systems with Home Assistant using the **ATW-IOT-01 module** through the **CSNet Manager** cloud service.

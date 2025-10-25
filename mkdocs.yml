@@ -12,7 +12,7 @@ copyright: Copyright &copy; 2024-2025 Marco Mornati - Licensed under Apache Lice
 theme:
   name: material
   language: en
-  logo: images/logo.png
+  logo: images/logo@2x.png
   favicon: images/logo.png
   palette:
     # Palette toggle for light mode
@@ -131,6 +131,3 @@ nav:
   - Help:
     - Troubleshooting: wiki/Troubleshooting.md
     - FAQ: wiki/FAQ.md
-  - Development:
-    - Contributing: CONTRIBUTING.md
-    - Supported Devices: SUPPORTED_DEVICES.md
