@@ -39,6 +39,27 @@ A custom Home Assistant integration to control Hitachi heat pumps and air condit
 
 ---
 
+## 📚 Documentation
+
+**Complete user documentation is available at:** 
+
+### 👉 **[https://mmornati.github.io/home-assistant-csnet-home](https://mmornati.github.io/home-assistant-csnet-home)**
+
+The documentation includes:
+- 📖 **[Installation Guide](https://mmornati.github.io/home-assistant-csnet-home/wiki/Installation-Guide/)** - Step-by-step installation (HACS, manual, from source)
+- ⚙️ **[Configuration Guide](https://mmornati.github.io/home-assistant-csnet-home/wiki/Configuration-Guide/)** - Initial setup and configuration
+- 🌡️ **[Climate Control](https://mmornati.github.io/home-assistant-csnet-home/wiki/Climate-Control/)** - Complete climate entity guide with examples
+- 💧 **[Water Heater Control](https://mmornati.github.io/home-assistant-csnet-home/wiki/Water-Heater-Control/)** - DHW management
+- 📊 **[Sensors Reference](https://mmornati.github.io/home-assistant-csnet-home/wiki/Sensors-Reference/)** - Complete sensor catalog
+- 🚀 **[Advanced Features](https://mmornati.github.io/home-assistant-csnet-home/wiki/Advanced-Features/)** - Silent mode, fan control, OTC
+- 🏠 **[Multi-Zone Configuration](https://mmornati.github.io/home-assistant-csnet-home/wiki/Multi-Zone-Configuration/)** - C1/C2 setup guide
+- 🔧 **[Troubleshooting](https://mmornati.github.io/home-assistant-csnet-home/wiki/Troubleshooting/)** - Solutions to common issues
+- ❓ **[FAQ](https://mmornati.github.io/home-assistant-csnet-home/wiki/FAQ/)** - Frequently asked questions
+
+> 💡 **Quick Start:** New to the integration? Start with the [Installation Guide](https://mmornati.github.io/home-assistant-csnet-home/wiki/Installation-Guide/) and then follow the [Configuration Guide](https://mmornati.github.io/home-assistant-csnet-home/wiki/Configuration-Guide/).
+
+---
+
 ## Overview
 
 As Hitachi [explains](https://device.report/manual/12211094), the ATW-IOT-01 device has replaced the older Hi-Kumo system. This change blocked previous integration methods for retrieving data and controlling Hitachi devices through Home Assistant.
@@ -528,10 +549,11 @@ Join our [discussions community](https://github.com/mmornati/home-assistant-csne
 
 ---
 
-## Documentation
+## Additional Documentation
 
-Additional documentation is available:
+Developer and technical documentation:
 
+- **[User Documentation](https://mmornati.github.io/home-assistant-csnet-home)** - Complete user guide (installation, configuration, usage)
 - **[SUPPORTED_DEVICES.md](SUPPORTED_DEVICES.md)** - Device compatibility matrix and testing results from the community
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contribution guidelines, development setup, and bug reporting
 - **[ALARM_API_IMPLEMENTATION.md](ALARM_API_IMPLEMENTATION.md)** - Technical details about the alarm API implementation
@@ -547,9 +569,10 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 ## Support
 
-- **Issues:** [GitHub Issues](https://github.com/mmornati/home-assistant-csnet-home/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/mmornati/home-assistant-csnet-home/discussions)
-- **Releases:** [GitHub Releases](https://github.com/mmornati/home-assistant-csnet-home/releases)
+- **📚 Documentation:** [User Guide](https://mmornati.github.io/home-assistant-csnet-home)
+- **🐛 Issues:** [GitHub Issues](https://github.com/mmornati/home-assistant-csnet-home/issues)
+- **💬 Discussions:** [GitHub Discussions](https://github.com/mmornati/home-assistant-csnet-home/discussions)
+- **📦 Releases:** [GitHub Releases](https://github.com/mmornati/home-assistant-csnet-home/releases)
 
 ---
 

@@ -1,0 +1,15 @@
+# This file helps organize the documentation structure
+# Used by MkDocs with awesome-pages plugin if installed
+
+title: Documentation
+nav:
+  - Home.md
+  - Installation-Guide.md
+  - Configuration-Guide.md
+  - Climate-Control.md
+  - Water-Heater-Control.md
+  - Sensors-Reference.md
+  - Advanced-Features.md
+  - Multi-Zone-Configuration.md
+  - Troubleshooting.md
+  - FAQ.md
