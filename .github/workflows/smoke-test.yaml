@@ -63,19 +63,16 @@ jobs:
           failed = []
           for module in modules:
               try:
-                  spec = importlib.util.find_spec(module.replace('.', '/') + '.py' if '.' in module.split('.')[-1] else module)
-                  if spec:
-                      print(f'✓ {module}')
-                  else:
-                      # Try importing directly
-                      __import__(module)
-                      print(f'✓ {module}')
+                  # Try importing directly - simpler and clearer
+                  __import__(module)
+                  print(f'✓ {module}')
               except Exception as e:
                   print(f'⚠️  {module}: {e}')
                   failed.append(module)
 
           if failed:
-              print(f'\\n⚠️  Some imports failed (may be dependency conflicts with HA {\"${{ matrix.ha-version }}\"})')
+              ha_ver = \"${{ matrix.ha-version }}\"
+              print(f'\\n⚠️  Some imports failed (may be dependency conflicts with HA {ha_ver})')
               print(f'Note: Docker integration tests provide the real compatibility validation')
           else:
               print('\\n✓ All modules imported successfully')
@@ -147,7 +144,8 @@ jobs:
           echo "- **Home Assistant Version**: ${{ matrix.ha-version }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Python Version**: ${{ matrix.python-version }}" >> $GITHUB_STEP_SUMMARY
           if [ "${{ steps.import-test.outcome }}" == "failure" ]; then
-            echo "- **Import Test**: ⚠️ Some dependency conflicts (see Docker integration test for real validation)" >> $GITHUB_STEP_SUMMARY
+            echo "- **Import Test**: ⚠️ Some dependency conflicts" >> $GITHUB_STEP_SUMMARY
+            echo "  (see Docker integration test for real validation)" >> $GITHUB_STEP_SUMMARY
           else
             echo "- **Import Test**: ✓ Passed" >> $GITHUB_STEP_SUMMARY
           fi
