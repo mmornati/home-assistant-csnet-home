@@ -1,4 +1,4 @@
-![logo](./images/logo.png)
+![logo](./docs/images/logo.png)
 
 # Hitachi CSNet Home Integration for Home Assistant
 
@@ -168,7 +168,7 @@ After installation and restart:
 4. Enter your **CSNet Manager credentials** (same as used on the CSNet Manager website/app)
 5. Click **Submit**
 
-![Add Integration](images/add_integration.png)
+![Add Integration](docs/images/add_integration.png)
 
 ### Quick Start Checklist
 
@@ -276,7 +276,7 @@ logger:
    - Look for the `elements` call
    - Copy the JSON response
 
-   ![Elements](images/elements.png)
+   ![Elements](docs/images/elements.png)
 
 3. **Create an issue** on [GitHub Issues](https://github.com/mmornati/home-assistant-csnet-home/issues) with:
    - Your configuration (number of zones, device type)
