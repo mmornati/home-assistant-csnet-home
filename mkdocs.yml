@@ -1,0 +1,133 @@
+site_name: Hitachi CSNet Home Integration
+site_description: Complete user documentation for the Hitachi CSNet Home integration for Home Assistant
+site_author: Marco Mornati
+site_url: https://mmornati.github.io/home-assistant-csnet-home
+
+repo_name: mmornati/home-assistant-csnet-home
+repo_url: https://github.com/mmornati/home-assistant-csnet-home
+edit_uri: edit/main/docs/wiki/
+
+copyright: Copyright &copy; 2024-2025 Marco Mornati - Licensed under Apache License 2.0
+
+theme:
+  name: material
+  language: en
+  logo: images/logo@2x.png
+  favicon: images/logo.png
+  palette:
+    # Palette toggle for light mode
+    - scheme: default
+      primary: blue
+      accent: light blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Palette toggle for dark mode
+    - scheme: slate
+      primary: blue
+      accent: light blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.path
+    - navigation.indexes
+    - navigation.top
+    - navigation.footer
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+    - content.action.edit
+    - content.action.view
+    - announce.dismiss
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/mmornati/home-assistant-csnet-home
+    - icon: fontawesome/solid/bug
+      link: https://github.com/mmornati/home-assistant-csnet-home/issues
+    - icon: fontawesome/solid/comments
+      link: https://github.com/mmornati/home-assistant-csnet-home/discussions
+  version:
+    provider: mike
+  analytics:
+    provider: google
+    property: !ENV GOOGLE_ANALYTICS_KEY
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+plugins:
+  - search:
+      lang: en
+      separator: '[\s\-,:!=\[\]()"/]+|(?!\b)(?=[A-Z][a-z])|\.(?!\d)|&[lg]t;'
+  - minify:
+      minify_html: true
+      minify_js: true
+      minify_css: true
+      htmlmin_opts:
+        remove_comments: true
+  - redirects:
+      redirect_maps:
+
+nav:
+  - Home: wiki/Home.md
+  - Getting Started:
+      - Installation Guide: wiki/Installation-Guide.md
+      - Configuration Guide: wiki/Configuration-Guide.md
+  - Features:
+      - Climate Control: wiki/Climate-Control.md
+      - Water Heater Control: wiki/Water-Heater-Control.md
+      - Sensors Reference: wiki/Sensors-Reference.md
+      - Advanced Features: wiki/Advanced-Features.md
+  - Configuration:
+      - Multi-Zone Configuration: wiki/Multi-Zone-Configuration.md
+  - Help:
+      - Troubleshooting: wiki/Troubleshooting.md
+      - FAQ: wiki/FAQ.md
