@@ -81,11 +81,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.13"]
+        python-version: ["3.12"]
         ha-version:
-          - "2025.1.4"  # Latest working version
-          # Note: 2024.x versions have josepy dependency conflicts in pip-only installs
-          # Docker integration tests provide validation for those versions
+          - "2024.12.5"  # Latest 2024 version that works with pytest
+          # Note: 2025.x versions require async context for HomeAssistant init
+          # Docker integration tests provide validation for all versions
 
     steps:
       - name: Checkout
@@ -112,7 +112,7 @@ jobs:
           HA_VERSION: ${{ matrix.ha-version }}
 
       - name: Upload coverage to Codecov
-        if: matrix.python-version == '3.13' && matrix.ha-version == '2025.1.4'
+        if: matrix.python-version == '3.12' && matrix.ha-version == '2024.12.5'
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
