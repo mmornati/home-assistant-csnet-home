@@ -49,7 +49,7 @@ logger:
 
 ## Development Environment Setup
 
-To setup your development environment you can follow the documentation available in this [README](tests/README.md) file
+To setup your development environment you can follow the documentation available in the [tests README](https://github.com/mmornati/home-assistant-csnet-home/blob/main/tests/README.md) file
 
 ## Local Testing
 

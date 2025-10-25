@@ -228,7 +228,11 @@ jobs:
       - name: Upload Zip as Artifact
         uses: actions/upload-artifact@v4.6.2
         with:
-          name: hass-custom-csnet-home-${{ github.event_name == 'release' && github.event.release.tag_name || inputs.version }}
+          name: >-
+            hass-custom-csnet-home-${{
+              github.event_name == 'release' &&
+              github.event.release.tag_name || inputs.version
+            }}
           path: ./custom_components/csnet_home/hass-custom-csnet-home.zip
           if-no-files-found: error
           retention-days: 90

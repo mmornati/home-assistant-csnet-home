@@ -1,0 +1,182 @@
+name: Documentation Preview
+
+"on":
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'docs/wiki/**'
+      - 'docs/images/**'
+      - 'mkdocs.yml'
+      - 'docs/requirements.txt'
+      - '.github/workflows/docs-preview.yaml'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  build-docs-preview:
+    name: Build Documentation Preview
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Required for git-revision-date-localized-plugin
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          pip install -r docs/requirements.txt
+
+      - name: Build MkDocs site
+        run: |
+          mkdocs build --strict
+          echo "✅ Documentation built successfully"
+
+      - name: Create preview info file
+        run: |
+          cat > site/PREVIEW_INFO.txt << 'EOF'
+          ════════════════════════════════════════════════════════════════
+          📚 Documentation Preview Build
+          ════════════════════════════════════════════════════════════════
+
+          This is a preview build of the documentation for PR #${{ github.event.pull_request.number }}
+
+          Commit: ${{ github.sha }}
+          Build Date: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+
+          ════════════════════════════════════════════════════════════════
+          📖 How to View This Preview
+          ════════════════════════════════════════════════════════════════
+
+          METHOD 1: Simple HTTP Server (Recommended)
+          ───────────────────────────────────────────
+          1. Extract the artifact ZIP file
+          2. Open a terminal in the extracted 'site' folder
+          3. Run one of these commands:
+
+             Python 3:
+             python3 -m http.server 8000
+
+             Python 2:
+             python -m SimpleHTTPServer 8000
+
+             Node.js (if installed):
+             npx serve
+
+          4. Open your browser to: http://localhost:8000
+
+          METHOD 2: Direct File Access
+          ───────────────────────────────────────────
+          1. Extract the artifact ZIP file
+          2. Open the 'site/index.html' file in your browser
+
+          Note: Some features (like search) may not work with direct file access.
+          Using a local HTTP server (Method 1) is recommended.
+
+          ════════════════════════════════════════════════════════════════
+          EOF
+
+      - name: Upload Documentation Preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: documentation-preview-pr${{ github.event.pull_request.number }}
+          path: ./site
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 9
+
+      - name: Find existing comment
+        id: find_comment
+        uses: peter-evans/find-comment@v3
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body-includes: '📚 Documentation Preview'
+
+      - name: Add or Update PR comment
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          comment-id: ${{ steps.find_comment.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          edit-mode: replace
+          body: |
+            ## 📚 Documentation Preview
+
+            A preview build of the documentation is ready for review! 🎉
+
+            ### 📥 Download Preview
+
+            **[⬇️ Download Documentation Preview](${{ github.server_url }}/${{
+              github.repository }}/actions/runs/${{ github.run_id }})**
+
+            Click the link above, scroll to the **Artifacts** section at the bottom, and download
+            `documentation-preview-pr${{ github.event.pull_request.number }}`.
+
+            ### 🔍 How to View
+
+            **Method 1: Local HTTP Server (Recommended)**
+            ```bash
+            # Extract the ZIP and navigate to the 'site' folder
+            cd site
+
+            # Start a local server (choose one):
+            python3 -m http.server 8000
+            # or
+            npx serve
+            ```
+            Then open **http://localhost:8000** in your browser.
+
+            **Method 2: Direct File Access**
+
+            Extract the ZIP and open `site/index.html` in your browser.
+
+            > ⚠️ **Note:** Search and some interactive features work best with Method 1.
+
+            ---
+
+            ### 📊 Build Info
+
+            - **Commit:** `${{ github.sha }}`
+            - **Build Time:** ${{ github.event.pull_request.updated_at }}
+            - **Retention:** 30 days
+
+            ### ✨ What's Included
+
+            - ✅ Full documentation site
+            - ✅ All pages and navigation
+            - ✅ Images and assets
+            - ✅ Search functionality (with local server)
+            - ✅ Dark/light theme toggle
+            - ✅ Responsive design
+
+            ---
+
+            <details>
+            <summary>💡 Alternative: Build Locally</summary>
+
+            If you prefer to build the docs yourself:
+
+            ```bash
+            # Check out this PR branch
+            git fetch origin pull/${{ github.event.pull_request.number }}/head:pr-${{
+              github.event.pull_request.number }}
+            git checkout pr-${{ github.event.pull_request.number }}
+
+            # Install dependencies
+            pip install -r docs/requirements.txt
+
+            # Build and serve
+            mkdocs serve
+
+            # Open http://127.0.0.1:8000
+            ```
+
+            </details>
+
+            📝 *This preview updates automatically when new commits are pushed to the PR.*
