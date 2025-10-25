@@ -391,7 +391,7 @@ This project includes comprehensive automated testing across multiple Home Assis
 - ✅ Automatic alerts for breaking changes
 - ✅ 32+ test combinations across 7+ HA versions (dynamic latest adjusts automatically)
 
-📖 **See [CI/CD Testing Documentation](docs/CI_CD_TESTING.md)** for complete details on:
+📖 **See [CI/CD Testing Documentation](CI_CD_TESTING.md)** for complete details on:
 - Testing workflows and what they check
 - 🔥 Dynamic latest version testing (zero maintenance!)
 - How to interpret test results
@@ -656,7 +656,7 @@ Join our [discussions community](https://github.com/mmornati/home-assistant-csne
 Developer and technical documentation:
 
 - **[User Documentation](https://mmornati.github.io/home-assistant-csnet-home)** - Complete user guide (installation, configuration, usage)
-- **[CI/CD Testing](docs/CI_CD_TESTING.md)** - Comprehensive testing infrastructure and Home Assistant compatibility testing
+- **[CI/CD Testing](CI_CD_TESTING.md)** - Comprehensive testing infrastructure and Home Assistant compatibility testing
 - **[Dynamic Version Testing](DYNAMIC_VERSION_TESTING.md)** - 🔥 Automatic latest HA version detection (zero maintenance!)
 - **[SUPPORTED_DEVICES.md](docs/SUPPORTED_DEVICES.md)** - Device compatibility matrix and testing results from the community
 - **[CONTRIBUTING.md](docs/CONTRIBUTING.md)** - Contribution guidelines, development setup, and bug reporting

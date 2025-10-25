@@ -468,7 +468,7 @@ A: You can manually trigger the workflow and specify version in inputs (enhancem
 
 ## Related Documentation
 
-- [CI/CD Testing Guide](docs/CI_CD_TESTING.md) - Complete testing documentation
+- [CI/CD Testing Guide](CI_CD_TESTING.md) - Complete testing documentation
 - [Nightly Compatibility Workflow](.github/workflows/nightly-compatibility.yaml) - The actual workflow file
 
 ---
