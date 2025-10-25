@@ -414,24 +414,98 @@ act release -W .github/workflows/release.yaml --secret-file .secrets
 - [Local Testing Guide](.github/LOCAL_TESTING.md) - Static validation tools
 - [Integration Testing Guide](.github/INTEGRATION_TESTING.md) - Full workflow testing with `act`
 
-### End-to-End Testing
+### Integration Testing (Recommended)
 
-Test in a real Home Assistant environment:
+**Test your LOCAL development code in a real Home Assistant environment with ONE command!**
 
-#### Option 1: Docker Container
+This project includes a complete integration testing setup that spins up a local Home Assistant instance with **YOUR LOCAL CODE** from `custom_components/csnet_home/` automatically mounted.
+
+🔑 **Key Feature:** Tests your current working directory code, NOT a downloaded or released version. Make changes and run `make restart` to test immediately!
+
+#### Quick Start
 
 ```bash
-# Start Home Assistant in Docker
-docker run --rm -d \
-  --name home-assistant \
-  -v /path/to/config:/config \
-  -p 8123:8123 \
-  homeassistant/home-assistant
+# Start Home Assistant with your integration
+./scripts/integration-test.sh start
+
+# Open in browser (auto-opens on macOS)
+./scripts/integration-test.sh open
+
+# View logs
+./scripts/integration-test.sh logs
+
+# Stop when done
+./scripts/integration-test.sh stop
 ```
 
-Then copy your integration to `/path/to/config/custom_components/csnet_home` and restart the container.
+#### Or using Make
 
-#### Option 2: Your HA Instance
+```bash
+make start    # Start Home Assistant
+make logs     # View logs
+make stop     # Stop Home Assistant
+make clean    # Clean all test data
+```
+
+#### What It Does
+
+The integration testing environment:
+- ✅ Starts Home Assistant in Docker (port 8123)
+- ✅ Mounts your custom component automatically
+- ✅ Provides a clean test configuration
+- ✅ Allows you to test the full user experience
+- ✅ Hot-reloads on restart after code changes
+- ✅ Isolated from your production Home Assistant
+
+#### Testing Workflow
+
+1. **Start the test environment:**
+   ```bash
+   ./scripts/integration-test.sh start
+   ```
+
+2. **Open http://localhost:8123** and create an admin account (first time only)
+
+3. **Add your integration:**
+   - Go to **Configuration** → **Integrations**
+   - Click **"Add Integration"**
+   - Search for **"Hitachi CSNet Home"**
+   - Enter your CSNet credentials
+
+4. **Test your integration** with real devices
+
+5. **Make code changes**, then restart:
+   ```bash
+   ./scripts/integration-test.sh restart
+   ```
+
+6. **View detailed logs:**
+   ```bash
+   ./scripts/integration-test.sh logs
+   ```
+
+#### Available Commands
+
+```bash
+./scripts/integration-test.sh start      # Start Home Assistant
+./scripts/integration-test.sh stop       # Stop Home Assistant
+./scripts/integration-test.sh restart    # Restart after code changes
+./scripts/integration-test.sh logs       # Follow logs (real-time)
+./scripts/integration-test.sh status     # Check if running
+./scripts/integration-test.sh clean      # Remove all test data
+./scripts/integration-test.sh test       # Run unit tests first
+```
+
+📖 **Full documentation:** See [INTEGRATION_TESTING.md](INTEGRATION_TESTING.md) for the complete guide including:
+- All commands (make and script)
+- Debugging techniques
+- Verification steps
+- Troubleshooting solutions
+- Examples and best practices
+
+### End-to-End Testing (Alternative Methods)
+
+#### Option 1: Your Production HA Instance
 
 1. Install the integration (HACS or manual)
 2. Enable debug logging in `configuration.yaml`:
@@ -445,6 +519,8 @@ logger:
 
 3. Restart HA and watch logs for `custom_components.csnet_home`
 4. Check **Settings** → **System** → **Logs** in Home Assistant UI
+
+**⚠️ Warning:** Testing on production can break your setup. Use the integration testing environment instead!
 
 ### Code Formatting
 

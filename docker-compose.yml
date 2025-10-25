@@ -1,10 +1,28 @@
-version: '3.8'
 services:
   home-assistant:
-    container_name: home-assistant
+    container_name: home-assistant-csnet-test
     image: homeassistant/home-assistant:latest
     volumes:
+      # Mount test configuration files first
+      - ./test_config/configuration.yaml:/config/configuration.yaml
+      - ./test_config/automations.yaml:/config/automations.yaml
+      - ./test_config/scripts.yaml:/config/scripts.yaml
+      - ./test_config/scenes.yaml:/config/scenes.yaml
+      # Mount local development code (THIS IS WHAT YOU'RE TESTING!)
       - ./custom_components/csnet_home:/config/custom_components/csnet_home
+      # Persistent storage for Home Assistant data
+      - ha_config:/config/.storage
     ports:
-      - "8080:8123"
+      - "8123:8123"
     restart: unless-stopped
+    environment:
+      - TZ=Europe/Amsterdam
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8123"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  ha_config:
