@@ -329,8 +329,8 @@ If you see the integration in search results, installation was successful! 🎉
 Now that installation is complete:
 
 1. **Configure the integration**: Follow the [Configuration Guide](Configuration-Guide)
-2. **Explore features**: Check out the [Features Overview](Features-Overview)
-3. **Customize your setup**: Visit [Advanced Configuration](Advanced-Configuration)
+2. **Explore features**: Check out [Climate Control](Climate-Control), [Water Heater Control](Water-Heater-Control), and [Sensors Reference](Sensors-Reference)
+3. **Customize your setup**: Visit [Advanced Features](Advanced-Features)
 
 ---
 
@@ -406,8 +406,9 @@ rm -rf custom_components/csnet_home/
 
 Now proceed to:
 - **[Configuration Guide](Configuration-Guide)** - Set up the integration
-- **[Quick Start Tutorial](Quick-Start)** - Get started quickly
-- **[Features Overview](Features-Overview)** - Learn what you can do
+- **[Climate Control](Climate-Control)** - Control your heating and cooling zones
+- **[Water Heater Control](Water-Heater-Control)** - Manage your DHW system
+- **[Advanced Features](Advanced-Features)** - Explore all available features
 
 ---
 

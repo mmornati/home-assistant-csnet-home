@@ -683,7 +683,7 @@ automation:
 Explore related documentation:
 - **[Multi-Zone Configuration](Multi-Zone-Configuration)** - Managing multiple circuits
 - **[Sensors Reference](Sensors-Reference)** - Complete sensor list
-- **[Automations Guide](Automations-and-Scripts)** - Advanced automation examples
+- **[Climate Control](Climate-Control)** - Climate entity control with automation examples
 - **[Troubleshooting](Troubleshooting)** - Issue resolution
 
 ---

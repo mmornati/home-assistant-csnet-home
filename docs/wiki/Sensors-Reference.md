@@ -781,7 +781,7 @@ sensor:
 Explore related documentation:
 - **[Advanced Features](Advanced-Features)** - Silent mode, fan control, OTC
 - **[Climate Control](Climate-Control)** - Using sensors in climate control
-- **[Automations Guide](Automations-and-Scripts)** - Sensor-based automations
+- **[Water Heater Control](Water-Heater-Control)** - DHW management
 - **[Troubleshooting](Troubleshooting)** - Sensor issues and solutions
 
 ---
