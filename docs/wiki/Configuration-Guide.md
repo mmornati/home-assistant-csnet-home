@@ -448,7 +448,7 @@ Now explore:
 - **[Water Heater Control](Water-Heater-Control)** - Manage your DHW
 - **[Sensors Reference](Sensors-Reference)** - Understand all sensors
 - **[Advanced Features](Advanced-Features)** - Silent mode, fan control, OTC
-- **[Automations Guide](Automations-and-Scripts)** - Create smart automations
+- **[Multi-Zone Configuration](Multi-Zone-Configuration)** - Managing multiple circuits
 
 ---
 

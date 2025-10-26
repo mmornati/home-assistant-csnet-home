@@ -19,7 +19,7 @@ Any Hitachi heat pump equipped with the **ATW-IOT-01 module** that works with th
 - Systems with or without DHW (hot water)
 - Fan coil compatible systems
 
-See [Supported Devices](Supported-Devices) for detailed compatibility.
+See [Supported Devices](../SUPPORTED_DEVICES) for detailed compatibility.
 
 ### Do I need a CSNet Manager account?
 
@@ -152,7 +152,7 @@ Yes, through Home Assistant. If you've connected Home Assistant to Alexa or Goog
 
 ### Can I create automations?
 
-Absolutely! All entities can be used in Home Assistant automations, scripts, and scenes. See [Automations Guide](Automations-and-Scripts) for examples.
+Absolutely! All entities can be used in Home Assistant automations, scripts, and scenes. Check the automation examples in [Climate Control](Climate-Control) and [Water Heater Control](Water-Heater-Control) pages.
 
 ---
 
@@ -482,7 +482,7 @@ Many ways:
 - Improve documentation
 - Test preview builds
 
-See [Contributing](Contributing) guide.
+See the [Contributing Guide](https://github.com/mmornati/home-assistant-csnet-home/blob/main/CONTRIBUTING.md) on GitHub.
 
 ### Where do I report bugs?
 

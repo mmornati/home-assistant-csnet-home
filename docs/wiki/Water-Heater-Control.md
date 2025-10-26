@@ -721,7 +721,7 @@ Explore related documentation:
 - **[Climate Control](Climate-Control)** - Control heating zones
 - **[Sensors Reference](Sensors-Reference)** - All available sensors
 - **[Advanced Features](Advanced-Features)** - Additional system features
-- **[Automations Guide](Automations-and-Scripts)** - More automation examples
+- **[Multi-Zone Configuration](Multi-Zone-Configuration)** - Managing multiple circuits
 
 ---
 

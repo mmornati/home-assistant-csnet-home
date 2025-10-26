@@ -775,7 +775,7 @@ Learn more about related features:
 - **[Sensors Reference](Sensors-Reference)** - All available sensors
 - **[Advanced Features](Advanced-Features)** - Silent mode, fan control, OTC
 - **[Multi-Zone Configuration](Multi-Zone-Configuration)** - Managing multiple circuits
-- **[Automations Guide](Automations-and-Scripts)** - More automation examples
+- **[Troubleshooting](Troubleshooting)** - Common issues and solutions
 
 ---
 

@@ -706,7 +706,7 @@ Explore related documentation:
 - **[Climate Control](Climate-Control)** - Detailed climate entity control
 - **[Advanced Features](Advanced-Features)** - Silent mode, fan control, OTC
 - **[Sensors Reference](Sensors-Reference)** - All available sensors
-- **[Automations Guide](Automations-and-Scripts)** - More automation examples
+- **[Water Heater Control](Water-Heater-Control)** - DHW management
 
 ---
 
