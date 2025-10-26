@@ -6,7 +6,7 @@ This guide will help you configure the Hitachi CSNet Home integration after inst
 
 Before configuring, ensure:
 
-✅ Integration is installed (see [Installation Guide](Installation-Guide))  
+✅ Integration is installed (see [Installation Guide](Installation-Guide.md))  
 ✅ Home Assistant has been restarted  
 ✅ You have your CSNet Manager credentials ready  
 ✅ Your Hitachi system is connected to CSNet Manager and working
@@ -444,23 +444,23 @@ After configuration, verify everything is working:
 ✅ Configuration complete!
 
 Now explore:
-- **[Climate Control Guide](Climate-Control)** - Learn to control your zones
-- **[Water Heater Control](Water-Heater-Control)** - Manage your DHW
-- **[Sensors Reference](Sensors-Reference)** - Understand all sensors
-- **[Advanced Features](Advanced-Features)** - Silent mode, fan control, OTC
-- **[Multi-Zone Configuration](Multi-Zone-Configuration)** - Managing multiple circuits
+- **[Climate Control Guide](Climate-Control.md)** - Learn to control your zones
+- **[Water Heater Control](Water-Heater-Control.md)** - Manage your DHW
+- **[Sensors Reference](Sensors-Reference.md)** - Understand all sensors
+- **[Advanced Features](Advanced-Features.md)** - Silent mode, fan control, OTC
+- **[Multi-Zone Configuration](Multi-Zone-Configuration.md)** - Managing multiple circuits
 
 ---
 
 ## Getting Help
 
 If you need assistance:
-- Check [Troubleshooting](Troubleshooting) for common issues
-- Review [FAQ](FAQ) for frequent questions
+- Check [Troubleshooting](Troubleshooting.md) for common issues
+- Review [FAQ](FAQ.md) for frequent questions
 - Ask in [GitHub Discussions](https://github.com/mmornati/home-assistant-csnet-home/discussions)
 - Report bugs in [GitHub Issues](https://github.com/mmornati/home-assistant-csnet-home/issues)
 
 ---
 
-**[← Back to Installation](Installation-Guide)** | **[Next: Climate Control →](Climate-Control)**
+**[← Back to Installation](Installation-Guide.md)** | **[Next: Climate Control →](Climate-Control.md)**
 
