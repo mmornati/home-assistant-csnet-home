@@ -1,14 +1,16 @@
 """Pytest configuration and fixtures for CSNet Home tests."""
 
 import pytest
-from homeassistant.core import HomeAssistant
+from unittest.mock import MagicMock
 from tests.fixtures.conftest_fixtures import load_fixture as _load_fixture
 
 
 @pytest.fixture
 def hass():
     """Fixture to provide a mock Home Assistant instance."""
-    return HomeAssistant("/test/config")
+    hass_mock = MagicMock()
+    hass_mock.data = {}
+    return hass_mock
 
 
 @pytest.fixture

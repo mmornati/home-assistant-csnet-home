@@ -319,6 +319,10 @@ class CSNetHomeAPI:
         Returns:
             Tuple of (min_temp, max_temp) or (None, None) if not available
         """
+        # SWP has fixed temperature range regardless of installation data
+        if zone_id == 4:  # SWP (swimming pool)
+            return (24, 33)
+
         if not installation_devices_data:
             return (None, None)
 
@@ -330,7 +334,7 @@ class CSNetHomeAPI:
         is_heating = mode == 1  # mode 1 is heat, mode 0 is cool
 
         # Zone mapping based on JavaScript code analysis:
-        # zone_id 1, 2, 4 = air circuits (C1_AIR, C2_AIR)
+        # zone_id 1, 2 = air circuits (C1_AIR, C2_AIR)
         # zone_id 5 = water circuit (C1_WATER)
         # zone_id 3 = DHW (water heater)
 
@@ -385,6 +389,8 @@ class CSNetHomeAPI:
         }
         if zone_id == 3:
             data["settingTempDHW"] = str(int(temperature))
+        elif zone_id == 4:
+            data["settingTempSWP"] = str(int(temperature))
         elif zone_id == 5:
             if mode == 0:
                 data["fixTempCoolC1"] = str(int(temperature))
@@ -624,7 +630,11 @@ class CSNetHomeAPI:
             return False
 
     async def set_water_heater_mode(self, zone_id, parent_id, preset_mode):
-        """Set the off/eco/performance demand mode for water_heater."""
+        """Set the off/eco/performance demand mode for water_heater and swimming pool.
+
+        For DHW (zone_id=3): supports eco/performance/off
+        For SWP (zone_id=4): supports on/off only
+        """
         settings_url = f"{self.base_url}{HEAT_SETTINGS_PATH}"
         _LOGGER.debug("URL %s et mode %s", settings_url, preset_mode)
 
@@ -640,16 +650,23 @@ class CSNetHomeAPI:
             "indoorId": parent_id,
             "_csrf": self.xsrf_token,
         }
-        if preset_mode == "performance":
-            data["boostDHW"] = 1
-            data["runStopDHW"] = 1
-        if preset_mode == "eco":
-            data["boostDHW"] = 0
-            data["runStopDHW"] = 1
-        if preset_mode == "off":
-            data["runStopDHW"] = 0
-        if preset_mode == "on":
-            data["runStopDHW"] = 1
+
+        if zone_id == 3:  # DHW (water heater)
+            if preset_mode == "performance":
+                data["boostDHW"] = 1
+                data["runStopDHW"] = 1
+            elif preset_mode == "eco":
+                data["boostDHW"] = 0
+                data["runStopDHW"] = 1
+            elif preset_mode == "off":
+                data["runStopDHW"] = 0
+            elif preset_mode == "on":
+                data["runStopDHW"] = 1
+        elif zone_id == 4:  # SWP (swimming pool)
+            if preset_mode == "on":
+                data["runStopSWP"] = 1
+            elif preset_mode == "off":
+                data["runStopSWP"] = 0
 
         cookies = {
             "XSRF-TOKEN": self.xsrf_token,
@@ -983,6 +1000,10 @@ class CSNetHomeAPI:
         # Zone 3 is typically DHW (water heater)
         if zone_id == 3:
             return "water_heater"
+
+        # Zone 4 is swimming pool
+        if zone_id == 4:
+            return "swimming_pool"
 
         # Zone 5 is typically water circuit (Yutaki/Hydro)
         if zone_id == 5:

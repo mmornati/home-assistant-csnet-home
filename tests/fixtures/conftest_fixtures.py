@@ -1,7 +1,7 @@
 """Fixtures loader for CSNet Home tests."""
 
+import copy
 import json
-import os
 from pathlib import Path
 from typing import Any, Dict
 
@@ -94,21 +94,16 @@ def sanitize_api_response(response: Dict[str, Any]) -> Dict[str, Any]:
         Sanitized response dictionary safe for committing to repository
 
     Example:
-        >>> real_response = api.get_data()
+        >>> real_response = {"data": "example"}
         >>> safe_response = sanitize_api_response(real_response)
         >>> save_fixture("new_fixture.json", safe_response)
     """
-    # This is a basic sanitizer - extend as needed
-    sanitized = response.copy()
+    # Sanitize common sensitive fields (deep copy to avoid modifying original)
+    sanitized = copy.deepcopy(response)
 
     # Add metadata
     sanitized["_sanitized"] = True
     sanitized["_comment"] = "Sanitized test fixture"
-
-    # Sanitize common sensitive fields (deep copy to avoid modifying original)
-    import copy
-
-    sanitized = copy.deepcopy(response)
 
     # Example sanitization (customize based on your needs)
     if isinstance(sanitized, dict):
