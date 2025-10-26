@@ -2146,3 +2146,139 @@ async def test_async_get_elements_data_with_bcd_alarm(mock_aiohttp_client, hass)
     assert sensor["alarm_code"] == 0x0162
     assert sensor["alarm_code_formatted"] == "62"  # BCD format: 0x62
     assert sensor["unit_type"] == "yutaki"
+
+
+def test_get_unit_type_swimming_pool(hass):
+    """Test unit type detection for swimming pool."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    sensor_data = {"zone_id": 4}
+    unit_type = api.get_unit_type(sensor_data, None)
+    assert unit_type == "swimming_pool"
+
+
+def test_get_temperature_limits_swp(hass):
+    """Test temperature limits for swimming pool."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    installation_devices_data = {"heatingStatus": {}}
+
+    min_temp, max_temp = api.get_temperature_limits(4, 1, installation_devices_data)
+    assert min_temp == 24
+    assert max_temp == 33
+
+
+@pytest.mark.asyncio
+async def test_async_set_temperature_swp(mock_aiohttp_client, hass):
+    """Test setting swimming pool temperature."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    mock_response = mock_client_instance.post.return_value.__aenter__.return_value
+    mock_response.status = 200
+    mock_response.raise_for_status = AsyncMock()
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.session = mock_client_instance
+    api.xsrf_token = "test_token"
+
+    result = await api.async_set_temperature(4, 1706, 1, temperature=28)
+
+    assert result is True
+    mock_client_instance.post.assert_called_once()
+    call_args = mock_client_instance.post.call_args
+    data = call_args[1]["data"]
+    assert data["settingTempSWP"] == "28"
+    assert data["indoorId"] == 1706
+
+
+@pytest.mark.asyncio
+async def test_set_water_heater_mode_swp_on(mock_aiohttp_client, hass):
+    """Test turning swimming pool on."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    mock_response = mock_client_instance.post.return_value.__aenter__.return_value
+    mock_response.status = 200
+    mock_response.text = AsyncMock(return_value="OK")
+    mock_response.raise_for_status = AsyncMock()
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.session = mock_client_instance
+    api.xsrf_token = "test_token"
+
+    result = await api.set_water_heater_mode(4, 1706, "on")
+
+    assert result is True
+    mock_client_instance.post.assert_called_once()
+    call_args = mock_client_instance.post.call_args
+    data = call_args[1]["data"]
+    assert data["runStopSWP"] == 1
+    assert "runStopDHW" not in data
+    assert "boostDHW" not in data
+
+
+@pytest.mark.asyncio
+async def test_set_water_heater_mode_swp_off(mock_aiohttp_client, hass):
+    """Test turning swimming pool off."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    mock_response = mock_client_instance.post.return_value.__aenter__.return_value
+    mock_response.status = 200
+    mock_response.text = AsyncMock(return_value="OK")
+    mock_response.raise_for_status = AsyncMock()
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.session = mock_client_instance
+    api.xsrf_token = "test_token"
+
+    result = await api.set_water_heater_mode(4, 1706, "off")
+
+    assert result is True
+    mock_client_instance.post.assert_called_once()
+    call_args = mock_client_instance.post.call_args
+    data = call_args[1]["data"]
+    assert data["runStopSWP"] == 0
+    assert "runStopDHW" not in data
+
+
+@pytest.mark.asyncio
+async def test_async_get_elements_data_with_swp(
+    mock_aiohttp_client, hass, load_fixture
+):
+    """Test elements data parsing with swimming pool."""
+    mock_client_instance = mock_aiohttp_client.return_value
+
+    fixture_data = load_fixture("api_responses/elements_with_swp.json")
+
+    mock_response = mock_client_instance.get.return_value.__aenter__.return_value
+    mock_response.status = 200
+    mock_response.json = AsyncMock(return_value=fixture_data)
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.session = mock_client_instance
+    api.logged_in = True
+
+    data = await api.async_get_elements_data()
+
+    assert data is not None
+    assert len(data["sensors"]) == 3
+
+    # Find swimming pool sensor
+    swp_sensor = next((s for s in data["sensors"] if s["zone_id"] == 4), None)
+    assert swp_sensor is not None
+    assert swp_sensor["room_name"] == "Swimming Pool"
+    assert swp_sensor["setting_temperature"] == 28
+    assert swp_sensor["current_temperature"] == 27.0
+    assert swp_sensor["operation_status"] == 10  # OPST_SWP_ON
+    assert swp_sensor["unit_type"] == "swimming_pool"
+
+    # Verify water heater still works
+    dhw_sensor = next((s for s in data["sensors"] if s["zone_id"] == 3), None)
+    assert dhw_sensor is not None
+    assert dhw_sensor["room_name"] == "Water Heater"
+    assert dhw_sensor["unit_type"] == "water_heater"
+
+    # Verify climate zone still works
+    climate_sensor = next((s for s in data["sensors"] if s["zone_id"] == 1), None)
+    assert climate_sensor is not None
+    assert climate_sensor["room_name"] == "Living Room"
+    assert climate_sensor["unit_type"] == "standard"
