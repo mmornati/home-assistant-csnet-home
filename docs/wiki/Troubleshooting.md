@@ -760,12 +760,12 @@ Found a bug? Know how to fix it?
 
 ## Next Steps
 
-- Return to [Home](Home) page
-- Check [FAQ](FAQ) for quick answers
-- Review [Configuration Guide](Configuration-Guide)
+- Return to [Home](Home.md) page
+- Check [FAQ](FAQ.md) for quick answers
+- Review [Configuration Guide](Configuration-Guide.md)
 - Visit [GitHub Issues](https://github.com/mmornati/home-assistant-csnet-home/issues)
 
 ---
 
-**[← Back to Home](Home)** | **[Next: FAQ →](FAQ)**
+**[← Back to Home](Home.md)** | **[Next: FAQ →](FAQ.md)**
 

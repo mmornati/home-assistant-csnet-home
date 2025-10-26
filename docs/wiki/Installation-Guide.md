@@ -81,7 +81,7 @@ After installation completes:
 3. Confirm the restart
 4. Wait for Home Assistant to come back online (usually 1-2 minutes)
 
-✅ **Installation Complete!** Proceed to the [Configuration Guide](Configuration-Guide).
+✅ **Installation Complete!** Proceed to the [Configuration Guide](Configuration-Guide.md).
 
 ---
 
@@ -167,7 +167,7 @@ config/
 2. Click **Restart**
 3. Wait for restart to complete
 
-✅ **Installation Complete!** Proceed to the [Configuration Guide](Configuration-Guide).
+✅ **Installation Complete!** Proceed to the [Configuration Guide](Configuration-Guide.md).
 
 ---
 
@@ -207,7 +207,7 @@ cp -r /tmp/home-assistant-csnet-home/custom_components/csnet_home custom_compone
 2. Click **Restart**
 3. Wait for restart to complete
 
-✅ **Installation Complete!** Proceed to the [Configuration Guide](Configuration-Guide).
+✅ **Installation Complete!** Proceed to the [Configuration Guide](Configuration-Guide.md).
 
 ---
 
@@ -328,9 +328,9 @@ If you see the integration in search results, installation was successful! 🎉
 
 Now that installation is complete:
 
-1. **Configure the integration**: Follow the [Configuration Guide](Configuration-Guide)
-2. **Explore features**: Check out [Climate Control](Climate-Control), [Water Heater Control](Water-Heater-Control), and [Sensors Reference](Sensors-Reference)
-3. **Customize your setup**: Visit [Advanced Features](Advanced-Features)
+1. **Configure the integration**: Follow the [Configuration Guide](Configuration-Guide.md)
+2. **Explore features**: Check out [Climate Control](Climate-Control.md), [Water Heater Control](Water-Heater-Control.md), and [Sensors Reference](Sensors-Reference.md)
+3. **Customize your setup**: Visit [Advanced Features](Advanced-Features.md)
 
 ---
 
@@ -405,22 +405,22 @@ rm -rf custom_components/csnet_home/
 ✅ Installation complete!
 
 Now proceed to:
-- **[Configuration Guide](Configuration-Guide)** - Set up the integration
-- **[Climate Control](Climate-Control)** - Control your heating and cooling zones
-- **[Water Heater Control](Water-Heater-Control)** - Manage your DHW system
-- **[Advanced Features](Advanced-Features)** - Explore all available features
+- **[Configuration Guide](Configuration-Guide.md)** - Set up the integration
+- **[Climate Control](Climate-Control.md)** - Control your heating and cooling zones
+- **[Water Heater Control](Water-Heater-Control.md)** - Manage your DHW system
+- **[Advanced Features](Advanced-Features.md)** - Explore all available features
 
 ---
 
 ## Getting Help
 
 If you encounter issues:
-- Check [Troubleshooting](Troubleshooting) page
+- Check [Troubleshooting](Troubleshooting.md) page
 - Search [GitHub Issues](https://github.com/mmornati/home-assistant-csnet-home/issues)
 - Ask in [GitHub Discussions](https://github.com/mmornati/home-assistant-csnet-home/discussions)
-- Review [FAQ](FAQ) for common questions
+- Review [FAQ](FAQ.md) for common questions
 
 ---
 
-**[← Back to Home](Home)** | **[Next: Configuration →](Configuration-Guide)**
+**[← Back to Home](Home.md)** | **[Next: Configuration →](Configuration-Guide.md)**
 

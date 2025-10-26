@@ -771,13 +771,13 @@ automation:
 ## Next Steps
 
 Learn more about related features:
-- **[Water Heater Control](Water-Heater-Control)** - Control your DHW system
-- **[Sensors Reference](Sensors-Reference)** - All available sensors
-- **[Advanced Features](Advanced-Features)** - Silent mode, fan control, OTC
-- **[Multi-Zone Configuration](Multi-Zone-Configuration)** - Managing multiple circuits
-- **[Troubleshooting](Troubleshooting)** - Common issues and solutions
+- **[Water Heater Control](Water-Heater-Control.md)** - Control your DHW system
+- **[Sensors Reference](Sensors-Reference.md)** - All available sensors
+- **[Advanced Features](Advanced-Features.md)** - Silent mode, fan control, OTC
+- **[Multi-Zone Configuration](Multi-Zone-Configuration.md)** - Managing multiple circuits
+- **[Troubleshooting](Troubleshooting.md)** - Common issues and solutions
 
 ---
 
-**[← Back to Configuration](Configuration-Guide)** | **[Next: Water Heater →](Water-Heater-Control)**
+**[← Back to Configuration](Configuration-Guide.md)** | **[Next: Water Heater →](Water-Heater-Control.md)**
 
