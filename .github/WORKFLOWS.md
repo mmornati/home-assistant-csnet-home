@@ -4,6 +4,8 @@ This document describes all GitHub Actions workflows in this repository and thei
 
 ## Workflows Overview
 
+> **Note on Version Testing**: As of 2025, all CI workflows use dynamic version detection from PyPI to ensure tests run against current, relevant Home Assistant versions. No more hardcoded 2024 versions!
+
 ### 1. Release Workflow (`release.yaml`)
 
 **Purpose:** Automate the release process with proper version management
@@ -79,7 +81,58 @@ This document describes all GitHub Actions workflows in this repository and thei
 - ✅ Minimal permissions
 - ✅ No external dependencies
 
-### 5. Labeler Workflow (`labeler.yaml`)
+### 5. Smoke Test Workflow (`smoke-test.yaml`)
+
+**Purpose:** Quick import and basic compatibility validation
+
+**Triggers:**
+- Push to main branch
+- Pull requests
+- Manual workflow dispatch
+
+**Security Measures:**
+- ✅ Read-only permissions
+- ✅ Dynamic version detection from PyPI
+- ✅ Automatic Python version selection
+
+**Key Features:**
+- 🚀 **Fast Testing**: Tests the 3 most recent stable HA versions (2025.x only)
+- 🐍 **Smart Python Detection**: Auto-selects Python 3.12 or 3.13 based on HA requirements
+- ✅ Module import validation
+- ✅ Manifest validation
+- ✅ HA API compatibility checks
+- 💨 Runs on every PR for quick feedback
+
+**Why Only 3 Versions?**
+Smoke tests are meant to be fast. They test basic imports and compatibility. The 3 most recent versions provide good coverage without slowing down PR feedback.
+
+### 6. Integration Test Workflow (`integration-test.yaml`)
+
+**Purpose:** Full Docker-based integration testing with real Home Assistant
+
+**Triggers:**
+- Push to main branch
+- Pull requests
+- Manual workflow dispatch (with optional version override)
+
+**Security Measures:**
+- ✅ Read-only permissions
+- ✅ Isolated Docker containers
+- ✅ Dynamic version detection
+
+**Key Features:**
+- 🐳 **Real HA Environment**: Tests in actual Home Assistant Docker containers
+- 🎯 **Dynamic Versions**: Tests the 2 most recent stable 2025.x versions + "latest"
+- ✅ Integration loading verification
+- ✅ Manifest validation in container
+- ✅ Log analysis for errors
+- 📦 Artifact collection on failure
+- 🔄 Always includes "latest" to catch breaking changes early
+
+**Why Docker?**
+Docker testing is the most accurate way to test integrations, as it runs in the actual Home Assistant environment with all dependencies and the real loading mechanism.
+
+### 7. Labeler Workflow (`labeler.yaml`)
 
 **Purpose:** Auto-label PRs based on changed files
 
@@ -90,7 +143,7 @@ This document describes all GitHub Actions workflows in this repository and thei
 - ✅ Read-only for contents
 - ✅ Write for PRs only
 
-### 6. Nightly Compatibility Check (`nightly-compatibility.yaml`)
+### 8. Nightly Compatibility Check (`nightly-compatibility.yaml`)
 
 **Purpose:** Test integration compatibility with multiple Home Assistant versions
 
@@ -123,6 +176,31 @@ Instead of testing against hardcoded old versions (like 2024.6.4 in October 2025
 - No wasted CI time on ancient versions
 - Automatic adaptation to HA's release cadence
 - Proper Python version matching for each HA release
+
+## Testing Strategy Overview
+
+The repository uses a multi-layered testing approach for Home Assistant compatibility:
+
+| Workflow | Trigger | HA Versions Tested | Speed | Purpose |
+|----------|---------|-------------------|-------|---------|
+| **Smoke Test** | Every PR/Push | 3 most recent (2025.x) | ⚡ Fast | Quick import validation |
+| **Integration Test** | Every PR/Push | 2 most recent + latest | 🐳 Medium | Real Docker environment |
+| **Nightly Check** | Scheduled | 5 most recent + dev | 🌙 Comprehensive | Full compatibility scan |
+
+### Version Selection Philosophy
+
+All workflows now use **dynamic version detection** to ensure relevance:
+
+1. **Current Year Focus**: Only tests against 2025.x versions (no ancient 2024 versions)
+2. **Automatic Updates**: Pulls latest versions from PyPI - no manual updates needed
+3. **Python Version Matching**: Automatically uses Python 3.12 or 3.13 based on HA requirements
+4. **Fail Gracefully**: Skips versions that can't be installed rather than failing
+
+### When to Use Each Test
+
+- **Smoke Test**: Fast feedback on PRs, basic compatibility check
+- **Integration Test**: Validates integration loads in real HA (most important)
+- **Nightly Check**: Comprehensive compatibility testing including dev branch
 
 ## Security Best Practices
 
