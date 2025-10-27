@@ -40,7 +40,7 @@ jobs:
           # Group by month and get the latest patch version from each of the last 3 months
           VERSIONS=""
           for month in $(seq $((CURRENT_MONTH)) -1 $((CURRENT_MONTH - 2))); do
-            if [ $month -lt 1 ]; then
+            if [ "$month" -lt 1 ]; then
               # Handle year boundary (e.g., Jan 2026 looking back to Dec 2025)
               PREV_YEAR=$((CURRENT_YEAR - 1))
               month=$((month + 12))

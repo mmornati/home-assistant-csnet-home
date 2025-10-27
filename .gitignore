@@ -161,3 +161,4 @@ known_devices.yaml
 
 # Pre-commit
 .pre-commit-config.yaml.backup
+actionlint
