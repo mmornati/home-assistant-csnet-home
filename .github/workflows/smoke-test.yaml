@@ -1,6 +1,7 @@
+---
 name: Smoke Test - HA Compatibility
 
-on:
+'on':
   push:
     branches:
       - main
@@ -84,7 +85,8 @@ jobs:
           VERSION="${{ matrix.ha-version }}"
 
           # Get Python requirement for this HA version
-          PY_REQ=$(curl -s https://pypi.org/pypi/homeassistant/$VERSION/json | jq -r '.info.requires_python // ">=3.12.0"')
+          PY_REQ=$(curl -s https://pypi.org/pypi/homeassistant/$VERSION/json \
+            | jq -r '.info.requires_python // ">=3.12.0"')
           echo "HA $VERSION requires: $PY_REQ"
 
           # Determine Python version

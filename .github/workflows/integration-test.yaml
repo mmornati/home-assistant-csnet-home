@@ -1,6 +1,7 @@
+---
 name: Integration Test
 
-on:
+'on':
   push:
     branches:
       - main

@@ -265,7 +265,8 @@ jobs:
           VERSION="${{ matrix.version }}"
 
           # Get Python requirement for this HA version
-          PY_REQ=$(curl -s https://pypi.org/pypi/homeassistant/$VERSION/json | jq -r '.info.requires_python // ">=3.12.0"')
+          PY_REQ=$(curl -s https://pypi.org/pypi/homeassistant/$VERSION/json \
+            | jq -r '.info.requires_python // ">=3.12.0"')
           echo "HA $VERSION requires: $PY_REQ"
 
           # Map requirement to Python version to install
@@ -372,10 +373,13 @@ jobs:
             echo "## Versions Tested"
             echo ""
             echo "- **Latest Stable**: ${{ needs.get-versions-to-test.outputs.latest_version }} 🔥"
-            echo "- **Recent Versions**: $(echo '${{ needs.get-versions-to-test.outputs.versions_matrix }}' | jq -r 'join(", ")')"
+            VERSIONS=$(echo '${{ needs.get-versions-to-test.outputs.versions_matrix }}' \
+              | jq -r 'join(", ")')
+            echo "- **Recent Versions**: $VERSIONS"
             echo "- **Dev Branch**: Latest development version"
             echo ""
-            echo "_Note: Tests dynamically against the 5 most recent stable HA releases with appropriate Python versions_"
+            echo "_Note: Tests dynamically against recent stable HA releases" \
+              "with appropriate Python versions_"
             echo ""
             echo "## Test Results"
             echo ""
