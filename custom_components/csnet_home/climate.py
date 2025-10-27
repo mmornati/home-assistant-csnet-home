@@ -16,6 +16,9 @@ from .const import (
     DOMAIN,
     HEATING_MAX_TEMPERATURE,
     HEATING_MIN_TEMPERATURE,
+    WATER_CIRCUIT_MAX_HEAT,
+    WATER_CIRCUIT_MIN_HEAT,
+    CONF_MAX_TEMP_OVERRIDE,
     FAN_SPEED_MAP,
     FAN_SPEED_REVERSE_MAP,
     OPERATION_STATUS_MAP,
@@ -190,14 +193,32 @@ class CSNetHomeClimate(ClimateEntity):
             zone_id, mode, installation_devices_data
         )
 
-        # Return API limit if available, otherwise use static default
-        return min_limit if min_limit is not None else HEATING_MIN_TEMPERATURE
+        # Return API limit if available, otherwise use static default based on zone type
+        if min_limit is not None:
+            return min_limit
+
+        # Use appropriate fallback based on zone type
+        if zone_id in [5, 6]:  # Water circuits (C1_WATER, C2_WATER)
+            return WATER_CIRCUIT_MIN_HEAT
+        else:  # Air circuits (C1_AIR, C2_AIR)
+            return HEATING_MIN_TEMPERATURE
 
     @property
     def max_temp(self):
-        """Return the maximum temperature based on current mode and API data."""
+        """Return the maximum temperature based on current mode and API data.
+
+        Priority order:
+        1. User-configured override (if set)
+        2. API-provided limit from heatingStatus
+        3. Default based on zone type
+        """
         if self._sensor_data is None:
             return HEATING_MAX_TEMPERATURE
+
+        # Check for user override first
+        max_temp_override = self.entry.data.get(CONF_MAX_TEMP_OVERRIDE)
+        if max_temp_override is not None:
+            return max_temp_override
 
         # Get the current mode to determine temperature limits
         mode = self._sensor_data.get("mode", 1)  # Default to heat mode
@@ -213,8 +234,15 @@ class CSNetHomeClimate(ClimateEntity):
             zone_id, mode, installation_devices_data
         )
 
-        # Return API limit if available, otherwise use static default
-        return max_limit if max_limit is not None else HEATING_MAX_TEMPERATURE
+        # Return API limit if available, otherwise use static default based on zone type
+        if max_limit is not None:
+            return max_limit
+
+        # Use appropriate fallback based on zone type
+        if zone_id in [5, 6]:  # Water circuits (C1_WATER, C2_WATER)
+            return WATER_CIRCUIT_MAX_HEAT
+        else:  # Air circuits (C1_AIR, C2_AIR) - max 35°C (RTU_MAX)
+            return HEATING_MAX_TEMPERATURE
 
     @property
     def unique_id(self) -> str:

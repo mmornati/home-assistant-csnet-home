@@ -8,6 +8,7 @@ INSTALLATION_DEVICES_PATH = "/data/installationdevices"
 INSTALLATION_ALARMS_PATH = "/data/installationalarms"
 HEAT_SETTINGS_PATH = "/data/indoor/heat_setting"
 CONF_ENABLE_DEVICE_LOGGING = "enable_device_logging"
+CONF_MAX_TEMP_OVERRIDE = "max_temp_override"
 COMMON_API_HEADERS = {
     "accept-language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
     "cache-control": "no-cache",
@@ -17,11 +18,16 @@ COMMON_API_HEADERS = {
 }
 DEFAULT_API_TIMEOUT = 10
 
-WATER_HEATER_MAX_TEMPERATURE = 55
+WATER_HEATER_MAX_TEMPERATURE = 80
 WATER_HEATER_MIN_TEMPERATURE = 30
 
-HEATING_MAX_TEMPERATURE = 55
+# Air circuit (RTU) temperature limits - for zones 1, 2 (C1_AIR, C2_AIR)
+HEATING_MAX_TEMPERATURE = 35  # RTU_MAX from JavaScript
 HEATING_MIN_TEMPERATURE = 8
+
+# Water circuit temperature limits - for zones 5, 6 (C1_WATER, C2_WATER)
+WATER_CIRCUIT_MAX_HEAT = 80  # C1_MAX_HEAT / C2_MAX_HEAT from JavaScript
+WATER_CIRCUIT_MIN_HEAT = 20
 
 # Fan Speed Control (for fan coil systems)
 FAN_SPEED_OFF = "0"

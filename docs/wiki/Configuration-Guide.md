@@ -35,6 +35,7 @@ You'll see a configuration dialog with the following fields:
 | **Password** | Your CSNet Manager password | `••••••••` |
 | **Scan Interval** | Update frequency in seconds (default: 60) | `60` |
 | **Language** | Alarm message language | `en` or `fr` |
+| **Max Temp Override** | Optional maximum temperature override (8-80°C) | `45` (leave empty for auto) |
 
 **[PLACEHOLDER: Screenshot of configuration dialog]**
 
@@ -59,6 +60,20 @@ You'll see a configuration dialog with the following fields:
 - **Options**: `en` (English) or `fr` (French)
 - **Default**: `en`
 - Can be changed later by reconfiguring
+
+**Max Temp Override** (Optional, Advanced)
+- Allows you to override the maximum temperature limit for all climate entities
+- **Range**: 8-80°C
+- **Default behavior** (when empty):
+  - Air circuits (standard heat pumps): 35°C maximum
+  - Water circuits (Yutaki/Hydro systems): 80°C maximum  
+  - Water heaters (DHW): 80°C maximum
+- **Use cases**:
+  - Special hardware configurations
+  - Testing purposes
+  - Custom installations requiring non-standard limits
+- ⚠️ **Warning**: Setting this above manufacturer specifications may prevent your system from reaching the target temperature
+- 💡 **Recommendation**: Leave empty unless you have a specific reason to override
 
 ### Step 3: Submit Configuration
 
