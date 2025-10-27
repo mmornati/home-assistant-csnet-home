@@ -96,15 +96,16 @@ This document describes all GitHub Actions workflows in this repository and thei
 - ✅ Automatic Python version selection
 
 **Key Features:**
-- 🚀 **Fast Testing**: Tests the 3 most recent stable HA versions (2025.x only)
+- 🚀 **Fast Testing**: Tests latest version from last 3 months (month-based selection)
 - 🐍 **Smart Python Detection**: Auto-selects Python 3.12 or 3.13 based on HA requirements
 - ✅ Module import validation
 - ✅ Manifest validation
 - ✅ HA API compatibility checks
 - 💨 Runs on every PR for quick feedback
+- 📅 **Year-Agnostic**: Works in any year automatically
 
-**Why Only 3 Versions?**
-Smoke tests are meant to be fast. They test basic imports and compatibility. The 3 most recent versions provide good coverage without slowing down PR feedback.
+**Why Last 3 Months?**
+Smoke tests are meant to be fast. Testing the latest version from each of the last 3 months provides good coverage of recent releases without slowing down PR feedback. If there are multiple patches in a month (e.g., 2025.10.1, 2025.10.2, 2025.10.4), only the latest is tested.
 
 ### 6. Integration Test Workflow (`integration-test.yaml`)
 
@@ -122,15 +123,19 @@ Smoke tests are meant to be fast. They test basic imports and compatibility. The
 
 **Key Features:**
 - 🐳 **Real HA Environment**: Tests in actual Home Assistant Docker containers
-- 🎯 **Dynamic Versions**: Tests the 2 most recent stable 2025.x versions + "latest"
+- 🎯 **Month-Based Selection**: Tests latest version from last 2 months + "latest"
 - ✅ Integration loading verification
 - ✅ Manifest validation in container
 - ✅ Log analysis for errors
 - 📦 Artifact collection on failure
 - 🔄 Always includes "latest" to catch breaking changes early
+- 📅 **Year-Agnostic**: Works across year boundaries automatically
 
 **Why Docker?**
 Docker testing is the most accurate way to test integrations, as it runs in the actual Home Assistant environment with all dependencies and the real loading mechanism.
+
+**Why Last 2 Months + Latest?**
+Docker tests are slower than smoke tests. Testing the latest version from each of the last 2 months plus the "latest" Docker image provides thorough coverage without excessive CI time. The "latest" image ensures we catch breaking changes immediately.
 
 ### 7. Labeler Workflow (`labeler.yaml`)
 
@@ -159,7 +164,7 @@ Docker testing is the most accurate way to test integrations, as it runs in the 
 - ✅ Continue-on-error for non-critical failures
 
 **Key Features:**
-- 🎯 **Dynamic Version Selection**: Automatically fetches the 5 most recent stable HA versions from PyPI
+- 🎯 **Month-Based Version Selection**: Automatically fetches latest version from the last 4 months (by major release)
 - 🐍 **Smart Python Detection**: Detects Python requirements for each HA version and uses the correct Python version
   - Python 3.12 for HA versions up to 2025.5.x
   - Python 3.13 for HA versions 2025.6.0+
@@ -169,13 +174,16 @@ Docker testing is the most accurate way to test integrations, as it runs in the 
 - 📊 Skips tests for versions that fail to install (version not available)
 - 🚨 Creates GitHub issues on failure (scheduled runs only)
 - 📝 Generates comprehensive compatibility report with recommendations
+- 📅 **Year-Agnostic**: Uses current date, works in 2025, 2026, 2027+
 
-**Why Dynamic Versions?**
-Instead of testing against hardcoded old versions (like 2024.6.4 in October 2025), the workflow automatically tests against the most recent stable releases. This ensures:
-- Tests are always relevant and up-to-date
-- No wasted CI time on ancient versions
-- Automatic adaptation to HA's release cadence
-- Proper Python version matching for each HA release
+**Why Month-Based Selection?**
+Instead of testing arbitrary version counts, the workflow selects the latest version from each of the last N months:
+- **October 2025**: Tests 2025.10.x, 2025.9.x, 2025.8.x, 2025.7.x (latest patch from each)
+- **January 2026**: Tests 2026.1.x, 2025.12.x, 2025.11.x, 2025.10.x (handles year boundaries)
+- Always current and relevant
+- Adapts to HA's monthly release cadence
+- Handles multiple patches per month (takes latest)
+- Proper Python version matching for each release
 
 ## Testing Strategy Overview
 
@@ -183,18 +191,22 @@ The repository uses a multi-layered testing approach for Home Assistant compatib
 
 | Workflow | Trigger | HA Versions Tested | Speed | Purpose |
 |----------|---------|-------------------|-------|---------|
-| **Smoke Test** | Every PR/Push | 3 most recent (2025.x) | ⚡ Fast | Quick import validation |
-| **Integration Test** | Every PR/Push | 2 most recent + latest | 🐳 Medium | Real Docker environment |
-| **Nightly Check** | Scheduled | 5 most recent + dev | 🌙 Comprehensive | Full compatibility scan |
+| **Smoke Test** | Every PR/Push | Last 3 months (latest per month) | ⚡ Fast | Quick import validation |
+| **Integration Test** | Every PR/Push | Last 2 months + "latest" | 🐳 Medium | Real Docker environment |
+| **Nightly Check** | Scheduled | Last 4 months + dev branch | 🌙 Comprehensive | Full compatibility scan |
 
 ### Version Selection Philosophy
 
-All workflows now use **dynamic version detection** to ensure relevance:
+All workflows now use **month-based dynamic version detection** to ensure relevance:
 
-1. **Current Year Focus**: Only tests against 2025.x versions (no ancient 2024 versions)
-2. **Automatic Updates**: Pulls latest versions from PyPI - no manual updates needed
-3. **Python Version Matching**: Automatically uses Python 3.12 or 3.13 based on HA requirements
-4. **Fail Gracefully**: Skips versions that can't be installed rather than failing
+1. **Month-Based Selection**: Selects latest version from each of the last N months
+   - Example (Oct 2025): 2025.10.4, 2025.9.3, 2025.8.2
+   - Adapts to current date automatically
+   - Works across year boundaries (Jan 2026 → Dec 2025, Nov 2025, etc.)
+2. **Year-Agnostic**: Uses `date +%Y` - works in 2025, 2026, 2027+ without changes
+3. **Patch-Smart**: If there are multiple patches (2025.10.1, 2025.10.2, 2025.10.4), picks the latest
+4. **Python Version Matching**: Automatically uses Python 3.12 or 3.13 based on HA requirements
+5. **Fail Gracefully**: Skips versions that can't be installed rather than failing
 
 ### When to Use Each Test
 
