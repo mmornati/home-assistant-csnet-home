@@ -261,7 +261,7 @@ jobs:
         uses: actions/checkout@v5.0.0
 
       - name: Download Test Results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           pattern: '*-results*'
           path: artifacts
