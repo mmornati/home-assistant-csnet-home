@@ -20,6 +20,8 @@ from custom_components.csnet_home.const import (
     HEAT_SETTINGS_PATH,
     LOGIN_PATH,
     LANGUAGE_FILES,
+    WATER_CIRCUIT_MAX_HEAT,
+    WATER_CIRCUIT_MIN_HEAT,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -312,12 +314,19 @@ class CSNetHomeAPI:
         """Extract temperature limits from installation devices data.
 
         Args:
-            zone_id: The zone/element type (1, 2, 5, etc.)
+            zone_id: The zone/element type (1, 2, 5, 6, 3)
             mode: The HVAC mode (0=cool, 1=heat, 2=auto)
             installation_devices_data: The installation devices API response
 
         Returns:
             Tuple of (min_temp, max_temp) or (None, None) if not available
+
+        Zone mapping based on JavaScript code:
+        - zone_id 1 = C1_AIR (air circuit 1) - max 35°C (RTU_MAX)
+        - zone_id 2 = C2_AIR (air circuit 2) - max 35°C (RTU_MAX)
+        - zone_id 5 = C1_WATER (water circuit 1) - max 80°C (C1_MAX_HEAT)
+        - zone_id 6 = C2_WATER (water circuit 2) - max 80°C (C2_MAX_HEAT)
+        - zone_id 3 = DHW (water heater) - max 80°C (DHW_MAX)
         """
         if not installation_devices_data:
             return (None, None)
@@ -329,35 +338,37 @@ class CSNetHomeAPI:
         # Determine if we're in heating or cooling mode
         is_heating = mode == 1  # mode 1 is heat, mode 0 is cool
 
-        # Zone mapping based on JavaScript code analysis:
-        # zone_id 1, 2, 4 = air circuits (C1_AIR, C2_AIR)
-        # zone_id 5 = water circuit (C1_WATER)
-        # zone_id 3 = DHW (water heater)
-
         min_temp = None
         max_temp = None
 
-        if zone_id == 1:  # Air circuit 1
+        if zone_id == 1:  # Air circuit 1 (C1_AIR)
             if is_heating:
                 min_temp = heating_status.get("heatAirMinC1")
                 max_temp = heating_status.get("heatAirMaxC1")
             else:
                 min_temp = heating_status.get("coolAirMinC1")
                 max_temp = heating_status.get("coolAirMaxC1")
-        elif zone_id == 2:  # Air circuit 2
+        elif zone_id == 2:  # Air circuit 2 (C2_AIR)
             if is_heating:
                 min_temp = heating_status.get("heatAirMinC2")
                 max_temp = heating_status.get("heatAirMaxC2")
             else:
                 min_temp = heating_status.get("coolAirMinC2")
                 max_temp = heating_status.get("coolAirMaxC2")
-        elif zone_id == 5:  # Water circuit 1 (fixed temperature)
+        elif zone_id == 5:  # Water circuit 1 (C1_WATER)
             if is_heating:
                 min_temp = heating_status.get("heatMinC1")
                 max_temp = heating_status.get("heatMaxC1")
             else:
                 min_temp = heating_status.get("coolMinC1")
                 max_temp = heating_status.get("coolMaxC1")
+        elif zone_id == 6:  # Water circuit 2 (C2_WATER)
+            if is_heating:
+                min_temp = heating_status.get("heatMinC2")
+                max_temp = heating_status.get("heatMaxC2")
+            else:
+                min_temp = heating_status.get("coolMinC2")
+                max_temp = heating_status.get("coolMaxC2")
         elif zone_id == 3:  # DHW (water heater)
             # DHW typically only has a max limit, min is constant
             max_temp = heating_status.get("dhwMax")

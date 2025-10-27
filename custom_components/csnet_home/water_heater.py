@@ -11,7 +11,12 @@ from homeassistant.const import UnitOfTemperature, PRECISION_WHOLE
 from homeassistant.helpers.device_registry import DeviceInfo
 from typing import Any
 
-from .const import DOMAIN, WATER_HEATER_MAX_TEMPERATURE, WATER_HEATER_MIN_TEMPERATURE
+from .const import (
+    DOMAIN,
+    WATER_HEATER_MAX_TEMPERATURE,
+    WATER_HEATER_MIN_TEMPERATURE,
+    CONF_MAX_TEMP_OVERRIDE,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -150,7 +155,18 @@ class CSNetHomeWaterHeater(WaterHeaterEntity):
 
     @property
     def max_temp(self):
-        """Return the maximum temperature for DHW from API data."""
+        """Return the maximum temperature for DHW from API data.
+
+        Priority order:
+        1. User-configured override (if set)
+        2. API-provided limit from heatingStatus
+        3. Default DHW maximum (80°C)
+        """
+        # Check for user override first
+        max_temp_override = self.entry.data.get(CONF_MAX_TEMP_OVERRIDE)
+        if max_temp_override is not None:
+            return max_temp_override
+
         # DHW zone_id is 3, mode is always 1 (heat) for water heater
         zone_id = 3
         mode = 1

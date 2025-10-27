@@ -1420,6 +1420,46 @@ def test_get_temperature_limits_zone3_dhw(hass):
     assert max_temp == 60
 
 
+def test_get_temperature_limits_zone6_heating(hass):
+    """Test temperature limits extraction for zone 6 (C2_WATER water circuit) in heating mode."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    installation_devices_data = {
+        "heatingStatus": {
+            "heatMinC2": 25,
+            "heatMaxC2": 60,
+            "coolMinC2": 15,
+            "coolMaxC2": 22,
+        }
+    }
+
+    # Zone 6, heating mode (mode=1)
+    min_temp, max_temp = api.get_temperature_limits(6, 1, installation_devices_data)
+
+    assert min_temp == 25
+    assert max_temp == 60
+
+
+def test_get_temperature_limits_zone6_cooling(hass):
+    """Test temperature limits extraction for zone 6 (C2_WATER water circuit) in cooling mode."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    installation_devices_data = {
+        "heatingStatus": {
+            "heatMinC2": 25,
+            "heatMaxC2": 60,
+            "coolMinC2": 15,
+            "coolMaxC2": 22,
+        }
+    }
+
+    # Zone 6, cooling mode (mode=0)
+    min_temp, max_temp = api.get_temperature_limits(6, 0, installation_devices_data)
+
+    assert min_temp == 15
+    assert max_temp == 22
+
+
 def test_get_temperature_limits_no_data(hass):
     """Test temperature limits extraction when no installation devices data is available."""
     api = CSNetHomeAPI(hass, "user", "pass")
