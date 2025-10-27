@@ -90,6 +90,40 @@ This document describes all GitHub Actions workflows in this repository and thei
 - ✅ Read-only for contents
 - ✅ Write for PRs only
 
+### 6. Nightly Compatibility Check (`nightly-compatibility.yaml`)
+
+**Purpose:** Test integration compatibility with multiple Home Assistant versions
+
+**Triggers:**
+- Scheduled (nightly at 2 AM UTC)
+- Manual workflow dispatch
+
+**Security Measures:**
+- ✅ Minimal permissions (contents: read, issues: write)
+- ✅ Dynamic version detection from PyPI
+- ✅ Automatic Python version selection based on HA requirements
+- ✅ Proper error handling for failed installations
+- ✅ Continue-on-error for non-critical failures
+
+**Key Features:**
+- 🎯 **Dynamic Version Selection**: Automatically fetches the 5 most recent stable HA versions from PyPI
+- 🐍 **Smart Python Detection**: Detects Python requirements for each HA version and uses the correct Python version
+  - Python 3.12 for HA versions up to 2025.5.x
+  - Python 3.13 for HA versions 2025.6.0+
+- ✅ Tests against latest stable HA version with full test suite
+- 🔬 Tests against HA dev branch for upcoming breaking changes
+- 💨 Smoke tests across multiple recent HA versions (import verification)
+- 📊 Skips tests for versions that fail to install (version not available)
+- 🚨 Creates GitHub issues on failure (scheduled runs only)
+- 📝 Generates comprehensive compatibility report with recommendations
+
+**Why Dynamic Versions?**
+Instead of testing against hardcoded old versions (like 2024.6.4 in October 2025), the workflow automatically tests against the most recent stable releases. This ensures:
+- Tests are always relevant and up-to-date
+- No wasted CI time on ancient versions
+- Automatic adaptation to HA's release cadence
+- Proper Python version matching for each HA release
+
 ## Security Best Practices
 
 ### 1. Minimal Permissions
@@ -170,6 +204,41 @@ pytest tests/
 - Check if PR is in draft mode (drafts are skipped)
 - Check if changed files include custom_components
 - Review workflow run logs
+
+### Nightly Compatibility Issues
+
+**Issue:** Tests fail with "No module named 'homeassistant'"
+```bash
+# This usually means Python version mismatch
+# The workflow now automatically detects and uses the correct Python version
+# Check the "Determine Python Version" step in the workflow logs
+# HA 2025.6+ requires Python 3.13, earlier versions use 3.12
+```
+
+**Issue:** All smoke tests show "SKIPPED (version not available)"
+```bash
+# This is normal if PyPI temporarily has issues
+# The workflow will automatically skip unavailable versions
+# Check PyPI status: https://status.python.org/
+# Or verify versions exist: curl -s https://pypi.org/pypi/homeassistant/json | jq '.releases | keys'
+```
+
+**Issue:** Tests pass on old versions but fail on latest
+```bash
+# This indicates a breaking change in the latest Home Assistant release
+# Review the compatibility report artifact for details
+# Check Home Assistant release notes for breaking changes
+# Update the integration to support the new HA API changes
+```
+
+**Issue:** Want to test against specific older versions
+```bash
+# The workflow now dynamically tests the 5 most recent stable versions
+# To add specific versions, modify get-versions-to-test job
+# Or run integration tests locally with specific HA versions:
+pip install homeassistant==2025.9.0
+pytest tests/
+```
 
 ## Workflow Maintenance
 
