@@ -597,7 +597,7 @@ act pull_request -W .github/workflows/validate.yaml
 
 # Check Home Assistant version compatibility
 pip install homeassistant==2025.10.0
-python -c "import homeassistant; print(homeassistant.__version__)"
+python -c "import homeassistant; print(homeassistant.const.__version__)"
 ```
 
 ---
