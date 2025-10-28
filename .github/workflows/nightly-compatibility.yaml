@@ -81,7 +81,7 @@ jobs:
           pip install -r custom_components/csnet_home/requirements-dev.txt
 
           # Verify installation
-          python -c "import homeassistant; print(f'✅ Installed: {homeassistant.__version__}')"
+          python -c "from homeassistant.const import __version__; print(f'✅ Installed: {__version__}')"
 
       - name: Run Tests Against Latest Stable
         id: test-stable
@@ -317,9 +317,9 @@ jobs:
 
           try:
               from custom_components.csnet_home import api, climate, sensor, water_heater
-              import homeassistant
+              from homeassistant.const import __version__ as ha_version
               print(f"✅ All modules imported successfully")
-              print(f"   Tested with HA version: {homeassistant.__version__}")
+              print(f"   Tested with HA version: {ha_version}")
               print(f"   Matrix version: ${{ matrix.version }}")
           except Exception as e:
               print(f"❌ Import failed: {e}")
