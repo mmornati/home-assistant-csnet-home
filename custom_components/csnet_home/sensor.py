@@ -1681,9 +1681,8 @@ class CSNetHomeCompressorSensor(CoordinatorEntity, Entity):
                 return None
         else:
             if self._key == "secondary_discharge_temp":
-                value = second_cycle.get("dischargeTemp")
-                # 0 might indicate inactive, but could also be a real value
-                return value if value != 0 else None
+                # 0°C is a valid temperature reading, don't filter it out
+                return second_cycle.get("dischargeTemp")
 
             if self._key == "secondary_suction_temp":
                 return second_cycle.get("suctionTemp")
