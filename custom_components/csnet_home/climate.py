@@ -171,6 +171,34 @@ class CSNetHomeClimate(ClimateEntity):
         """Return the target temperature set by the user."""
         if self._sensor_data is None:
             return None
+
+        zone_id = self._sensor_data.get("zone_id")
+
+        # For water circuits (zone 5, 6), only return target temperature if OTC type is FIX
+        # Otherwise, the temperature is controlled by law/curve/gradient and cannot be set
+        if zone_id in [5, 6]:  # Water circuits (C1_WATER, C2_WATER)
+            # Get installation devices data to check OTC type
+            coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
+            installation_devices_data = coordinator.get_installation_devices_data()
+
+            if installation_devices_data:
+                cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
+                mode = self._sensor_data.get("mode", 1)
+
+                # Determine circuit number from zone_id
+                circuit = 1 if zone_id == 5 else 2
+
+                # Check if fixed temperature is editable (OTC type is FIX)
+                is_editable = cloud_api.is_fixed_water_temperature_editable(
+                    circuit, mode, installation_devices_data
+                )
+
+                if not is_editable:
+                    # OTC type is not FIX, temperature is controlled by law/curve/gradient
+                    # Return None to indicate it's not editable via climate entity
+                    # The user should use the number entity instead (if available)
+                    return None
+
         return self._sensor_data["setting_temperature"]
 
     @property
@@ -324,7 +352,10 @@ class CSNetHomeClimate(ClimateEntity):
 
         # Add OTC (Outdoor Temperature Compensation) information
         if installation_devices_data:
-            heating_status = installation_devices_data.get("heatingStatus", {})
+            cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
+            heating_status = cloud_api.get_heating_status_from_installation_devices(
+                installation_devices_data
+            )
             zone_id = self._sensor_data.get("zone_id")
 
             # Determine which circuit this zone belongs to
@@ -359,9 +390,37 @@ class CSNetHomeClimate(ClimateEntity):
     async def async_set_temperature(self, **kwargs):
         """Set the target temperature for a room."""
         temperature = kwargs.get("temperature")
+        zone_id = self._sensor_data.get("zone_id")
+
+        # For water circuits (zone 5, 6), only allow temperature changes if OTC type is FIX
+        if zone_id in [5, 6]:  # Water circuits (C1_WATER, C2_WATER)
+            # Get installation devices data to check OTC type
+            coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
+            installation_devices_data = coordinator.get_installation_devices_data()
+
+            if installation_devices_data:
+                cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
+                mode = self._sensor_data.get("mode", 1)
+
+                # Determine circuit number from zone_id
+                circuit = 1 if zone_id == 5 else 2
+
+                # Check if fixed temperature is editable (OTC type is FIX)
+                is_editable = cloud_api.is_fixed_water_temperature_editable(
+                    circuit, mode, installation_devices_data
+                )
+
+                if not is_editable:
+                    _LOGGER.warning(
+                        "Cannot set temperature for water circuit %d: OTC type is not FIX. "
+                        "Use the fixed water temperature number entity instead.",
+                        circuit,
+                    )
+                    return
+
         cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
         response = await cloud_api.async_set_temperature(
-            self._sensor_data["zone_id"],
+            zone_id,
             self._sensor_data["parent_id"],
             self._sensor_data["mode"],
             temperature=temperature,
