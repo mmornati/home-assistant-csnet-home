@@ -228,8 +228,8 @@ class CSNetHomeClimate(ClimateEntity):
         # Use appropriate fallback based on zone type
         if zone_id in [5, 6]:  # Water circuits (C1_WATER, C2_WATER)
             return WATER_CIRCUIT_MIN_HEAT
-        else:  # Air circuits (C1_AIR, C2_AIR)
-            return HEATING_MIN_TEMPERATURE
+        # Air circuits (C1_AIR, C2_AIR)
+        return HEATING_MIN_TEMPERATURE
 
     @property
     def max_temp(self):
@@ -269,8 +269,8 @@ class CSNetHomeClimate(ClimateEntity):
         # Use appropriate fallback based on zone type
         if zone_id in [5, 6]:  # Water circuits (C1_WATER, C2_WATER)
             return WATER_CIRCUIT_MAX_HEAT
-        else:  # Air circuits (C1_AIR, C2_AIR) - max 35°C (RTU_MAX)
-            return HEATING_MAX_TEMPERATURE
+        # Air circuits (C1_AIR, C2_AIR) - max 35°C (RTU_MAX)
+        return HEATING_MAX_TEMPERATURE
 
     @property
     def unique_id(self) -> str:

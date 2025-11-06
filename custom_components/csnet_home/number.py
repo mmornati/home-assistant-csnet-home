@@ -36,9 +36,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
         _LOGGER.debug("No installation devices data available for number entities")
         return None
 
-    # Get API instance
-    cloud_api = hass.data[DOMAIN][entry.entry_id]["api"]
-
     # Get heating status from installation devices
     # Navigate through: data[0].indoors[0].heatingStatus and heatingSetting
     heating_status = None

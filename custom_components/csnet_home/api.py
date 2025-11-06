@@ -20,8 +20,6 @@ from custom_components.csnet_home.const import (
     HEAT_SETTINGS_PATH,
     LOGIN_PATH,
     LANGUAGE_FILES,
-    WATER_CIRCUIT_MAX_HEAT,
-    WATER_CIRCUIT_MIN_HEAT,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -1038,12 +1036,12 @@ class CSNetHomeAPI:
             otc_type = heating_status.get(otc_key, 0)
             # OTC_HEATING_TYPE_FIX = 3
             return otc_type == 3
-        elif mode == 0:  # Cooling mode
+        if mode == 0:  # Cooling mode
             otc_key = f"otcTypeCoolC{circuit}"
             otc_type = heating_status.get(otc_key, 0)
             # OTC_COOLING_TYPE_FIX = 2
             return otc_type == 2
-        elif mode == 2:  # Auto mode - check both heating and cooling
+        if mode == 2:  # Auto mode - check both heating and cooling
             otc_heat_key = f"otcTypeHeatC{circuit}"
             otc_cool_key = f"otcTypeCoolC{circuit}"
             otc_heat_type = heating_status.get(otc_heat_key, 0)
@@ -1080,11 +1078,11 @@ class CSNetHomeAPI:
         if mode == 1:  # Heating mode
             temp_key = f"fixTempHeatC{circuit}"
             return heating_setting.get(temp_key)
-        elif mode == 0:  # Cooling mode
+        if mode == 0:  # Cooling mode
             temp_key = f"fixTempCoolC{circuit}"
             return heating_setting.get(temp_key)
         # For auto mode, prefer heating temperature if available
-        elif mode == 2:  # Auto mode
+        if mode == 2:  # Auto mode
             temp_heat_key = f"fixTempHeatC{circuit}"
             temp_cool_key = f"fixTempCoolC{circuit}"
             # Return heating temp if available, otherwise cooling temp
