@@ -23,6 +23,7 @@ from .const import (
     DOMAIN,
     OTC_HEATING_TYPE_NAMES,
     OTC_COOLING_TYPE_NAMES,
+    OPERATION_STATUS_MAP,
 )
 from .coordinator import CSNetHomeCoordinator
 
@@ -1635,18 +1636,9 @@ class CSNetHomeCompressorSensor(CoordinatorEntity, Entity):
         # Outdoor unit information
         if self._key == "operation_status":
             value = heating_status.get("operationStatus")
-            # Decode operation status codes
-            operation_status_map = {
-                0: "Standby",
-                1: "Preheating",
-                2: "Heating",
-                3: "Cooling",
-                4: "DHW",
-                5: "Idle",
-                6: "Defrost",
-                7: "Stop",
-            }
-            return operation_status_map.get(value, f"Unknown ({value})")
+            if value is None:
+                return None
+            return OPERATION_STATUS_MAP.get(value, f"Unknown ({value})")
 
         if self._key == "system_status_flags":
             # Return as hex string for easier interpretation
@@ -1754,8 +1746,12 @@ class CSNetHomeCompressorSensor(CoordinatorEntity, Entity):
         if self._key == "operation_status":
             heating_status = self._get_heating_status()
             if heating_status:
+                raw_value = heating_status.get("operationStatus")
                 return {
-                    "raw_value": heating_status.get("operationStatus"),
+                    "raw_value": raw_value,
+                    "status_text": OPERATION_STATUS_MAP.get(
+                        raw_value, f"Unknown ({raw_value})"
+                    ),
                     "defrosting": bool(heating_status.get("defrosting", 0)),
                 }
 
