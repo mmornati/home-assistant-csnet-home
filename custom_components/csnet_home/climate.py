@@ -1,5 +1,6 @@
 """Create a Climate Component for Home Assistant."""
 
+import asyncio
 import logging
 
 from homeassistant.components.climate import (
@@ -427,6 +428,14 @@ class CSNetHomeClimate(ClimateEntity):
         )
         if response:
             self._sensor_data["setting_temperature"] = temperature
+            # For water circuits (zone 5, 6), refresh data to get updated fixed temperature
+            if zone_id in [5, 6]:
+                # Wait a short delay to ensure the server has processed the change
+                # The API sometimes ignores calls between two requests
+                await asyncio.sleep(1.5)
+                # Request coordinator refresh to update the value immediately
+                coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
+                await coordinator.async_refresh()
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode):
         """Set new target hvac mode."""
