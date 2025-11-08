@@ -1,5 +1,6 @@
 """Create a Climate Component for Home Assistant."""
 
+import asyncio
 import logging
 
 from homeassistant.components.climate import (
@@ -171,6 +172,34 @@ class CSNetHomeClimate(ClimateEntity):
         """Return the target temperature set by the user."""
         if self._sensor_data is None:
             return None
+
+        zone_id = self._sensor_data.get("zone_id")
+
+        # For water circuits (zone 5, 6), only return target temperature if OTC type is FIX
+        # Otherwise, the temperature is controlled by law/curve/gradient and cannot be set
+        if zone_id in [5, 6]:  # Water circuits (C1_WATER, C2_WATER)
+            # Get installation devices data to check OTC type
+            coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
+            installation_devices_data = coordinator.get_installation_devices_data()
+
+            if installation_devices_data:
+                cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
+                mode = self._sensor_data.get("mode", 1)
+
+                # Determine circuit number from zone_id
+                circuit = 1 if zone_id == 5 else 2
+
+                # Check if fixed temperature is editable (OTC type is FIX)
+                is_editable = cloud_api.is_fixed_water_temperature_editable(
+                    circuit, mode, installation_devices_data
+                )
+
+                if not is_editable:
+                    # OTC type is not FIX, temperature is controlled by law/curve/gradient
+                    # Return None to indicate it's not editable via climate entity
+                    # The user should use the number entity instead (if available)
+                    return None
+
         return self._sensor_data["setting_temperature"]
 
     @property
@@ -200,8 +229,8 @@ class CSNetHomeClimate(ClimateEntity):
         # Use appropriate fallback based on zone type
         if zone_id in [5, 6]:  # Water circuits (C1_WATER, C2_WATER)
             return WATER_CIRCUIT_MIN_HEAT
-        else:  # Air circuits (C1_AIR, C2_AIR)
-            return HEATING_MIN_TEMPERATURE
+        # Air circuits (C1_AIR, C2_AIR)
+        return HEATING_MIN_TEMPERATURE
 
     @property
     def max_temp(self):
@@ -241,8 +270,8 @@ class CSNetHomeClimate(ClimateEntity):
         # Use appropriate fallback based on zone type
         if zone_id in [5, 6]:  # Water circuits (C1_WATER, C2_WATER)
             return WATER_CIRCUIT_MAX_HEAT
-        else:  # Air circuits (C1_AIR, C2_AIR) - max 35°C (RTU_MAX)
-            return HEATING_MAX_TEMPERATURE
+        # Air circuits (C1_AIR, C2_AIR) - max 35°C (RTU_MAX)
+        return HEATING_MAX_TEMPERATURE
 
     @property
     def unique_id(self) -> str:
@@ -324,7 +353,10 @@ class CSNetHomeClimate(ClimateEntity):
 
         # Add OTC (Outdoor Temperature Compensation) information
         if installation_devices_data:
-            heating_status = installation_devices_data.get("heatingStatus", {})
+            cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
+            heating_status = cloud_api.get_heating_status_from_installation_devices(
+                installation_devices_data
+            )
             zone_id = self._sensor_data.get("zone_id")
 
             # Determine which circuit this zone belongs to
@@ -359,15 +391,51 @@ class CSNetHomeClimate(ClimateEntity):
     async def async_set_temperature(self, **kwargs):
         """Set the target temperature for a room."""
         temperature = kwargs.get("temperature")
+        zone_id = self._sensor_data.get("zone_id")
+
+        # For water circuits (zone 5, 6), only allow temperature changes if OTC type is FIX
+        if zone_id in [5, 6]:  # Water circuits (C1_WATER, C2_WATER)
+            # Get installation devices data to check OTC type
+            coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
+            installation_devices_data = coordinator.get_installation_devices_data()
+
+            if installation_devices_data:
+                cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
+                mode = self._sensor_data.get("mode", 1)
+
+                # Determine circuit number from zone_id
+                circuit = 1 if zone_id == 5 else 2
+
+                # Check if fixed temperature is editable (OTC type is FIX)
+                is_editable = cloud_api.is_fixed_water_temperature_editable(
+                    circuit, mode, installation_devices_data
+                )
+
+                if not is_editable:
+                    _LOGGER.warning(
+                        "Cannot set temperature for water circuit %d: OTC type is not FIX. "
+                        "Use the fixed water temperature number entity instead.",
+                        circuit,
+                    )
+                    return
+
         cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
         response = await cloud_api.async_set_temperature(
-            self._sensor_data["zone_id"],
+            zone_id,
             self._sensor_data["parent_id"],
             self._sensor_data["mode"],
             temperature=temperature,
         )
         if response:
             self._sensor_data["setting_temperature"] = temperature
+            # For water circuits (zone 5, 6), refresh data to get updated fixed temperature
+            if zone_id in [5, 6]:
+                # Wait a short delay to ensure the server has processed the change
+                # The API sometimes ignores calls between two requests
+                await asyncio.sleep(1.5)
+                # Request coordinator refresh to update the value immediately
+                coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
+                await coordinator.async_refresh()
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode):
         """Set new target hvac mode."""
