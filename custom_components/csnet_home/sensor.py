@@ -32,28 +32,28 @@ _LOGGER = logging.getLogger(__name__)
 
 def _convert_unsigned_to_signed_byte(value):
     """Convert an unsigned byte (0-255) to a signed byte (-128 to 127).
-    
+
     This is necessary because temperature values transmitted from the device
     may be sent as unsigned bytes (0-255), but should be interpreted as signed
     when they represent negative temperatures.
-    
+
     For example:
     - 246 (unsigned) should be interpreted as -10°C (signed)
     - 250 (unsigned) should be interpreted as -6°C (signed)
-    
+
     Args:
         value: The value to convert (int or None)
-        
+
     Returns:
         Converted signed value or None if input is None
     """
     if value is None or not isinstance(value, int):
         return value
-    
+
     # If the value is in the range 128-255, it should be converted to negative
     if value > 127:
         return value - 256
-    
+
     return value
 
 
@@ -1628,13 +1628,19 @@ class CSNetHomeCompressorSensor(CoordinatorEntity, Entity):
 
         # Temperatures
         if self._key == "discharge_temperature":
-            return _convert_unsigned_to_signed_byte(heating_status.get("ouDischargeTemperature"))
+            return _convert_unsigned_to_signed_byte(
+                heating_status.get("ouDischargeTemperature")
+            )
 
         if self._key == "evaporator_temperature":
-            return _convert_unsigned_to_signed_byte(heating_status.get("ouEvapTemperature"))
+            return _convert_unsigned_to_signed_byte(
+                heating_status.get("ouEvapTemperature")
+            )
 
         if self._key == "outdoor_ambient_temperature":
-            return _convert_unsigned_to_signed_byte(heating_status.get("ouAmbientTemperature"))
+            return _convert_unsigned_to_signed_byte(
+                heating_status.get("ouAmbientTemperature")
+            )
 
         # Pressures
         if self._key == "discharge_pressure":
@@ -1701,7 +1707,9 @@ class CSNetHomeCompressorSensor(CoordinatorEntity, Entity):
         else:
             if self._key == "secondary_discharge_temp":
                 # 0°C is a valid temperature reading, don't filter it out
-                return _convert_unsigned_to_signed_byte(second_cycle.get("dischargeTemp"))
+                return _convert_unsigned_to_signed_byte(
+                    second_cycle.get("dischargeTemp")
+                )
 
             if self._key == "secondary_suction_temp":
                 return _convert_unsigned_to_signed_byte(second_cycle.get("suctionTemp"))
