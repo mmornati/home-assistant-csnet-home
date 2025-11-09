@@ -12,6 +12,8 @@ from custom_components.csnet_home.sensor import (
     CSNetHomeDeviceSensor,
     CSNetHomeAlarmHistorySensor,
     CSNetHomeAlarmStatisticsSensor,
+    CSNetHomeCompressorSensor,
+    _convert_unsigned_to_signed_byte,
 )
 from custom_components.csnet_home.const import (
     OTC_HEATING_TYPE_NONE,
@@ -2387,3 +2389,417 @@ def test_otc_sensors_no_installation_data():
         "OTC Cooling Type C1",
     )
     assert sensor_cool_c1.state == "Unknown"
+
+
+# Tests for Issue #124: Compressor Temperature Negative Value Overflow Fix
+
+
+def test_convert_unsigned_to_signed_byte_positive_values():
+    """Test conversion of unsigned bytes that should remain positive."""
+    # Values 0-127 should remain unchanged
+    assert _convert_unsigned_to_signed_byte(0) == 0
+    assert _convert_unsigned_to_signed_byte(1) == 1
+    assert _convert_unsigned_to_signed_byte(50) == 50
+    assert _convert_unsigned_to_signed_byte(100) == 100
+    assert _convert_unsigned_to_signed_byte(127) == 127
+
+
+def test_convert_unsigned_to_signed_byte_negative_values():
+    """Test conversion of unsigned bytes that should become negative.
+    
+    When API sends unsigned bytes (0-255) for temperature values:
+    - 128 (0x80) represents -128°C
+    - 255 (0xFF) represents -1°C
+    - 246 (0xF6) represents -10°C
+    - 250 (0xFA) represents -6°C
+    """
+    # Values 128-255 should be converted to negative
+    assert _convert_unsigned_to_signed_byte(128) == -128
+    assert _convert_unsigned_to_signed_byte(255) == -1
+    assert _convert_unsigned_to_signed_byte(246) == -10
+    assert _convert_unsigned_to_signed_byte(250) == -6
+    assert _convert_unsigned_to_signed_byte(254) == -2
+    assert _convert_unsigned_to_signed_byte(240) == -16
+    assert _convert_unsigned_to_signed_byte(200) == -56
+
+
+def test_convert_unsigned_to_signed_byte_edge_cases():
+    """Test edge cases for byte conversion."""
+    # None should remain None
+    assert _convert_unsigned_to_signed_byte(None) is None
+    
+    # Non-integer values should be passed through
+    assert _convert_unsigned_to_signed_byte(25.5) == 25.5
+    assert _convert_unsigned_to_signed_byte("100") == "100"
+    assert _convert_unsigned_to_signed_byte([]) == []
+
+
+def test_compressor_evaporator_temperature_positive():
+    """Test compressor evaporator temperature sensor with positive values."""
+    device_data = {
+        "device_name": "Compressor",
+        "device_id": "compressor",
+        "room_name": "Outdoor Unit",
+        "parent_id": "outdoor",
+        "room_id": "outdoor",
+    }
+    common_data = {"name": "Hitachi Installation", "firmware": "1.0.0"}
+    
+    # Mock installation devices data with positive evaporator temperature
+    installation_data = {
+        "data": [
+            {
+                "indoors": [
+                    {
+                        "heatingStatus": {
+                            "ouEvapTemperature": 45,  # Positive 45°C
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    
+    coordinator = SimpleNamespace(
+        get_installation_devices_data=lambda: installation_data,
+    )
+    
+    s = CSNetHomeCompressorSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "evaporator_temperature",
+        "temperature",
+        "°C",
+        "Evaporator Temperature",
+    )
+    
+    assert s.state == 45
+
+
+def test_compressor_evaporator_temperature_negative():
+    """Test compressor evaporator temperature sensor with negative values.
+    
+    This addresses Issue #124 where negative evaporator temperatures
+    were being displayed as values above 250°C due to unsigned byte overflow.
+    """
+    device_data = {
+        "device_name": "Compressor",
+        "device_id": "compressor",
+        "room_name": "Outdoor Unit",
+        "parent_id": "outdoor",
+        "room_id": "outdoor",
+    }
+    common_data = {"name": "Hitachi Installation", "firmware": "1.0.0"}
+    
+    # Mock installation devices data with negative evaporator temperature
+    # API sends 246 (unsigned) which should be interpreted as -10°C
+    installation_data = {
+        "data": [
+            {
+                "indoors": [
+                    {
+                        "heatingStatus": {
+                            "ouEvapTemperature": 246,  # Unsigned representation of -10°C
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    
+    coordinator = SimpleNamespace(
+        get_installation_devices_data=lambda: installation_data,
+    )
+    
+    s = CSNetHomeCompressorSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "evaporator_temperature",
+        "temperature",
+        "°C",
+        "Evaporator Temperature",
+    )
+    
+    # Should be -10, NOT 246
+    assert s.state == -10
+
+
+def test_compressor_discharge_temperature_negative():
+    """Test compressor discharge temperature with negative value conversion."""
+    device_data = {
+        "device_name": "Compressor",
+        "device_id": "compressor",
+        "room_name": "Outdoor Unit",
+        "parent_id": "outdoor",
+        "room_id": "outdoor",
+    }
+    common_data = {"name": "Hitachi Installation", "firmware": "1.0.0"}
+    
+    # API sends 250 (unsigned) which should be interpreted as -6°C
+    installation_data = {
+        "data": [
+            {
+                "indoors": [
+                    {
+                        "heatingStatus": {
+                            "ouDischargeTemperature": 250,  # Unsigned representation of -6°C
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    
+    coordinator = SimpleNamespace(
+        get_installation_devices_data=lambda: installation_data,
+    )
+    
+    s = CSNetHomeCompressorSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "discharge_temperature",
+        "temperature",
+        "°C",
+        "Discharge Temperature",
+    )
+    
+    # Should be -6, NOT 250
+    assert s.state == -6
+
+
+def test_compressor_outdoor_ambient_temperature_negative():
+    """Test compressor outdoor ambient temperature with negative value conversion."""
+    device_data = {
+        "device_name": "Compressor",
+        "device_id": "compressor",
+        "room_name": "Outdoor Unit",
+        "parent_id": "outdoor",
+        "room_id": "outdoor",
+    }
+    common_data = {"name": "Hitachi Installation", "firmware": "1.0.0"}
+    
+    # API sends 240 (unsigned) which should be interpreted as -16°C
+    installation_data = {
+        "data": [
+            {
+                "indoors": [
+                    {
+                        "heatingStatus": {
+                            "ouAmbientTemperature": 240,  # Unsigned representation of -16°C
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    
+    coordinator = SimpleNamespace(
+        get_installation_devices_data=lambda: installation_data,
+    )
+    
+    s = CSNetHomeCompressorSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "outdoor_ambient_temperature",
+        "temperature",
+        "°C",
+        "Outdoor Ambient Temperature",
+    )
+    
+    # Should be -16, NOT 240
+    assert s.state == -16
+
+
+def test_compressor_secondary_discharge_temperature_negative():
+    """Test secondary cycle discharge temperature with negative value conversion."""
+    device_data = {
+        "device_name": "Compressor",
+        "device_id": "compressor",
+        "room_name": "Outdoor Unit",
+        "parent_id": "outdoor",
+        "room_id": "outdoor",
+    }
+    common_data = {"name": "Hitachi Installation", "firmware": "1.0.0"}
+    
+    # API sends 254 (unsigned) which should be interpreted as -2°C
+    installation_data = {
+        "data": [
+            {
+                "indoors": [
+                    {
+                        "heatingStatus": {"ouEvapTemperature": 20},
+                    }
+                ],
+                "secondCycle": {
+                    "dischargeTemp": 254,  # Unsigned representation of -2°C
+                }
+            }
+        ]
+    }
+    
+    coordinator = SimpleNamespace(
+        get_installation_devices_data=lambda: installation_data,
+    )
+    
+    s = CSNetHomeCompressorSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "secondary_discharge_temp",
+        "temperature",
+        "°C",
+        "Secondary Discharge Temperature",
+    )
+    
+    # Should be -2, NOT 254
+    assert s.state == -2
+
+
+def test_compressor_secondary_suction_temperature_negative():
+    """Test secondary cycle suction temperature with negative value conversion."""
+    device_data = {
+        "device_name": "Compressor",
+        "device_id": "compressor",
+        "room_name": "Outdoor Unit",
+        "parent_id": "outdoor",
+        "room_id": "outdoor",
+    }
+    common_data = {"name": "Hitachi Installation", "firmware": "1.0.0"}
+    
+    # API sends 128 (unsigned) which should be interpreted as -128°C
+    installation_data = {
+        "data": [
+            {
+                "indoors": [
+                    {
+                        "heatingStatus": {"ouEvapTemperature": 20},
+                    }
+                ],
+                "secondCycle": {
+                    "suctionTemp": 128,  # Unsigned representation of -128°C (extreme cold)
+                }
+            }
+        ]
+    }
+    
+    coordinator = SimpleNamespace(
+        get_installation_devices_data=lambda: installation_data,
+    )
+    
+    s = CSNetHomeCompressorSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "secondary_suction_temp",
+        "temperature",
+        "°C",
+        "Secondary Suction Temperature",
+    )
+    
+    # Should be -128, NOT 128
+    assert s.state == -128
+
+
+def test_compressor_temperatures_extreme_values():
+    """Test temperature conversion with various extreme values."""
+    device_data = {
+        "device_name": "Compressor",
+        "device_id": "compressor",
+        "room_name": "Outdoor Unit",
+        "parent_id": "outdoor",
+        "room_id": "outdoor",
+    }
+    common_data = {"name": "Hitachi Installation", "firmware": "1.0.0"}
+    
+    # Test extreme cold
+    installation_data = {
+        "data": [
+            {
+                "indoors": [
+                    {
+                        "heatingStatus": {
+                            "ouEvapTemperature": 200,  # -56°C
+                            "ouDischargeTemperature": 220,  # -36°C
+                            "ouAmbientTemperature": 225,  # -31°C
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    
+    coordinator = SimpleNamespace(
+        get_installation_devices_data=lambda: installation_data,
+    )
+    
+    s_evap = CSNetHomeCompressorSensor(
+        coordinator, device_data, common_data, "evaporator_temperature", "temperature", "°C", "Evaporator"
+    )
+    s_discharge = CSNetHomeCompressorSensor(
+        coordinator, device_data, common_data, "discharge_temperature", "temperature", "°C", "Discharge"
+    )
+    s_ambient = CSNetHomeCompressorSensor(
+        coordinator, device_data, common_data, "outdoor_ambient_temperature", "temperature", "°C", "Ambient"
+    )
+    
+    assert s_evap.state == -56
+    assert s_discharge.state == -36
+    assert s_ambient.state == -31
+    
+    # Test extreme heat
+    installation_data["data"][0]["indoors"][0]["heatingStatus"]["ouEvapTemperature"] = 100  # 100°C
+    installation_data["data"][0]["indoors"][0]["heatingStatus"]["ouDischargeTemperature"] = 80  # 80°C
+    installation_data["data"][0]["indoors"][0]["heatingStatus"]["ouAmbientTemperature"] = 50  # 50°C
+    
+    assert s_evap.state == 100
+    assert s_discharge.state == 80
+    assert s_ambient.state == 50
+
+
+def test_compressor_temperature_none_values():
+    """Test that None temperature values are handled correctly."""
+    device_data = {
+        "device_name": "Compressor",
+        "device_id": "compressor",
+        "room_name": "Outdoor Unit",
+        "parent_id": "outdoor",
+        "room_id": "outdoor",
+    }
+    common_data = {"name": "Hitachi Installation", "firmware": "1.0.0"}
+    
+    # Mock with None values
+    installation_data = {
+        "data": [
+            {
+                "indoors": [
+                    {
+                        "heatingStatus": {
+                            "ouEvapTemperature": None,
+                            "ouDischargeTemperature": None,
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    
+    coordinator = SimpleNamespace(
+        get_installation_devices_data=lambda: installation_data,
+    )
+    
+    s = CSNetHomeCompressorSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "evaporator_temperature",
+        "temperature",
+        "°C",
+        "Evaporator Temperature",
+    )
+    
+    # Should return None, not crash
+    assert s.state is None
