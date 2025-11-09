@@ -26,9 +26,13 @@ help:
 	@echo ""
 
 install-dev:
-	@echo "Installing development dependencies..."
-	pip install -r custom_components/csnet_home/requirements-dev.txt
-	pre-commit install
+	@echo "Creating virtual environment (.venv) if needed..."
+	python3 -m venv .venv
+	@echo "Installing development dependencies inside .venv..."
+	. .venv/bin/activate && pip install --upgrade pip
+	. .venv/bin/activate && pip install -r custom_components/csnet_home/requirements-dev.txt
+	. .venv/bin/activate && pre-commit install
+	@echo "✅ Environment ready. Activate it with: source .venv/bin/activate"
 
 format:
 	@echo "Formatting code..."
