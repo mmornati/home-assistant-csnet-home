@@ -102,6 +102,9 @@ class CSNetHomeClimate(ClimateEntity):
             | ClimateEntityFeature.FAN_MODE
         )
 
+        # cache for dynamically computed limits
+        self._cached_limits: tuple[float | None, float | None] | None = None
+
     @property
     def current_temperature(self):
         """Return the current temperature."""
@@ -205,32 +208,8 @@ class CSNetHomeClimate(ClimateEntity):
     @property
     def min_temp(self):
         """Return the minimum temperature based on current mode and API data."""
-        if self._sensor_data is None:
-            return HEATING_MIN_TEMPERATURE
-
-        # Get the current mode to determine temperature limits
-        mode = self._sensor_data.get("mode", 1)  # Default to heat mode
-        zone_id = self._sensor_data.get("zone_id")
-
-        # Get installation devices data from coordinator
-        coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
-        installation_devices_data = coordinator.get_installation_devices_data()
-
-        # Get temperature limits from API
-        cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
-        min_limit, _ = cloud_api.get_temperature_limits(
-            zone_id, mode, installation_devices_data
-        )
-
-        # Return API limit if available, otherwise use static default based on zone type
-        if min_limit is not None:
-            return min_limit
-
-        # Use appropriate fallback based on zone type
-        if zone_id in [5, 6]:  # Water circuits (C1_WATER, C2_WATER)
-            return WATER_CIRCUIT_MIN_HEAT
-        # Air circuits (C1_AIR, C2_AIR)
-        return HEATING_MIN_TEMPERATURE
+        limits = self._calculate_temperature_limits()
+        return limits[0]
 
     @property
     def max_temp(self):
@@ -249,29 +228,8 @@ class CSNetHomeClimate(ClimateEntity):
         if max_temp_override is not None:
             return max_temp_override
 
-        # Get the current mode to determine temperature limits
-        mode = self._sensor_data.get("mode", 1)  # Default to heat mode
-        zone_id = self._sensor_data.get("zone_id")
-
-        # Get installation devices data from coordinator
-        coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
-        installation_devices_data = coordinator.get_installation_devices_data()
-
-        # Get temperature limits from API
-        cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
-        _, max_limit = cloud_api.get_temperature_limits(
-            zone_id, mode, installation_devices_data
-        )
-
-        # Return API limit if available, otherwise use static default based on zone type
-        if max_limit is not None:
-            return max_limit
-
-        # Use appropriate fallback based on zone type
-        if zone_id in [5, 6]:  # Water circuits (C1_WATER, C2_WATER)
-            return WATER_CIRCUIT_MAX_HEAT
-        # Air circuits (C1_AIR, C2_AIR) - max 35°C (RTU_MAX)
-        return HEATING_MAX_TEMPERATURE
+        limits = self._calculate_temperature_limits()
+        return limits[1]
 
     @property
     def unique_id(self) -> str:
@@ -574,3 +532,71 @@ class CSNetHomeClimate(ClimateEntity):
                 self._attr_name,
             )
         self._common_data = coordinator.get_common_data()
+        # reset cached limits after data refresh
+        self._cached_limits = None
+
+    def _normalize_temperature_limit(self, value: float | int | None) -> float | None:
+        """Convert raw API limit values to Celsius and validate."""
+        if value is None:
+            return None
+
+        try:
+            val = float(value)
+        except (TypeError, ValueError):
+            return None
+
+        # Filter out invalid or sentinel values
+        if val <= 0:
+            return None
+
+        # Air circuit values are tenths of °C (e.g. 190 => 19.0)
+        if val > 200:
+            val = round(val / 10, 1)
+
+        return val
+
+    def _calculate_temperature_limits(self) -> tuple[float, float]:
+        """Compute sanitized temperature limits with sensible fallbacks."""
+        if self._cached_limits is not None:
+            return self._cached_limits
+
+        if self._sensor_data is None:
+            self._cached_limits = (HEATING_MIN_TEMPERATURE, HEATING_MAX_TEMPERATURE)
+            return self._cached_limits
+
+        zone_id = self._sensor_data.get("zone_id")
+        default_min = (
+            WATER_CIRCUIT_MIN_HEAT if zone_id in [5, 6] else HEATING_MIN_TEMPERATURE
+        )
+        default_max = (
+            WATER_CIRCUIT_MAX_HEAT if zone_id in [5, 6] else HEATING_MAX_TEMPERATURE
+        )
+
+        min_limit = default_min
+        max_limit = default_max
+
+        coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
+        installation_devices_data = coordinator.get_installation_devices_data()
+
+        if installation_devices_data:
+            cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
+            mode = self._sensor_data.get("mode", 1)
+            raw_min, raw_max = cloud_api.get_temperature_limits(
+                zone_id, mode, installation_devices_data
+            )
+
+            normalized_min = self._normalize_temperature_limit(raw_min)
+            normalized_max = self._normalize_temperature_limit(raw_max)
+
+            if normalized_min is not None:
+                min_limit = normalized_min
+            if normalized_max is not None:
+                max_limit = normalized_max
+
+        # Ensure limits remain logical
+        if min_limit >= max_limit:
+            min_limit = default_min
+            max_limit = default_max
+
+        self._cached_limits = (min_limit, max_limit)
+        return self._cached_limits
