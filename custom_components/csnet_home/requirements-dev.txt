@@ -10,3 +10,4 @@ pytest-asyncio
 homeassistant
 bandit
 pbr
+black
