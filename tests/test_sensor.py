@@ -250,13 +250,13 @@ def test_installation_sensor_edge_cases():
                 "indoors": [
                     {
                         "heatingStatus": {
-                            "pumpSpeed": 50,  # Will be converted to 0.5
+                            "pumpSpeed": 50,  # Percentage (0-100)
                             "waterFlow": 25,  # Will be divided by 10 = 2.5
                             "waterInletTemp": 18,
                             "waterOutletTemp": 22,
                             "waterPressure": 160,  # Will be divided by 50 = 3.2
                             "defrosting": 0,  # 0 = off
-                            "mixingValveOpening": 75,  # Will be converted to 0.75
+                            "mixingValveOpening": 75,  # Percentage (0-100)
                             "outdoorAmbientTemp": 12,
                             "outdoorAmbientAverageTemp": 13,
                             "gasTemp": 15,
@@ -278,11 +278,11 @@ def test_installation_sensor_edge_cases():
         device_data,
         common_data,
         "pump_speed",
-        "water_speed",
-        "m/s",
+        "percentage",
+        "%",
         "Pump Speed",
     )
-    assert s.state == 0.5  # 50% converted to 0.5
+    assert s.state == 50  # pumpSpeed is already in percentage (0-100)
 
     # Test water flow with division
     s = CSNetHomeInstallationSensor(
@@ -324,7 +324,7 @@ def test_installation_sensor_edge_cases():
         "%",
         "Mix Valve Position",
     )
-    assert s.state == 0.75  # 75% converted to 0.75
+    assert s.state == 75  # mixingValveOpening is already in percentage (0-100)
 
 
 def test_installation_sensor_no_data():
