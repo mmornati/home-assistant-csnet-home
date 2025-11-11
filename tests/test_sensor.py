@@ -1905,6 +1905,51 @@ def test_system_config_sensors_partial_bits():
     assert s.state == STATE_OFF
 
 
+def test_system_config_sensors_fallback_detection():
+    """Fan coil compatible sensor should turn on via fallback logic."""
+    device_data = {
+        "device_name": "System",
+        "device_id": "global",
+        "room_name": "Controller",
+        "parent_id": "global",
+        "room_id": "global",
+    }
+    common_data = {"name": "Hitachi Installation", "firmware": "1.0.0"}
+
+    installation_data = {
+        "data": [
+            {
+                "indoors": [
+                    {
+                        "heatingStatus": {
+                            "systemConfigBits": 0x0000,
+                            "fan1ControlledOnLCD": 3,
+                        },
+                        "heatingSetting": {
+                            "fan1Speed": 1,
+                        },
+                    }
+                ]
+            }
+        ]
+    }
+
+    coordinator = SimpleNamespace(
+        get_installation_devices_data=lambda: installation_data,
+    )
+
+    s = CSNetHomeInstallationSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "fan_coil_compatible",
+        "binary",
+        None,
+        "Fan Coil Compatible",
+    )
+    assert s.state == STATE_ON
+
+
 def test_system_config_sensors_no_data():
     """Test system configuration sensors when no installation data available."""
     device_data = {

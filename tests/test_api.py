@@ -1677,6 +1677,34 @@ def test_is_fan_coil_compatible_false(hass):
     assert api.is_fan_coil_compatible(installation_data) is False
 
 
+def test_is_fan_coil_compatible_fallback_on_flags(hass):
+    """Test fan coil compatibility detected from fanControlledOnLCD flags."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    installation_data = {
+        "heatingStatus": {
+            "systemConfigBits": 0x0000,
+            "fan1ControlledOnLCD": 3,
+        }
+    }
+
+    assert api.is_fan_coil_compatible(installation_data) is True
+
+
+def test_is_fan_coil_compatible_fallback_on_setting(hass):
+    """Test fan coil compatibility detected from heatingSetting fan speeds."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    installation_data = {
+        "heatingSetting": {
+            "fan1Speed": 2,
+            "fan2Speed": -1,
+        }
+    }
+
+    assert api.is_fan_coil_compatible(installation_data) is True
+
+
 def test_is_fan_coil_compatible_missing_data(hass):
     """Test fan coil compatibility check with missing data."""
     api = CSNetHomeAPI(hass, "user", "pass")
@@ -1783,8 +1811,8 @@ def test_get_fan_control_availability_not_compatible(hass):
         }
     }
 
-    # Should return False even though fan1ControlledOnLCD is set
-    assert api.get_fan_control_availability(1, 1, installation_data) is False
+    # Should return True thanks to fallback detection on fanControlledOnLCD
+    assert api.get_fan_control_availability(1, 1, installation_data) is True
 
 
 def test_get_fan_control_availability_missing_data(hass):
