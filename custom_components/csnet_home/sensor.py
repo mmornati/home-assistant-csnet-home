@@ -8,7 +8,6 @@ from homeassistant.const import (
     UnitOfTemperature,
     UnitOfPressure,
     UnitOfVolumeFlowRate,
-    UnitOfSpeed,
     SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
 )
 from homeassistant.core import callback
@@ -190,8 +189,8 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 global_device_data,
                 common_data,
                 "pump_speed",
-                "water_speed",
-                UnitOfSpeed.METERS_PER_SECOND,
+                "percentage",
+                "%",
                 "Pump Speed",
             )
         )
@@ -1005,9 +1004,7 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, Entity):
                 return value / 50
             return value
         if self._key in ["pump_speed", "mix_valve_position"]:
-            # Convert percentage to decimal if needed
-            if isinstance(value, (int, float)) and value > 1:
-                return value / 100
+            # These values are already in percentage (0-100) from the API
             return value
 
         # Central control configuration sensors
