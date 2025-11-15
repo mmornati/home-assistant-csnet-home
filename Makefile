@@ -25,13 +25,36 @@ help:
 	@echo "  make clean            Clean all test data"
 	@echo ""
 
+PYTHON_BIN ?= python3
+
 install-dev:
-	@echo "Creating virtual environment (.venv) if needed..."
-	python3 -m venv .venv
+	@if ! command -v $(PYTHON_BIN) >/dev/null 2>&1; then \
+		echo "❌ $(PYTHON_BIN) not found. Please install Python 3.13 and try again (or run 'make install-dev PYTHON_BIN=python3.13')."; \
+		exit 1; \
+	fi
+	@if ! $(PYTHON_BIN) -c "import sys; sys.exit(0 if sys.version_info[:2] == (3, 13) else 1)" >/dev/null 2>&1; then \
+		echo "❌ $(PYTHON_BIN) must point to Python 3.13.x (found $$($(PYTHON_BIN) -V 2>&1))."; \
+		echo "   Override with 'make install-dev PYTHON_BIN=python3.13' if you have multiple Python versions installed."; \
+		exit 1; \
+	fi
+	@if [ -d .venv ] && [ -f .venv/pyvenv.cfg ] && ! grep -q "version = 3\.13" .venv/pyvenv.cfg; then \
+		echo "Detected virtual environment with incorrect Python version. Recreating..."; \
+		rm -rf .venv; \
+	fi
+	@echo "Creating virtual environment (.venv) with $(PYTHON_BIN)..."
+	$(PYTHON_BIN) -m venv .venv
 	@echo "Installing development dependencies inside .venv..."
 	. .venv/bin/activate && pip install --upgrade pip
 	. .venv/bin/activate && pip install -r custom_components/csnet_home/requirements-dev.txt
-	. .venv/bin/activate && pre-commit install
+	. .venv/bin/activate && python -m pip install --upgrade --force-reinstall pre-commit
+	. .venv/bin/activate && python -m pip install "PyYAML==6.0.2"
+	@HOOKS_PATH=$$(git config --get core.hooksPath || true); \
+	if [ -n "$$HOOKS_PATH" ]; then \
+		echo "⚠️ Git config 'core.hooksPath' is set to '$$HOOKS_PATH'. Skipping pre-commit hook installation."; \
+		echo "   Run 'git config --unset core.hooksPath' (or '--global') and re-run 'make install-dev' to install hooks automatically."; \
+	else \
+		. .venv/bin/activate && pre-commit install; \
+	fi
 	@echo "✅ Environment ready. Activate it with: source .venv/bin/activate"
 
 format:
@@ -51,7 +74,11 @@ test: test-unit
 
 test-unit:
 	@echo "Running unit tests..."
-	pytest tests/ -v --cov=custom_components.csnet_home --cov-report=html --cov-report=term
+	@if [ ! -d .venv ]; then \
+		echo "❌ Virtualenv (.venv) not found. Run 'make install-dev' first."; \
+		exit 1; \
+	fi
+	. .venv/bin/activate && python -m pytest tests/ -v --cov=custom_components.csnet_home --cov-report=html --cov-report=term
 
 test-integration:
 	@echo "Starting integration testing environment..."

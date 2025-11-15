@@ -24,6 +24,11 @@ from custom_components.csnet_home.const import (
     WATER_CIRCUIT_MAX_HEAT,
     WATER_HEATER_MAX_TEMPERATURE,
 )
+from .helpers import (
+    extract_heating_setting,
+    extract_heating_status,
+    has_fan_coil_support,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -322,26 +327,7 @@ class CSNetHomeAPI:
         Returns:
             dict or None: heatingStatus dictionary, or None if not found
         """
-        if not installation_devices_data:
-            return None
-
-        # Try direct access first (if already extracted)
-        heating_status = installation_devices_data.get("heatingStatus")
-        if heating_status:
-            return heating_status
-
-        # Navigate through: data[0].indoors[0].heatingStatus
-        data_array = installation_devices_data.get("data", [])
-        if isinstance(data_array, list) and len(data_array) > 0:
-            first_device = data_array[0]
-            if isinstance(first_device, dict):
-                indoors_array = first_device.get("indoors", [])
-                if isinstance(indoors_array, list) and len(indoors_array) > 0:
-                    first_indoors = indoors_array[0]
-                    if isinstance(first_indoors, dict):
-                        return first_indoors.get("heatingStatus", {})
-
-        return None
+        return extract_heating_status(installation_devices_data)
 
     def get_heating_setting_from_installation_devices(self, installation_devices_data):
         """Extract heatingSetting from installation devices data structure.
@@ -354,26 +340,7 @@ class CSNetHomeAPI:
         Returns:
             dict or None: heatingSetting dictionary, or None if not found
         """
-        if not installation_devices_data:
-            return None
-
-        # Try direct access first (if already extracted)
-        heating_setting = installation_devices_data.get("heatingSetting")
-        if heating_setting:
-            return heating_setting
-
-        # Navigate through: data[0].indoors[0].heatingSetting
-        data_array = installation_devices_data.get("data", [])
-        if isinstance(data_array, list) and len(data_array) > 0:
-            first_device = data_array[0]
-            if isinstance(first_device, dict):
-                indoors_array = first_device.get("indoors", [])
-                if isinstance(indoors_array, list) and len(indoors_array) > 0:
-                    first_indoors = indoors_array[0]
-                    if isinstance(first_indoors, dict):
-                        return first_indoors.get("heatingSetting", {})
-
-        return None
+        return extract_heating_setting(installation_devices_data)
 
     def _validate_value(self, value, default):
         """Validate temperature limit value matching JavaScript validateValue logic.
@@ -1020,11 +987,10 @@ class CSNetHomeAPI:
         heating_status = self.get_heating_status_from_installation_devices(
             installation_devices_data
         )
-        if not heating_status:
-            return False
-
-        system_config_bits = heating_status.get("systemConfigBits", 0)
-        return (system_config_bits & 0x2000) > 0
+        heating_setting = self.get_heating_setting_from_installation_devices(
+            installation_devices_data
+        )
+        return has_fan_coil_support(heating_status, heating_setting)
 
     def get_fan_control_availability(
         self, circuit: int, mode: int, installation_devices_data
@@ -1039,18 +1005,39 @@ class CSNetHomeAPI:
         Returns:
             bool: True if fan control is available
         """
-        if not self.is_fan_coil_compatible(installation_devices_data):
+        if not installation_devices_data:
             return False
 
         heating_status = self.get_heating_status_from_installation_devices(
             installation_devices_data
         )
-        if not heating_status:
+        heating_setting = self.get_heating_setting_from_installation_devices(
+            installation_devices_data
+        )
+
+        if not has_fan_coil_support(heating_status, heating_setting):
+            return False
+
+        if not isinstance(heating_status, dict):
             return False
 
         # Get the fan control flag for the circuit
         fan_control_key = f"fan{circuit}ControlledOnLCD"
         fan_controlled = heating_status.get(fan_control_key, 0)
+
+        # Check if fan speed field exists in heatingSetting (fallback for older units)
+        # If it exists, allow control even if LCD flags are 0
+        fan_speed_key = f"fan{circuit}Speed"
+        has_fan_speed_field = (
+            isinstance(heating_setting, dict)
+            and fan_speed_key in heating_setting
+            and isinstance(heating_setting[fan_speed_key], int)
+            and heating_setting[fan_speed_key] >= 0
+        )
+
+        # If fan speed field exists but LCD flag is 0, allow control (older firmware)
+        if has_fan_speed_field and fan_controlled == 0:
+            return True
 
         # fanXControlledOnLCD values: 0=No, 1=Heating, 2=Cooling, 3=Heating+Cooling
         if mode == 1:  # Heat mode

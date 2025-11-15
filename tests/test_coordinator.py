@@ -15,6 +15,13 @@ def mock_api():
         yield mock
 
 
+@pytest.fixture(autouse=True)
+def suppress_frame_report_usage():
+    """Prevent Home Assistant frame helper from raising during tests."""
+    with patch("homeassistant.helpers.frame.report_usage", return_value=None):
+        yield
+
+
 @pytest.mark.asyncio
 async def test_coordinator_initialization(hass: HomeAssistant):
     """Test the initialization of the coordinator."""

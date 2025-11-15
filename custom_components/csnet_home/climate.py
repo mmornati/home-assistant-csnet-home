@@ -26,6 +26,7 @@ from .const import (
     OTC_HEATING_TYPE_NAMES,
     OTC_COOLING_TYPE_NAMES,
 )
+from .helpers import extract_heating_status
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -311,10 +312,7 @@ class CSNetHomeClimate(ClimateEntity):
 
         # Add OTC (Outdoor Temperature Compensation) information
         if installation_devices_data:
-            cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
-            heating_status = cloud_api.get_heating_status_from_installation_devices(
-                installation_devices_data
-            )
+            heating_status = extract_heating_status(installation_devices_data) or {}
             zone_id = self._sensor_data.get("zone_id")
 
             # Determine which circuit this zone belongs to

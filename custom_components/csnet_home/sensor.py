@@ -25,6 +25,11 @@ from .const import (
     OPERATION_STATUS_MAP,
 )
 from .coordinator import CSNetHomeCoordinator
+from .helpers import (
+    detect_fan_coil_support,
+    extract_heating_status,
+    extract_second_cycle,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -1091,16 +1096,14 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, Entity):
             "c1_thermostat_present",
             "c2_thermostat_present",
         ]:
-            heating_status = None
-            data_array = installation_data.get("data", [])
-            if isinstance(data_array, list) and len(data_array) > 0:
-                first_device = data_array[0]
-                if isinstance(first_device, dict):
-                    indoors_array = first_device.get("indoors", [])
-                    if isinstance(indoors_array, list) and len(indoors_array) > 0:
-                        first_indoors = indoors_array[0]
-                        if isinstance(first_indoors, dict):
-                            heating_status = first_indoors.get("heatingStatus", {})
+            heating_status = extract_heating_status(installation_data) or {}
+
+            if self._key == "fan_coil_compatible":
+                return (
+                    STATE_ON
+                    if detect_fan_coil_support(installation_data)
+                    else STATE_OFF
+                )
 
             if not heating_status:
                 return STATE_OFF
@@ -1111,9 +1114,6 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, Entity):
             if self._key == "cascade_slave_mode":
                 # Bit 0x1000 (4096) indicates cascade slave mode
                 return STATE_ON if (system_config_bits & 0x1000) > 0 else STATE_OFF
-            if self._key == "fan_coil_compatible":
-                # Bit 0x2000 (8192) indicates fan coil compatibility
-                return STATE_ON if (system_config_bits & 0x2000) > 0 else STATE_OFF
             if self._key == "c1_thermostat_present":
                 # Bit 0x40 (64) indicates C1 thermostat present
                 return STATE_ON if (system_config_bits & 0x40) > 0 else STATE_OFF
@@ -1575,36 +1575,12 @@ class CSNetHomeCompressorSensor(CoordinatorEntity, Entity):
     def _get_heating_status(self):
         """Get heatingStatus from installation devices data."""
         installation_data = self._coordinator.get_installation_devices_data()
-        if not isinstance(installation_data, dict):
-            return None
-
-        data_array = installation_data.get("data", [])
-        if isinstance(data_array, list) and len(data_array) > 0:
-            first_device = data_array[0]
-            if isinstance(first_device, dict):
-                indoors_array = first_device.get("indoors", [])
-                if isinstance(indoors_array, list) and len(indoors_array) > 0:
-                    first_indoors = indoors_array[0]
-                    if isinstance(first_indoors, dict):
-                        return first_indoors.get("heatingStatus", {})
-        return None
+        return extract_heating_status(installation_data)
 
     def _get_second_cycle(self):
         """Get secondCycle from installation devices data."""
         installation_data = self._coordinator.get_installation_devices_data()
-        if not isinstance(installation_data, dict):
-            return None
-
-        data_array = installation_data.get("data", [])
-        if isinstance(data_array, list) and len(data_array) > 0:
-            first_device = data_array[0]
-            if isinstance(first_device, dict):
-                indoors_array = first_device.get("indoors", [])
-                if isinstance(indoors_array, list) and len(indoors_array) > 0:
-                    first_indoors = indoors_array[0]
-                    if isinstance(first_indoors, dict):
-                        return first_indoors.get("secondCycle", {})
-        return None
+        return extract_second_cycle(installation_data)
 
     @property
     def state(self):
