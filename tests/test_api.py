@@ -1815,6 +1815,41 @@ def test_get_fan_control_availability_not_compatible(hass):
     assert api.get_fan_control_availability(1, 1, installation_data) is True
 
 
+def test_get_fan_control_availability_fallback_on_speed_fields(hass):
+    """Test fan control availability when fan speed fields exist but LCD flags are 0.
+
+    This tests the case from issue #127 where older units have fan speed fields
+    in heatingSetting but fanXControlledOnLCD is 0. Control should still be allowed.
+    """
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    installation_data = {
+        "data": [
+            {
+                "indoors": [
+                    {
+                        "heatingStatus": {
+                            "systemConfigBits": 215,  # No fan coil bit (0x2000)
+                            "fan1ControlledOnLCD": 0,  # No LCD control
+                            "fan2ControlledOnLCD": 0,
+                        },
+                        "heatingSetting": {
+                            "fan1Speed": 0,  # Field exists (enables fallback detection)
+                            "fan2Speed": 0,
+                        },
+                    }
+                ]
+            }
+        ]
+    }
+
+    # Should return True because fan speed fields exist, even though LCD flags are 0
+    assert api.get_fan_control_availability(1, 1, installation_data) is True
+    assert api.get_fan_control_availability(1, 0, installation_data) is True
+    assert api.get_fan_control_availability(2, 1, installation_data) is True
+    assert api.get_fan_control_availability(2, 0, installation_data) is True
+
+
 def test_get_fan_control_availability_missing_data(hass):
     """Test fan control availability with missing data."""
     api = CSNetHomeAPI(hass, "user", "pass")

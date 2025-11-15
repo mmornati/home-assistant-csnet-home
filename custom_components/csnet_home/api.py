@@ -966,6 +966,20 @@ class CSNetHomeAPI:
         fan_control_key = f"fan{circuit}ControlledOnLCD"
         fan_controlled = heating_status.get(fan_control_key, 0)
 
+        # Check if fan speed field exists in heatingSetting (fallback for older units)
+        # If it exists, allow control even if LCD flags are 0
+        fan_speed_key = f"fan{circuit}Speed"
+        has_fan_speed_field = (
+            isinstance(heating_setting, dict)
+            and fan_speed_key in heating_setting
+            and isinstance(heating_setting[fan_speed_key], int)
+            and heating_setting[fan_speed_key] >= 0
+        )
+
+        # If fan speed field exists but LCD flag is 0, allow control (older firmware)
+        if has_fan_speed_field and fan_controlled == 0:
+            return True
+
         # fanXControlledOnLCD values: 0=No, 1=Heating, 2=Cooling, 3=Heating+Cooling
         if mode == 1:  # Heat mode
             return fan_controlled in [1, 3]
