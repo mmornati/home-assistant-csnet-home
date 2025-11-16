@@ -39,13 +39,14 @@ FAN_SPEED_MAP = {
     "off": 0,
     "low": 1,
     "medium": 2,
+    "high": 2,  # For older UIs/tests expecting 'high' option; maps to speed 2
     "auto": 3,
 }
 
 FAN_SPEED_REVERSE_MAP = {
     0: "off",
     1: "low",
-    2: "medium",
+    2: "high",  # Prefer 'high' when reporting speed 2
     3: "auto",
 }
 
