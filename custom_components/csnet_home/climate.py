@@ -95,7 +95,9 @@ class CSNetHomeClimate(ClimateEntity):
         self._is_fan_coil = cloud_api.is_fan_coil_compatible(installation_devices_data)
 
         # Determine Fan Coil type
-        self._fan_model = self.entry.data.get(CONF_FAN_COIL_MODEL, DEFAULT_FAN_COIL_MODEL)
+        self._fan_model = self.entry.data.get(
+            CONF_FAN_COIL_MODEL, DEFAULT_FAN_COIL_MODEL
+        )
 
         if self._fan_model == FAN_COIL_MODEL_LEGACY:
             self._fan_speed_map = FAN_SPEED_MAP_LEGACY
@@ -535,7 +537,7 @@ class CSNetHomeClimate(ClimateEntity):
         coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
         if not coordinator:
             _LOGGER.error("No coordinator instance found!")
-            return # Añadido 'return'
+            return
         await coordinator.async_request_refresh()
         self._sensor_data = next(
             (
@@ -560,7 +562,8 @@ class CSNetHomeClimate(ClimateEntity):
             self._is_fan_coil
             and self._fan_model == FAN_COIL_MODEL_LEGACY
             and api_fan_mode == "auto"
-            and self._assumed_fan_mode not in ["auto", None] # Si es manual (low, medium, high)
+            and self._assumed_fan_mode
+            not in ["auto", None]
         ):
             pass
         else:
