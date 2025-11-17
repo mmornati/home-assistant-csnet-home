@@ -7,7 +7,16 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_USERNAME
 
-from .const import DOMAIN, CONF_LANGUAGE, DEFAULT_LANGUAGE, CONF_MAX_TEMP_OVERRIDE
+from .const import (
+    DOMAIN,
+    CONF_LANGUAGE,
+    DEFAULT_LANGUAGE,
+    CONF_MAX_TEMP_OVERRIDE,
+    CONF_FAN_COIL_MODEL,
+    FAN_COIL_MODEL_STANDARD,
+    FAN_COIL_MODEL_LEGACY,
+    DEFAULT_FAN_COIL_MODEL,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -19,30 +28,22 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     def __init__(self):
         """Initialize the config flow."""
-        self._username = None
-        self._password = None
-        self._scan_interval = DEFAULT_SCAN_INTERVAL
-        self._max_temp_override = None
+        pass
 
     async def async_step_user(self, user_input=None):
         """Handle user input for login credentials."""
         if user_input is not None:
-            self._username = user_input[CONF_USERNAME]
-            self._password = user_input[CONF_PASSWORD]
-            self._scan_interval = user_input[CONF_SCAN_INTERVAL]
-
-            # You might also want to handle validation and authentication here
-            # cloud_service_api = CloudServiceAPI(hass, self._username, self._password)
-
             # Create the config entry and store the data
             return self.async_create_entry(
                 title="CSNet Home",
                 data={
-                    CONF_USERNAME: self._username,
-                    CONF_PASSWORD: self._password,
-                    CONF_SCAN_INTERVAL: self._scan_interval,
+                    CONF_USERNAME: user_input[CONF_USERNAME],
+                    CONF_PASSWORD: user_input[CONF_PASSWORD],
+                    CONF_SCAN_INTERVAL: user_input[CONF_SCAN_INTERVAL],
                     CONF_LANGUAGE: user_input.get(CONF_LANGUAGE, DEFAULT_LANGUAGE),
                     CONF_MAX_TEMP_OVERRIDE: user_input.get(CONF_MAX_TEMP_OVERRIDE),
+                    # Store the Fan coil control type
+                    CONF_FAN_COIL_MODEL: user_input.get(CONF_FAN_COIL_MODEL, DEFAULT_FAN_COIL_MODEL),
                 },
             )
 
@@ -61,6 +62,10 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Optional(CONF_MAX_TEMP_OVERRIDE): vol.All(
                         vol.Coerce(int), vol.Range(min=8, max=80)
                     ),
+                    # Selection of Fan coil control type
+                    vol.Optional(
+                        CONF_FAN_COIL_MODEL, default=DEFAULT_FAN_COIL_MODEL
+                    ): vol.In([FAN_COIL_MODEL_STANDARD, FAN_COIL_MODEL_LEGACY]),
                 }
             ),
             description_placeholders={
