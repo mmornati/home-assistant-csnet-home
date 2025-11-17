@@ -188,7 +188,6 @@ class CSNetHomeClimate(ClimateEntity):
     @property
     def fan_mode(self):
         """Return the current fan mode (fan speed for fan coil, silent mode otherwise)."""
-        # --- MODIFICADO: Devolvemos el estado asumido (el último que seleccionó el usuario) ---
         return self._assumed_fan_mode
 
     @property
