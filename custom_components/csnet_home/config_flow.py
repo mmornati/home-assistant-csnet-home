@@ -43,7 +43,9 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_LANGUAGE: user_input.get(CONF_LANGUAGE, DEFAULT_LANGUAGE),
                     CONF_MAX_TEMP_OVERRIDE: user_input.get(CONF_MAX_TEMP_OVERRIDE),
                     # Store the Fan coil control type
-                    CONF_FAN_COIL_MODEL: user_input.get(CONF_FAN_COIL_MODEL, DEFAULT_FAN_COIL_MODEL),
+                    CONF_FAN_COIL_MODEL: user_input.get(
+                        CONF_FAN_COIL_MODEL, DEFAULT_FAN_COIL_MODEL
+                    ),
                 },
             )
 
