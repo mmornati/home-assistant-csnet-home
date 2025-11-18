@@ -306,7 +306,7 @@ class CSNetHomeClimate(ClimateEntity):
             "c2_demand": self._sensor_data.get("c2_demand"),
             "doingBoost": self._sensor_data.get("doingBoost"),
             "silent_mode": self._sensor_data.get("silent_mode"),
-            # --- AÑADIDO: Incluir el modelo de Fan Coil para debugging ---
+            # --- ADDED: Include Fan Coil model for debugging ---
             "fan_coil_model": self._fan_model,
         }
 
