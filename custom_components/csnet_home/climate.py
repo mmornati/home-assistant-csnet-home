@@ -127,7 +127,7 @@ class CSNetHomeClimate(ClimateEntity):
         self._cached_limits: tuple[float | None, float | None] | None = None
 
     def _get_fan_mode_from_data(self):
-        """Helper para leer el modo de ventilador de los datos brutos de la API."""
+        """Helper to read the fan mode from the raw API data."""
         if self._sensor_data is None:
             return FAN_AUTO if not self._is_fan_coil else "auto"
 
