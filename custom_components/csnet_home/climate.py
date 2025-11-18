@@ -565,6 +565,7 @@ class CSNetHomeClimate(ClimateEntity):
             and self._assumed_fan_mode
             not in ["auto", None]
         ):
+            # Preserve the cached assumed fan mode; do not update it when in legacy mode and API reports 'auto'
             pass
         else:
             self._assumed_fan_mode = api_fan_mode
