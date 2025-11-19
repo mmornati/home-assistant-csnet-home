@@ -10,8 +10,8 @@ HEAT_SETTINGS_PATH = "/data/indoor/heat_setting"
 CONF_ENABLE_DEVICE_LOGGING = "enable_device_logging"
 CONF_MAX_TEMP_OVERRIDE = "max_temp_override"
 CONF_FAN_COIL_MODEL = "fan_coil_model"
-FAN_COIL_MODEL_STANDARD = "standard"  
-FAN_COIL_MODEL_LEGACY = "legacy"  
+FAN_COIL_MODEL_STANDARD = "standard"
+FAN_COIL_MODEL_LEGACY = "legacy"
 DEFAULT_FAN_COIL_MODEL = FAN_COIL_MODEL_STANDARD
 
 COMMON_API_HEADERS = {

@@ -562,8 +562,7 @@ class CSNetHomeClimate(ClimateEntity):
             self._is_fan_coil
             and self._fan_model == FAN_COIL_MODEL_LEGACY
             and api_fan_mode == "auto"
-            and self._assumed_fan_mode
-            not in ["auto", None]
+            and self._assumed_fan_mode not in ["auto", None]
         ):
             # Preserve the cached assumed fan mode; do not update it when in legacy mode and API reports 'auto'
             pass
