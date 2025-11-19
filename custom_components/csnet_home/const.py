@@ -9,6 +9,11 @@ INSTALLATION_ALARMS_PATH = "/data/installationalarms"
 HEAT_SETTINGS_PATH = "/data/indoor/heat_setting"
 CONF_ENABLE_DEVICE_LOGGING = "enable_device_logging"
 CONF_MAX_TEMP_OVERRIDE = "max_temp_override"
+CONF_FAN_COIL_MODEL = "fan_coil_model"
+FAN_COIL_MODEL_STANDARD = "standard"  
+FAN_COIL_MODEL_LEGACY = "legacy"  
+DEFAULT_FAN_COIL_MODEL = FAN_COIL_MODEL_STANDARD
+
 COMMON_API_HEADERS = {
     "accept-language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
     "cache-control": "no-cache",
@@ -35,19 +40,38 @@ FAN_SPEED_LOW = "1"
 FAN_SPEED_MEDIUM = "2"
 FAN_SPEED_AUTO = "3"
 
-FAN_SPEED_MAP = {
+# Standard
+FAN_SPEED_MAP_STANDARD = {
     "off": 0,
     "low": 1,
     "medium": 2,
     "auto": 3,
 }
 
-FAN_SPEED_REVERSE_MAP = {
+FAN_SPEED_REVERSE_MAP_STANDARD = {
     0: "off",
     1: "low",
     2: "medium",
     3: "auto",
 }
+
+# Legacy
+FAN_SPEED_MAP_LEGACY = {
+    "low": 0,
+    "medium": 1,
+    "high": 2,
+    "auto": 3,
+}
+
+FAN_SPEED_REVERSE_MAP_LEGACY = {
+    0: "low",
+    1: "medium",
+    2: "high",
+    3: "auto",
+}
+
+FAN_SPEED_MAP = FAN_SPEED_MAP_STANDARD
+FAN_SPEED_REVERSE_MAP = FAN_SPEED_REVERSE_MAP_STANDARD
 
 # Operation Status Constants
 OPST_OFF = 0

@@ -20,12 +20,20 @@ from .const import (
     WATER_CIRCUIT_MAX_HEAT,
     WATER_CIRCUIT_MIN_HEAT,
     CONF_MAX_TEMP_OVERRIDE,
-    FAN_SPEED_MAP,
-    FAN_SPEED_REVERSE_MAP,
+    FAN_SPEED_MAP_STANDARD,
+    FAN_SPEED_REVERSE_MAP_STANDARD,
+    FAN_SPEED_MAP_LEGACY,
+    FAN_SPEED_REVERSE_MAP_LEGACY,
+    CONF_FAN_COIL_MODEL,
+    FAN_COIL_MODEL_LEGACY,
+    DEFAULT_FAN_COIL_MODEL,
+    # FAN_SPEED_MAP,
+    # FAN_SPEED_REVERSE_MAP,
     OPERATION_STATUS_MAP,
     OTC_HEATING_TYPE_NAMES,
     OTC_COOLING_TYPE_NAMES,
 )
+from .helpers import extract_heating_status
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -86,13 +94,26 @@ class CSNetHomeClimate(ClimateEntity):
         cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
         self._is_fan_coil = cloud_api.is_fan_coil_compatible(installation_devices_data)
 
-        # Set fan modes based on system type
+        # Determine Fan Coil type
+        self._fan_model = self.entry.data.get(
+            CONF_FAN_COIL_MODEL, DEFAULT_FAN_COIL_MODEL
+        )
+
+        if self._fan_model == FAN_COIL_MODEL_LEGACY:
+            self._fan_speed_map = FAN_SPEED_MAP_LEGACY
+            self._fan_speed_reverse_map = FAN_SPEED_REVERSE_MAP_LEGACY
+        else:
+            self._fan_speed_map = FAN_SPEED_MAP_STANDARD
+            self._fan_speed_reverse_map = FAN_SPEED_REVERSE_MAP_STANDARD
+
         if self._is_fan_coil:
             # Fan coil systems use fan speed control
-            self._attr_fan_modes = list(FAN_SPEED_MAP.keys())
+            self._attr_fan_modes = list(self._fan_speed_map.keys())
         else:
             # Non-fan coil systems use silent mode (auto = normal, on = silent)
             self._attr_fan_modes = [FAN_AUTO, FAN_ON]
+
+        self._assumed_fan_mode = self._get_fan_mode_from_data()
 
         self._attr_supported_features = (
             ClimateEntityFeature.PRESET_MODE
@@ -104,6 +125,30 @@ class CSNetHomeClimate(ClimateEntity):
 
         # cache for dynamically computed limits
         self._cached_limits: tuple[float | None, float | None] | None = None
+
+    def _get_fan_mode_from_data(self):
+        """Helper to read the fan mode from the raw API data."""
+        if self._sensor_data is None:
+            return FAN_AUTO if not self._is_fan_coil else "auto"
+
+        if self._is_fan_coil:
+            # Fan speed for fan coil
+            zone_id = self._sensor_data.get("zone_id")
+            circuit = 1 if zone_id == 1 else 2
+
+            fan_speed_key = f"fan{circuit}_speed"
+            fan_speed = self._sensor_data.get(fan_speed_key)
+
+            if fan_speed is not None and fan_speed >= 0:
+                return self._fan_speed_reverse_map.get(fan_speed, "auto")
+            return "auto"
+
+        # Silent mode for non fan coil systems
+        silent_mode = self._sensor_data.get("silent_mode")
+        # silent_mode: 0 = Off (auto), 1 = On (silent)
+        if silent_mode == 1:
+            return FAN_ON
+        return FAN_AUTO
 
     @property
     def current_temperature(self):
@@ -145,30 +190,7 @@ class CSNetHomeClimate(ClimateEntity):
     @property
     def fan_mode(self):
         """Return the current fan mode (fan speed for fan coil, silent mode otherwise)."""
-        if self._sensor_data is None:
-            return FAN_AUTO if not self._is_fan_coil else "auto"
-
-        if self._is_fan_coil:
-            # For fan coil systems, return the fan speed
-            # Determine which circuit to use based on zone_id
-            zone_id = self._sensor_data.get("zone_id")
-            # Zone 1 uses C1, Zone 2 uses C2
-            circuit = 1 if zone_id == 1 else 2
-
-            # Get fan speed from sensor data
-            fan_speed_key = f"fan{circuit}_speed"
-            fan_speed = self._sensor_data.get(fan_speed_key)
-
-            if fan_speed is not None and fan_speed >= 0:
-                return FAN_SPEED_REVERSE_MAP.get(fan_speed, "auto")
-            return "auto"
-
-        # For non-fan coil systems, return silent mode status
-        silent_mode = self._sensor_data.get("silent_mode")
-        # silent_mode: 0 = Off (auto), 1 = On (silent)
-        if silent_mode == 1:
-            return FAN_ON
-        return FAN_AUTO
+        return self._assumed_fan_mode
 
     @property
     def target_temperature(self):
@@ -284,6 +306,8 @@ class CSNetHomeClimate(ClimateEntity):
             "c2_demand": self._sensor_data.get("c2_demand"),
             "doingBoost": self._sensor_data.get("doingBoost"),
             "silent_mode": self._sensor_data.get("silent_mode"),
+            # --- ADDED: Include Fan Coil model for debugging ---
+            "fan_coil_model": self._fan_model,
         }
 
         # Get installation devices data (used by both fan coil and OTC)
@@ -311,10 +335,7 @@ class CSNetHomeClimate(ClimateEntity):
 
         # Add OTC (Outdoor Temperature Compensation) information
         if installation_devices_data:
-            cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
-            heating_status = cloud_api.get_heating_status_from_installation_devices(
-                installation_devices_data
-            )
+            heating_status = extract_heating_status(installation_devices_data) or {}
             zone_id = self._sensor_data.get("zone_id")
 
             # Determine which circuit this zone belongs to
@@ -443,11 +464,11 @@ class CSNetHomeClimate(ClimateEntity):
 
         if self._is_fan_coil:
             # For fan coil systems, set the fan speed
-            if fan_mode not in FAN_SPEED_MAP:
+            if fan_mode not in self._fan_speed_map:
                 _LOGGER.warning("Invalid fan mode %s for fan coil system", fan_mode)
                 return
 
-            fan_speed = FAN_SPEED_MAP[fan_mode]
+            fan_speed = self._fan_speed_map[fan_mode]
 
             # Determine which circuit to use based on zone_id
             zone_id = self._sensor_data.get("zone_id")
@@ -474,8 +495,7 @@ class CSNetHomeClimate(ClimateEntity):
                 circuit,
             )
             if response:
-                fan_speed_key = f"fan{circuit}_speed"
-                self._sensor_data[fan_speed_key] = fan_speed
+                self._assumed_fan_mode = fan_mode
         else:
             # For non-fan coil systems, set silent mode
             # Map fan mode to silent mode boolean
@@ -487,7 +507,7 @@ class CSNetHomeClimate(ClimateEntity):
                 silent_mode,
             )
             if response:
-                self._sensor_data["silent_mode"] = 1 if silent_mode else 0
+                self._assumed_fan_mode = fan_mode
 
     def is_heating(self):
         """Return true if the thermostat is currently heating."""
@@ -517,6 +537,7 @@ class CSNetHomeClimate(ClimateEntity):
         coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
         if not coordinator:
             _LOGGER.error("No coordinator instance found!")
+            return
         await coordinator.async_request_refresh()
         self._sensor_data = next(
             (
@@ -531,6 +552,24 @@ class CSNetHomeClimate(ClimateEntity):
                 "No sensor data found for room %s after coordinator refresh",
                 self._attr_name,
             )
+            return
+
+        # Obtain real state from API
+        api_fan_mode = self._get_fan_mode_from_data()
+
+        # Save current speed for Legacy Control
+        if (
+            self._is_fan_coil
+            and self._fan_model == FAN_COIL_MODEL_LEGACY
+            and api_fan_mode == "auto"
+            and self._assumed_fan_mode
+            not in ["auto", None]
+        ):
+            # Preserve the cached assumed fan mode; do not update it when in legacy mode and API reports 'auto'
+            pass
+        else:
+            self._assumed_fan_mode = api_fan_mode
+
         self._common_data = coordinator.get_common_data()
         # reset cached limits after data refresh
         self._cached_limits = None
