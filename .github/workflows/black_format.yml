@@ -1,0 +1,32 @@
+name: Python Black Auto-Format
+
+on:
+  # Dispara la acción en cada 'push' (subida) a las ramas principales
+  push:
+    branches:
+      - main
+      - master
+  
+  # También se dispara en cada 'pull_request' (solicitud de fusión)
+  pull_request:
+
+jobs:
+  formatting:
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Paso 1: Descarga tu código (Checkout)
+      - uses: actions/checkout@v4
+        with:
+          # ¡IMPORTANTE! Esto le da a la acción permiso para hacer 'push' de los cambios.
+          token: ${{ secrets.GITHUB_TOKEN }}
+          # Mantenemos el historial para que la acción pueda crear un commit.
+          fetch-depth: 0 
+
+      # Paso 2: Ejecutar Black Formatter y hacer Commit
+      # Usamos una acción pre-construida que hace el formateo y el commit por nosotros.
+      - name: Run Black Formatter and Commit Changes
+        uses: lorenzmi/action-python-black@v1.0.0
+        with:
+          # Argumento para que Black revise todos los archivos en el directorio actual.
+          args: "."
