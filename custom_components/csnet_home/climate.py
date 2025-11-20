@@ -102,14 +102,16 @@ class CSNetHomeClimate(ClimateEntity):
         else:
             self._fan_speed_map = FAN_SPEED_MAP_STANDARD
             self._fan_speed_reverse_map = FAN_SPEED_REVERSE_MAP_STANDARD
-        
+
         # If user selects Legacy control it's assumed that a fan coil is installed
         if self._fan_model == FAN_COIL_MODEL_LEGACY:
             self._is_fan_coil = True
         else:
             # If it's Standard, then API detection is used
-            self._is_fan_coil = cloud_api.is_fan_coil_compatible(installation_devices_data)
-        
+            self._is_fan_coil = cloud_api.is_fan_coil_compatible(
+                installation_devices_data
+            )
+
         if self._is_fan_coil:
             # Fan coil systems use fan speed control
             self._attr_fan_modes = list(self._fan_speed_map.keys())
@@ -473,7 +475,7 @@ class CSNetHomeClimate(ClimateEntity):
             # Skip the API check if the user has selected Legacy
             if self._fan_model == FAN_COIL_MODEL_LEGACY:
                 check_availability = False
-            
+
             if check_availability and not cloud_api.get_fan_control_availability(
                 circuit, mode, installation_devices_data
             ):
