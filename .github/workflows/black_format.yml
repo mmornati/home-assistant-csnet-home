@@ -9,6 +9,7 @@ on:
   
   # También se dispara en cada 'pull_request' (solicitud de fusión)
   pull_request:
+  workflow_dispatch:
 
 jobs:
   formatting:
