@@ -6,7 +6,6 @@ on:
   pull_request:
     branches: [ main, master ]
   workflow_dispatch:
-
 permissions:
   contents: write
 
@@ -20,7 +19,6 @@ jobs:
         with:
           options: "--verbose"
           src: "."
-
       - name: Commit changes
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
