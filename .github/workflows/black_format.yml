@@ -1,33 +1,34 @@
-name: Python Black Auto-Format
+name: Format Python Code
 
 on:
-  # Dispara la acción en cada 'push' (subida) a las ramas principales
   push:
-    branches:
-      - main
-      - master
-  
-  # También se dispara en cada 'pull_request' (solicitud de fusión)
+    branches: [ main, master ]
   pull_request:
+    branches: [ main, master ]
+  # Esta línea es clave: permite el botón de ejecución manual
   workflow_dispatch:
 
-jobs:
-  formatting:
-    runs-on: ubuntu-latest
-    
-    steps:
-      # Paso 1: Descarga tu código (Checkout)
-      - uses: actions/checkout@v4
-        with:
-          # ¡IMPORTANTE! Esto le da a la acción permiso para hacer 'push' de los cambios.
-          token: ${{ secrets.GITHUB_TOKEN }}
-          # Mantenemos el historial para que la acción pueda crear un commit.
-          fetch-depth: 0 
+permissions:
+  contents: write
 
-      # Paso 2: Ejecutar Black Formatter y hacer Commit
-      # Usamos una acción pre-construida que hace el formateo y el commit por nosotros.
-      - name: Run Black Formatter and Commit Changes
-        uses: lorenzmi/action-python-black@v1.0.0
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Descargar el código
+      - uses: actions/checkout@v4
+
+      # 2. Ejecutar Black (La versión oficial)
+      - name: Run Black
+        uses: psf/black@stable
         with:
-          # Argumento para que Black revise todos los archivos en el directorio actual.
-          args: "."
+          options: "--verbose"
+          # Esto le dice a Black que mire todos los archivos
+          src: "."
+
+      # 3. Guardar los cambios automáticamente si Black modificó algo
+      - name: Commit changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "🤖 Auto-format: Black style fixes"
+          branch: ${{ github.head_ref }}
