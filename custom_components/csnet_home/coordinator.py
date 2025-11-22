@@ -68,6 +68,44 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
                 "installation_alarms"
             ] = installation_alarms_data
 
+        # Enrich sensor data with correct temperatures from installation devices data
+        # This fixes issue #137: water heater (zone_id 3) and water circuits (zone_id 5, 6)
+        # need temperatures from heatingStatus, not from elements API
+        if installation_devices_data and self._device_data.get("sensors"):
+            heating_status = cloud_api.get_heating_status_from_installation_devices(
+                installation_devices_data
+            )
+            if heating_status:
+                for sensor in self._device_data["sensors"]:
+                    zone_id = sensor.get("zone_id")
+                    # For zone_id 3 (DHW/water heater), use tempDHW from heatingStatus
+                    if zone_id == 3:
+                        temp_dhw = heating_status.get("tempDHW")
+                        if temp_dhw is not None:
+                            sensor["current_temperature"] = temp_dhw
+                            _LOGGER.debug(
+                                "Enriched zone_id 3 (DHW) current_temperature: %s",
+                                temp_dhw,
+                            )
+                    # For zone_id 5 (C1_WATER), use waterOutletHPTemp from heatingStatus
+                    elif zone_id == 5:
+                        temp_c1_water = heating_status.get("waterOutletHPTemp")
+                        if temp_c1_water is not None:
+                            sensor["current_temperature"] = temp_c1_water
+                            _LOGGER.debug(
+                                "Enriched zone_id 5 (C1_WATER) current_temperature: %s",
+                                temp_c1_water,
+                            )
+                    # For zone_id 6 (C2_WATER), use waterOutlet2Temp from heatingStatus
+                    elif zone_id == 6:
+                        temp_c2_water = heating_status.get("waterOutlet2Temp")
+                        if temp_c2_water is not None:
+                            sensor["current_temperature"] = temp_c2_water
+                            _LOGGER.debug(
+                                "Enriched zone_id 6 (C2_WATER) current_temperature: %s",
+                                temp_c2_water,
+                            )
+
         # Raise notification if new alarm codes appear
         try:
             for sensor in self._device_data.get("sensors", []):
