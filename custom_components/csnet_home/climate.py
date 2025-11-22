@@ -471,10 +471,8 @@ class CSNetHomeClimate(ClimateEntity):
             coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
             installation_devices_data = coordinator.get_installation_devices_data()
             mode = self._sensor_data.get("mode", 1)
-            check_availability = True
             # Skip the API check if the user has selected Legacy
-            if self._fan_model == FAN_COIL_MODEL_LEGACY:
-                check_availability = False
+            check_availability = self._fan_model != FAN_COIL_MODEL_LEGACY
 
             if check_availability and not cloud_api.get_fan_control_availability(
                 circuit, mode, installation_devices_data
