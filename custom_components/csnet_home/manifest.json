@@ -14,5 +14,5 @@
         "requests>=2.25.1"
     ],
     "single_config_entry": true,
-    "version": "2.3.6"
+    "version": "2.3.7"
   }
