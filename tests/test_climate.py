@@ -1271,3 +1271,143 @@ def test_otc_attributes_zone3_dhw_no_otc(hass):
     assert "otc_heating_type_name" not in attrs
     assert "otc_cooling_type" not in attrs
     assert "otc_cooling_type_name" not in attrs
+
+
+# Device Info Tests - Issue #140
+def test_device_info_with_complete_data(hass):
+    """Test device_info property with complete data (initial state)."""
+    entity = build_entity(hass)
+    device_info = entity.device_info
+
+    assert device_info is not None
+    assert device_info.name == "Hitachi PAC-Living"
+    assert device_info.manufacturer == "Hitachi"
+    assert device_info.model == "Hitachi PAC Remote Controller"
+    assert device_info.sw_version == "1.0.0"
+    assert (DOMAIN, "Hitachi PAC-Living") in device_info.identifiers
+
+
+def test_device_info_with_missing_firmware(hass):
+    """Test device_info property when firmware is missing (defensive access)."""
+    sensor_data = {
+        "device_name": "Hitachi PAC",
+        "device_id": 1234,
+        "room_name": "Living",
+        "parent_id": 1706,
+        "room_id": 395,
+        "operation_status": 5,
+        "mode": 1,
+        "real_mode": 1,
+        "on_off": 1,
+        "timer_running": False,
+        "alarm_code": 0,
+        "c1_demand": True,
+        "c2_demand": False,
+        "ecocomfort": 1,
+        "silent_mode": 0,
+        "current_temperature": 19.5,
+        "setting_temperature": 20.0,
+        "zone_id": 1,
+    }
+    # Missing firmware key
+    common_data = {"name": "Hitachi PAC"}
+    entry = SimpleNamespace(entry_id="test-entry", data={})
+
+    if DOMAIN not in hass.data:
+        hass.data[DOMAIN] = {}
+    if entry.entry_id not in hass.data[DOMAIN]:
+        hass.data[DOMAIN][entry.entry_id] = {}
+
+    hass.data[DOMAIN][entry.entry_id]["api"] = SimpleNamespace(
+        async_set_hvac_mode=AsyncMock(return_value=True),
+        async_set_temperature=AsyncMock(return_value=True),
+        set_preset_modes=AsyncMock(return_value=True),
+        async_set_silent_mode=AsyncMock(return_value=True),
+        async_set_fan_speed=AsyncMock(return_value=True),
+        is_fan_coil_compatible=lambda data: False,
+        get_fan_control_availability=lambda circuit, mode, data: False,
+        get_temperature_limits=lambda zone_id, mode, data: (None, None),
+    )
+    hass.data[DOMAIN][entry.entry_id]["coordinator"] = SimpleNamespace(
+        get_sensors_data=lambda: [sensor_data],
+        get_common_data=lambda: {"device_status": {1234: common_data}},
+        get_installation_devices_data=lambda: {},
+        async_request_refresh=AsyncMock(return_value=None),
+    )
+
+    entity = CSNetHomeClimate(hass, entry, sensor_data, common_data)
+    device_info = entity.device_info
+
+    # Should not raise KeyError, firmware should be None
+    assert device_info is not None
+    assert device_info.sw_version is None
+
+
+def test_device_info_after_update_with_nested_structure(hass):
+    """Test device_info property after update when _common_data is full dict."""
+    entity = build_entity(hass)
+
+    # Simulate update: replace _common_data with full common_data dict
+    entity._common_data = {
+        "device_status": {1234: {"name": "Hitachi PAC", "firmware": "2.0.0"}}
+    }
+
+    device_info = entity.device_info
+
+    assert device_info is not None
+    assert device_info.model == "Hitachi PAC Remote Controller"
+    assert device_info.sw_version == "2.0.0"
+
+
+def test_device_info_with_missing_device_status(hass):
+    """Test device_info when device_status is missing after update."""
+    entity = build_entity(hass)
+
+    # Simulate update with missing device_status
+    entity._common_data = {"device_status": {}}
+
+    device_info = entity.device_info
+
+    # Should not raise KeyError, should use defaults
+    assert device_info is not None
+    assert device_info.model == "Unknown Remote Controller"
+    assert device_info.sw_version is None
+
+
+def test_device_info_with_missing_sensor_data_keys(hass):
+    """Test device_info when sensor_data keys are missing."""
+    sensor_data = {
+        "device_id": 1234,
+        # Missing device_name and room_name
+    }
+    common_data = {"name": "Hitachi PAC", "firmware": "1.0.0"}
+    entry = SimpleNamespace(entry_id="test-entry", data={})
+
+    if DOMAIN not in hass.data:
+        hass.data[DOMAIN] = {}
+    if entry.entry_id not in hass.data[DOMAIN]:
+        hass.data[DOMAIN][entry.entry_id] = {}
+
+    hass.data[DOMAIN][entry.entry_id]["api"] = SimpleNamespace(
+        async_set_hvac_mode=AsyncMock(return_value=True),
+        async_set_temperature=AsyncMock(return_value=True),
+        set_preset_modes=AsyncMock(return_value=True),
+        async_set_silent_mode=AsyncMock(return_value=True),
+        async_set_fan_speed=AsyncMock(return_value=True),
+        is_fan_coil_compatible=lambda data: False,
+        get_fan_control_availability=lambda circuit, mode, data: False,
+        get_temperature_limits=lambda zone_id, mode, data: (None, None),
+    )
+    hass.data[DOMAIN][entry.entry_id]["coordinator"] = SimpleNamespace(
+        get_sensors_data=lambda: [sensor_data],
+        get_common_data=lambda: {"device_status": {1234: common_data}},
+        get_installation_devices_data=lambda: {},
+        async_request_refresh=AsyncMock(return_value=None),
+    )
+
+    entity = CSNetHomeClimate(hass, entry, sensor_data, common_data)
+    device_info = entity.device_info
+
+    # Should not raise KeyError, should use defaults
+    assert device_info is not None
+    assert device_info.name == "Unknown Device-Unknown Room"

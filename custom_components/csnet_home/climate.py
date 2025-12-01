@@ -257,15 +257,34 @@ class CSNetHomeClimate(ClimateEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return device information."""
+        device_name = self._sensor_data.get("device_name", "Unknown Device")
+        room_name = self._sensor_data.get("room_name", "Unknown Room")
+        device_id = self._sensor_data.get("device_id")
+
+        # Handle both data structures:
+        # 1. Device-specific dict (initial): _common_data = {"name": "...", "firmware": "..."}
+        # 2. Full common_data dict (after update): _common_data = {"device_status": {...}}
+        if "device_status" in self._common_data:
+            # After update: nested structure
+            device_status = self._common_data.get("device_status", {}).get(
+                device_id, {}
+            )
+            device_name_from_status = device_status.get("name", "Unknown")
+            firmware = device_status.get("firmware")
+        else:
+            # Initial state: direct access
+            device_name_from_status = self._common_data.get("name", "Unknown")
+            firmware = self._common_data.get("firmware")
+
         return DeviceInfo(
-            name=f"{self._sensor_data['device_name']}-{self._sensor_data['room_name']}",
+            name=f"{device_name}-{room_name}",
             manufacturer="Hitachi",
-            model=f"{self._common_data['name']} Remote Controller",
-            sw_version=self._common_data["firmware"],
+            model=f"{device_name_from_status} Remote Controller",
+            sw_version=firmware,  # None is acceptable for DeviceInfo
             identifiers={
                 (
                     DOMAIN,
-                    f"{self._sensor_data['device_name']}-{self._sensor_data['room_name']}",
+                    f"{device_name}-{room_name}",
                 )
             },
         )
