@@ -108,6 +108,8 @@ class CSNetHomeAPI:
                 ) as response:
                     if await self.check_logged_in(response):
                         _LOGGER.info("Login successful")
+                        # Extract all cookies from the session cookie jar after successful login
+                        self._extract_all_cookies()
                         return True
                     _LOGGER.error("Failed to login. Status code: %s", response.status)
                     return False
@@ -130,8 +132,11 @@ class CSNetHomeAPI:
 
         try:
             async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+                # Use cookies from session if self.cookies is not set
+                # aiohttp will automatically use cookies from cookie_jar if cookies=None
+                request_cookies = self.cookies if self.cookies else None
                 async with self.session.get(
-                    sensor_data_url, headers=headers, cookies=self.cookies
+                    sensor_data_url, headers=headers, cookies=request_cookies
                 ) as response:
                     data = await self.check_api_response(response)
                     if data is not None and data.get("status") == "success":
@@ -250,8 +255,11 @@ class CSNetHomeAPI:
 
         try:
             async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+                # Use cookies from session if self.cookies is not set
+                # aiohttp will automatically use cookies from cookie_jar if cookies=None
+                request_cookies = self.cookies if self.cookies else None
                 async with self.session.get(
-                    installation_devices_url, headers=headers, cookies=self.cookies
+                    installation_devices_url, headers=headers, cookies=request_cookies
                 ) as response:
                     data = await self.check_api_response(response)
                     if data is not None:
@@ -286,8 +294,11 @@ class CSNetHomeAPI:
 
         try:
             async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+                # Use cookies from session if self.cookies is not set
+                # aiohttp will automatically use cookies from cookie_jar if cookies=None
+                request_cookies = self.cookies if self.cookies else None
                 async with self.session.get(
-                    installation_alarms_url, headers=headers, cookies=self.cookies
+                    installation_alarms_url, headers=headers, cookies=request_cookies
                 ) as response:
                     data = await self.check_api_response(response)
                     if data is not None:
@@ -1208,6 +1219,23 @@ class CSNetHomeAPI:
                 )
                 return cookie.value
         return None
+
+    def _extract_all_cookies(self):
+        """Extract all cookies from the session cookie jar and store them.
+
+        This method extracts all cookies from the session's cookie jar and stores
+        them in self.cookies as a dictionary for use in API requests.
+        """
+        if not self.session or not self.session.cookie_jar:
+            _LOGGER.warning("No session or cookie jar available")
+            return
+
+        self.cookies = {}
+        for cookie in self.session.cookie_jar:
+            self.cookies[cookie.key] = cookie.value
+            _LOGGER.debug("Extracted cookie %s", cookie.key)
+
+        _LOGGER.debug("Extracted %d cookies from session", len(self.cookies))
 
     async def load_translations(self):
         """Load translations dictionaries for alarm messages (lazy)."""
