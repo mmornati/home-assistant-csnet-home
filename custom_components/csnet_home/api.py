@@ -518,7 +518,9 @@ class CSNetHomeAPI:
             "_csrf": self.xsrf_token,
         }
         if zone_id == 3:
-            data["settingTempDHW"] = str(int(temperature))
+            # DHW temperature must be divided by 10 before sending (matches JavaScript behavior)
+            # JavaScript: un.heatingOrder.settingTempDHW = parseInt(val / 10);
+            data["settingTempDHW"] = str(int(temperature / 10))
         elif zone_id == 5:  # C1_WATER
             if mode == 0:  # Cooling mode
                 data["fixTempCoolC1"] = str(int(temperature))

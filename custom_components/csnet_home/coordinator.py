@@ -79,16 +79,11 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
                 for sensor in self._device_data["sensors"]:
                     zone_id = sensor.get("zone_id")
                     # For zone_id 3 (DHW/water heater), use tempDHW from heatingStatus
+                    # JavaScript: return un.heatingStatus.tempDHW; (no scaling, already in degrees)
                     if zone_id == 3:
                         temp_dhw = heating_status.get("tempDHW")
                         if temp_dhw is not None:
-                            # Handle potential temperature scaling (some APIs return *10)
-                            if temp_dhw > 200:
-                                _LOGGER.debug(
-                                    "tempDHW seems scaled (%s), dividing by 10",
-                                    temp_dhw,
-                                )
-                                temp_dhw = temp_dhw / 10.0
+                            # tempDHW is already in degrees Celsius (no /10 needed per JavaScript)
                             sensor["current_temperature"] = temp_dhw
                             _LOGGER.debug(
                                 "Enriched zone_id 3 (DHW) current_temperature from tempDHW: %s",
