@@ -82,10 +82,26 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
                     if zone_id == 3:
                         temp_dhw = heating_status.get("tempDHW")
                         if temp_dhw is not None:
+                            # Handle potential temperature scaling (some APIs return *10)
+                            if temp_dhw > 200:
+                                _LOGGER.debug(
+                                    "tempDHW seems scaled (%s), dividing by 10",
+                                    temp_dhw,
+                                )
+                                temp_dhw = temp_dhw / 10.0
                             sensor["current_temperature"] = temp_dhw
                             _LOGGER.debug(
-                                "Enriched zone_id 3 (DHW) current_temperature: %s",
+                                "Enriched zone_id 3 (DHW) current_temperature from tempDHW: %s",
                                 temp_dhw,
+                            )
+                        else:
+                            # tempDHW not available in heatingStatus (common for Yutampo)
+                            # Keep the original currentTemperature from elements API
+                            original_temp = sensor.get("current_temperature")
+                            _LOGGER.debug(
+                                "tempDHW not found in heatingStatus for zone_id 3, "
+                                "using currentTemperature from elements API: %s",
+                                original_temp,
                             )
                     # For zone_id 5 (C1_WATER), use waterOutletHPTemp from heatingStatus
                     elif zone_id == 5:
