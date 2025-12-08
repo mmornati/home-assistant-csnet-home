@@ -88,7 +88,10 @@ class CSNetHomeWaterHeater(WaterHeaterEntity):
 
         # Initialize operation mode based on sensor data
         # Check both onOff (from API) and on_off (normalized) for compatibility
-        on_off = self._sensor_data.get("on_off") or self._sensor_data.get("onOff", 1)
+        # Use explicit None check to handle 0 (off) correctly
+        on_off = self._sensor_data.get("on_off")
+        if on_off is None:
+            on_off = self._sensor_data.get("onOff", 1)
         doing_boost = self._sensor_data.get("doingBoost", False)
 
         if on_off == 0:
@@ -162,7 +165,10 @@ class CSNetHomeWaterHeater(WaterHeaterEntity):
         self._attr_target_temperature = setting_temp
 
         # Update operation mode - check both onOff and on_off for compatibility
-        on_off = self._sensor_data.get("on_off") or self._sensor_data.get("onOff", 1)
+        # Use explicit None check to handle 0 (off) correctly
+        on_off = self._sensor_data.get("on_off")
+        if on_off is None:
+            on_off = self._sensor_data.get("onOff", 1)
         doing_boost = self._sensor_data.get("doingBoost", False)
 
         _LOGGER.debug(
