@@ -3,8 +3,8 @@
 import asyncio
 import json
 import logging
+import re
 import time
-from urllib.parse import urlencode
 
 import aiohttp
 import async_timeout
@@ -116,24 +116,28 @@ class CSNetHomeAPI:
                 ),
             )
 
-        # Manually encode form data to ensure special characters like % are properly encoded
-        # This gives us full control over the encoding process
-        # Using urlencode ensures % becomes %25, & becomes %26, = becomes %3D, etc.
-        form_data_dict = {
+        # Use dict - aiohttp will automatically URL-encode form data when using data parameter
+        # This ensures proper Content-Type header and encoding
+        form_data = {
             "_csrf": self.xsrf_token,
             "token": "",
             "username": self.username,
             "password_unsanitized": self.password,
             "password": self.password,
         }
-        # Encode as bytes to ensure proper handling
-        form_data_encoded = urlencode(form_data_dict, doseq=False).encode("utf-8")
-        _LOGGER.debug("Form data encoded length: %d bytes", len(form_data_encoded))
+
+        # Debug: Log what will be sent (without exposing password value)
+        _LOGGER.debug(
+            "Login POST data keys: %s, username: %s, password length: %d",
+            list(form_data.keys()),
+            form_data["username"],
+            len(form_data["password"]) if form_data["password"] else 0,
+        )
 
         try:
             async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
                 async with self.session.post(
-                    login_url, headers=headers, cookies=cookies, data=form_data_encoded
+                    login_url, headers=headers, cookies=cookies, data=form_data
                 ) as response:
                     if await self.check_logged_in(response):
                         _LOGGER.info("Login successful")
@@ -1218,13 +1222,28 @@ class CSNetHomeAPI:
             response.status,
             'loadContent("login")' in page_content,
         )
-        # Log a snippet of the response for debugging (first 200 chars)
+        # Log a snippet of the response for debugging (first 500 chars)
         if page_content:
-            preview = page_content[:200].replace("\n", " ")
+            preview = page_content[:500].replace("\n", " ")
             _LOGGER.debug(
                 "Login response preview: %s...",
                 preview,
             )
+            # Check for common error messages in the response
+            if "invalid" in page_content.lower() or "incorrect" in page_content.lower():
+                _LOGGER.error("Response suggests invalid credentials")
+            if "error" in page_content.lower():
+                # Try to extract error message
+                error_match = re.search(
+                    r'<[^>]*class=["\']error[^"\']*["\'][^>]*>([^<]+)',
+                    page_content,
+                    re.IGNORECASE,
+                )
+                if error_match:
+                    _LOGGER.error(
+                        "Error message found in response: %s",
+                        error_match.group(1).strip(),
+                    )
         self.logged_in = False
         return False
 
