@@ -20,6 +20,9 @@ from custom_components.csnet_home.const import (
     HEAT_SETTINGS_PATH,
     LOGIN_PATH,
     LANGUAGE_FILES,
+    HEATING_MAX_TEMPERATURE,
+    WATER_CIRCUIT_MAX_HEAT,
+    WATER_HEATER_MAX_TEMPERATURE,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -90,12 +93,15 @@ class CSNetHomeAPI:
             "acceptedCookies": "yes",
         }
 
+        # CSNet API requires password field to replace % with # (as done in csnet.js)
+        password_sanitized = self.password.replace("%", "#") if self.password else ""
+
         form_data = {
             "_csrf": self.xsrf_token,
             "token": "",
             "username": self.username,
             "password_unsanitized": self.password,
-            "password": self.password,
+            "password": password_sanitized,
         }
 
         try:
@@ -127,8 +133,11 @@ class CSNetHomeAPI:
 
         try:
             async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+                # Use cookies from session if self.cookies is not set
+                # aiohttp will automatically use cookies from cookie_jar if cookies=None
+                request_cookies = self.cookies if self.cookies else None
                 async with self.session.get(
-                    sensor_data_url, headers=headers, cookies=self.cookies
+                    sensor_data_url, headers=headers, cookies=request_cookies
                 ) as response:
                     data = await self.check_api_response(response)
                     if data is not None and data.get("status") == "success":
@@ -247,8 +256,11 @@ class CSNetHomeAPI:
 
         try:
             async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+                # Use cookies from session if self.cookies is not set
+                # aiohttp will automatically use cookies from cookie_jar if cookies=None
+                request_cookies = self.cookies if self.cookies else None
                 async with self.session.get(
-                    installation_devices_url, headers=headers, cookies=self.cookies
+                    installation_devices_url, headers=headers, cookies=request_cookies
                 ) as response:
                     data = await self.check_api_response(response)
                     if data is not None:
@@ -283,8 +295,11 @@ class CSNetHomeAPI:
 
         try:
             async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+                # Use cookies from session if self.cookies is not set
+                # aiohttp will automatically use cookies from cookie_jar if cookies=None
+                request_cookies = self.cookies if self.cookies else None
                 async with self.session.get(
-                    installation_alarms_url, headers=headers, cookies=self.cookies
+                    installation_alarms_url, headers=headers, cookies=request_cookies
                 ) as response:
                     data = await self.check_api_response(response)
                     if data is not None:
@@ -308,16 +323,115 @@ class CSNetHomeAPI:
             return element.get("settingTemperature") * 10
         return element.get("settingTemperature")
 
+    def get_heating_status_from_installation_devices(self, installation_devices_data):
+        """Extract heatingStatus from installation devices data structure.
+
+        Navigates through: data[0].indoors[0].heatingStatus
+
+        Args:
+            installation_devices_data: The installation devices API response
+
+        Returns:
+            dict or None: heatingStatus dictionary, or None if not found
+        """
+        if not installation_devices_data:
+            return None
+
+        # Try direct access first (if already extracted)
+        heating_status = installation_devices_data.get("heatingStatus")
+        if heating_status:
+            return heating_status
+
+        # Navigate through: data[0].indoors[0].heatingStatus
+        data_array = installation_devices_data.get("data", [])
+        if isinstance(data_array, list) and len(data_array) > 0:
+            first_device = data_array[0]
+            if isinstance(first_device, dict):
+                indoors_array = first_device.get("indoors", [])
+                if isinstance(indoors_array, list) and len(indoors_array) > 0:
+                    first_indoors = indoors_array[0]
+                    if isinstance(first_indoors, dict):
+                        return first_indoors.get("heatingStatus", {})
+
+        return None
+
+    def get_heating_setting_from_installation_devices(self, installation_devices_data):
+        """Extract heatingSetting from installation devices data structure.
+
+        Navigates through: data[0].indoors[0].heatingSetting
+
+        Args:
+            installation_devices_data: The installation devices API response
+
+        Returns:
+            dict or None: heatingSetting dictionary, or None if not found
+        """
+        if not installation_devices_data:
+            return None
+
+        # Try direct access first (if already extracted)
+        heating_setting = installation_devices_data.get("heatingSetting")
+        if heating_setting:
+            return heating_setting
+
+        # Navigate through: data[0].indoors[0].heatingSetting
+        data_array = installation_devices_data.get("data", [])
+        if isinstance(data_array, list) and len(data_array) > 0:
+            first_device = data_array[0]
+            if isinstance(first_device, dict):
+                indoors_array = first_device.get("indoors", [])
+                if isinstance(indoors_array, list) and len(indoors_array) > 0:
+                    first_indoors = indoors_array[0]
+                    if isinstance(first_indoors, dict):
+                        return first_indoors.get("heatingSetting", {})
+
+        return None
+
+    def _validate_value(self, value, default):
+        """Validate temperature limit value matching JavaScript validateValue logic.
+
+        Args:
+            value: The value to validate (can be None, int, float)
+            default: The default value to return if validation fails
+
+        Returns:
+            The validated value or default if value is None, 0, or -1
+
+        This matches the JavaScript validateValue function:
+        function validateValue(v, def) {
+            if (v != null && v != undefined && v != 0 && v != -1)
+                return v;
+            return def;
+        }
+        """
+        if value is None:
+            return default
+        try:
+            val = float(value)
+            # Check if value is 0 or -1 (invalid sentinel values)
+            if val == 0 or val == -1:
+                return default
+            return val
+        except (TypeError, ValueError):
+            return default
+
     def get_temperature_limits(self, zone_id, mode, installation_devices_data):
         """Extract temperature limits from installation devices data.
 
         Args:
-            zone_id: The zone/element type (1, 2, 5, etc.)
+            zone_id: The zone/element type (1, 2, 5, 6, 3)
             mode: The HVAC mode (0=cool, 1=heat, 2=auto)
             installation_devices_data: The installation devices API response
 
         Returns:
             Tuple of (min_temp, max_temp) or (None, None) if not available
+
+        Zone mapping based on JavaScript code:
+        - zone_id 1 = C1_AIR (air circuit 1) - max 35°C (RTU_MAX)
+        - zone_id 2 = C2_AIR (air circuit 2) - max 35°C (RTU_MAX)
+        - zone_id 5 = C1_WATER (water circuit 1) - max 80°C (C1_MAX_HEAT)
+        - zone_id 6 = C2_WATER (water circuit 2) - max 80°C (C2_MAX_HEAT)
+        - zone_id 3 = DHW (water heater) - max 80°C (DHW_MAX)
         """
         # SWP has fixed temperature range regardless of installation data
         if zone_id == 4:  # SWP (swimming pool)
@@ -326,46 +440,78 @@ class CSNetHomeAPI:
         if not installation_devices_data:
             return (None, None)
 
-        heating_status = installation_devices_data.get("heatingStatus", {})
+        heating_status = self.get_heating_status_from_installation_devices(
+            installation_devices_data
+        )
         if not heating_status:
             return (None, None)
 
         # Determine if we're in heating or cooling mode
         is_heating = mode == 1  # mode 1 is heat, mode 0 is cool
 
-        # Zone mapping based on JavaScript code analysis:
-        # zone_id 1, 2 = air circuits (C1_AIR, C2_AIR)
-        # zone_id 5 = water circuit (C1_WATER)
-        # zone_id 3 = DHW (water heater)
-
         min_temp = None
         max_temp = None
 
-        if zone_id == 1:  # Air circuit 1
+        if zone_id == 1:  # Air circuit 1 (C1_AIR)
             if is_heating:
-                min_temp = heating_status.get("heatAirMinC1")
-                max_temp = heating_status.get("heatAirMaxC1")
+                raw_min = heating_status.get("heatAirMinC1")
+                raw_max = heating_status.get("heatAirMaxC1")
+                # Validate with RTU_MAX default (35°C) - JavaScript multiplies by 10, but we work in Celsius
+                max_temp = self._validate_value(raw_max, HEATING_MAX_TEMPERATURE)
+                min_temp = raw_min  # Min doesn't have a default in JS code
             else:
-                min_temp = heating_status.get("coolAirMinC1")
-                max_temp = heating_status.get("coolAirMaxC1")
-        elif zone_id == 2:  # Air circuit 2
+                raw_min = heating_status.get("coolAirMinC1")
+                raw_max = heating_status.get("coolAirMaxC1")
+                # Validate with RTU_MAX default (35°C)
+                max_temp = self._validate_value(raw_max, HEATING_MAX_TEMPERATURE)
+                min_temp = raw_min  # Min doesn't have a default in JS code
+        elif zone_id == 2:  # Air circuit 2 (C2_AIR)
             if is_heating:
-                min_temp = heating_status.get("heatAirMinC2")
-                max_temp = heating_status.get("heatAirMaxC2")
+                raw_min = heating_status.get("heatAirMinC2")
+                raw_max = heating_status.get("heatAirMaxC2")
+                # Validate with RTU_MAX default (35°C)
+                max_temp = self._validate_value(raw_max, HEATING_MAX_TEMPERATURE)
+                min_temp = raw_min  # Min doesn't have a default in JS code
             else:
-                min_temp = heating_status.get("coolAirMinC2")
-                max_temp = heating_status.get("coolAirMaxC2")
-        elif zone_id == 5:  # Water circuit 1 (fixed temperature)
+                raw_min = heating_status.get("coolAirMinC2")
+                raw_max = heating_status.get("coolAirMaxC2")
+                # Validate with RTU_MAX default (35°C)
+                max_temp = self._validate_value(raw_max, HEATING_MAX_TEMPERATURE)
+                min_temp = raw_min  # Min doesn't have a default in JS code
+        elif zone_id == 5:  # Water circuit 1 (C1_WATER)
             if is_heating:
-                min_temp = heating_status.get("heatMinC1")
-                max_temp = heating_status.get("heatMaxC1")
+                raw_min = heating_status.get("heatMinC1")
+                raw_max = heating_status.get("heatMaxC1")
+                # Validate with C1_MAX_HEAT default (80°C)
+                max_temp = self._validate_value(raw_max, WATER_CIRCUIT_MAX_HEAT)
+                min_temp = raw_min  # Min doesn't have a default in JS code
             else:
-                min_temp = heating_status.get("coolMinC1")
-                max_temp = heating_status.get("coolMaxC1")
+                raw_min = heating_status.get("coolMinC1")
+                raw_max = heating_status.get("coolMaxC1")
+                # Validate with C1_MAX_COOL default - not defined in constants, use same as heat for now
+                # Note: JavaScript uses C1_MAX_COOL which may differ, but not available in our constants
+                max_temp = self._validate_value(raw_max, WATER_CIRCUIT_MAX_HEAT)
+                min_temp = raw_min  # Min doesn't have a default in JS code
+        elif zone_id == 6:  # Water circuit 2 (C2_WATER)
+            if is_heating:
+                raw_min = heating_status.get("heatMinC2")
+                raw_max = heating_status.get("heatMaxC2")
+                # Validate with C2_MAX_HEAT default (80°C)
+                max_temp = self._validate_value(raw_max, WATER_CIRCUIT_MAX_HEAT)
+                min_temp = raw_min  # Min doesn't have a default in JS code
+            else:
+                raw_min = heating_status.get("coolMinC2")
+                raw_max = heating_status.get("coolMaxC2")
+                # Validate with C2_MAX_COOL default - not defined in constants, use same as heat for now
+                # Note: JavaScript uses C2_MAX_COOL which may differ, but not available in our constants
+                max_temp = self._validate_value(raw_max, WATER_CIRCUIT_MAX_HEAT)
+                min_temp = raw_min  # Min doesn't have a default in JS code
         elif zone_id == 3:  # DHW (water heater)
             # DHW typically only has a max limit, min is constant
-            max_temp = heating_status.get("dhwMax")
-            # Min is typically 30 for DHW
+            raw_max = heating_status.get("dhwMax")
+            # Validate with DHW_MAX default (80°C)
+            max_temp = self._validate_value(raw_max, WATER_HEATER_MAX_TEMPERATURE)
+            # Min is typically 30 for DHW, not provided by API
 
         return (min_temp, max_temp)
 
@@ -391,11 +537,16 @@ class CSNetHomeAPI:
             data["settingTempDHW"] = str(int(temperature))
         elif zone_id == 4:
             data["settingTempSWP"] = str(int(temperature))
-        elif zone_id == 5:
-            if mode == 0:
+        elif zone_id == 5:  # C1_WATER
+            if mode == 0:  # Cooling mode
                 data["fixTempCoolC1"] = str(int(temperature))
-            else:
+            else:  # Heating mode
                 data["fixTempHeatC1"] = str(int(temperature))
+        elif zone_id == 6:  # C2_WATER
+            if mode == 0:  # Cooling mode
+                data["fixTempCoolC2"] = str(int(temperature))
+            else:  # Heating mode
+                data["fixTempHeatC2"] = str(int(temperature))
         else:
             data[f"settingTempRoomZ{zone_id}"] = str(int(temperature * 10))
 
@@ -414,6 +565,75 @@ class CSNetHomeAPI:
                     return True
         except (aiohttp.ClientError, asyncio.TimeoutError) as err:
             _LOGGER.error("Error setting temperature for %s: %s", zone_id, err)
+            return False
+
+    async def async_set_fixed_water_temperature(
+        self, circuit: int, parent_id: int, mode: int, temperature: float
+    ):
+        """Set fixed water temperature for a circuit.
+
+        This is only valid when OTC type is "FIX" (Fixed mode).
+        For water circuits (C1_WATER, C2_WATER), this sets the fixed water temperature
+        that is used when OTC type is set to Fixed mode.
+
+        Args:
+            circuit: Circuit number (1 for C1, 2 for C2)
+            parent_id: Parent device ID (indoor unit ID)
+            mode: HVAC mode (0=cool, 1=heat, 2=auto)
+            temperature: Temperature value to set
+
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        settings_url = f"{self.base_url}{HEAT_SETTINGS_PATH}"
+
+        headers = COMMON_API_HEADERS | {
+            "accept": "*/*",
+            "x-requested-with": "XMLHttpRequest",
+            "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "origin": self.base_url,
+        }
+
+        data = {
+            "orderStatus": "PENDING",
+            "indoorId": parent_id,
+            "_csrf": self.xsrf_token,
+        }
+
+        # Set the appropriate fixed temperature field based on circuit and mode
+        if mode == 1:  # Heating mode
+            data[f"fixTempHeatC{circuit}"] = str(int(temperature))
+        elif mode == 0:  # Cooling mode
+            data[f"fixTempCoolC{circuit}"] = str(int(temperature))
+        elif mode == 2:  # Auto mode - set both heating and cooling
+            data[f"fixTempHeatC{circuit}"] = str(int(temperature))
+            data[f"fixTempCoolC{circuit}"] = str(int(temperature))
+        else:
+            _LOGGER.warning("Invalid mode %s for fixed water temperature", mode)
+            return False
+
+        cookies = {
+            "XSRF-TOKEN": self.xsrf_token,
+            "acceptedCookies": "yes",
+        }
+
+        try:
+            async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+                async with self.session.post(
+                    settings_url, headers=headers, cookies=cookies, data=data
+                ) as response:
+                    response.raise_for_status()
+                    _LOGGER.debug(
+                        "Fixed water temperature set to %s for circuit %s (mode %s)",
+                        temperature,
+                        circuit,
+                        mode,
+                    )
+                    return True
+        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+            _LOGGER.error(
+                "Error setting fixed water temperature for circuit %s: %s", circuit, err
+            )
             return False
 
     async def set_water_heater_status(self, zone_id, parent_id, status):
@@ -826,7 +1046,9 @@ class CSNetHomeAPI:
         if not installation_devices_data:
             return False
 
-        heating_status = installation_devices_data.get("heatingStatus", {})
+        heating_status = self.get_heating_status_from_installation_devices(
+            installation_devices_data
+        )
         if not heating_status:
             return False
 
@@ -849,7 +1071,9 @@ class CSNetHomeAPI:
         if not self.is_fan_coil_compatible(installation_devices_data):
             return False
 
-        heating_status = installation_devices_data.get("heatingStatus", {})
+        heating_status = self.get_heating_status_from_installation_devices(
+            installation_devices_data
+        )
         if not heating_status:
             return False
 
@@ -866,6 +1090,96 @@ class CSNetHomeAPI:
             return fan_controlled == 3
 
         return False
+
+    def is_fixed_water_temperature_editable(
+        self, circuit: int, mode: int, installation_devices_data
+    ):
+        """Check if fixed water temperature is editable for a circuit.
+
+        Fixed water temperature is only editable when OTC (Outdoor Temperature
+        Compensation) type is set to "FIX" (Fixed mode). When using law/curve/gradient
+        OTC types, the temperature is automatically calculated and cannot be set manually.
+
+        Args:
+            circuit: Circuit number (1 for C1, 2 for C2)
+            mode: HVAC mode (0=cool, 1=heat, 2=auto)
+            installation_devices_data: The installation devices API response
+
+        Returns:
+            bool: True if fixed water temperature can be edited, False otherwise
+        """
+        if not installation_devices_data:
+            return False
+
+        heating_status = self.get_heating_status_from_installation_devices(
+            installation_devices_data
+        )
+        if not heating_status:
+            return False
+
+        # For heating mode (1), check if otcTypeHeatC{X} == OTC_HEATING_TYPE_FIX (3)
+        # For cooling mode (0), check if otcTypeCoolC{X} == OTC_COOLING_TYPE_FIX (2)
+        if mode == 1:  # Heating mode
+            otc_key = f"otcTypeHeatC{circuit}"
+            otc_type = heating_status.get(otc_key, 0)
+            # OTC_HEATING_TYPE_FIX = 3
+            return otc_type == 3
+        if mode == 0:  # Cooling mode
+            otc_key = f"otcTypeCoolC{circuit}"
+            otc_type = heating_status.get(otc_key, 0)
+            # OTC_COOLING_TYPE_FIX = 2
+            return otc_type == 2
+        if mode == 2:  # Auto mode - check both heating and cooling
+            otc_heat_key = f"otcTypeHeatC{circuit}"
+            otc_cool_key = f"otcTypeCoolC{circuit}"
+            otc_heat_type = heating_status.get(otc_heat_key, 0)
+            otc_cool_type = heating_status.get(otc_cool_key, 0)
+            # In auto mode, editable if either heating or cooling is FIX
+            return otc_heat_type == 3 or otc_cool_type == 2
+
+        return False
+
+    def get_fixed_water_temperature(
+        self, circuit: int, mode: int, installation_devices_data
+    ):
+        """Get the current fixed water temperature for a circuit.
+
+        Args:
+            circuit: Circuit number (1 for C1, 2 for C2)
+            mode: HVAC mode (0=cool, 1=heat, 2=auto)
+            installation_devices_data: The installation devices API response
+
+        Returns:
+            float or None: Fixed water temperature value, or None if not available
+        """
+        if not installation_devices_data:
+            return None
+
+        heating_setting = self.get_heating_setting_from_installation_devices(
+            installation_devices_data
+        )
+        if not heating_setting:
+            return None
+
+        # For heating mode, get fixTempHeatC{X}
+        # For cooling mode, get fixTempCoolC{X}
+        if mode == 1:  # Heating mode
+            temp_key = f"fixTempHeatC{circuit}"
+            return heating_setting.get(temp_key)
+        if mode == 0:  # Cooling mode
+            temp_key = f"fixTempCoolC{circuit}"
+            return heating_setting.get(temp_key)
+        # For auto mode, prefer heating temperature if available
+        if mode == 2:  # Auto mode
+            temp_heat_key = f"fixTempHeatC{circuit}"
+            temp_cool_key = f"fixTempCoolC{circuit}"
+            # Return heating temp if available, otherwise cooling temp
+            temp = heating_setting.get(temp_heat_key)
+            if temp is not None:
+                return temp
+            return heating_setting.get(temp_cool_key)
+
+        return None
 
     async def close(self):
         """Close the session after usage."""
@@ -886,7 +1200,7 @@ class CSNetHomeAPI:
             _LOGGER.info("Login successful")
             self.logged_in = True
             return True
-        _LOGGER.error("Failed to login. Status code: %s", response.status)
+
         self.logged_in = False
         return False
 

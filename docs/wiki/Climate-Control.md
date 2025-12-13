@@ -226,6 +226,179 @@ fan_modes: ["off", "low", "medium", "auto"]  # Fan coil
 fan_modes: ["auto", "on"]  # Standard (silent mode)
 ```
 
+### Fixed Water Temperature Control (Water Circuits Only)
+
+For **water circuits** (C1 Water and C2 Water), you can control the fixed water supply temperature when your system is configured in **Fixed Temperature mode** (OTC type = FIX).
+
+#### Understanding OTC (Outdoor Temperature Compensation)
+
+Your Hitachi system can operate in different **OTC (Outdoor Temperature Compensation)** modes:
+
+- **Fixed Mode (FIX)**: Water temperature is set to a fixed value you control
+- **Gradient/Points Mode**: Water temperature is automatically calculated based on outdoor temperature
+
+**Important**: Fixed water temperature control is **only available when OTC type is set to FIX**. If your system uses Gradient or Points mode, the water temperature is automatically calculated and cannot be manually set.
+
+#### Checking Your OTC Mode
+
+Check your climate entity attributes to see your current OTC mode:
+
+```yaml
+# For C1 circuit
+otc_heating_type: 3  # 3 = Fixed mode
+otc_heating_type_name: "Fixed"
+
+# For C2 circuit
+otc_heating_type_c2: 3
+otc_heating_type_name_c2: "Fixed"
+```
+
+**OTC Type Values**:
+- **Heating**: None (0), Points (1), Gradient (2), **Fixed (3)**
+- **Cooling**: None (0), Points (1), **Fixed (2)**
+
+#### Number Entities for Fixed Water Temperature
+
+When your system is in **Fixed mode (OTC = FIX)**, number entities automatically appear for controlling the fixed water temperature:
+
+**Entity Names**:
+- `number.{zone_name}_fixed_water_temperature_heating_c1` - C1 heating mode
+- `number.{zone_name}_fixed_water_temperature_cooling_c1` - C1 cooling mode
+- `number.{zone_name}_fixed_water_temperature_heating_c2` - C2 heating mode
+- `number.{zone_name}_fixed_water_temperature_cooling_c2` - C2 cooling mode
+
+**Examples**:
+- `number.salon_fixed_water_temperature_heating_c1`
+- `number.bibliotheque_fixed_water_temperature_cooling_c2`
+
+**Note**: These entities are **circuit-level** settings that affect both air zones (1,2) and water zones (5,6) of the same circuit. The fixed water temperature controls the water supply temperature for the entire circuit.
+
+#### Using Fixed Water Temperature Control
+
+**Via UI**:
+1. Open the number entity (e.g., `number.salon_fixed_water_temperature_heating_c1`)
+2. Adjust the temperature value
+3. The value is saved automatically
+
+**Via Service Call**:
+```yaml
+service: number.set_value
+target:
+  entity_id: number.salon_fixed_water_temperature_heating_c1
+data:
+  value: 45  # Set fixed water temperature to 45°C
+```
+
+**Via Automation**:
+```yaml
+automation:
+  - alias: "Set Fixed Water Temperature for Winter"
+    trigger:
+      - platform: time
+        at: "06:00:00"
+    action:
+      - service: number.set_value
+        target:
+          entity_id: number.salon_fixed_water_temperature_heating_c1
+        data:
+          value: 50  # Higher temperature for cold days
+          
+  - alias: "Set Fixed Water Temperature for Spring"
+    trigger:
+      - platform: time
+        at: "20:00:00"
+    condition:
+      - condition: numeric_state
+        entity_id: sensor.system_controller_outdoor_temperature
+        above: 15
+    action:
+      - service: number.set_value
+        target:
+          entity_id: number.salon_fixed_water_temperature_heating_c1
+        data:
+          value: 40  # Lower temperature for milder weather
+```
+
+#### Climate Entity Behavior for Water Circuits
+
+For **water zones** (zone_id 5 = C1 Water, zone_id 6 = C2 Water):
+
+- **When OTC type is FIX**: The climate entity's `target_temperature` shows the fixed water temperature and can be edited
+- **When OTC type is NOT FIX** (Gradient/Points): The climate entity's `target_temperature` returns `None` (unavailable) since the temperature is automatically calculated
+
+**For air zones** (zone_id 1 = C1 Air, zone_id 2 = C2 Air):
+- The climate entity's `target_temperature` always shows the **room temperature** (`settingTempRoomZ1/Z2`) and is always editable
+- Fixed water temperature is controlled via the **separate number entity** (when OTC is FIX)
+- Room temperature and fixed water temperature are **independent settings**
+
+#### Temperature Range
+
+Fixed water temperature typically ranges from:
+- **Heating**: 20°C to 80°C (varies by system)
+- **Cooling**: 10°C to 30°C (varies by system)
+
+Check the number entity's `min` and `max` attributes for your system's exact range.
+
+#### Why Don't I See the Number Entity?
+
+If you don't see the fixed water temperature number entity, it's because:
+
+1. **Your OTC type is NOT FIX** - The entity only appears when OTC type is FIX
+2. **System not in Fixed mode** - Check your climate entity attributes to see your current OTC type
+3. **Entity not created yet** - The entity appears automatically when conditions are met
+
+**To enable fixed temperature control**:
+- Change your OTC type to FIX in the CSNet Manager app or website
+- The number entity will appear automatically after the next integration update
+
+#### Example: Seasonal Temperature Adjustment
+
+```yaml
+automation:
+  - alias: "Winter Fixed Water Temperature"
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.system_controller_outdoor_temperature
+        below: 5
+        for: "01:00:00"
+    action:
+      - service: number.set_value
+        target:
+          entity_id: number.salon_fixed_water_temperature_heating_c1
+        data:
+          value: 55  # Higher temperature for cold weather
+          
+  - alias: "Spring Fixed Water Temperature"
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.system_controller_outdoor_temperature
+        above: 15
+        for: "01:00:00"
+    action:
+      - service: number.set_value
+        target:
+          entity_id: number.salon_fixed_water_temperature_heating_c1
+        data:
+          value: 40  # Lower temperature for milder weather
+```
+
+#### Troubleshooting
+
+**Entity Not Available**:
+- Check that OTC type is FIX in climate entity attributes
+- Verify the number entity exists in Home Assistant
+- Check integration logs for errors
+
+**Temperature Not Changing**:
+- Ensure OTC type is FIX (not Gradient/Points)
+- Check that the number entity is available
+- Verify the value is within the allowed range (check min/max)
+
+**Want to Use Fixed Mode**:
+- Change OTC type to FIX in CSNet Manager app/website
+- The number entity will appear automatically
+- You can then set fixed water temperature via Home Assistant
+
 ---
 
 ## Reading Climate State
@@ -771,13 +944,13 @@ automation:
 ## Next Steps
 
 Learn more about related features:
-- **[Water Heater Control](Water-Heater-Control)** - Control your DHW system
-- **[Sensors Reference](Sensors-Reference)** - All available sensors
-- **[Advanced Features](Advanced-Features)** - Silent mode, fan control, OTC
-- **[Multi-Zone Configuration](Multi-Zone-Configuration)** - Managing multiple circuits
-- **[Automations Guide](Automations-and-Scripts)** - More automation examples
+- **[Water Heater Control](Water-Heater-Control.md)** - Control your DHW system
+- **[Sensors Reference](Sensors-Reference.md)** - All available sensors
+- **[Advanced Features](Advanced-Features.md)** - Silent mode, fan control, OTC
+- **[Multi-Zone Configuration](Multi-Zone-Configuration.md)** - Managing multiple circuits
+- **[Troubleshooting](Troubleshooting.md)** - Common issues and solutions
 
 ---
 
-**[← Back to Configuration](Configuration-Guide)** | **[Next: Water Heater →](Water-Heater-Control)**
+**[← Back to Configuration](Configuration-Guide.md)** | **[Next: Water Heater →](Water-Heater-Control.md)**
 

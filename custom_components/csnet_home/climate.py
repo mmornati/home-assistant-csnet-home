@@ -1,27 +1,37 @@
 """Create a Climate Component for Home Assistant."""
 
+import asyncio
 import logging
 
 from homeassistant.components.climate import (
-    ClimateEntity,
-    HVACMode,
-    HVACAction,
     FAN_AUTO,
+    ClimateEntity,
+    HVACAction,
+    HVACMode,
 )
-from homeassistant.components.climate.const import ClimateEntityFeature, FAN_ON
+from homeassistant.components.climate.const import FAN_ON, ClimateEntityFeature
 from homeassistant.const import UnitOfTemperature
 from homeassistant.helpers.device_registry import DeviceInfo
 
 from .const import (
+    CONF_FAN_COIL_MODEL,
+    CONF_MAX_TEMP_OVERRIDE,
+    DEFAULT_FAN_COIL_MODEL,
     DOMAIN,
+    FAN_COIL_MODEL_LEGACY,
+    FAN_SPEED_MAP_LEGACY,
+    FAN_SPEED_MAP_STANDARD,
+    FAN_SPEED_REVERSE_MAP_LEGACY,
+    FAN_SPEED_REVERSE_MAP_STANDARD,
     HEATING_MAX_TEMPERATURE,
     HEATING_MIN_TEMPERATURE,
-    FAN_SPEED_MAP,
-    FAN_SPEED_REVERSE_MAP,
     OPERATION_STATUS_MAP,
-    OTC_HEATING_TYPE_NAMES,
     OTC_COOLING_TYPE_NAMES,
+    OTC_HEATING_TYPE_NAMES,
+    WATER_CIRCUIT_MAX_HEAT,
+    WATER_CIRCUIT_MIN_HEAT,
 )
+from .helpers import extract_heating_status
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -77,19 +87,40 @@ class CSNetHomeClimate(ClimateEntity):
         else:
             self._attr_preset_mode = "comfort"
 
-        # Determine if this is a fan coil compatible system
         coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
         installation_devices_data = coordinator.get_installation_devices_data()
         cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
-        self._is_fan_coil = cloud_api.is_fan_coil_compatible(installation_devices_data)
 
-        # Set fan modes based on system type
+        # Determine Fan Coil type from config
+        self._fan_model = self.entry.data.get(
+            CONF_FAN_COIL_MODEL, DEFAULT_FAN_COIL_MODEL
+        )
+
+        # Set the correct maps
+        if self._fan_model == FAN_COIL_MODEL_LEGACY:
+            self._fan_speed_map = FAN_SPEED_MAP_LEGACY
+            self._fan_speed_reverse_map = FAN_SPEED_REVERSE_MAP_LEGACY
+        else:
+            self._fan_speed_map = FAN_SPEED_MAP_STANDARD
+            self._fan_speed_reverse_map = FAN_SPEED_REVERSE_MAP_STANDARD
+
+        # If user selects Legacy control it's assumed that a fan coil is installed
+        if self._fan_model == FAN_COIL_MODEL_LEGACY:
+            self._is_fan_coil = True
+        else:
+            # If it's Standard, then API detection is used
+            self._is_fan_coil = cloud_api.is_fan_coil_compatible(
+                installation_devices_data
+            )
+
         if self._is_fan_coil:
             # Fan coil systems use fan speed control
-            self._attr_fan_modes = list(FAN_SPEED_MAP.keys())
+            self._attr_fan_modes = list(self._fan_speed_map.keys())
         else:
             # Non-fan coil systems use silent mode (auto = normal, on = silent)
             self._attr_fan_modes = [FAN_AUTO, FAN_ON]
+
+        self._assumed_fan_mode = self._get_fan_mode_from_data()
 
         self._attr_supported_features = (
             ClimateEntityFeature.PRESET_MODE
@@ -98,6 +129,33 @@ class CSNetHomeClimate(ClimateEntity):
             | ClimateEntityFeature.TURN_OFF
             | ClimateEntityFeature.FAN_MODE
         )
+
+        # cache for dynamically computed limits
+        self._cached_limits: tuple[float | None, float | None] | None = None
+
+    def _get_fan_mode_from_data(self):
+        """Helper to read the fan mode from the raw API data."""
+        if self._sensor_data is None:
+            return FAN_AUTO if not self._is_fan_coil else "auto"
+
+        if self._is_fan_coil:
+            # Fan speed for fan coil
+            zone_id = self._sensor_data.get("zone_id")
+            circuit = 1 if zone_id == 1 else 2
+
+            fan_speed_key = f"fan{circuit}_speed"
+            fan_speed = self._sensor_data.get(fan_speed_key)
+
+            if fan_speed is not None and fan_speed >= 0:
+                return self._fan_speed_reverse_map.get(fan_speed, "auto")
+            return "auto"
+
+        # Silent mode for non fan coil systems
+        silent_mode = self._sensor_data.get("silent_mode")
+        # silent_mode: 0 = Off (auto), 1 = On (silent)
+        if silent_mode == 1:
+            return FAN_ON
+        return FAN_AUTO
 
     @property
     def current_temperature(self):
@@ -139,60 +197,44 @@ class CSNetHomeClimate(ClimateEntity):
     @property
     def fan_mode(self):
         """Return the current fan mode (fan speed for fan coil, silent mode otherwise)."""
-        if self._sensor_data is None:
-            return FAN_AUTO if not self._is_fan_coil else "auto"
-
-        if self._is_fan_coil:
-            # For fan coil systems, return the fan speed
-            # Determine which circuit to use based on zone_id
-            zone_id = self._sensor_data.get("zone_id")
-            # Zone 1 uses C1, Zone 2 uses C2
-            circuit = 1 if zone_id == 1 else 2
-
-            # Get fan speed from sensor data
-            fan_speed_key = f"fan{circuit}_speed"
-            fan_speed = self._sensor_data.get(fan_speed_key)
-
-            if fan_speed is not None and fan_speed >= 0:
-                return FAN_SPEED_REVERSE_MAP.get(fan_speed, "auto")
-            return "auto"
-
-        # For non-fan coil systems, return silent mode status
-        silent_mode = self._sensor_data.get("silent_mode")
-        # silent_mode: 0 = Off (auto), 1 = On (silent)
-        if silent_mode == 1:
-            return FAN_ON
-        return FAN_AUTO
+        return self._assumed_fan_mode
 
     @property
     def target_temperature(self):
         """Return the target temperature set by the user."""
         if self._sensor_data is None:
             return None
+
+        zone_id = self._sensor_data.get("zone_id")
+
+        # For water circuits (zone 5, 6), only return target temperature if OTC type is FIX
+        if zone_id in [5, 6]:  # Water circuits (C1_WATER, C2_WATER)
+            # Get installation devices data to check OTC type
+            coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
+            installation_devices_data = coordinator.get_installation_devices_data()
+
+            if installation_devices_data:
+                cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
+                mode = self._sensor_data.get("mode", 1)
+
+                # Determine circuit number from zone_id
+                circuit = 1 if zone_id == 5 else 2
+
+                # Check if fixed temperature is editable (OTC type is FIX)
+                is_editable = cloud_api.is_fixed_water_temperature_editable(
+                    circuit, mode, installation_devices_data
+                )
+
+                if not is_editable:
+                    return None
+
         return self._sensor_data["setting_temperature"]
 
     @property
     def min_temp(self):
         """Return the minimum temperature based on current mode and API data."""
-        if self._sensor_data is None:
-            return HEATING_MIN_TEMPERATURE
-
-        # Get the current mode to determine temperature limits
-        mode = self._sensor_data.get("mode", 1)  # Default to heat mode
-        zone_id = self._sensor_data.get("zone_id")
-
-        # Get installation devices data from coordinator
-        coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
-        installation_devices_data = coordinator.get_installation_devices_data()
-
-        # Get temperature limits from API
-        cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
-        min_limit, _ = cloud_api.get_temperature_limits(
-            zone_id, mode, installation_devices_data
-        )
-
-        # Return API limit if available, otherwise use static default
-        return min_limit if min_limit is not None else HEATING_MIN_TEMPERATURE
+        limits = self._calculate_temperature_limits()
+        return limits[0]
 
     @property
     def max_temp(self):
@@ -200,22 +242,13 @@ class CSNetHomeClimate(ClimateEntity):
         if self._sensor_data is None:
             return HEATING_MAX_TEMPERATURE
 
-        # Get the current mode to determine temperature limits
-        mode = self._sensor_data.get("mode", 1)  # Default to heat mode
-        zone_id = self._sensor_data.get("zone_id")
+        # Check for user override first
+        max_temp_override = self.entry.data.get(CONF_MAX_TEMP_OVERRIDE)
+        if max_temp_override is not None:
+            return max_temp_override
 
-        # Get installation devices data from coordinator
-        coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
-        installation_devices_data = coordinator.get_installation_devices_data()
-
-        # Get temperature limits from API
-        cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
-        _, max_limit = cloud_api.get_temperature_limits(
-            zone_id, mode, installation_devices_data
-        )
-
-        # Return API limit if available, otherwise use static default
-        return max_limit if max_limit is not None else HEATING_MAX_TEMPERATURE
+        limits = self._calculate_temperature_limits()
+        return limits[1]
 
     @property
     def unique_id(self) -> str:
@@ -225,15 +258,34 @@ class CSNetHomeClimate(ClimateEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return device information."""
+        device_name = self._sensor_data.get("device_name", "Unknown Device")
+        room_name = self._sensor_data.get("room_name", "Unknown Room")
+        device_id = self._sensor_data.get("device_id")
+
+        # Handle both data structures:
+        # 1. Device-specific dict (initial): _common_data = {"name": "...", "firmware": "..."}
+        # 2. Full common_data dict (after update): _common_data = {"device_status": {...}}
+        if "device_status" in self._common_data:
+            # After update: nested structure
+            device_status = self._common_data.get("device_status", {}).get(
+                device_id, {}
+            )
+            device_name_from_status = device_status.get("name", "Unknown")
+            firmware = device_status.get("firmware")
+        else:
+            # Initial state: direct access
+            device_name_from_status = self._common_data.get("name", "Unknown")
+            firmware = self._common_data.get("firmware")
+
         return DeviceInfo(
-            name=f"{self._sensor_data['device_name']}-{self._sensor_data['room_name']}",
+            name=f"{device_name}-{room_name}",
             manufacturer="Hitachi",
-            model=f"{self._common_data['name']} Remote Controller",
-            sw_version=self._common_data["firmware"],
+            model=f"{device_name_from_status} Remote Controller",
+            sw_version=firmware,  # None is acceptable for DeviceInfo
             identifiers={
                 (
                     DOMAIN,
-                    f"{self._sensor_data['device_name']}-{self._sensor_data['room_name']}",
+                    f"{device_name}-{room_name}",
                 )
             },
         )
@@ -270,6 +322,7 @@ class CSNetHomeClimate(ClimateEntity):
             "c2_demand": self._sensor_data.get("c2_demand"),
             "doingBoost": self._sensor_data.get("doingBoost"),
             "silent_mode": self._sensor_data.get("silent_mode"),
+            "fan_coil_model": self._fan_model,
         }
 
         # Get installation devices data (used by both fan coil and OTC)
@@ -297,7 +350,7 @@ class CSNetHomeClimate(ClimateEntity):
 
         # Add OTC (Outdoor Temperature Compensation) information
         if installation_devices_data:
-            heating_status = installation_devices_data.get("heatingStatus", {})
+            heating_status = extract_heating_status(installation_devices_data) or {}
             zone_id = self._sensor_data.get("zone_id")
 
             # Determine which circuit this zone belongs to
@@ -332,15 +385,50 @@ class CSNetHomeClimate(ClimateEntity):
     async def async_set_temperature(self, **kwargs):
         """Set the target temperature for a room."""
         temperature = kwargs.get("temperature")
+        zone_id = self._sensor_data.get("zone_id")
+
+        # For water circuits (zone 5, 6), only allow temperature changes if OTC type is FIX
+        if zone_id in [5, 6]:  # Water circuits (C1_WATER, C2_WATER)
+            # Get installation devices data to check OTC type
+            coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
+            installation_devices_data = coordinator.get_installation_devices_data()
+
+            if installation_devices_data:
+                cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
+                mode = self._sensor_data.get("mode", 1)
+
+                # Determine circuit number from zone_id
+                circuit = 1 if zone_id == 5 else 2
+
+                # Check if fixed temperature is editable (OTC type is FIX)
+                is_editable = cloud_api.is_fixed_water_temperature_editable(
+                    circuit, mode, installation_devices_data
+                )
+
+                if not is_editable:
+                    _LOGGER.warning(
+                        "Cannot set temperature for water circuit %d: OTC type is not FIX. "
+                        "Use the fixed water temperature number entity instead.",
+                        circuit,
+                    )
+                    return
+
         cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
         response = await cloud_api.async_set_temperature(
-            self._sensor_data["zone_id"],
+            zone_id,
             self._sensor_data["parent_id"],
             self._sensor_data["mode"],
             temperature=temperature,
         )
         if response:
             self._sensor_data["setting_temperature"] = temperature
+            # For water circuits (zone 5, 6), refresh data to get updated fixed temperature
+            if zone_id in [5, 6]:
+                # Wait a short delay to ensure the server has processed the change
+                await asyncio.sleep(1.5)
+                # Request coordinator refresh to update the value immediately
+                coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
+                await coordinator.async_refresh()
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode):
         """Set new target hvac mode."""
@@ -348,8 +436,6 @@ class CSNetHomeClimate(ClimateEntity):
         await cloud_api.async_set_hvac_mode(
             self._sensor_data["zone_id"], self._sensor_data["parent_id"], hvac_mode
         )
-        # if response:
-        #    self._sensor_data["on_off"] = 1 if hvac_mode == HVACMode.HEAT else 0
 
     async def async_turn_on(self) -> None:
         """Turn the climate device on (preserve current mode if possible)."""
@@ -390,11 +476,11 @@ class CSNetHomeClimate(ClimateEntity):
 
         if self._is_fan_coil:
             # For fan coil systems, set the fan speed
-            if fan_mode not in FAN_SPEED_MAP:
+            if fan_mode not in self._fan_speed_map:
                 _LOGGER.warning("Invalid fan mode %s for fan coil system", fan_mode)
                 return
 
-            fan_speed = FAN_SPEED_MAP[fan_mode]
+            fan_speed = self._fan_speed_map[fan_mode]
 
             # Determine which circuit to use based on zone_id
             zone_id = self._sensor_data.get("zone_id")
@@ -405,8 +491,10 @@ class CSNetHomeClimate(ClimateEntity):
             coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
             installation_devices_data = coordinator.get_installation_devices_data()
             mode = self._sensor_data.get("mode", 1)
+            # Skip the API check if the user has selected Legacy
+            check_availability = self._fan_model != FAN_COIL_MODEL_LEGACY
 
-            if not cloud_api.get_fan_control_availability(
+            if check_availability and not cloud_api.get_fan_control_availability(
                 circuit, mode, installation_devices_data
             ):
                 _LOGGER.warning(
@@ -421,12 +509,9 @@ class CSNetHomeClimate(ClimateEntity):
                 circuit,
             )
             if response:
-                fan_speed_key = f"fan{circuit}_speed"
-                self._sensor_data[fan_speed_key] = fan_speed
+                self._assumed_fan_mode = fan_mode
         else:
             # For non-fan coil systems, set silent mode
-            # Map fan mode to silent mode boolean
-            # FAN_ON = silent mode on, FAN_AUTO = silent mode off
             silent_mode = fan_mode == FAN_ON
             response = await cloud_api.async_set_silent_mode(
                 self._sensor_data["zone_id"],
@@ -434,7 +519,7 @@ class CSNetHomeClimate(ClimateEntity):
                 silent_mode,
             )
             if response:
-                self._sensor_data["silent_mode"] = 1 if silent_mode else 0
+                self._assumed_fan_mode = fan_mode
 
     def is_heating(self):
         """Return true if the thermostat is currently heating."""
@@ -464,6 +549,7 @@ class CSNetHomeClimate(ClimateEntity):
         coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
         if not coordinator:
             _LOGGER.error("No coordinator instance found!")
+            return
         await coordinator.async_request_refresh()
         self._sensor_data = next(
             (
@@ -478,4 +564,89 @@ class CSNetHomeClimate(ClimateEntity):
                 "No sensor data found for room %s after coordinator refresh",
                 self._attr_name,
             )
+            return
+
+        # Obtain real state from API
+        api_fan_mode = self._get_fan_mode_from_data()
+
+        # Save current speed for Legacy Control
+        if (
+            self._is_fan_coil
+            and self._fan_model == FAN_COIL_MODEL_LEGACY
+            and api_fan_mode == "auto"
+            and self._assumed_fan_mode not in ["auto", None]
+        ):
+            # Preserve the cached assumed fan mode
+            pass
+        else:
+            self._assumed_fan_mode = api_fan_mode
+
         self._common_data = coordinator.get_common_data()
+        # reset cached limits after data refresh
+        self._cached_limits = None
+
+    def _normalize_temperature_limit(self, value: float | int | None) -> float | None:
+        """Convert raw API limit values to Celsius and validate."""
+        if value is None:
+            return None
+
+        try:
+            val = float(value)
+        except (TypeError, ValueError):
+            return None
+
+        # Filter out invalid or sentinel values
+        if val <= 0:
+            return None
+
+        # Air circuit values are tenths of °C (e.g. 190 => 19.0)
+        if val > 200:
+            val = round(val / 10, 1)
+
+        return val
+
+    def _calculate_temperature_limits(self) -> tuple[float, float]:
+        """Compute sanitized temperature limits with sensible fallbacks."""
+        if self._cached_limits is not None:
+            return self._cached_limits
+
+        if self._sensor_data is None:
+            self._cached_limits = (HEATING_MIN_TEMPERATURE, HEATING_MAX_TEMPERATURE)
+            return self._cached_limits
+
+        zone_id = self._sensor_data.get("zone_id")
+        default_min = (
+            WATER_CIRCUIT_MIN_HEAT if zone_id in [5, 6] else HEATING_MIN_TEMPERATURE
+        )
+        default_max = (
+            WATER_CIRCUIT_MAX_HEAT if zone_id in [5, 6] else HEATING_MAX_TEMPERATURE
+        )
+
+        min_limit = default_min
+        max_limit = default_max
+
+        coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
+        installation_devices_data = coordinator.get_installation_devices_data()
+
+        if installation_devices_data:
+            cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
+            mode = self._sensor_data.get("mode", 1)
+            raw_min, raw_max = cloud_api.get_temperature_limits(
+                zone_id, mode, installation_devices_data
+            )
+
+            normalized_min = self._normalize_temperature_limit(raw_min)
+            normalized_max = self._normalize_temperature_limit(raw_max)
+
+            if normalized_min is not None:
+                min_limit = normalized_min
+            if normalized_max is not None:
+                max_limit = normalized_max
+
+        # Ensure limits remain logical
+        if min_limit >= max_limit:
+            min_limit = default_min
+            max_limit = default_max
+
+        self._cached_limits = (min_limit, max_limit)
+        return self._cached_limits

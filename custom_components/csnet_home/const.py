@@ -8,6 +8,12 @@ INSTALLATION_DEVICES_PATH = "/data/installationdevices"
 INSTALLATION_ALARMS_PATH = "/data/installationalarms"
 HEAT_SETTINGS_PATH = "/data/indoor/heat_setting"
 CONF_ENABLE_DEVICE_LOGGING = "enable_device_logging"
+CONF_MAX_TEMP_OVERRIDE = "max_temp_override"
+CONF_FAN_COIL_MODEL = "fan_coil_model"
+FAN_COIL_MODEL_STANDARD = "standard"
+FAN_COIL_MODEL_LEGACY = "legacy"
+DEFAULT_FAN_COIL_MODEL = FAN_COIL_MODEL_STANDARD
+
 COMMON_API_HEADERS = {
     "accept-language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
     "cache-control": "no-cache",
@@ -17,14 +23,19 @@ COMMON_API_HEADERS = {
 }
 DEFAULT_API_TIMEOUT = 10
 
-WATER_HEATER_MAX_TEMPERATURE = 55
+WATER_HEATER_MAX_TEMPERATURE = 80
 WATER_HEATER_MIN_TEMPERATURE = 30
 
 SWIMMING_POOL_MAX_TEMPERATURE = 33
 SWIMMING_POOL_MIN_TEMPERATURE = 24
 
-HEATING_MAX_TEMPERATURE = 55
+# Air circuit (RTU) temperature limits - for zones 1, 2 (C1_AIR, C2_AIR)
+HEATING_MAX_TEMPERATURE = 35  # RTU_MAX from JavaScript
 HEATING_MIN_TEMPERATURE = 8
+
+# Water circuit temperature limits - for zones 5, 6 (C1_WATER, C2_WATER)
+WATER_CIRCUIT_MAX_HEAT = 80  # C1_MAX_HEAT / C2_MAX_HEAT from JavaScript
+WATER_CIRCUIT_MIN_HEAT = 20
 
 # Fan Speed Control (for fan coil systems)
 FAN_SPEED_OFF = "0"
@@ -32,19 +43,38 @@ FAN_SPEED_LOW = "1"
 FAN_SPEED_MEDIUM = "2"
 FAN_SPEED_AUTO = "3"
 
-FAN_SPEED_MAP = {
+# Standard
+FAN_SPEED_MAP_STANDARD = {
     "off": 0,
     "low": 1,
     "medium": 2,
     "auto": 3,
 }
 
-FAN_SPEED_REVERSE_MAP = {
+FAN_SPEED_REVERSE_MAP_STANDARD = {
     0: "off",
     1: "low",
     2: "medium",
     3: "auto",
 }
+
+# Legacy
+FAN_SPEED_MAP_LEGACY = {
+    "low": 0,
+    "medium": 1,
+    "high": 2,
+    "auto": 3,
+}
+
+FAN_SPEED_REVERSE_MAP_LEGACY = {
+    0: "low",
+    1: "medium",
+    2: "high",
+    3: "auto",
+}
+
+FAN_SPEED_MAP = FAN_SPEED_MAP_STANDARD
+FAN_SPEED_REVERSE_MAP = FAN_SPEED_REVERSE_MAP_STANDARD
 
 # Operation Status Constants
 OPST_OFF = 0

@@ -53,6 +53,8 @@ Based on the CSNet Manager system, devices are categorized by **Unit Model** and
 | Tester | Unit Model | Firmware | Heat Circuits | Thermostats | DHW | Integration Version | Last Updated |
 |--------|------------|----------|---------------|-------------|-----|---------------------|--------------|
 | @mmornati | Yutaki S | H-0302 | 2 (C1, C2 - Floor Heating) | 2 (1 per floor) | ➖ N/A | Latest | 2025-10-24 |
+| @Aparenty-1977 | Yutaki S2 | ❓ Unknown | ✅ | ❓ Unknown | ✅ Yutampo | Latest | 2025-10-26 |
+
 | *Add your config* | | | | | | | |
 
 ### Feature Compatibility
@@ -60,6 +62,7 @@ Based on the CSNet Manager system, devices are categorized by **Unit Model** and
 | Tester | Climate Control | Temperature Set | HVAC Modes | Preset Modes | DHW Control | Silent Mode | Fan Control | Alarm Monitor | OTC Support | Multi-Zone |
 |--------|----------------|-----------------|------------|--------------|-------------|-------------|-------------|---------------|-------------|------------|
 | @mmornati | ✅ | ✅ | ✅ Heat/Cool/Auto/Off | ✅ Eco/Comfort | ➖ N/A | ❓ Unknown | ➖ N/A | ❓ Unknown | ✅ | ✅ 2 zones/2 thermostats |
+| @Aparenty-1977 | ✅ | ✅ | ❓ Unknown | ❓ Unknown | ✅ Yutampo | ❓ Unknown | ❓ Not tested | ❓ Not tested | ❓ Unknown | ❓ Unknown |
 | *Add your results* | | | | | | | | | | |
 
 ### Known Issues & Notes

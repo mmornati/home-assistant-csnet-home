@@ -779,12 +779,12 @@ sensor:
 ## Next Steps
 
 Explore related documentation:
-- **[Advanced Features](Advanced-Features)** - Silent mode, fan control, OTC
-- **[Climate Control](Climate-Control)** - Using sensors in climate control
-- **[Automations Guide](Automations-and-Scripts)** - Sensor-based automations
-- **[Troubleshooting](Troubleshooting)** - Sensor issues and solutions
+- **[Advanced Features](Advanced-Features.md)** - Silent mode, fan control, OTC
+- **[Climate Control](Climate-Control.md)** - Using sensors in climate control
+- **[Water Heater Control](Water-Heater-Control.md)** - DHW management
+- **[Troubleshooting](Troubleshooting.md)** - Sensor issues and solutions
 
 ---
 
-**[← Back to Water Heater](Water-Heater-Control)** | **[Next: Advanced Features →](Advanced-Features)**
+**[← Back to Water Heater](Water-Heater-Control.md)** | **[Next: Advanced Features →](Advanced-Features.md)**
 

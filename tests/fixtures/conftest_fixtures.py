@@ -94,7 +94,8 @@ def sanitize_api_response(response: Dict[str, Any]) -> Dict[str, Any]:
         Sanitized response dictionary safe for committing to repository
 
     Example:
-        >>> real_response = {"data": "example"}
+        >>> # Example usage (pseudocode)
+        >>> real_response = {"username": "john", "password": "secret123"}
         >>> safe_response = sanitize_api_response(real_response)
         >>> save_fixture("new_fixture.json", safe_response)
     """

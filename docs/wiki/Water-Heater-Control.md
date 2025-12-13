@@ -718,12 +718,12 @@ automation:
 ## Next Steps
 
 Explore related documentation:
-- **[Climate Control](Climate-Control)** - Control heating zones
-- **[Sensors Reference](Sensors-Reference)** - All available sensors
-- **[Advanced Features](Advanced-Features)** - Additional system features
-- **[Automations Guide](Automations-and-Scripts)** - More automation examples
+- **[Climate Control](Climate-Control.md)** - Control heating zones
+- **[Sensors Reference](Sensors-Reference.md)** - All available sensors
+- **[Advanced Features](Advanced-Features.md)** - Additional system features
+- **[Multi-Zone Configuration](Multi-Zone-Configuration.md)** - Managing multiple circuits
 
 ---
 
-**[← Back to Climate Control](Climate-Control)** | **[Next: Sensors Reference →](Sensors-Reference)**
+**[← Back to Climate Control](Climate-Control.md)** | **[Next: Sensors Reference →](Sensors-Reference.md)**
 

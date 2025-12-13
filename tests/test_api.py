@@ -1420,6 +1420,46 @@ def test_get_temperature_limits_zone3_dhw(hass):
     assert max_temp == 60
 
 
+def test_get_temperature_limits_zone6_heating(hass):
+    """Test temperature limits extraction for zone 6 (C2_WATER water circuit) in heating mode."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    installation_devices_data = {
+        "heatingStatus": {
+            "heatMinC2": 25,
+            "heatMaxC2": 60,
+            "coolMinC2": 15,
+            "coolMaxC2": 22,
+        }
+    }
+
+    # Zone 6, heating mode (mode=1)
+    min_temp, max_temp = api.get_temperature_limits(6, 1, installation_devices_data)
+
+    assert min_temp == 25
+    assert max_temp == 60
+
+
+def test_get_temperature_limits_zone6_cooling(hass):
+    """Test temperature limits extraction for zone 6 (C2_WATER water circuit) in cooling mode."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    installation_devices_data = {
+        "heatingStatus": {
+            "heatMinC2": 25,
+            "heatMaxC2": 60,
+            "coolMinC2": 15,
+            "coolMaxC2": 22,
+        }
+    }
+
+    # Zone 6, cooling mode (mode=0)
+    min_temp, max_temp = api.get_temperature_limits(6, 0, installation_devices_data)
+
+    assert min_temp == 15
+    assert max_temp == 22
+
+
 def test_get_temperature_limits_no_data(hass):
     """Test temperature limits extraction when no installation devices data is available."""
     api = CSNetHomeAPI(hass, "user", "pass")
@@ -1460,6 +1500,95 @@ def test_get_temperature_limits_partial_data(hass):
 
     assert min_temp == 11
     assert max_temp is None  # Max not available
+
+
+def test_get_temperature_limits_validation_zero_value(hass):
+    """Test temperature limits validation when value is 0 (should use default)."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    installation_devices_data = {
+        "heatingStatus": {
+            "heatAirMaxC1": 0,  # Invalid value, should use default
+            "heatAirMinC1": 11,
+        }
+    }
+
+    # Zone 1, heating mode (mode=1)
+    min_temp, max_temp = api.get_temperature_limits(1, 1, installation_devices_data)
+
+    assert min_temp == 11
+    assert max_temp == 35  # Should use HEATING_MAX_TEMPERATURE default (35°C)
+
+
+def test_get_temperature_limits_validation_negative_one(hass):
+    """Test temperature limits validation when value is -1 (should use default)."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    installation_devices_data = {
+        "heatingStatus": {
+            "heatAirMaxC1": -1,  # Invalid value, should use default
+            "heatAirMinC1": 11,
+        }
+    }
+
+    # Zone 1, heating mode (mode=1)
+    min_temp, max_temp = api.get_temperature_limits(1, 1, installation_devices_data)
+
+    assert min_temp == 11
+    assert max_temp == 35  # Should use HEATING_MAX_TEMPERATURE default (35°C)
+
+
+def test_get_temperature_limits_validation_water_circuit_zero(hass):
+    """Test temperature limits validation for water circuit when value is 0."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    installation_devices_data = {
+        "heatingStatus": {
+            "heatMaxC1": 0,  # Invalid value, should use default
+            "heatMinC1": 25,
+        }
+    }
+
+    # Zone 5, heating mode (mode=1)
+    min_temp, max_temp = api.get_temperature_limits(5, 1, installation_devices_data)
+
+    assert min_temp == 25
+    assert max_temp == 80  # Should use WATER_CIRCUIT_MAX_HEAT default (80°C)
+
+
+def test_get_temperature_limits_validation_dhw_zero(hass):
+    """Test temperature limits validation for DHW when value is 0."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    installation_devices_data = {
+        "heatingStatus": {
+            "dhwMax": 0,  # Invalid value, should use default
+        }
+    }
+
+    # Zone 3 (DHW), heating mode (mode=1)
+    min_temp, max_temp = api.get_temperature_limits(3, 1, installation_devices_data)
+
+    assert min_temp is None  # DHW min is not provided by API
+    assert max_temp == 80  # Should use WATER_HEATER_MAX_TEMPERATURE default (80°C)
+
+
+def test_get_temperature_limits_validation_cooling_mode_zero(hass):
+    """Test temperature limits validation for cooling mode when value is 0."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    installation_devices_data = {
+        "heatingStatus": {
+            "coolAirMaxC1": 0,  # Invalid value, should use default
+            "coolAirMinC1": 16,
+        }
+    }
+
+    # Zone 1, cooling mode (mode=0)
+    min_temp, max_temp = api.get_temperature_limits(1, 0, installation_devices_data)
+
+    assert min_temp == 16
+    assert max_temp == 35  # Should use HEATING_MAX_TEMPERATURE default (35°C)
 
 
 # Fan Speed Control Tests

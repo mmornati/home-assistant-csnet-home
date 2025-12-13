@@ -8,7 +8,6 @@ from homeassistant.const import (
     UnitOfTemperature,
     UnitOfPressure,
     UnitOfVolumeFlowRate,
-    UnitOfSpeed,
     SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
 )
 from homeassistant.core import callback
@@ -23,10 +22,38 @@ from .const import (
     DOMAIN,
     OTC_HEATING_TYPE_NAMES,
     OTC_COOLING_TYPE_NAMES,
+    OPERATION_STATUS_MAP,
 )
 from .coordinator import CSNetHomeCoordinator
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _convert_unsigned_to_signed_byte(value):
+    """Convert an unsigned byte (0-255) to a signed byte (-128 to 127).
+
+    This is necessary because temperature values transmitted from the device
+    may be sent as unsigned bytes (0-255), but should be interpreted as signed
+    when they represent negative temperatures.
+
+    For example:
+    - 246 (unsigned) should be interpreted as -10°C (signed)
+    - 250 (unsigned) should be interpreted as -6°C (signed)
+
+    Args:
+        value: The value to convert (int or None)
+
+    Returns:
+        Converted signed value or None if input is None
+    """
+    if value is None or not isinstance(value, int):
+        return value
+
+    # If the value is in the range 128-255, it should be converted to negative
+    if value > 127:
+        return value - 256
+
+    return value
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -162,8 +189,8 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 global_device_data,
                 common_data,
                 "pump_speed",
-                "water_speed",
-                UnitOfSpeed.METERS_PER_SECOND,
+                "percentage",
+                "%",
                 "Pump Speed",
             )
         )
@@ -462,6 +489,325 @@ async def async_setup_entry(hass, entry, async_add_entities):
         )
     )
 
+    # Add compressor/outdoor unit sensors
+    if installation_devices_data:
+        compressor_device_data = {
+            "device_name": "Compressor",
+            "device_id": "compressor",
+            "room_name": "Outdoor Unit",
+            "parent_id": "compressor",
+            "room_id": "compressor",
+        }
+
+        # Primary Compressor Sensors
+        sensors.append(
+            CSNetHomeCompressorSensor(
+                coordinator,
+                compressor_device_data,
+                common_data,
+                "compressor_frequency",
+                "frequency",
+                "Hz",
+                "Compressor Frequency",
+            )
+        )
+        sensors.append(
+            CSNetHomeCompressorSensor(
+                coordinator,
+                compressor_device_data,
+                common_data,
+                "compressor_current",
+                "current",
+                "A",
+                "Compressor Current",
+            )
+        )
+        sensors.append(
+            CSNetHomeCompressorSensor(
+                coordinator,
+                compressor_device_data,
+                common_data,
+                "compressor_capacity",
+                None,
+                None,
+                "Compressor Capacity",
+            )
+        )
+
+        # Compressor Temperatures
+        sensors.append(
+            CSNetHomeCompressorSensor(
+                coordinator,
+                compressor_device_data,
+                common_data,
+                "discharge_temperature",
+                "temperature",
+                UnitOfTemperature.CELSIUS,
+                "Discharge Temperature",
+            )
+        )
+        sensors.append(
+            CSNetHomeCompressorSensor(
+                coordinator,
+                compressor_device_data,
+                common_data,
+                "evaporator_temperature",
+                "temperature",
+                UnitOfTemperature.CELSIUS,
+                "Evaporator Temperature",
+            )
+        )
+        sensors.append(
+            CSNetHomeCompressorSensor(
+                coordinator,
+                compressor_device_data,
+                common_data,
+                "outdoor_ambient_temperature",
+                "temperature",
+                UnitOfTemperature.CELSIUS,
+                "Outdoor Ambient Temperature",
+            )
+        )
+
+        # Compressor Pressures
+        sensors.append(
+            CSNetHomeCompressorSensor(
+                coordinator,
+                compressor_device_data,
+                common_data,
+                "discharge_pressure",
+                "pressure",
+                UnitOfPressure.BAR,
+                "Discharge Pressure",
+            )
+        )
+        sensors.append(
+            CSNetHomeCompressorSensor(
+                coordinator,
+                compressor_device_data,
+                common_data,
+                "suction_pressure",
+                "pressure",
+                UnitOfPressure.BAR,
+                "Suction Pressure",
+            )
+        )
+        sensors.append(
+            CSNetHomeCompressorSensor(
+                coordinator,
+                compressor_device_data,
+                common_data,
+                "suction_pressure_correction",
+                None,
+                None,
+                "Suction Pressure Correction",
+            )
+        )
+
+        # Expansion Valve and Control
+        sensors.append(
+            CSNetHomeCompressorSensor(
+                coordinator,
+                compressor_device_data,
+                common_data,
+                "expansion_valve_opening",
+                "percentage",
+                "%",
+                "Expansion Valve Opening (EVI)",
+            )
+        )
+        sensors.append(
+            CSNetHomeCompressorSensor(
+                coordinator,
+                compressor_device_data,
+                common_data,
+                "outdoor_fan_rpm",
+                None,
+                "RPM",
+                "Outdoor Fan RPM",
+            )
+        )
+
+        # Outdoor Unit Information
+        sensors.append(
+            CSNetHomeCompressorSensor(
+                coordinator,
+                compressor_device_data,
+                common_data,
+                "operation_status",
+                "enum",
+                None,
+                "Operation Status",
+            )
+        )
+        sensors.append(
+            CSNetHomeCompressorSensor(
+                coordinator,
+                compressor_device_data,
+                common_data,
+                "system_status_flags",
+                None,
+                None,
+                "System Status Flags",
+            )
+        )
+        sensors.append(
+            CSNetHomeCompressorSensor(
+                coordinator,
+                compressor_device_data,
+                common_data,
+                "ou_code",
+                "enum",
+                None,
+                "Outdoor Unit Code",
+            )
+        )
+        sensors.append(
+            CSNetHomeCompressorSensor(
+                coordinator,
+                compressor_device_data,
+                common_data,
+                "ou_capacity_code",
+                None,
+                None,
+                "Outdoor Unit Capacity Code",
+            )
+        )
+        sensors.append(
+            CSNetHomeCompressorSensor(
+                coordinator,
+                compressor_device_data,
+                common_data,
+                "ou_pcb_software",
+                None,
+                None,
+                "Outdoor Unit PCB Software",
+            )
+        )
+
+        # Secondary Cycle Sensors (for dual-cycle systems)
+        sensors.append(
+            CSNetHomeCompressorSensor(
+                coordinator,
+                compressor_device_data,
+                common_data,
+                "secondary_discharge_temp",
+                "temperature",
+                UnitOfTemperature.CELSIUS,
+                "Secondary Discharge Temperature",
+            )
+        )
+        sensors.append(
+            CSNetHomeCompressorSensor(
+                coordinator,
+                compressor_device_data,
+                common_data,
+                "secondary_suction_temp",
+                "temperature",
+                UnitOfTemperature.CELSIUS,
+                "Secondary Suction Temperature",
+            )
+        )
+        sensors.append(
+            CSNetHomeCompressorSensor(
+                coordinator,
+                compressor_device_data,
+                common_data,
+                "secondary_discharge_pressure",
+                "pressure",
+                UnitOfPressure.BAR,
+                "Secondary Discharge Pressure",
+            )
+        )
+        sensors.append(
+            CSNetHomeCompressorSensor(
+                coordinator,
+                compressor_device_data,
+                common_data,
+                "secondary_suction_pressure",
+                "pressure",
+                UnitOfPressure.BAR,
+                "Secondary Suction Pressure",
+            )
+        )
+        sensors.append(
+            CSNetHomeCompressorSensor(
+                coordinator,
+                compressor_device_data,
+                common_data,
+                "secondary_compressor_frequency",
+                "frequency",
+                "Hz",
+                "Secondary Compressor Frequency",
+            )
+        )
+        sensors.append(
+            CSNetHomeCompressorSensor(
+                coordinator,
+                compressor_device_data,
+                common_data,
+                "secondary_expansion_valve",
+                None,
+                None,
+                "Secondary Expansion Valve",
+            )
+        )
+        sensors.append(
+            CSNetHomeCompressorSensor(
+                coordinator,
+                compressor_device_data,
+                common_data,
+                "secondary_compressor_current",
+                "current",
+                "A",
+                "Secondary Compressor Current",
+            )
+        )
+        sensors.append(
+            CSNetHomeCompressorSensor(
+                coordinator,
+                compressor_device_data,
+                common_data,
+                "secondary_current",
+                "current",
+                "A",
+                "Secondary Current",
+            )
+        )
+        sensors.append(
+            CSNetHomeCompressorSensor(
+                coordinator,
+                compressor_device_data,
+                common_data,
+                "secondary_superheat",
+                None,
+                None,
+                "Secondary Superheat",
+            )
+        )
+        sensors.append(
+            CSNetHomeCompressorSensor(
+                coordinator,
+                compressor_device_data,
+                common_data,
+                "secondary_stop_code",
+                "enum",
+                None,
+                "Secondary Stop Code",
+            )
+        )
+        sensors.append(
+            CSNetHomeCompressorSensor(
+                coordinator,
+                compressor_device_data,
+                common_data,
+                "secondary_retry_code",
+                "enum",
+                None,
+                "Secondary Retry Code",
+            )
+        )
+
     async_add_entities(sensors)
 
 
@@ -533,15 +879,34 @@ class CSNetHomeSensor(CoordinatorEntity, Entity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return device information."""
+        device_name = self._sensor_data.get("device_name", "Unknown Device")
+        room_name = self._sensor_data.get("room_name", "Unknown Room")
+        device_id = self._sensor_data.get("device_id")
+
+        # Handle both data structures:
+        # 1. Device-specific dict (initial): _common_data = {"name": "...", "firmware": "..."}
+        # 2. Full common_data dict (after update): _common_data = {"device_status": {...}}
+        if "device_status" in self._common_data:
+            # After update: nested structure
+            device_status = self._common_data.get("device_status", {}).get(
+                device_id, {}
+            )
+            device_name_from_status = device_status.get("name", "Unknown")
+            firmware = device_status.get("firmware")
+        else:
+            # Initial state: direct access
+            device_name_from_status = self._common_data.get("name", "Unknown")
+            firmware = self._common_data.get("firmware")
+
         return DeviceInfo(
-            name=f"{self._sensor_data['device_name']}-{self._sensor_data['room_name']}",
+            name=f"{device_name}-{room_name}",
             manufacturer="Hitachi",
-            model=f"{self._common_data['name']} Remote Controller",
-            sw_version=self._common_data["firmware"],
+            model=f"{device_name_from_status} Remote Controller",
+            sw_version=firmware,  # None is acceptable for DeviceInfo
             identifiers={
                 (
                     DOMAIN,
-                    f"{self._sensor_data['device_name']}-{self._sensor_data['room_name']}",
+                    f"{device_name}-{room_name}",
                 )
             },
         )
@@ -658,9 +1023,7 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, Entity):
                 return value / 50
             return value
         if self._key in ["pump_speed", "mix_valve_position"]:
-            # Convert percentage to decimal if needed
-            if isinstance(value, (int, float)) and value > 1:
-                return value / 100
+            # These values are already in percentage (0-100) from the API
             return value
 
         # Central control configuration sensors
@@ -1201,3 +1564,296 @@ class CSNetHomeAlarmStatisticsSensor(CoordinatorEntity, Entity):
     def unique_id(self) -> str:
         """Return unique id."""
         return f"{DOMAIN}-{self._statistic_type}"
+
+
+class CSNetHomeCompressorSensor(CoordinatorEntity, Entity):
+    """Representation of a compressor/outdoor unit sensor from CSNet Home."""
+
+    def __init__(
+        self,
+        coordinator: CSNetHomeCoordinator,
+        device_data,
+        common_data,
+        key,
+        device_class=None,
+        unit=None,
+        friendly_name=None,
+    ):
+        """Initialize the compressor sensor."""
+        super().__init__(coordinator)
+        self._coordinator = coordinator
+        self._device_data = device_data
+        self._common_data = common_data
+        self._key = key
+        self._device_class = device_class
+        self._unit = unit
+        self._friendly_name = friendly_name or key
+        self._name = f"{device_data['device_name']} {device_data['room_name']} {self._friendly_name}"
+        _LOGGER.debug("Configuring Compressor Sensor %s", self._name)
+
+    def _get_heating_status(self):
+        """Get heatingStatus from installation devices data."""
+        installation_data = self._coordinator.get_installation_devices_data()
+        if not isinstance(installation_data, dict):
+            return None
+
+        data_array = installation_data.get("data", [])
+        if isinstance(data_array, list) and len(data_array) > 0:
+            first_device = data_array[0]
+            if isinstance(first_device, dict):
+                indoors_array = first_device.get("indoors", [])
+                if isinstance(indoors_array, list) and len(indoors_array) > 0:
+                    first_indoors = indoors_array[0]
+                    if isinstance(first_indoors, dict):
+                        return first_indoors.get("heatingStatus", {})
+        return None
+
+    def _get_second_cycle(self):
+        """Get secondCycle from installation devices data."""
+        installation_data = self._coordinator.get_installation_devices_data()
+        if not isinstance(installation_data, dict):
+            return None
+
+        data_array = installation_data.get("data", [])
+        if isinstance(data_array, list) and len(data_array) > 0:
+            first_device = data_array[0]
+            if isinstance(first_device, dict):
+                indoors_array = first_device.get("indoors", [])
+                if isinstance(indoors_array, list) and len(indoors_array) > 0:
+                    first_indoors = indoors_array[0]
+                    if isinstance(first_indoors, dict):
+                        return first_indoors.get("secondCycle", {})
+        return None
+
+    @property
+    def state(self):
+        """Return the current state of the sensor."""
+        heating_status = self._get_heating_status()
+        if not heating_status:
+            return None
+
+        # Primary compressor metrics
+        if self._key == "compressor_frequency":
+            return heating_status.get("ouHz")
+
+        if self._key == "compressor_current":
+            return heating_status.get("ouCurrent")
+
+        if self._key == "compressor_capacity":
+            return heating_status.get("unitCapacity")
+
+        # Temperatures
+        if self._key == "discharge_temperature":
+            return _convert_unsigned_to_signed_byte(
+                heating_status.get("ouDischargeTemperature")
+            )
+
+        if self._key == "evaporator_temperature":
+            return _convert_unsigned_to_signed_byte(
+                heating_status.get("ouEvapTemperature")
+            )
+
+        if self._key == "outdoor_ambient_temperature":
+            return _convert_unsigned_to_signed_byte(
+                heating_status.get("ouAmbientTemperature")
+            )
+
+        # Pressures
+        if self._key == "discharge_pressure":
+            value = heating_status.get("ouDischargePress")
+            # Pressure conversion if needed (assuming value is already in bar)
+            return value
+
+        if self._key == "suction_pressure":
+            value = heating_status.get("ouSuctionPress")
+            # Pressure conversion if needed (assuming value is already in bar)
+            return value
+
+        if self._key == "suction_pressure_correction":
+            return heating_status.get("ouSuctionPressCorrection")
+
+        # Expansion valve and control
+        if self._key == "expansion_valve_opening":
+            # evi is the expansion valve opening (0-100%)
+            return heating_status.get("evi")
+
+        if self._key == "outdoor_fan_rpm":
+            value = heating_status.get("fanRPM")
+            # -1 indicates no data or unavailable
+            return value if value != -1 else None
+
+        # Outdoor unit information
+        if self._key == "operation_status":
+            value = heating_status.get("operationStatus")
+            if value is None:
+                return None
+            return OPERATION_STATUS_MAP.get(value, f"Unknown ({value})")
+
+        if self._key == "system_status_flags":
+            # Return as hex string for easier interpretation
+            value = heating_status.get("systemStatus2Flags")
+            return f"0x{value:04X}" if value is not None else None
+
+        if self._key == "ou_code":
+            value = heating_status.get("ouCode")
+            # Outdoor unit codes
+            ou_code_map = {
+                0: "Unknown",
+                1: "RAS-1",
+                2: "RAS-2",
+                3: "Yutaki",
+                4: "RAD",
+            }
+            return ou_code_map.get(value, f"Code {value}")
+
+        if self._key == "ou_capacity_code":
+            return heating_status.get("ouCapacityCode")
+
+        if self._key == "ou_pcb_software":
+            value = heating_status.get("ouPcbSoft")
+            # -1 indicates no data
+            return value if value != -1 else None
+
+        # Secondary cycle sensors
+        second_cycle = self._get_second_cycle()
+        if not second_cycle:
+            # If no secondary cycle data, return None
+            if self._key.startswith("secondary_"):
+                return None
+        else:
+            if self._key == "secondary_discharge_temp":
+                # 0°C is a valid temperature reading, don't filter it out
+                return _convert_unsigned_to_signed_byte(
+                    second_cycle.get("dischargeTemp")
+                )
+
+            if self._key == "secondary_suction_temp":
+                return _convert_unsigned_to_signed_byte(second_cycle.get("suctionTemp"))
+
+            if self._key == "secondary_discharge_pressure":
+                value = second_cycle.get("dischargePressure")
+                # 127 seems to be a default/invalid value
+                return value if value != 127 else None
+
+            if self._key == "secondary_suction_pressure":
+                value = second_cycle.get("suctionPressure")
+                # 127 seems to be a default/invalid value
+                return value if value != 127 else None
+
+            if self._key == "secondary_compressor_frequency":
+                return second_cycle.get("compressorFreq")
+
+            if self._key == "secondary_expansion_valve":
+                value = second_cycle.get("expansionValve")
+                # 255 seems to be a default/invalid value
+                return value if value != 255 else None
+
+            if self._key == "secondary_compressor_current":
+                return second_cycle.get("compressorCurrent")
+
+            if self._key == "secondary_current":
+                return second_cycle.get("secondaryCurrent")
+
+            if self._key == "secondary_superheat":
+                return second_cycle.get("teSH")
+
+            if self._key == "secondary_stop_code":
+                value = second_cycle.get("stopCode")
+                return value if value != 0 else "Running"
+
+            if self._key == "secondary_retry_code":
+                value = second_cycle.get("retryCode")
+                return value if value != 0 else "Normal"
+
+        return None
+
+    @property
+    def device_class(self):
+        """Return the device class of the sensor."""
+        return self._device_class
+
+    @property
+    def unit_of_measurement(self):
+        """Return the unit of measurement for the sensor."""
+        return self._unit
+
+    @property
+    def extra_state_attributes(self):
+        """Return additional attributes for certain sensors."""
+        if self._key == "system_status_flags":
+            heating_status = self._get_heating_status()
+            if heating_status:
+                flags = heating_status.get("systemStatus2Flags", 0)
+                # Decode individual bits
+                return {
+                    "raw_value": flags,
+                    "hex_value": f"0x{flags:04X}",
+                    "cascade_slave": bool(flags & 0x1000),
+                    "fan_coil_mode": bool(flags & 0x2000),
+                    "c1_thermostat": bool(flags & 0x40),
+                    "c2_thermostat": bool(flags & 0x80),
+                }
+
+        if self._key == "operation_status":
+            heating_status = self._get_heating_status()
+            if heating_status:
+                raw_value = heating_status.get("operationStatus")
+                return {
+                    "raw_value": raw_value,
+                    "status_text": OPERATION_STATUS_MAP.get(
+                        raw_value, f"Unknown ({raw_value})"
+                    ),
+                    "defrosting": bool(heating_status.get("defrosting", 0)),
+                }
+
+        return None
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Update sensor with latest data from coordinator."""
+        self.async_write_ha_state()
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device information."""
+        heating_status = self._get_heating_status()
+        ou_model = "Unknown"
+        ou_software = "Unknown"
+
+        if heating_status:
+            ou_code = heating_status.get("ouCode", 0)
+            ou_code_map = {
+                0: "Unknown",
+                1: "RAS-1",
+                2: "RAS-2",
+                3: "Yutaki",
+                4: "RAD",
+            }
+            ou_model = ou_code_map.get(ou_code, f"Code {ou_code}")
+
+            ou_pcb = heating_status.get("ouPcbSoft", -1)
+            if ou_pcb != -1:
+                ou_software = f"0x{ou_pcb:04X}"
+
+        return DeviceInfo(
+            name=f"{self._device_data['device_name']} {self._device_data['room_name']}",
+            manufacturer="Hitachi",
+            model=f"{ou_model} Outdoor Unit",
+            sw_version=ou_software,
+            identifiers={
+                (
+                    DOMAIN,
+                    f"{self._device_data['device_name']}-{self._device_data['room_name']}",
+                )
+            },
+        )
+
+    @property
+    def name(self) -> str:
+        """Return the name of the sensor."""
+        return self._name
+
+    @property
+    def unique_id(self) -> str:
+        """Return unique id."""
+        return f"{DOMAIN}-compressor-{self._key}"

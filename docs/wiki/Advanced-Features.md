@@ -681,12 +681,12 @@ automation:
 ## Next Steps
 
 Explore related documentation:
-- **[Multi-Zone Configuration](Multi-Zone-Configuration)** - Managing multiple circuits
-- **[Sensors Reference](Sensors-Reference)** - Complete sensor list
-- **[Automations Guide](Automations-and-Scripts)** - Advanced automation examples
-- **[Troubleshooting](Troubleshooting)** - Issue resolution
+- **[Multi-Zone Configuration](Multi-Zone-Configuration.md)** - Managing multiple circuits
+- **[Sensors Reference](Sensors-Reference.md)** - Complete sensor list
+- **[Climate Control](Climate-Control.md)** - Climate entity control with automation examples
+- **[Troubleshooting](Troubleshooting.md)** - Issue resolution
 
 ---
 
-**[← Back to Sensors](Sensors-Reference)** | **[Next: Multi-Zone Config →](Multi-Zone-Configuration)**
+**[← Back to Sensors](Sensors-Reference.md)** | **[Next: Multi-Zone Config →](Multi-Zone-Configuration.md)**
 

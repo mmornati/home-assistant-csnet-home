@@ -1,6 +1,6 @@
 # Makefile for CSNet Home Custom Component Development
 
-.PHONY: help test test-unit test-integration start stop restart logs clean format lint install-dev
+.PHONY: help test test-unit test-integration start stop restart logs clean format lint install-dev package
 
 help:
 	@echo "CSNet Home Development Commands"
@@ -10,6 +10,7 @@ help:
 	@echo "  make install-dev      Install development dependencies"
 	@echo "  make format           Format code with black and isort"
 	@echo "  make lint             Run linters (pylint, mypy)"
+	@echo "  make package          Build a distributable zip for manual testing"
 	@echo ""
 	@echo "Testing:"
 	@echo "  make test             Run all tests"
@@ -25,9 +26,13 @@ help:
 	@echo ""
 
 install-dev:
-	@echo "Installing development dependencies..."
-	pip install -r custom_components/csnet_home/requirements-dev.txt
-	pre-commit install
+	@echo "Creating virtual environment (.venv) if needed..."
+	python3 -m venv .venv
+	@echo "Installing development dependencies inside .venv..."
+	. .venv/bin/activate && pip install --upgrade pip
+	. .venv/bin/activate && pip install -r custom_components/csnet_home/requirements-dev.txt
+	. .venv/bin/activate && pre-commit install
+	@echo "✅ Environment ready. Activate it with: source .venv/bin/activate"
 
 format:
 	@echo "Formatting code..."
@@ -74,3 +79,17 @@ clean:
 	find . -type f -name "*.pyc" -delete 2>/dev/null || true
 	@echo "Cleaning coverage reports..."
 	rm -rf htmlcov/ .coverage 2>/dev/null || true
+
+package:
+	@echo "Creating development zip package..."
+	mkdir -p dist
+	rm -f dist/hass-custom-csnet-home.zip
+	cd custom_components && \
+	zip -r ../dist/hass-custom-csnet-home.zip csnet_home \
+		-x "*.git*" \
+		-x "*__pycache__*" \
+		-x "*.pyc" \
+		-x "*.pyo" \
+		-x "*.DS_Store" \
+		-x "*.pytest_cache*"
+	@echo "✅ Package created at dist/hass-custom-csnet-home.zip"

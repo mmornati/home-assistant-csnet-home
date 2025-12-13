@@ -81,15 +81,20 @@ This custom integration solves that problem by connecting directly to the CSNet 
 - **Climate entities per zone** with full Home Assistant integration:
   - HVAC modes: `off`, `heat`, `cool`
   - Presets: `comfort`, `eco` (mapped from `ecocomfort`)
-  - Target temperature control
+  - Target temperature control with dynamic limits based on device type
   - On/Off support
   - Action reporting: `heating`, `cooling`, `idle`
   - Extended attributes: `real_mode`, `operation_status`, `timer_running`, `alarm_code`, `c1_demand`, `c2_demand`, `doingBoost`
+  - **Temperature Limits** (automatically detected):
+    - Air circuits (standard heat pumps): 8-35°C
+    - Water circuits (Yutaki/Hydro systems): 20-80°C
+    - Optional manual override available in configuration
 
 ### Water Heater
 - **DHW (Domestic Hot Water)** entity with:
-  - Temperature control
+  - Temperature control (30-80°C)
   - Operation modes: `off`, `eco`, `performance`
+  - Optional maximum temperature override
 
 ### Sensors
 - Temperature sensors (current and target)

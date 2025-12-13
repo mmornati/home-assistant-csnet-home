@@ -703,12 +703,12 @@ automation:
 ## Next Steps
 
 Explore related documentation:
-- **[Climate Control](Climate-Control)** - Detailed climate entity control
-- **[Advanced Features](Advanced-Features)** - Silent mode, fan control, OTC
-- **[Sensors Reference](Sensors-Reference)** - All available sensors
-- **[Automations Guide](Automations-and-Scripts)** - More automation examples
+- **[Climate Control](Climate-Control.md)** - Detailed climate entity control
+- **[Advanced Features](Advanced-Features.md)** - Silent mode, fan control, OTC
+- **[Sensors Reference](Sensors-Reference.md)** - All available sensors
+- **[Water Heater Control](Water-Heater-Control.md)** - DHW management
 
 ---
 
-**[← Back to Advanced Features](Advanced-Features)** | **[Back to Home](Home)**
+**[← Back to Advanced Features](Advanced-Features.md)** | **[Back to Home](Home.md)**
 

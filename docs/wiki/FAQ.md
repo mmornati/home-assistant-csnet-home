@@ -19,7 +19,7 @@ Any Hitachi heat pump equipped with the **ATW-IOT-01 module** that works with th
 - Systems with or without DHW (hot water)
 - Fan coil compatible systems
 
-See [Supported Devices](Supported-Devices) for detailed compatibility.
+See [Supported Devices](../SUPPORTED_DEVICES) for detailed compatibility.
 
 ### Do I need a CSNet Manager account?
 
@@ -48,7 +48,7 @@ Three methods:
 2. **Manual from Release** - Download ZIP from GitHub
 3. **Manual from Source** - Clone repository
 
-See complete instructions: [Installation Guide](Installation-Guide)
+See complete instructions: [Installation Guide](Installation-Guide.md)
 
 ### Do I need HACS?
 
@@ -140,7 +140,7 @@ The integration must log in to CSNet Manager on your behalf to retrieve data and
 - OTC settings
 - And many more!
 
-See complete list: [Sensors Reference](Sensors-Reference)
+See complete list: [Sensors Reference](Sensors-Reference.md)
 
 ### Can I control multiple zones independently?
 
@@ -152,7 +152,7 @@ Yes, through Home Assistant. If you've connected Home Assistant to Alexa or Goog
 
 ### Can I create automations?
 
-Absolutely! All entities can be used in Home Assistant automations, scripts, and scenes. See [Automations Guide](Automations-and-Scripts) for examples.
+Absolutely! All entities can be used in Home Assistant automations, scripts, and scenes. Check the automation examples in [Climate Control](Climate-Control.md) and [Water Heater Control](Water-Heater-Control.md) pages.
 
 ---
 
@@ -379,7 +379,7 @@ Check:
 4. Is device online? (Check `connectivity` sensor)
 5. Did you wait 1-2 minutes for sync?
 
-See [Troubleshooting](Troubleshooting) for detailed help.
+See [Troubleshooting](Troubleshooting.md) for detailed help.
 
 ### Why do I see "Unavailable"?
 
@@ -482,7 +482,7 @@ Many ways:
 - Improve documentation
 - Test preview builds
 
-See [Contributing](Contributing) guide.
+See the [Contributing Guide](https://github.com/mmornati/home-assistant-csnet-home/blob/main/CONTRIBUTING.md) on GitHub.
 
 ### Where do I report bugs?
 
@@ -538,10 +538,10 @@ There's no fixed roadmap. Development is driven by:
 
 ## Quick Links
 
-- **[Home](Home)** - Documentation home
-- **[Installation Guide](Installation-Guide)** - How to install
-- **[Configuration Guide](Configuration-Guide)** - How to configure
-- **[Troubleshooting](Troubleshooting)** - Fix issues
+- **[Home](Home.md)** - Documentation home
+- **[Installation Guide](Installation-Guide.md)** - How to install
+- **[Configuration Guide](Configuration-Guide.md)** - How to configure
+- **[Troubleshooting](Troubleshooting.md)** - Fix issues
 - **[GitHub Repository](https://github.com/mmornati/home-assistant-csnet-home)** - Source code
 - **[GitHub Issues](https://github.com/mmornati/home-assistant-csnet-home/issues)** - Bug reports
 - **[GitHub Discussions](https://github.com/mmornati/home-assistant-csnet-home/discussions)** - Community support
@@ -553,11 +553,11 @@ There's no fixed roadmap. Development is driven by:
 If your question isn't answered here:
 
 1. **Search the documentation** - Use your browser's find function (Ctrl+F)
-2. **Check [Troubleshooting](Troubleshooting)** - Common issues covered there
+2. **Check [Troubleshooting](Troubleshooting.md)** - Common issues covered there
 3. **Search [GitHub Discussions](https://github.com/mmornati/home-assistant-csnet-home/discussions)** - May already be answered
 4. **Ask in Discussions** - Create a new discussion thread
 
 ---
 
-**[← Back to Home](Home)** | **[Back to Troubleshooting](Troubleshooting)**
+**[← Back to Home](Home.md)** | **[Back to Troubleshooting](Troubleshooting.md)**
 

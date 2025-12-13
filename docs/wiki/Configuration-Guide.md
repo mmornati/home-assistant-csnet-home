@@ -6,7 +6,7 @@ This guide will help you configure the Hitachi CSNet Home integration after inst
 
 Before configuring, ensure:
 
-✅ Integration is installed (see [Installation Guide](Installation-Guide))  
+✅ Integration is installed (see [Installation Guide](Installation-Guide.md))  
 ✅ Home Assistant has been restarted  
 ✅ You have your CSNet Manager credentials ready  
 ✅ Your Hitachi system is connected to CSNet Manager and working
@@ -35,6 +35,7 @@ You'll see a configuration dialog with the following fields:
 | **Password** | Your CSNet Manager password | `••••••••` |
 | **Scan Interval** | Update frequency in seconds (default: 60) | `60` |
 | **Language** | Alarm message language | `en` or `fr` |
+| **Max Temp Override** | Optional maximum temperature override (8-80°C) | `45` (leave empty for auto) |
 
 **[PLACEHOLDER: Screenshot of configuration dialog]**
 
@@ -59,6 +60,20 @@ You'll see a configuration dialog with the following fields:
 - **Options**: `en` (English) or `fr` (French)
 - **Default**: `en`
 - Can be changed later by reconfiguring
+
+**Max Temp Override** (Optional, Advanced)
+- Allows you to override the maximum temperature limit for all climate entities
+- **Range**: 8-80°C
+- **Default behavior** (when empty):
+  - Air circuits (standard heat pumps): 35°C maximum
+  - Water circuits (Yutaki/Hydro systems): 80°C maximum  
+  - Water heaters (DHW): 80°C maximum
+- **Use cases**:
+  - Special hardware configurations
+  - Testing purposes
+  - Custom installations requiring non-standard limits
+- ⚠️ **Warning**: Setting this above manufacturer specifications may prevent your system from reaching the target temperature
+- 💡 **Recommendation**: Leave empty unless you have a specific reason to override
 
 ### Step 3: Submit Configuration
 
@@ -444,23 +459,23 @@ After configuration, verify everything is working:
 ✅ Configuration complete!
 
 Now explore:
-- **[Climate Control Guide](Climate-Control)** - Learn to control your zones
-- **[Water Heater Control](Water-Heater-Control)** - Manage your DHW
-- **[Sensors Reference](Sensors-Reference)** - Understand all sensors
-- **[Advanced Features](Advanced-Features)** - Silent mode, fan control, OTC
-- **[Automations Guide](Automations-and-Scripts)** - Create smart automations
+- **[Climate Control Guide](Climate-Control.md)** - Learn to control your zones
+- **[Water Heater Control](Water-Heater-Control.md)** - Manage your DHW
+- **[Sensors Reference](Sensors-Reference.md)** - Understand all sensors
+- **[Advanced Features](Advanced-Features.md)** - Silent mode, fan control, OTC
+- **[Multi-Zone Configuration](Multi-Zone-Configuration.md)** - Managing multiple circuits
 
 ---
 
 ## Getting Help
 
 If you need assistance:
-- Check [Troubleshooting](Troubleshooting) for common issues
-- Review [FAQ](FAQ) for frequent questions
+- Check [Troubleshooting](Troubleshooting.md) for common issues
+- Review [FAQ](FAQ.md) for frequent questions
 - Ask in [GitHub Discussions](https://github.com/mmornati/home-assistant-csnet-home/discussions)
 - Report bugs in [GitHub Issues](https://github.com/mmornati/home-assistant-csnet-home/issues)
 
 ---
 
-**[← Back to Installation](Installation-Guide)** | **[Next: Climate Control →](Climate-Control)**
+**[← Back to Installation](Installation-Guide.md)** | **[Next: Climate Control →](Climate-Control.md)**
 

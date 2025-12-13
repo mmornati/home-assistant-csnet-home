@@ -1,6 +1,7 @@
+---
 name: Integration Test
 
-on:
+'on':
   push:
     branches:
       - main
@@ -16,20 +17,75 @@ permissions:
   contents: read
 
 jobs:
+  get-test-versions:
+    name: Get HA Versions for Docker Testing
+    runs-on: ubuntu-latest
+    outputs:
+      versions_with_latest: ${{ steps.fetch-versions.outputs.versions_with_latest }}
+    steps:
+      - name: Fetch Test Versions
+        id: fetch-versions
+        run: |
+          echo "Fetching recent stable HA versions for Docker integration testing..."
+
+          # Get current year and month
+          CURRENT_YEAR=$(date +%Y)
+          CURRENT_MONTH=$(date +%-m)  # Remove leading zero
+
+          echo "Current date: $CURRENT_YEAR.$CURRENT_MONTH"
+          echo "Will test last 2 months of releases + 'latest'"
+
+          # Get all stable versions for current year (and previous if needed)
+          ALL_VERSIONS=$(curl -s https://pypi.org/pypi/homeassistant/json | \
+            jq -r '.releases | keys | .[]' | \
+            grep -E '^20[0-9]{2}\.[0-9]+\.[0-9]+$' | \
+            grep -v 'b' | \
+            sort -V)
+
+          # Group by month and get the latest patch version from each of the last 2 months
+          VERSIONS=""
+          for month in $(seq $((CURRENT_MONTH)) -1 $((CURRENT_MONTH - 1))); do
+            if [ "$month" -lt 1 ]; then
+              # Handle year boundary (e.g., Jan 2026 looking back to Dec 2025)
+              PREV_YEAR=$((CURRENT_YEAR - 1))
+              month=$((month + 12))
+              LATEST=$(echo "$ALL_VERSIONS" | grep "^${PREV_YEAR}\.${month}\." | tail -1)
+            else
+              LATEST=$(echo "$ALL_VERSIONS" | grep "^${CURRENT_YEAR}\.${month}\." | tail -1)
+            fi
+
+            if [ -n "$LATEST" ]; then
+              echo "  Month $month: $LATEST"
+              VERSIONS="${VERSIONS}${LATEST}"$'\n'
+            fi
+          done
+
+          # Remove trailing newline and sort
+          VERSIONS=$(echo "$VERSIONS" | grep -v '^$' | sort -V)
+
+          # Add "latest" to always test against the most current Docker image
+          VERSIONS_WITH_LATEST=$(echo "$VERSIONS" | cat - <(echo "latest"))
+
+          echo ""
+          echo "Final test matrix (including 'latest'):"
+          echo "$VERSIONS_WITH_LATEST"
+
+          # Create JSON array
+          VERSIONS_JSON=$(echo "$VERSIONS_WITH_LATEST" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "versions_with_latest=$VERSIONS_JSON" >> "$GITHUB_OUTPUT"
+
   docker-integration-test:
     name: Docker Integration Test - HA ${{ matrix.ha-version }}
     runs-on: ubuntu-latest
+    needs: get-test-versions
     strategy:
       fail-fast: false
       matrix:
-        ha-version:
-          - "2024.11.3"
-          - "2024.12.5"
-          - "latest"
+        ha-version: ${{ fromJson(needs.get-test-versions.outputs.versions_with_latest) }}
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5.0.0
+        uses: actions/checkout@v6
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -244,7 +300,7 @@ jobs:
 
       - name: Upload logs as artifact
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ha-logs-${{ matrix.ha-version }}-${{ github.run_number }}
           path: |

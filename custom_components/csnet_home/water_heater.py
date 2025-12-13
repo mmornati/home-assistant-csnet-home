@@ -17,6 +17,7 @@ from .const import (
     WATER_HEATER_MIN_TEMPERATURE,
     SWIMMING_POOL_MAX_TEMPERATURE,
     SWIMMING_POOL_MIN_TEMPERATURE,
+    CONF_MAX_TEMP_OVERRIDE,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -195,10 +196,23 @@ class CSNetHomeWaterHeater(WaterHeaterEntity):
 
     @property
     def max_temp(self):
-        """Return the maximum temperature from API data."""
+        """Return the maximum temperature from API data.
+
+        For swimming pools: fixed maximum (33°C)
+        For water heaters:
+        Priority order:
+        1. User-configured override (if set)
+        2. API-provided limit from heatingStatus
+        3. Default DHW maximum (80°C)
+        """
         if self._is_swimming_pool:
             # Swimming pool has fixed maximum temperature
             return SWIMMING_POOL_MAX_TEMPERATURE
+
+        # Check for user override first (DHW only)
+        max_temp_override = self.entry.data.get(CONF_MAX_TEMP_OVERRIDE)
+        if max_temp_override is not None:
+            return max_temp_override
 
         # DHW zone_id is 3, mode is always 1 (heat) for water heater
         zone_id = 3
