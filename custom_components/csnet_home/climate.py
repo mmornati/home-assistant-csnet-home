@@ -56,7 +56,8 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 ],
             )
             for sensor_data in coordinator.get_sensors_data()
-            if sensor_data.get("zone_id") != 3  # Skip if zone_id is 3
+            if sensor_data.get("zone_id")
+            not in [3, 4]  # Skip water heater (3) and swimming pool (4)
         ]
     )
 
