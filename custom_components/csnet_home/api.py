@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import time
+from urllib.parse import urlencode
 
 import aiohttp
 import async_timeout
@@ -93,18 +94,46 @@ class CSNetHomeAPI:
             "acceptedCookies": "yes",
         }
 
-        form_data = {
+        _LOGGER.debug(
+            "Login attempt for user: %s (password length: %d)",
+            self.username,
+            len(self.password) if self.password else 0,
+        )
+        # Log if password contains special characters that might need encoding
+        if self.password and (
+            "%" in self.password or "&" in self.password or "=" in self.password
+        ):
+            _LOGGER.debug(
+                "Password contains special characters that need URL-encoding: %s",
+                (
+                    "%, &, ="
+                    if all(c in self.password for c in ["%", "&", "="])
+                    else (
+                        "%"
+                        if "%" in self.password
+                        else "&" if "&" in self.password else "="
+                    )
+                ),
+            )
+
+        # Manually encode form data to ensure special characters like % are properly encoded
+        # This gives us full control over the encoding process
+        # Using urlencode ensures % becomes %25, & becomes %26, = becomes %3D, etc.
+        form_data_dict = {
             "_csrf": self.xsrf_token,
             "token": "",
             "username": self.username,
             "password_unsanitized": self.password,
             "password": self.password,
         }
+        # Encode as bytes to ensure proper handling
+        form_data_encoded = urlencode(form_data_dict, doseq=False).encode("utf-8")
+        _LOGGER.debug("Form data encoded length: %d bytes", len(form_data_encoded))
 
         try:
             async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
                 async with self.session.post(
-                    login_url, headers=headers, cookies=cookies, data=form_data
+                    login_url, headers=headers, cookies=cookies, data=form_data_encoded
                 ) as response:
                     if await self.check_logged_in(response):
                         _LOGGER.info("Login successful")
@@ -1182,7 +1211,20 @@ class CSNetHomeAPI:
             _LOGGER.info("Login successful")
             self.logged_in = True
             return True
-        _LOGGER.error("Failed to login. Status code: %s", response.status)
+
+        # Enhanced error logging for failed login attempts
+        _LOGGER.error(
+            "Failed to login. Status code: %s. Response contains login form: %s",
+            response.status,
+            'loadContent("login")' in page_content,
+        )
+        # Log a snippet of the response for debugging (first 200 chars)
+        if page_content:
+            preview = page_content[:200].replace("\n", " ")
+            _LOGGER.debug(
+                "Login response preview: %s...",
+                preview,
+            )
         self.logged_in = False
         return False
 
