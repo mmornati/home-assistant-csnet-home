@@ -94,8 +94,6 @@ class CSNetHomeAPI:
         }
 
         # CSNet API requires password field to replace % with # (as done in csnet.js)
-        # password_unsanitized contains the original password
-        # password contains the password with % replaced by #
         password_sanitized = self.password.replace("%", "#") if self.password else ""
 
         form_data = {
@@ -113,8 +111,6 @@ class CSNetHomeAPI:
                 ) as response:
                     if await self.check_logged_in(response):
                         _LOGGER.info("Login successful")
-                        # Extract all cookies from the session cookie jar after successful login
-                        self._extract_all_cookies()
                         return True
                     _LOGGER.error("Failed to login. Status code: %s", response.status)
                     return False
@@ -1224,23 +1220,6 @@ class CSNetHomeAPI:
                 )
                 return cookie.value
         return None
-
-    def _extract_all_cookies(self):
-        """Extract all cookies from the session cookie jar and store them.
-
-        This method extracts all cookies from the session's cookie jar and stores
-        them in self.cookies as a dictionary for use in API requests.
-        """
-        if not self.session or not self.session.cookie_jar:
-            _LOGGER.warning("No session or cookie jar available")
-            return
-
-        self.cookies = {}
-        for cookie in self.session.cookie_jar:
-            self.cookies[cookie.key] = cookie.value
-            _LOGGER.debug("Extracted cookie %s", cookie.key)
-
-        _LOGGER.debug("Extracted %d cookies from session", len(self.cookies))
 
     async def load_translations(self):
         """Load translations dictionaries for alarm messages (lazy)."""
