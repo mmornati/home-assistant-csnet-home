@@ -3,7 +3,6 @@
 import asyncio
 import json
 import logging
-import re
 import time
 
 import aiohttp
@@ -94,45 +93,18 @@ class CSNetHomeAPI:
             "acceptedCookies": "yes",
         }
 
-        _LOGGER.debug(
-            "Login attempt for user: %s (password length: %d)",
-            self.username,
-            len(self.password) if self.password else 0,
-        )
-        # Log if password contains special characters that might need encoding
-        if self.password and (
-            "%" in self.password or "&" in self.password or "=" in self.password
-        ):
-            _LOGGER.debug(
-                "Password contains special characters that need URL-encoding: %s",
-                (
-                    "%, &, ="
-                    if all(c in self.password for c in ["%", "&", "="])
-                    else (
-                        "%"
-                        if "%" in self.password
-                        else "&" if "&" in self.password else "="
-                    )
-                ),
-            )
+        # CSNet API requires password field to replace % with # (as done in csnet.js)
+        # password_unsanitized contains the original password
+        # password contains the password with % replaced by #
+        password_sanitized = self.password.replace("%", "#") if self.password else ""
 
-        # Use dict - aiohttp will automatically URL-encode form data when using data parameter
-        # This ensures proper Content-Type header and encoding
         form_data = {
             "_csrf": self.xsrf_token,
             "token": "",
             "username": self.username,
             "password_unsanitized": self.password,
-            "password": self.password,
+            "password": password_sanitized,
         }
-
-        # Debug: Log what will be sent (without exposing password value)
-        _LOGGER.debug(
-            "Login POST data keys: %s, username: %s, password length: %d",
-            list(form_data.keys()),
-            form_data["username"],
-            len(form_data["password"]) if form_data["password"] else 0,
-        )
 
         try:
             async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
@@ -1216,34 +1188,6 @@ class CSNetHomeAPI:
             self.logged_in = True
             return True
 
-        # Enhanced error logging for failed login attempts
-        _LOGGER.error(
-            "Failed to login. Status code: %s. Response contains login form: %s",
-            response.status,
-            'loadContent("login")' in page_content,
-        )
-        # Log a snippet of the response for debugging (first 500 chars)
-        if page_content:
-            preview = page_content[:500].replace("\n", " ")
-            _LOGGER.debug(
-                "Login response preview: %s...",
-                preview,
-            )
-            # Check for common error messages in the response
-            if "invalid" in page_content.lower() or "incorrect" in page_content.lower():
-                _LOGGER.error("Response suggests invalid credentials")
-            if "error" in page_content.lower():
-                # Try to extract error message
-                error_match = re.search(
-                    r'<[^>]*class=["\']error[^"\']*["\'][^>]*>([^<]+)',
-                    page_content,
-                    re.IGNORECASE,
-                )
-                if error_match:
-                    _LOGGER.error(
-                        "Error message found in response: %s",
-                        error_match.group(1).strip(),
-                    )
         self.logged_in = False
         return False
 
