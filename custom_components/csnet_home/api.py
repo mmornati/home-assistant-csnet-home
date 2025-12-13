@@ -93,12 +93,15 @@ class CSNetHomeAPI:
             "acceptedCookies": "yes",
         }
 
+        # CSNet API requires password field to replace % with # (as done in csnet.js)
+        password_sanitized = self.password.replace("%", "#") if self.password else ""
+
         form_data = {
             "_csrf": self.xsrf_token,
             "token": "",
             "username": self.username,
             "password_unsanitized": self.password,
-            "password": self.password,
+            "password": password_sanitized,
         }
 
         try:
@@ -130,8 +133,11 @@ class CSNetHomeAPI:
 
         try:
             async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+                # Use cookies from session if self.cookies is not set
+                # aiohttp will automatically use cookies from cookie_jar if cookies=None
+                request_cookies = self.cookies if self.cookies else None
                 async with self.session.get(
-                    sensor_data_url, headers=headers, cookies=self.cookies
+                    sensor_data_url, headers=headers, cookies=request_cookies
                 ) as response:
                     data = await self.check_api_response(response)
                     if data is not None and data.get("status") == "success":
@@ -250,8 +256,11 @@ class CSNetHomeAPI:
 
         try:
             async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+                # Use cookies from session if self.cookies is not set
+                # aiohttp will automatically use cookies from cookie_jar if cookies=None
+                request_cookies = self.cookies if self.cookies else None
                 async with self.session.get(
-                    installation_devices_url, headers=headers, cookies=self.cookies
+                    installation_devices_url, headers=headers, cookies=request_cookies
                 ) as response:
                     data = await self.check_api_response(response)
                     if data is not None:
@@ -286,8 +295,11 @@ class CSNetHomeAPI:
 
         try:
             async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+                # Use cookies from session if self.cookies is not set
+                # aiohttp will automatically use cookies from cookie_jar if cookies=None
+                request_cookies = self.cookies if self.cookies else None
                 async with self.session.get(
-                    installation_alarms_url, headers=headers, cookies=self.cookies
+                    installation_alarms_url, headers=headers, cookies=request_cookies
                 ) as response:
                     data = await self.check_api_response(response)
                     if data is not None:
@@ -1171,7 +1183,7 @@ class CSNetHomeAPI:
             _LOGGER.info("Login successful")
             self.logged_in = True
             return True
-        _LOGGER.error("Failed to login. Status code: %s", response.status)
+
         self.logged_in = False
         return False
 
