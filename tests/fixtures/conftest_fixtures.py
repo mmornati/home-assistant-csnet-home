@@ -102,6 +102,10 @@ def sanitize_api_response(response: Dict[str, Any]) -> Dict[str, Any]:
     # Sanitize common sensitive fields (deep copy to avoid modifying original)
     sanitized = copy.deepcopy(response)
 
+    # Add metadata
+    sanitized["_sanitized"] = True
+    sanitized["_comment"] = "Sanitized test fixture"
+
     # Example sanitization (customize based on your needs)
     if isinstance(sanitized, dict):
         if "username" in sanitized:

@@ -89,6 +89,83 @@ def test_metadata_and_identity():
     assert common["firmware"] in info["sw_version"]
 
 
+def test_sensor_device_info_with_complete_data():
+    """Test sensor device_info property with complete data (initial state)."""
+    coordinator, sensor_data, common = build_context()
+    s = CSNetHomeSensor(coordinator, sensor_data, common, "current_temperature")
+
+    device_info = s.device_info
+    assert device_info is not None
+    assert device_info["name"] == "Hitachi PAC-Living"
+    assert device_info["manufacturer"] == "Hitachi"
+    assert device_info["model"] == "Hitachi PAC Remote Controller"
+    assert device_info["sw_version"] == "1.0.0"
+
+
+def test_sensor_device_info_with_missing_firmware():
+    """Test sensor device_info when firmware is missing (defensive access)."""
+    coordinator, sensor_data, common = build_context()
+    # Remove firmware key
+    common_no_firmware = {"name": "Hitachi PAC"}
+    s = CSNetHomeSensor(
+        coordinator, sensor_data, common_no_firmware, "current_temperature"
+    )
+
+    device_info = s.device_info
+    # Should not raise KeyError, firmware should be None
+    assert device_info is not None
+    assert device_info["sw_version"] is None
+
+
+def test_sensor_device_info_after_update_with_nested_structure():
+    """Test sensor device_info after update when _common_data is full dict."""
+    coordinator, sensor_data, common = build_context()
+    s = CSNetHomeSensor(coordinator, sensor_data, common, "current_temperature")
+
+    # Simulate update: replace _common_data with full common_data dict
+    s._common_data = {
+        "device_status": {1234: {"name": "Hitachi PAC", "firmware": "2.0.0"}}
+    }
+
+    device_info = s.device_info
+    assert device_info is not None
+    assert device_info["model"] == "Hitachi PAC Remote Controller"
+    assert device_info["sw_version"] == "2.0.0"
+
+
+def test_sensor_device_info_with_missing_device_status():
+    """Test sensor device_info when device_status is missing after update."""
+    coordinator, sensor_data, common = build_context()
+    s = CSNetHomeSensor(coordinator, sensor_data, common, "current_temperature")
+
+    # Simulate update with missing device_status
+    s._common_data = {"device_status": {}}
+
+    device_info = s.device_info
+    # Should not raise KeyError, should use defaults
+    assert device_info is not None
+    assert device_info["model"] == "Unknown Remote Controller"
+    assert device_info["sw_version"] is None
+
+
+def test_sensor_device_info_with_missing_sensor_data_keys():
+    """Test sensor device_info when sensor_data keys are missing."""
+    sensor_data = {
+        "device_id": 1234,
+        # Missing device_name and room_name
+    }
+    common = {"name": "Hitachi PAC", "firmware": "1.0.0"}
+    coordinator = SimpleNamespace(
+        get_sensors_data=lambda: [sensor_data],
+    )
+    s = CSNetHomeSensor(coordinator, sensor_data, common, "current_temperature")
+
+    device_info = s.device_info
+    # Should not raise KeyError, should use defaults
+    assert device_info is not None
+    assert device_info["name"] == "Unknown Device-Unknown Room"
+
+
 def test_handle_coordinator_update():
     """Refresh internal sensor_data on coordinator update."""
     coordinator, sensor_data, common = build_context()

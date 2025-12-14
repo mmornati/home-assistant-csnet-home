@@ -88,13 +88,24 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
                                 temp_dhw,
                             )
                     # For zone_id 5 (C1_WATER), use waterOutletHPTemp from heatingStatus
+                    # BUT: elementType 5 can also represent HEAT elements (parentName "Heat")
+                    # Only enrich if it's actually a water circuit, not a heat circuit
                     elif zone_id == 5:
-                        temp_c1_water = heating_status.get("waterOutletHPTemp")
-                        if temp_c1_water is not None:
-                            sensor["current_temperature"] = temp_c1_water
+                        room_name = sensor.get("room_name", "").lower()
+                        # Skip enrichment for HEAT elements (parentName "Heat")
+                        # Only enrich actual water circuits
+                        if "heat" not in room_name:
+                            temp_c1_water = heating_status.get("waterOutletHPTemp")
+                            if temp_c1_water is not None:
+                                sensor["current_temperature"] = temp_c1_water
+                                _LOGGER.debug(
+                                    "Enriched zone_id 5 (C1_WATER) current_temperature: %s",
+                                    temp_c1_water,
+                                )
+                        else:
                             _LOGGER.debug(
-                                "Enriched zone_id 5 (C1_WATER) current_temperature: %s",
-                                temp_c1_water,
+                                "Skipping enrichment for zone_id 5 with room_name '%s' (HEAT element, not water circuit)",
+                                sensor.get("room_name"),
                             )
                     # For zone_id 6 (C2_WATER), use waterOutlet2Temp from heatingStatus
                     elif zone_id == 6:
