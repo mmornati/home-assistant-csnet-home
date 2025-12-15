@@ -48,7 +48,7 @@ jobs:
           echo "✅ Preview zip created successfully"
 
       - name: Upload PR Preview Artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: csnet_home-pr-preview
           path: ./custom_components/csnet_home/hass-custom-csnet-home.zip
