@@ -4,35 +4,34 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
-
-from homeassistant.components.climate import HVACAction, HVACMode, FAN_AUTO, FAN_ON
+from homeassistant.components.climate import FAN_AUTO, FAN_ON, HVACAction, HVACMode
 from homeassistant.components.climate.const import ClimateEntityFeature
 
 from custom_components.csnet_home.climate import CSNetHomeClimate
 from custom_components.csnet_home.const import (
-    DOMAIN,
-    HEATING_MIN_TEMPERATURE,
-    HEATING_MAX_TEMPERATURE,
     CONF_MAX_TEMP_OVERRIDE,
-    OPST_OFF,
+    DOMAIN,
+    HEATING_MAX_TEMPERATURE,
+    HEATING_MIN_TEMPERATURE,
+    OPST_ALARM,
     OPST_COOL_D_OFF,
     OPST_COOL_T_OFF,
     OPST_COOL_T_ON,
+    OPST_DHW_OFF,
+    OPST_DHW_ON,
     OPST_HEAT_D_OFF,
     OPST_HEAT_T_OFF,
     OPST_HEAT_T_ON,
-    OPST_DHW_OFF,
-    OPST_DHW_ON,
+    OPST_OFF,
     OPST_SWP_OFF,
     OPST_SWP_ON,
-    OPST_ALARM,
-    OTC_HEATING_TYPE_NONE,
-    OTC_HEATING_TYPE_POINTS,
-    OTC_HEATING_TYPE_GRADIENT,
-    OTC_HEATING_TYPE_FIX,
+    OTC_COOLING_TYPE_FIX,
     OTC_COOLING_TYPE_NONE,
     OTC_COOLING_TYPE_POINTS,
-    OTC_COOLING_TYPE_FIX,
+    OTC_HEATING_TYPE_FIX,
+    OTC_HEATING_TYPE_GRADIENT,
+    OTC_HEATING_TYPE_NONE,
+    OTC_HEATING_TYPE_POINTS,
 )
 
 

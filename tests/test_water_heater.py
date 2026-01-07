@@ -4,19 +4,16 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from homeassistant.components.water_heater import WaterHeaterEntityFeature
+from homeassistant.const import PRECISION_WHOLE, UnitOfTemperature
 
-from homeassistant.components.water_heater import (
-    WaterHeaterEntityFeature,
-)
-from homeassistant.const import UnitOfTemperature, PRECISION_WHOLE
-
-from custom_components.csnet_home.water_heater import CSNetHomeWaterHeater
 from custom_components.csnet_home.const import (
     DOMAIN,
-    WATER_HEATER_MIN_TEMPERATURE,
-    SWIMMING_POOL_MIN_TEMPERATURE,
     SWIMMING_POOL_MAX_TEMPERATURE,
+    SWIMMING_POOL_MIN_TEMPERATURE,
+    WATER_HEATER_MIN_TEMPERATURE,
 )
+from custom_components.csnet_home.water_heater import CSNetHomeWaterHeater
 
 
 @pytest.fixture
