@@ -1,7 +1,9 @@
 """Pytest configuration and fixtures for CSNet Home tests."""
 
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
+
 from tests.fixtures.conftest_fixtures import load_fixture as _load_fixture
 
 

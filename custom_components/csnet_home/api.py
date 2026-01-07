@@ -7,7 +7,6 @@ import time
 
 import aiohttp
 import async_timeout
-
 from homeassistant.core import HomeAssistant
 
 from custom_components.csnet_home.const import (
@@ -15,12 +14,12 @@ from custom_components.csnet_home.const import (
     COMMON_API_HEADERS,
     DEFAULT_API_TIMEOUT,
     ELEMENTS_PATH,
-    INSTALLATION_DEVICES_PATH,
-    INSTALLATION_ALARMS_PATH,
     HEAT_SETTINGS_PATH,
-    LOGIN_PATH,
-    LANGUAGE_FILES,
     HEATING_MAX_TEMPERATURE,
+    INSTALLATION_ALARMS_PATH,
+    INSTALLATION_DEVICES_PATH,
+    LANGUAGE_FILES,
+    LOGIN_PATH,
     WATER_CIRCUIT_MAX_HEAT,
     WATER_HEATER_MAX_TEMPERATURE,
 )
@@ -76,10 +75,21 @@ class CSNetHomeAPI:
 
     async def async_login(self):
         """Log in to the cloud service and return a session cookie."""
+        _LOGGER.info("=== LOGIN ATTEMPT STARTING ===")
+        _LOGGER.info("Username: %s", self.username)
+        _LOGGER.debug(
+            "Password length: %d chars", len(self.password) if self.password else 0
+        )
+
         self.session = aiohttp.ClientSession(cookie_jar=aiohttp.CookieJar())
         if not await self.get_xsrf_token():
             _LOGGER.error("Failed to get XSRF token.")
             return False
+
+        _LOGGER.debug(
+            "XSRF token retrieved: %s",
+            self.xsrf_token[:10] + "..." if self.xsrf_token else "None",
+        )
 
         login_url = f"{self.base_url}{LOGIN_PATH}"
 
@@ -96,6 +106,12 @@ class CSNetHomeAPI:
         # CSNet API requires password field to replace % with # (as done in csnet.js)
         password_sanitized = self.password.replace("%", "#") if self.password else ""
 
+        _LOGGER.debug(
+            "Password sanitization: original has %%: %s, sanitized has #: %s",
+            "%" in self.password if self.password else False,
+            "#" in password_sanitized,
+        )
+
         form_data = {
             "_csrf": self.xsrf_token,
             "token": "",
@@ -104,19 +120,96 @@ class CSNetHomeAPI:
             "password": password_sanitized,
         }
 
+        # Log form data (REDACT PASSWORDS)
+        safe_form_data = {
+            "_csrf": self.xsrf_token[:10] + "..." if self.xsrf_token else "None",
+            "token": "",
+            "username": self.username,
+            "password_unsanitized": (
+                f"[{len(self.password)} chars]" if self.password else ""
+            ),
+            "password": (
+                f"[{len(password_sanitized)} chars]" if password_sanitized else ""
+            ),
+        }
+        _LOGGER.debug("Form data being sent: %s", safe_form_data)
+        _LOGGER.debug("Posting to: %s", login_url)
+
         try:
             async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
                 async with self.session.post(
                     login_url, headers=headers, cookies=cookies, data=form_data
                 ) as response:
+                    _LOGGER.debug("Login response status: %s", response.status)
+                    _LOGGER.debug(
+                        "Login response content-type: %s",
+                        response.headers.get("content-type"),
+                    )
+
                     if await self.check_logged_in(response):
-                        _LOGGER.info("Login successful")
+                        _LOGGER.info("=== LOGIN SUCCESSFUL ===")
                         return True
-                    _LOGGER.error("Failed to login. Status code: %s", response.status)
+                    _LOGGER.error(
+                        "=== LOGIN FAILED === Status code: %s", response.status
+                    )
+                    # Log first 500 chars of response to see what we got
+                    response_text = await response.text()
+                    _LOGGER.debug(
+                        "Response preview: %s",
+                        (
+                            response_text[:500]
+                            if len(response_text) > 500
+                            else response_text
+                        ),
+                    )
                     return False
         except Exception as e:
-            _LOGGER.error("Error during login: %s", e)
+            _LOGGER.error("=== LOGIN EXCEPTION === %s", e, exc_info=True)
             return False
+
+    @staticmethod
+    async def async_validate_credentials(
+        hass: HomeAssistant, username: str, password: str, base_url: str = API_URL
+    ) -> bool:
+        """Validate credentials by attempting to login.
+
+        This is a standalone method that creates a temporary API instance,
+        attempts to login, and returns whether the credentials are valid.
+        The session is properly cleaned up after validation.
+
+        Args:
+            hass: HomeAssistant instance
+            username: CSNet username
+            password: CSNet password
+            base_url: Base URL for the API (defaults to API_URL constant)
+
+        Returns:
+            bool: True if credentials are valid, False otherwise
+        """
+        _LOGGER.info("Starting credential validation for user: %s", username)
+        # Create a temporary API instance for validation
+        temp_api = CSNetHomeAPI(hass, username, password, base_url)
+
+        try:
+            # Attempt to login with the provided credentials
+            _LOGGER.debug("Attempting login for credential validation")
+            login_success = await temp_api.async_login()
+            _LOGGER.info(
+                "Credential validation result: %s",
+                "SUCCESS" if login_success else "FAILED",
+            )
+            return login_success
+        except Exception as e:
+            _LOGGER.error("Credential validation exception: %s", e, exc_info=True)
+            return False
+        finally:
+            # Always clean up the session
+            if temp_api.session:
+                try:
+                    await temp_api.session.close()
+                    _LOGGER.debug("Validation session closed successfully")
+                except Exception as e:
+                    _LOGGER.debug("Error closing validation session: %s", e)
 
     async def async_get_elements_data(self):
         """Get sensor data from the cloud service."""
