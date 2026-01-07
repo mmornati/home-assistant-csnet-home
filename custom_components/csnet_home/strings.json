@@ -1,0 +1,68 @@
+{
+    "config": {
+        "step": {
+            "user": {
+                "title": "Set up CSNet Home",
+                "description": "Enter your CSNet Manager credentials to connect your Hitachi system to Home Assistant.",
+                "data": {
+                    "username": "Username",
+                    "password": "Password",
+                    "scan_interval": "Scan Interval (seconds)",
+                    "language": "Language",
+                    "max_temp_override": "Maximum Temperature Override (°C)",
+                    "fan_coil_model": "Fan Coil Control Model"
+                },
+                "data_description": {
+                    "username": "Your CSNet Manager username",
+                    "password": "Your CSNet Manager password",
+                    "scan_interval": "How often to poll for updates (default: 60 seconds)",
+                    "language": "Preferred language for device names and alarms",
+                    "max_temp_override": "Override the maximum temperature limit (8-80°C). Leave empty for defaults.",
+                    "fan_coil_model": "Select the fan coil control type (standard or legacy)"
+                }
+            },
+            "reconfigure": {
+                "title": "Reconfigure CSNet Home",
+                "description": "Update your CSNet Home configuration. You can change credentials, scan interval, language, and other settings.",
+                "data": {
+                    "username": "Username",
+                    "password": "Password",
+                    "scan_interval": "Scan Interval (seconds)",
+                    "language": "Language",
+                    "max_temp_override": "Maximum Temperature Override (°C)",
+                    "fan_coil_model": "Fan Coil Control Model"
+                },
+                "data_description": {
+                    "username": "Your CSNet Manager username",
+                    "password": "Your CSNet Manager password",
+                    "scan_interval": "How often to poll for updates",
+                    "language": "Preferred language for device names and alarms",
+                    "max_temp_override": "Override the maximum temperature limit (8-80°C)",
+                    "fan_coil_model": "Select the fan coil control type"
+                }
+            },
+            "reauth_confirm": {
+                "title": "Reauthenticate CSNet Home",
+                "description": "Your CSNet Manager credentials are no longer valid. Please provide updated credentials to continue using this integration.",
+                "data": {
+                    "username": "Username",
+                    "password": "Password"
+                },
+                "data_description": {
+                    "username": "Your CSNet Manager username (update if changed)",
+                    "password": "Your updated CSNet Manager password"
+                }
+            }
+        },
+        "error": {
+            "cannot_connect": "Unable to connect to CSNet Manager. Please check your internet connection and try again.",
+            "invalid_auth": "Invalid username or password. Please check your credentials.",
+            "unknown": "An unexpected error occurred. Please try again."
+        },
+        "abort": {
+            "already_configured": "This CSNet Home integration is already configured.",
+            "reauth_successful": "Reauthentication successful! Your credentials have been updated.",
+            "reconfigure_successful": "Reconfiguration successful! Your settings have been updated."
+        }
+    }
+}

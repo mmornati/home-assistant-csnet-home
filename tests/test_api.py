@@ -109,6 +109,83 @@ async def test_login_error(mock_aiohttp_client, hass):
 
 
 @pytest.mark.asyncio
+async def test_validate_credentials_success(hass):
+    """Test successful credential validation."""
+    with patch.object(
+        CSNetHomeAPI, "async_login", return_value=True
+    ) as mock_login, patch("aiohttp.ClientSession") as mock_session:
+        mock_session_instance = mock_session.return_value
+        mock_session_instance.close = AsyncMock()
+
+        result = await CSNetHomeAPI.async_validate_credentials(
+            hass, "valid_user", "valid_pass"
+        )
+
+        assert result is True
+        mock_login.assert_called_once()
+        # Verify session was cleaned up
+        mock_session_instance.close.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_validate_credentials_failure(hass):
+    """Test failed credential validation."""
+    with patch.object(
+        CSNetHomeAPI, "async_login", return_value=False
+    ) as mock_login, patch("aiohttp.ClientSession") as mock_session:
+        mock_session_instance = mock_session.return_value
+        mock_session_instance.close = AsyncMock()
+
+        result = await CSNetHomeAPI.async_validate_credentials(
+            hass, "invalid_user", "invalid_pass"
+        )
+
+        assert result is False
+        mock_login.assert_called_once()
+        # Verify session was still cleaned up even on failure
+        mock_session_instance.close.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_validate_credentials_exception(hass):
+    """Test credential validation with exception during login."""
+    with patch.object(
+        CSNetHomeAPI, "async_login", side_effect=Exception("Connection error")
+    ) as mock_login, patch("aiohttp.ClientSession") as mock_session:
+        mock_session_instance = mock_session.return_value
+        mock_session_instance.close = AsyncMock()
+
+        result = await CSNetHomeAPI.async_validate_credentials(
+            hass, "test_user", "test_pass"
+        )
+
+        assert result is False
+        mock_login.assert_called_once()
+        # Verify session cleanup was attempted despite exception
+        mock_session_instance.close.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_validate_credentials_cleanup_failure(hass):
+    """Test credential validation when session cleanup fails."""
+    with patch.object(
+        CSNetHomeAPI, "async_login", return_value=True
+    ) as mock_login, patch("aiohttp.ClientSession") as mock_session:
+        mock_session_instance = mock_session.return_value
+        # Simulate session close failure
+        mock_session_instance.close = AsyncMock(side_effect=Exception("Close failed"))
+
+        # Should still return the validation result despite cleanup error
+        result = await CSNetHomeAPI.async_validate_credentials(
+            hass, "test_user", "test_pass"
+        )
+
+        assert result is True
+        mock_login.assert_called_once()
+        mock_session_instance.close.assert_called_once()
+
+
+@pytest.mark.asyncio
 async def test_api_get_elements_data_success(mock_aiohttp_client, hass):
     """Test a successful get_data call."""
     mock_client_instance = mock_aiohttp_client.return_value
