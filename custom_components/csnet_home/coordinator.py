@@ -1,7 +1,7 @@
 """Coordinator Class to centralise all data fetching from CSNet Home."""
 
-from datetime import timedelta
 import logging
+from datetime import timedelta
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator

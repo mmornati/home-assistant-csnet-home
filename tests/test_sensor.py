@@ -6,23 +6,23 @@ from unittest.mock import MagicMock
 from homeassistant.components.climate.const import HVACMode
 from homeassistant.const import STATE_OFF, STATE_ON, UnitOfTemperature
 
+from custom_components.csnet_home.const import (
+    OTC_COOLING_TYPE_FIX,
+    OTC_COOLING_TYPE_NONE,
+    OTC_COOLING_TYPE_POINTS,
+    OTC_HEATING_TYPE_FIX,
+    OTC_HEATING_TYPE_GRADIENT,
+    OTC_HEATING_TYPE_NONE,
+    OTC_HEATING_TYPE_POINTS,
+)
 from custom_components.csnet_home.sensor import (
-    CSNetHomeSensor,
-    CSNetHomeInstallationSensor,
-    CSNetHomeDeviceSensor,
     CSNetHomeAlarmHistorySensor,
     CSNetHomeAlarmStatisticsSensor,
     CSNetHomeCompressorSensor,
+    CSNetHomeDeviceSensor,
+    CSNetHomeInstallationSensor,
+    CSNetHomeSensor,
     _convert_unsigned_to_signed_byte,
-)
-from custom_components.csnet_home.const import (
-    OTC_HEATING_TYPE_NONE,
-    OTC_HEATING_TYPE_POINTS,
-    OTC_HEATING_TYPE_GRADIENT,
-    OTC_HEATING_TYPE_FIX,
-    OTC_COOLING_TYPE_NONE,
-    OTC_COOLING_TYPE_POINTS,
-    OTC_COOLING_TYPE_FIX,
 )
 
 

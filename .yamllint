@@ -1,6 +1,8 @@
 ---
 ignore: |
   azure-*.yml
+  agents/
+  .nexus/
 rules:
   braces:
     level: error

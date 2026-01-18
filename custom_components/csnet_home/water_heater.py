@@ -3,21 +3,22 @@
 # https://github.com/home-assistant/core/blob/dev/homeassistant/components/water_heater/__init__.py
 
 import logging
+from typing import Any
+
 from homeassistant.components.water_heater import (
     WaterHeaterEntity,
     WaterHeaterEntityFeature,
 )
-from homeassistant.const import UnitOfTemperature, PRECISION_WHOLE
+from homeassistant.const import PRECISION_WHOLE, UnitOfTemperature
 from homeassistant.helpers.device_registry import DeviceInfo
-from typing import Any
 
 from .const import (
+    CONF_MAX_TEMP_OVERRIDE,
     DOMAIN,
-    WATER_HEATER_MAX_TEMPERATURE,
-    WATER_HEATER_MIN_TEMPERATURE,
     SWIMMING_POOL_MAX_TEMPERATURE,
     SWIMMING_POOL_MIN_TEMPERATURE,
-    CONF_MAX_TEMP_OVERRIDE,
+    WATER_HEATER_MAX_TEMPERATURE,
+    WATER_HEATER_MIN_TEMPERATURE,
 )
 
 _LOGGER = logging.getLogger(__name__)

@@ -1,0 +1,36 @@
+{
+  "project_id": "22999c14-5d0e-4db9-b304-3c138c8756f8",
+  "project_name": "home-assistant-csnet-home",
+  "embedding_provider": "openai",
+  "embedding_model": "text-embedding-3-small",
+  "ollama_url": "http://localhost:11434",
+  "google_project_id": null,
+  "google_location": null,
+  "aws_region": null,
+  "aws_access_key_id": null,
+  "aws_secret_access_key": null,
+  "voyage_api_key": null,
+  "cohere_api_key": null,
+  "db_path": "~/.nexus-dev/db",
+  "include_patterns": [
+    "**/*.py",
+    "**/*.js",
+    "**/*.ts",
+    "**/*.java"
+  ],
+  "exclude_patterns": [
+    "**/node_modules/**",
+    "**/.venv/**",
+    "**/venv/**",
+    "**/__pycache__/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/.git/**",
+    "**/.next/**"
+  ],
+  "docs_folders": [
+    "docs/",
+    "documentation/",
+    "README.md"
+  ]
+}

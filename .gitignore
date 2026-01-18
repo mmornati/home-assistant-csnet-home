@@ -162,3 +162,8 @@ known_devices.yaml
 # Pre-commit
 .pre-commit-config.yaml.backup
 actionlint
+
+# Nexus-Dev
+.nexus_config.json
+.nexus/*
+!.nexus/lessons/
