@@ -72,3 +72,5 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             description_placeholders={
                 "max_temp_override_desc": "Optional: Override maximum temperature limit (8-80°C). Leave empty to use device defaults (35°C for air circuits, 80°C for water circuits/heaters)."
             },
+        )
+        

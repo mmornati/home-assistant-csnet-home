@@ -2230,7 +2230,7 @@ class CSNetHomeCompressorSensor(CoordinatorEntity, Entity):
         """Return the name of the sensor."""
         return self._name
 
-    @property
+@property
     def unique_id(self) -> str:
         """Return unique id."""
         return f"{DOMAIN}-compressor-{self._key}"
