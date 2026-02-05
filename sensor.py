@@ -2234,4 +2234,3 @@ class CSNetHomeCompressorSensor(CoordinatorEntity, Entity):
     def unique_id(self) -> str:
         """Return unique id."""
         return f"{DOMAIN}-compressor-{self._key}"
-        
