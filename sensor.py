@@ -1330,14 +1330,14 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
         hz = heating_status.get("ouHz", 0)
         p_high = heating_status.get("ouDischargePress", 0)
         p_low = heating_status.get("ouSuctionPress", 0)
-        
+
         # Get temp using the module-level helper function
         t_discharge = _convert_unsigned_to_signed_byte(
             heating_status.get("ouDischargeTemperature")
         )
         if t_discharge is None:
             t_discharge = 0
-            
+
         current_amps = heating_status.get("ouCurrent", 0)
         voltage = 230
 
@@ -1359,7 +1359,7 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
             k_dynamic = 1.40
 
         # 3. Red Zone Corrections
-        
+
         # A. RPM Saturation (>115 Hz)
         factor_rpm = 1.0
         if hz > 115:
@@ -1374,13 +1374,13 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
 
         # 4. Preliminary Calculation
         base_power = 50.0  # Electronics + Pumps
-        
+
         if p_high > p_low:
             delta_p = p_high - p_low
-            
+
             # Base Calculation
             raw_power = base_power + (k_dynamic * hz * delta_p)
-            
+
             # Apply correction factors
             calculated_power = raw_power * factor_rpm * factor_temp
         else:
@@ -1390,19 +1390,19 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
         # 5. Guardrail System (Protection)
         # Lower limit: reported amps * voltage (e.g., 6A -> 1380W)
         min_watts = current_amps * voltage
-        
+
         # Upper limit: reported amps + 0.99 (next integer) (e.g., 6A means < 7A)
         max_watts = (current_amps + 0.99) * voltage
-        
+
         final_power = calculated_power
-        
+
         if calculated_power < min_watts:
             # Error: Formula result too low, correct to minimum
             final_power = min_watts
         elif calculated_power > max_watts:
             # Error: Formula result too high, correct to maximum
             final_power = max_watts
-            
+
         return round(final_power)
 
     @property
@@ -1416,7 +1416,7 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
         raw_flow = heating_status.get("waterFlow", 0)
         flow_rate = raw_flow / 10.0 if raw_flow else 0
         temp_in = heating_status.get("waterInletTemp", 0)
-        
+
         # Operation Status needed for deciding temp_out
         op_status = heating_status.get("operationStatus")
 
@@ -1520,10 +1520,7 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
         now = dt_util.now()
 
         # Reset at midnight - Comparison is now safe (local vs local)
-        if (
-            self._last_update_time
-            and self._last_update_time.date() != now.date()
-        ):
+        if self._last_update_time and self._last_update_time.date() != now.date():
             self._state = 0.0
             self._energy_in = 0.0
             self._energy_out = 0.0
@@ -1543,7 +1540,7 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
             return
 
         # Re-calculate instant values locally
-        
+
         # 1. Use the NEW complex model for Consumption Power
         power_consumption_w = self._calculate_complex_power(heating_status)
 
@@ -1559,7 +1556,7 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
             temp_out = heating_status.get("waterOutletTemp", 0)
 
         delta_t = temp_out - temp_in
-        
+
         heating_power_w = 0
         if delta_t > 0 and flow_rate >= 0.01:
             heating_power_w = flow_rate * 1160 * delta_t
@@ -1578,15 +1575,15 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
         elif self._key in ["daily_cop_heating", "daily_cop_dhw"]:
             op_status = heating_status.get("operationStatus")
             defrost_active = heating_status.get("defrosting") == 1
-            
+
             should_accumulate = False
-            
+
             if self._key == "daily_cop_heating":
-                # Accumulate if Heating (6) 
+                # Accumulate if Heating (6)
                 # OR Defrosting is active (AND we are not explicitly in DHW mode)
                 if op_status == 6 or (defrost_active and op_status != 8):
                     should_accumulate = True
-                    
+
             elif self._key == "daily_cop_dhw":
                 # Accumulate if DHW (8)
                 # OR Defrosting is active (AND we are not explicitly in Heating mode)
@@ -2237,3 +2234,4 @@ class CSNetHomeCompressorSensor(CoordinatorEntity, Entity):
     def unique_id(self) -> str:
         """Return unique id."""
         return f"{DOMAIN}-compressor-{self._key}"
+        
