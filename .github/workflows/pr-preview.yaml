@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout PR
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -48,7 +48,7 @@ jobs:
           echo "✅ Preview zip created successfully"
 
       - name: Upload PR Preview Artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: csnet_home-pr-preview
           path: ./custom_components/csnet_home/hass-custom-csnet-home.zip

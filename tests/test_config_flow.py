@@ -3,10 +3,10 @@
 from unittest.mock import patch
 
 import pytest
-
-from custom_components.csnet_home.const import DOMAIN
 from homeassistant import config_entries, data_entry_flow
 from homeassistant.core import HomeAssistant
+
+from custom_components.csnet_home.const import DOMAIN
 
 # Define test constants
 TEST_CONFIG = {

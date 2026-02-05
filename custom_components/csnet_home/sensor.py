@@ -1,28 +1,29 @@
 """Support for CSNet Home sensors."""
 
 import logging
-from datetime import datetime, timezone
 from collections import Counter
+from datetime import datetime, timezone
 
+from homeassistant.components.climate.const import HVACMode
+from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.const import (
-    UnitOfTemperature,
-    UnitOfPressure,
-    UnitOfVolumeFlowRate,
     SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
+    STATE_OFF,
+    STATE_ON,
+    UnitOfPressure,
+    UnitOfTemperature,
+    UnitOfVolumeFlowRate,
 )
 from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.components.climate.const import HVACMode
-from homeassistant.components.sensor import SensorDeviceClass
-from homeassistant.const import STATE_ON, STATE_OFF
 
 from .const import (
     DOMAIN,
-    OTC_HEATING_TYPE_NAMES,
-    OTC_COOLING_TYPE_NAMES,
     OPERATION_STATUS_MAP,
+    OTC_COOLING_TYPE_NAMES,
+    OTC_HEATING_TYPE_NAMES,
 )
 from .coordinator import CSNetHomeCoordinator
 
@@ -879,15 +880,34 @@ class CSNetHomeSensor(CoordinatorEntity, Entity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return device information."""
+        device_name = self._sensor_data.get("device_name", "Unknown Device")
+        room_name = self._sensor_data.get("room_name", "Unknown Room")
+        device_id = self._sensor_data.get("device_id")
+
+        # Handle both data structures:
+        # 1. Device-specific dict (initial): _common_data = {"name": "...", "firmware": "..."}
+        # 2. Full common_data dict (after update): _common_data = {"device_status": {...}}
+        if "device_status" in self._common_data:
+            # After update: nested structure
+            device_status = self._common_data.get("device_status", {}).get(
+                device_id, {}
+            )
+            device_name_from_status = device_status.get("name", "Unknown")
+            firmware = device_status.get("firmware")
+        else:
+            # Initial state: direct access
+            device_name_from_status = self._common_data.get("name", "Unknown")
+            firmware = self._common_data.get("firmware")
+
         return DeviceInfo(
-            name=f"{self._sensor_data['device_name']}-{self._sensor_data['room_name']}",
+            name=f"{device_name}-{room_name}",
             manufacturer="Hitachi",
-            model=f"{self._common_data['name']} Remote Controller",
-            sw_version=self._common_data["firmware"],
+            model=f"{device_name_from_status} Remote Controller",
+            sw_version=firmware,  # None is acceptable for DeviceInfo
             identifiers={
                 (
                     DOMAIN,
-                    f"{self._sensor_data['device_name']}-{self._sensor_data['room_name']}",
+                    f"{device_name}-{room_name}",
                 )
             },
         )

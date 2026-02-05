@@ -3,9 +3,9 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from homeassistant.core import HomeAssistant
 
 from custom_components.csnet_home.coordinator import CSNetHomeCoordinator
-from homeassistant.core import HomeAssistant
 
 
 @pytest.fixture

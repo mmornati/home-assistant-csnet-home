@@ -11,10 +11,10 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
     DOMAIN,
-    WATER_CIRCUIT_MIN_HEAT,
-    WATER_CIRCUIT_MAX_HEAT,
-    OTC_HEATING_TYPE_FIX,
     OTC_COOLING_TYPE_FIX,
+    OTC_HEATING_TYPE_FIX,
+    WATER_CIRCUIT_MAX_HEAT,
+    WATER_CIRCUIT_MIN_HEAT,
 )
 from .coordinator import CSNetHomeCoordinator
 

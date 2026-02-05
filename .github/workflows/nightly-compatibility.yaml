@@ -27,7 +27,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Get Latest Home Assistant Version
         id: ha-version
@@ -113,7 +113,7 @@ jobs:
 
       - name: Upload Test Results
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: latest-stable-results
           path: results.txt
@@ -127,7 +127,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -170,7 +170,7 @@ jobs:
 
       - name: Upload Dev Results
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: dev-test-results
           path: dev-results.txt
@@ -259,7 +259,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Determine Python Version
         id: python-version
@@ -342,7 +342,7 @@ jobs:
 
       - name: Upload Smoke Test Results
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: smoke-test-${{ matrix.version }}
           path: smoke-results.txt
@@ -356,10 +356,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Download Test Results
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           pattern: '*-results*'
           path: artifacts
@@ -453,7 +453,7 @@ jobs:
           cat report.md
 
       - name: Upload Report
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: compatibility-report-${{ github.run_number }}
           path: report.md
