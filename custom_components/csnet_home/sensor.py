@@ -233,6 +233,17 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 coordinator,
                 global_device_data,
                 common_data,
+                "out_water_temperature_3",
+                "temperature",
+                UnitOfTemperature.CELSIUS,
+                "External Tank Temperature",
+            )
+        )
+        sensors.append(
+            CSNetHomeInstallationSensor(
+                coordinator,
+                global_device_data,
+                common_data,
                 "set_water_temperature",
                 "temperature",
                 UnitOfTemperature.CELSIUS,
@@ -966,6 +977,7 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, Entity):
             "water_flow": ["waterFlow"],
             "in_water_temperature": ["waterInletTemp"],
             "out_water_temperature": ["waterOutletTemp"],
+            "out_water_temperature_3": ["waterOutlet3Temp"],
             "set_water_temperature": ["waterTempSetting"],
             "water_pressure": ["waterPressure"],
             "defrost": ["defrosting"],

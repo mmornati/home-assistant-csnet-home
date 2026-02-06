@@ -220,6 +220,7 @@ def test_installation_sensor():
                             "waterFlow": 39,  # Will be divided by 10
                             "waterInletTemp": 20,
                             "waterOutletTemp": 20,
+                            "waterOutlet3Temp": 25,
                             "waterTempSetting": 23,
                             "waterPressure": 224,  # Will be divided by 50
                             "gasTemp": 20,
@@ -307,6 +308,18 @@ def test_installation_sensor():
         "Liquid Temperature",
     )
     assert s.state == 20
+
+    # Test external tank temperature sensor (waterOutlet3Temp)
+    s = CSNetHomeInstallationSensor(
+        coordinator,
+        device_data,
+        common_data,
+        "out_water_temperature_3",
+        "temperature",
+        "°C",
+        "External Tank Temperature",
+    )
+    assert s.state == 25
 
 
 def test_installation_sensor_edge_cases():

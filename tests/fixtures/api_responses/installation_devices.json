@@ -30,6 +30,7 @@
     "heatMaxC1": 55,
     "coolMinC1": 15,
     "coolMaxC1": 22,
-    "dhwMax": 60
+    "dhwMax": 60,
+    "waterOutlet3Temp": 25
   }
 }
