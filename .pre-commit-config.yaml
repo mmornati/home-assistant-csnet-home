@@ -8,6 +8,12 @@ repos:
           - --safe
           - --quiet
         files: ^((custom_components|tests)/.+)?[^/]+\.py$
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: ["--profile", "black"]
+        files: ^((custom_components|tests)/.+)?[^/]+\.py$
   - repo: https://github.com/codespell-project/codespell
     rev: v2.2.2
     hooks:

@@ -5,10 +5,7 @@ from collections import Counter
 from datetime import datetime, timezone
 
 from homeassistant.components.climate.const import HVACMode
-from homeassistant.components.sensor import (
-    SensorDeviceClass,
-    SensorStateClass,
-)
+from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.const import (
     SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
     STATE_OFF,

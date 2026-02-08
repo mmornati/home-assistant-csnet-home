@@ -1,3 +1,4 @@
+---
 services:
   home-assistant:
     container_name: home-assistant-csnet-test
@@ -18,7 +19,11 @@ services:
     environment:
       - TZ=Europe/Amsterdam
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8123"]
+      test:
+        - CMD
+        - curl
+        - -f
+        - http://localhost:8123
       interval: 30s
       timeout: 10s
       retries: 5
