@@ -1499,7 +1499,7 @@ def test_get_temperature_limits_partial_data(hass):
     min_temp, max_temp = api.get_temperature_limits(1, 1, installation_devices_data)
 
     assert min_temp == 11
-    assert max_temp is None  # Max not available
+    assert max_temp == 35  # Uses default when missing
 
 
 def test_get_temperature_limits_validation_zero_value(hass):

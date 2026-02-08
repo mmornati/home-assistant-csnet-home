@@ -27,7 +27,6 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     def __init__(self):
         """Initialize the config flow."""
-        pass
 
     async def async_step_user(self, user_input=None):
         """Handle user input for login credentials."""

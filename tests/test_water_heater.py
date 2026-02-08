@@ -53,7 +53,7 @@ def build_water_heater_entity(
         "zone_id": zone_id,
     }
     common_data = {"name": "Hitachi PAC", "firmware": "1.0.0"}
-    entry = SimpleNamespace(entry_id="test-entry")
+    entry = SimpleNamespace(entry_id="test-entry", data={})
 
     # Minimal hass structure for the entity
     if not hasattr(hass, "data"):

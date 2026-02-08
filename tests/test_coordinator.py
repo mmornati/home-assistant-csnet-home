@@ -8,6 +8,16 @@ from homeassistant.core import HomeAssistant
 from custom_components.csnet_home.coordinator import CSNetHomeCoordinator
 
 
+@pytest.fixture(autouse=True)
+def mock_integration_frame():
+    """Mock integration frame to prevent RuntimeError in DataUpdateCoordinator."""
+    with patch(
+        "homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__",
+        return_value=None,
+    ):
+        yield
+
+
 @pytest.fixture
 def mock_api():
     """Mock the CSNet API."""

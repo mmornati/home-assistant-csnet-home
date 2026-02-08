@@ -12,6 +12,7 @@
   "voyage_api_key": null,
   "cohere_api_key": null,
   "db_path": "~/.nexus-dev/db",
+  "enable_hybrid_db": true,
   "include_patterns": [
     "**/*.py",
     "**/*.js",

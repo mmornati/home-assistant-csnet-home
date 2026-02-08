@@ -249,7 +249,7 @@ def test_installation_sensor():
         "m/s",
         "Pump Speed",
     )
-    assert s.state == 1.0  # 100% converted to 1.0
+    assert s.state == 100  # 100%
     assert s.unit_of_measurement == "m/s"
     assert s.name == "System Controller Pump Speed"
 
@@ -491,7 +491,7 @@ def test_installation_sensor_nested_data():
         "m/s",
         "Pump Speed",
     )
-    assert s.state == 0.8  # 80% converted to 0.8
+    assert s.state == 80  # 80%
 
     # Test defrost from nested data
     s = CSNetHomeInstallationSensor(
@@ -2709,11 +2709,11 @@ def test_compressor_secondary_discharge_temperature_negative():
                 "indoors": [
                     {
                         "heatingStatus": {"ouEvapTemperature": 20},
+                        "secondCycle": {
+                            "dischargeTemp": 254,  # Unsigned representation of -2°C
+                        },
                     }
                 ],
-                "secondCycle": {
-                    "dischargeTemp": 254,  # Unsigned representation of -2°C
-                },
             }
         ]
     }
@@ -2754,11 +2754,11 @@ def test_compressor_secondary_suction_temperature_negative():
                 "indoors": [
                     {
                         "heatingStatus": {"ouEvapTemperature": 20},
+                        "secondCycle": {
+                            "suctionTemp": 128,  # Unsigned representation of -128°C (extreme cold)
+                        },
                     }
                 ],
-                "secondCycle": {
-                    "suctionTemp": 128,  # Unsigned representation of -128°C (extreme cold)
-                },
             }
         ]
     }

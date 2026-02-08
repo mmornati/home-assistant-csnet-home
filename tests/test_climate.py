@@ -1279,11 +1279,11 @@ def test_device_info_with_complete_data(hass):
     device_info = entity.device_info
 
     assert device_info is not None
-    assert device_info.name == "Hitachi PAC-Living"
-    assert device_info.manufacturer == "Hitachi"
-    assert device_info.model == "Hitachi PAC Remote Controller"
-    assert device_info.sw_version == "1.0.0"
-    assert (DOMAIN, "Hitachi PAC-Living") in device_info.identifiers
+    assert device_info["name"] == "Hitachi PAC-Living"
+    assert device_info["manufacturer"] == "Hitachi"
+    assert device_info["model"] == "Hitachi PAC Remote Controller"
+    assert device_info["sw_version"] == "1.0.0"
+    assert (DOMAIN, "Hitachi PAC-Living") in device_info["identifiers"]
 
 
 def test_device_info_with_missing_firmware(hass):
@@ -1339,7 +1339,7 @@ def test_device_info_with_missing_firmware(hass):
 
     # Should not raise KeyError, firmware should be None
     assert device_info is not None
-    assert device_info.sw_version is None
+    assert device_info["sw_version"] is None
 
 
 def test_device_info_after_update_with_nested_structure(hass):
@@ -1353,9 +1353,9 @@ def test_device_info_after_update_with_nested_structure(hass):
 
     device_info = entity.device_info
 
-    assert device_info is not None
-    assert device_info.model == "Hitachi PAC Remote Controller"
-    assert device_info.sw_version == "2.0.0"
+    assert device_info["name"] == "Hitachi PAC-Living"
+    assert device_info["model"] == "Hitachi PAC Remote Controller"
+    assert device_info["sw_version"] == "2.0.0"
 
 
 def test_device_info_with_missing_device_status(hass):
@@ -1369,8 +1369,8 @@ def test_device_info_with_missing_device_status(hass):
 
     # Should not raise KeyError, should use defaults
     assert device_info is not None
-    assert device_info.model == "Unknown Remote Controller"
-    assert device_info.sw_version is None
+    assert device_info["model"] == "Unknown Remote Controller"
+    assert device_info["sw_version"] is None
 
 
 def test_device_info_with_missing_sensor_data_keys(hass):
@@ -1409,4 +1409,4 @@ def test_device_info_with_missing_sensor_data_keys(hass):
 
     # Should not raise KeyError, should use defaults
     assert device_info is not None
-    assert device_info.name == "Unknown Device-Unknown Room"
+    assert device_info["name"] == "Unknown Device-Unknown Room"

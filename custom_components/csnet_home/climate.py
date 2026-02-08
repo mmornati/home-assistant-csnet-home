@@ -70,7 +70,7 @@ class CSNetHomeClimate(ClimateEntity):
         self.hass = hass
         self._sensor_data = sensor_data
         self._common_data = common_data
-        self._attr_name = self._sensor_data["room_name"]
+        self._attr_name = self._sensor_data.get("room_name", "Unknown")
         self.entry = entry
         # Temperature limits will be computed dynamically based on mode
         self._attr_temperature_unit = UnitOfTemperature.CELSIUS
@@ -82,7 +82,10 @@ class CSNetHomeClimate(ClimateEntity):
             HVACMode.HEAT_COOL,
         ]
         self._attr_preset_modes = ["comfort", "eco"]
-        if self._sensor_data["ecocomfort"] and self._sensor_data["ecocomfort"] == 0:
+        if (
+            self._sensor_data.get("ecocomfort")
+            and self._sensor_data.get("ecocomfort") == 0
+        ):
             self._attr_preset_mode = "eco"
         else:
             self._attr_preset_mode = "comfort"
@@ -134,7 +137,7 @@ class CSNetHomeClimate(ClimateEntity):
         self._cached_limits: tuple[float | None, float | None] | None = None
 
     def _get_fan_mode_from_data(self):
-        """Helper to read the fan mode from the raw API data."""
+        """Read the fan mode from the raw API data."""
         if self._sensor_data is None:
             return FAN_AUTO if not self._is_fan_coil else "auto"
 
@@ -253,7 +256,7 @@ class CSNetHomeClimate(ClimateEntity):
     @property
     def unique_id(self) -> str:
         """Return unique id."""
-        return f"{DOMAIN}-climate-{self._sensor_data['device_id']}-{self._sensor_data['room_name']}"
+        return f"{DOMAIN}-climate-{self._sensor_data['device_id']}-{self._sensor_data.get('room_name', 'unknown')}"
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -510,6 +513,9 @@ class CSNetHomeClimate(ClimateEntity):
             )
             if response:
                 self._assumed_fan_mode = fan_mode
+                # Optimistically update the sensor data
+                fan_speed_key = f"fan{circuit}_speed"
+                self._sensor_data[fan_speed_key] = fan_speed
         else:
             # For non-fan coil systems, set silent mode
             silent_mode = fan_mode == FAN_ON
@@ -520,6 +526,8 @@ class CSNetHomeClimate(ClimateEntity):
             )
             if response:
                 self._assumed_fan_mode = fan_mode
+                # Optimistically update the sensor data
+                self._sensor_data["silent_mode"] = 1 if silent_mode else 0
 
     def is_heating(self):
         """Return true if the thermostat is currently heating."""

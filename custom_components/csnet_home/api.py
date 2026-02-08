@@ -408,7 +408,7 @@ class CSNetHomeAPI:
         try:
             val = float(value)
             # Check if value is 0 or -1 (invalid sentinel values)
-            if val == 0 or val == -1:
+            if val in (0, -1):
                 return default
             return val
         except (TypeError, ValueError):

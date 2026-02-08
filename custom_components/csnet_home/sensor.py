@@ -832,7 +832,7 @@ class CSNetHomeSensor(CoordinatorEntity, Entity):
         self._key = key
         self._device_class = device_class
         self._unit = unit
-        self._name = f"{sensor_data['device_name']} {sensor_data['room_name']} {key}"
+        self._name = f"{sensor_data.get('device_name', 'Unknown')} {sensor_data.get('room_name', 'Unknown')} {key}"
         _LOGGER.debug("Configuring Sensor %s", self._name)
 
     @property
@@ -922,7 +922,7 @@ class CSNetHomeSensor(CoordinatorEntity, Entity):
         """Return unique id."""
         # All entities must have a unique id.  Think carefully what you want this to be as
         # changing it later will cause HA to create new entities.
-        return f"{DOMAIN}-{self._sensor_data['room_name']}-{self._key}"
+        return f"{DOMAIN}-{self._sensor_data.get('room_name', 'unknown')}-{self._key}"
 
 
 class CSNetHomeInstallationSensor(CoordinatorEntity, Entity):
