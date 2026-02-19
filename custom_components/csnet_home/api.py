@@ -702,38 +702,24 @@ class CSNetHomeAPI:
         # Zone 5 is fixed temperature water circuit, zones 1,2,4 are typically air/room thermostats
         is_water_circuit = zone_id == 5
 
-        if hvac_mode_lower == "heat":
-            data["mode"] = "1"
-            if is_water_circuit:
-                # Water circuits: only set runStopC{X}, not Air
-                data[f"runStopC{circuit_id}"] = "1"
-            else:
-                # Air circuits: only set runStopC{X}Air, not water
-                data[f"runStopC{circuit_id}Air"] = "1"
-        elif hvac_mode_lower == "cool":
-            data["mode"] = "0"
-            if is_water_circuit:
-                # Water circuits: only set runStopC{X}, not Air
-                data[f"runStopC{circuit_id}"] = "1"
-            else:
-                # Air circuits: only set runStopC{X}Air, not water
-                data[f"runStopC{circuit_id}Air"] = "1"
-        elif hvac_mode_lower == "heat_cool":
-            data["mode"] = "2"
-            if is_water_circuit:
-                # Water circuits: only set runStopC{X}, not Air
-                data[f"runStopC{circuit_id}"] = "1"
-            else:
-                # Air circuits: only set runStopC{X}Air, not water
-                data[f"runStopC{circuit_id}Air"] = "1"
+        # Determine the correct key for run/stop based on circuit type
+        run_stop_key = f"runStopC{circuit_id}"
+        if not is_water_circuit:
+            run_stop_key += "Air"
+
+        # Mapping from HA mode to CSNet parameters
+        mode_mapping = {
+            "heat": "1",
+            "cool": "0",
+            "heat_cool": "2",
+        }
+
+        if hvac_mode_lower in mode_mapping:
+            data["mode"] = mode_mapping[hvac_mode_lower]
+            data[run_stop_key] = "1"
         elif hvac_mode_lower == "off":
             # only stop — do not send "mode" to preserve last setting
-            if is_water_circuit:
-                # Water circuits: only set runStopC{X}, not Air
-                data[f"runStopC{circuit_id}"] = "0"
-            else:
-                # Air circuits: only set runStopC{X}Air, not water
-                data[f"runStopC{circuit_id}Air"] = "0"
+            data[run_stop_key] = "0"
         else:
             _LOGGER.warning("Unsupported hvac_mode=%s ignored", hvac_mode)
             return True
