@@ -41,6 +41,139 @@ TO_REDACT = {
     "token",
 }
 
+# Alarm Origin Map Constants
+# Optimized for performance to avoid recreation on every call
+BCD_ALARM_ORIGIN_MAP = {
+    0x62: "STR_ORIGIN_INVERTER",
+    0x5B: "STR_ORIGIN_OUTDOOR_FAN",
+    0x5C: "STR_ORIGIN_OUTDOOR_FAN",
+    0xEE: "STR_ORIGIN_COMPRESSOR",
+}
+
+ALARM_ORIGIN_MAP = {
+    # Standard Map entries
+    2: "STR_REFRIGERANT_CYCLE",
+    3: "STR_ORIGIN_TRANSMISSION",
+    4: "STR_ORIGIN_TRANSMISSION",
+    5: "STR_ORIGIN_POWER_SUPPLY",
+    6: "STR_ORIGIN_VOLTAGE",
+    7: "STR_REFRIGERANT_CYCLE",
+    8: "STR_REFRIGERANT_CYCLE",
+    10: "STR_ORIGIN_INDOOR",
+    23: "STR_ORIGIN_2ND_CYCLE",
+    27: "STR_ORIGIN_OUTDOOR",
+    31: "STR_ORIGIN_SYSTEM",
+    35: "STR_ORIGIN_SYSTEM",
+    36: "STR_ORIGIN_SYSTEM",
+    41: "STR_ORIGIN_INDOOR",
+    42: "STR_REFRIGERANT_CYCLE",
+    43: "STR_REFRIGERANT_CYCLE",
+    44: "STR_REFRIGERANT_CYCLE",
+    45: "STR_REFRIGERANT_CYCLE",
+    46: "STR_REFRIGERANT_CYCLE",
+    47: "STR_REFRIGERANT_CYCLE",
+    48: "STR_ORIGIN_INVERTER",
+    49: "STR_REFRIGERANT_CYCLE",
+    51: "STR_ORIGIN_INVERTER",
+    53: "STR_ORIGIN_INVERTER",
+    54: "STR_ORIGIN_INVERTER",
+    55: "STR_ORIGIN_INVERTER",
+    57: "STR_ORIGIN_OUTDOOR_FAN",
+    60: "STR_ORIGIN_COMUNICATION",
+    61: "STR_ORIGIN_COMUNICATION",
+    77: "STR_ORIGIN_INDOOR_UNIT_CONTROLLER",
+    78: "STR_ORIGIN_INDOOR_UNIT_CONTROLLER",
+    79: "STR_ORIGIN_SYSTEM",
+    80: "STR_ORIGIN_INDOOR_UNIT_CONTROLLER",
+    81: "STR_ORIGIN_INDOOR",
+    85: "STR_ORIGIN_INDOOR",
+    91: "STR_ORIGIN_OUTDOOR_FAN",
+    92: "STR_ORIGIN_OUTDOOR_FAN",
+    238: "STR_ORIGIN_COMPRESSOR",
+    # Merged List entries
+    # STR_ORIGIN_INDOOR list 1
+    11: "STR_ORIGIN_INDOOR",
+    12: "STR_ORIGIN_INDOOR",
+    13: "STR_ORIGIN_INDOOR",
+    14: "STR_ORIGIN_INDOOR",
+    75: "STR_ORIGIN_INDOOR",
+    76: "STR_ORIGIN_INDOOR",
+    83: "STR_ORIGIN_INDOOR",
+    # STR_ORIGIN_INDOOR list 2
+    15: "STR_ORIGIN_INDOOR",
+    16: "STR_ORIGIN_INDOOR",
+    17: "STR_ORIGIN_INDOOR",
+    18: "STR_ORIGIN_INDOOR",
+    19: "STR_ORIGIN_INDOOR",
+    25: "STR_ORIGIN_INDOOR",
+    33: "STR_ORIGIN_INDOOR",
+    34: "STR_ORIGIN_INDOOR",
+    40: "STR_ORIGIN_INDOOR",
+    72: "STR_ORIGIN_INDOOR",
+    73: "STR_ORIGIN_INDOOR",
+    74: "STR_ORIGIN_INDOOR",
+    # STR_ORIGIN_OUTDOOR
+    20: "STR_ORIGIN_OUTDOOR",
+    21: "STR_ORIGIN_OUTDOOR",
+    22: "STR_ORIGIN_OUTDOOR",
+    24: "STR_ORIGIN_OUTDOOR",
+    28: "STR_ORIGIN_OUTDOOR",
+    29: "STR_ORIGIN_OUTDOOR",
+    38: "STR_ORIGIN_OUTDOOR",
+    59: "STR_ORIGIN_OUTDOOR",
+    # Single value checks
+    26: "STR_ORIGIN_INDOOR",
+    # STR_ORIGIN_INDOOR list 3
+    70: "STR_ORIGIN_INDOOR",
+    71: "STR_ORIGIN_INDOOR",
+    84: "STR_ORIGIN_INDOOR",
+    90: "STR_ORIGIN_INDOOR",
+    # STR_ORIGIN_2ND_CYCLE list
+    101: "STR_ORIGIN_2ND_CYCLE",
+    102: "STR_ORIGIN_2ND_CYCLE",
+    103: "STR_ORIGIN_2ND_CYCLE",
+    104: "STR_ORIGIN_2ND_CYCLE",
+    105: "STR_ORIGIN_2ND_CYCLE",
+    106: "STR_ORIGIN_2ND_CYCLE",
+    124: "STR_ORIGIN_2ND_CYCLE",
+    125: "STR_ORIGIN_2ND_CYCLE",
+    126: "STR_ORIGIN_2ND_CYCLE",
+    127: "STR_ORIGIN_2ND_CYCLE",
+    128: "STR_ORIGIN_2ND_CYCLE",
+    129: "STR_ORIGIN_2ND_CYCLE",
+    130: "STR_ORIGIN_2ND_CYCLE",
+    132: "STR_ORIGIN_2ND_CYCLE",
+    134: "STR_ORIGIN_2ND_CYCLE",
+    135: "STR_ORIGIN_2ND_CYCLE",
+    136: "STR_ORIGIN_2ND_CYCLE",
+    151: "STR_ORIGIN_2ND_CYCLE",
+    152: "STR_ORIGIN_2ND_CYCLE",
+    153: "STR_ORIGIN_2ND_CYCLE",
+    154: "STR_ORIGIN_2ND_CYCLE",
+    155: "STR_ORIGIN_2ND_CYCLE",
+    156: "STR_ORIGIN_2ND_CYCLE",
+    157: "STR_ORIGIN_2ND_CYCLE",
+    # STR_ORIGIN_INDOOR list 4
+    202: "STR_ORIGIN_INDOOR",
+    203: "STR_ORIGIN_INDOOR",
+    204: "STR_ORIGIN_INDOOR",
+    205: "STR_ORIGIN_INDOOR",
+    # STR_ORIGIN_CASCADE_CONTROLLER
+    208: "STR_ORIGIN_CASCADE_CONTROLLER",
+    209: "STR_ORIGIN_CASCADE_CONTROLLER",
+    # STR_ORIGIN_CASCADE_MODULE
+    211: "STR_ORIGIN_CASCADE_MODULE",
+    212: "STR_ORIGIN_CASCADE_MODULE",
+    213: "STR_ORIGIN_CASCADE_MODULE",
+    214: "STR_ORIGIN_CASCADE_MODULE",
+    215: "STR_ORIGIN_CASCADE_MODULE",
+    216: "STR_ORIGIN_CASCADE_MODULE",
+    217: "STR_ORIGIN_CASCADE_MODULE",
+    218: "STR_ORIGIN_CASCADE_MODULE",
+    # STR_ORIGIN_UNIT_CONTROLLER
+    220: "STR_ORIGIN_UNIT_CONTROLLER",
+}
+
 
 def redact_data(data):
     """Redact sensitive keys from a dictionary or list."""
@@ -1436,12 +1569,7 @@ class CSNetHomeAPI:
         # BCD-specific origins (check raw value BEFORE reversing)
         # Note: raw_value is the hex byte value (e.g., 0x62 = 98 decimal)
         if is_bcd:
-            if raw_value == 0x62:
-                origin_key = "STR_ORIGIN_INVERTER"
-            elif raw_value in [0x5B, 0x5C]:  # 91, 92 in hex
-                origin_key = "STR_ORIGIN_OUTDOOR_FAN"
-            elif raw_value == 0xEE:  # 238 in hex
-                origin_key = "STR_ORIGIN_COMPRESSOR"
+            origin_key = BCD_ALARM_ORIGIN_MAP.get(raw_value)
 
         # If we found a BCD-specific origin, return it
         if origin_key and origin_key in self.translations:
@@ -1455,95 +1583,7 @@ class CSNetHomeAPI:
 
         # Standard alarm code origins
         if not origin_key:
-            origin_map = {
-                2: "STR_REFRIGERANT_CYCLE",
-                3: "STR_ORIGIN_TRANSMISSION",
-                4: "STR_ORIGIN_TRANSMISSION",
-                5: "STR_ORIGIN_POWER_SUPPLY",
-                6: "STR_ORIGIN_VOLTAGE",
-                7: "STR_REFRIGERANT_CYCLE",
-                8: "STR_REFRIGERANT_CYCLE",
-                10: "STR_ORIGIN_INDOOR",
-                23: "STR_ORIGIN_2ND_CYCLE",
-                27: "STR_ORIGIN_OUTDOOR",
-                31: "STR_ORIGIN_SYSTEM",
-                35: "STR_ORIGIN_SYSTEM",
-                36: "STR_ORIGIN_SYSTEM",
-                41: "STR_ORIGIN_INDOOR",
-                42: "STR_REFRIGERANT_CYCLE",
-                43: "STR_REFRIGERANT_CYCLE",
-                44: "STR_REFRIGERANT_CYCLE",
-                45: "STR_REFRIGERANT_CYCLE",
-                46: "STR_REFRIGERANT_CYCLE",
-                47: "STR_REFRIGERANT_CYCLE",
-                48: "STR_ORIGIN_INVERTER",
-                49: "STR_REFRIGERANT_CYCLE",
-                51: "STR_ORIGIN_INVERTER",
-                53: "STR_ORIGIN_INVERTER",
-                54: "STR_ORIGIN_INVERTER",
-                55: "STR_ORIGIN_INVERTER",
-                57: "STR_ORIGIN_OUTDOOR_FAN",
-                60: "STR_ORIGIN_COMUNICATION",
-                61: "STR_ORIGIN_COMUNICATION",
-                77: "STR_ORIGIN_INDOOR_UNIT_CONTROLLER",
-                78: "STR_ORIGIN_INDOOR_UNIT_CONTROLLER",
-                79: "STR_ORIGIN_SYSTEM",
-                80: "STR_ORIGIN_INDOOR_UNIT_CONTROLLER",
-                81: "STR_ORIGIN_INDOOR",
-                85: "STR_ORIGIN_INDOOR",
-                91: "STR_ORIGIN_OUTDOOR_FAN",
-                92: "STR_ORIGIN_OUTDOOR_FAN",
-                238: "STR_ORIGIN_COMPRESSOR",
-            }
-
-            # Group mappings for similar origins
-            if value in [11, 12, 13, 14, 75, 76, 83]:
-                origin_key = "STR_ORIGIN_INDOOR"
-            elif value in [15, 16, 17, 18, 19, 25, 33, 34, 40, 72, 73, 74]:
-                origin_key = "STR_ORIGIN_INDOOR"
-            elif value in [20, 21, 22, 24, 28, 29, 38, 59]:
-                origin_key = "STR_ORIGIN_OUTDOOR"
-            elif value == 26:
-                origin_key = "STR_ORIGIN_INDOOR"
-            elif value in [70, 71, 84, 90]:
-                origin_key = "STR_ORIGIN_INDOOR"
-            elif value in [
-                101,
-                102,
-                103,
-                104,
-                105,
-                106,
-                124,
-                125,
-                126,
-                127,
-                128,
-                129,
-                130,
-                132,
-                134,
-                135,
-                136,
-                151,
-                152,
-                153,
-                154,
-                155,
-                156,
-                157,
-            ]:
-                origin_key = "STR_ORIGIN_2ND_CYCLE"
-            elif value in [202, 203, 204, 205]:
-                origin_key = "STR_ORIGIN_INDOOR"
-            elif value in [208, 209]:
-                origin_key = "STR_ORIGIN_CASCADE_CONTROLLER"
-            elif value in [211, 212, 213, 214, 215, 216, 217, 218]:
-                origin_key = "STR_ORIGIN_CASCADE_MODULE"
-            elif value == 220:
-                origin_key = "STR_ORIGIN_UNIT_CONTROLLER"
-            else:
-                origin_key = origin_map.get(value)
+            origin_key = ALARM_ORIGIN_MAP.get(value)
 
         # Translate the origin key if found
         if origin_key and origin_key in self.translations:
