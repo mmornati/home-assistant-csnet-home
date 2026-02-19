@@ -7,6 +7,7 @@ from homeassistant.core import HomeAssistant
 
 from custom_components.csnet_home.coordinator import CSNetHomeCoordinator
 
+
 @pytest.fixture(autouse=True)
 def mock_integration_frame():
     """Mock integration frame to prevent RuntimeError in DataUpdateCoordinator."""
@@ -15,7 +16,6 @@ def mock_integration_frame():
         return_value=None,
     ):
         yield
-
 
 
 @pytest.fixture

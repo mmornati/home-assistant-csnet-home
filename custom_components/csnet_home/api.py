@@ -105,11 +105,9 @@ class CSNetHomeAPI:
         if self.session is None or self.session.closed:
             self.session = aiohttp.ClientSession(cookie_jar=aiohttp.CookieJar())
 
-
         if not await self.get_xsrf_token():
             _LOGGER.error("Failed to get XSRF token.")
             return False
-
 
         login_url = f"{self.base_url}{LOGIN_PATH}"
 
@@ -142,9 +140,7 @@ class CSNetHomeAPI:
                     if await self.check_logged_in(response):
                         _LOGGER.info("Login successful")
                         return True
-                    _LOGGER.error(
-                        "Login failed. Status code: %s", response.status
-                    )
+                    _LOGGER.error("Login failed. Status code: %s", response.status)
                     return False
         except Exception as e:
             _LOGGER.error("Login exception: %s", e, exc_info=True)
@@ -172,6 +168,8 @@ class CSNetHomeAPI:
         _LOGGER.info("Starting credential validation for user: %s", username)
         # Create a temporary API instance for validation
         temp_api = CSNetHomeAPI(hass, username, password, base_url)
+        # Pre-create the session so it is always available for cleanup
+        temp_api.session = aiohttp.ClientSession(cookie_jar=aiohttp.CookieJar())
 
         try:
             # Attempt to login with the provided credentials
@@ -187,12 +185,11 @@ class CSNetHomeAPI:
             return False
         finally:
             # Always clean up the session
-            if temp_api.session:
-                try:
-                    await temp_api.session.close()
-                    _LOGGER.debug("Validation session closed successfully")
-                except Exception as e:
-                    _LOGGER.debug("Error closing validation session: %s", e)
+            try:
+                await temp_api.session.close()
+                _LOGGER.debug("Validation session closed successfully")
+            except Exception as e:
+                _LOGGER.debug("Error closing validation session: %s", e)
 
     async def async_get_elements_data(self):
         """Get sensor data from the cloud service."""

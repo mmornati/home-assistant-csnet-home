@@ -1,18 +1,16 @@
 """Test ConfigFlows configuration."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
-import pytest
 from homeassistant import config_entries, data_entry_flow
 from homeassistant.const import CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_USERNAME
 from homeassistant.core import HomeAssistant
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.csnet_home.const import (
     CONF_FAN_COIL_MODEL,
     CONF_LANGUAGE,
     CONF_MAX_TEMP_OVERRIDE,
-    DEFAULT_FAN_COIL_MODEL,
-    DEFAULT_LANGUAGE,
     DOMAIN,
 )
 
@@ -47,7 +45,7 @@ async def test_config_flow_user_init(hass: HomeAssistant):
 async def test_config_flow_user_success(hass: HomeAssistant):
     """Test a successful configuration flow."""
     with patch(
-        "custom_components.csnet_home.config_flow.CSNetHomeAPI.async_validate_credentials",
+        "custom_components.csnet_home.api.CSNetHomeAPI.async_validate_credentials",
         return_value=True,
     ):
         result = await hass.config_entries.flow.async_init(
@@ -79,7 +77,7 @@ async def test_reconfigure_flow_success(hass: HomeAssistant):
 
     # Mock credential validation
     with patch(
-        "custom_components.csnet_home.config_flow.CSNetHomeAPI.async_validate_credentials",
+        "custom_components.csnet_home.api.CSNetHomeAPI.async_validate_credentials",
         return_value=True,
     ):
         # Start reconfigure flow
@@ -124,7 +122,7 @@ async def test_reconfigure_flow_invalid_credentials(hass: HomeAssistant):
 
     # Mock credential validation to fail
     with patch(
-        "custom_components.csnet_home.config_flow.CSNetHomeAPI.async_validate_credentials",
+        "custom_components.csnet_home.api.CSNetHomeAPI.async_validate_credentials",
         return_value=False,
     ):
         # Start reconfigure flow
@@ -165,7 +163,7 @@ async def test_reconfigure_preserves_entry_id(hass: HomeAssistant):
     original_entry_count = len(hass.config_entries.async_entries(DOMAIN))
 
     with patch(
-        "custom_components.csnet_home.config_flow.CSNetHomeAPI.async_validate_credentials",
+        "custom_components.csnet_home.api.CSNetHomeAPI.async_validate_credentials",
         return_value=True,
     ):
         result = await hass.config_entries.flow.async_init(
@@ -196,7 +194,7 @@ async def test_reauth_flow_success(hass: HomeAssistant):
     entry.add_to_hass(hass)
 
     with patch(
-        "custom_components.csnet_home.config_flow.CSNetHomeAPI.async_validate_credentials",
+        "custom_components.csnet_home.api.CSNetHomeAPI.async_validate_credentials",
         return_value=True,
     ):
         # Start reauth flow
@@ -241,7 +239,7 @@ async def test_reauth_flow_invalid_password(hass: HomeAssistant):
     entry.add_to_hass(hass)
 
     with patch(
-        "custom_components.csnet_home.config_flow.CSNetHomeAPI.async_validate_credentials",
+        "custom_components.csnet_home.api.CSNetHomeAPI.async_validate_credentials",
         return_value=False,
     ):
         # Start reauth flow
@@ -275,7 +273,7 @@ async def test_reauth_flow_invalid_password(hass: HomeAssistant):
 async def test_validate_credentials_connection_error(hass: HomeAssistant):
     """Test credential validation with connection error."""
     with patch(
-        "custom_components.csnet_home.config_flow.CSNetHomeAPI.async_validate_credentials",
+        "custom_components.csnet_home.api.CSNetHomeAPI.async_validate_credentials",
         side_effect=Exception("Connection failed"),
     ):
         result = await hass.config_entries.flow.async_init(
@@ -289,20 +287,3 @@ async def test_validate_credentials_connection_error(hass: HomeAssistant):
         # Should show form with connection error
         assert result["type"] == data_entry_flow.FlowResultType.FORM
         assert result["errors"] == {"base": "cannot_connect"}
-
-
-class MockConfigEntry(config_entries.ConfigEntry):
-    """Mock ConfigEntry for testing."""
-
-    def __init__(self, *, domain, data, entry_id, **kwargs):
-        """Initialize mock config entry."""
-        super().__init__(
-            version=1,
-            minor_version=0,
-            domain=domain,
-            title="CSNet Home",
-            data=data,
-            source=config_entries.SOURCE_USER,
-            entry_id=entry_id,
-            **kwargs,
-        )
