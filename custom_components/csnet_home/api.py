@@ -26,6 +26,33 @@ from custom_components.csnet_home.const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+TO_REDACT = {
+    "latitude",
+    "longitude",
+    "ownerId",
+    "installationId",
+    "installation",
+    "administrator",
+    "user_dispayableName",
+    "_csrf",
+    "username",
+    "password",
+    "password_unsanitized",
+    "token",
+}
+
+
+def redact_data(data):
+    """Redact sensitive keys from a dictionary or list."""
+    if isinstance(data, dict):
+        return {
+            k: redact_data(v) if k not in TO_REDACT else "**REDACTED**"
+            for k, v in data.items()
+        }
+    if isinstance(data, list):
+        return [redact_data(i) for i in data]
+    return data
+
 
 class CSNetHomeAPI:
     """Handles communication with the cloud service API."""
@@ -140,7 +167,7 @@ class CSNetHomeAPI:
                 ) as response:
                     data = await self.check_api_response(response)
                     if data is not None and data.get("status") == "success":
-                        _LOGGER.debug("Sensor data retrieved: %s", data["data"])
+                        _LOGGER.debug("Sensor data retrieved: %s", redact_data(data["data"]))
 
                         # Parse the sensor data from the API response
                         elements = data.get("data", {}).get("elements", [])
@@ -226,9 +253,9 @@ class CSNetHomeAPI:
                             )
 
                             sensors.append(sensor)
-                        _LOGGER.debug("Retrieved Sensors: %s", sensors)
+                        _LOGGER.debug("Retrieved Sensors: %s", redact_data(sensors))
                         data_elements = {"common_data": common_data, "sensors": sensors}
-                        _LOGGER.debug("Retrieved Data Elements: %s", data_elements)
+                        _LOGGER.debug("Retrieved Data Elements: %s", redact_data(data_elements))
                         return data_elements
 
                     _LOGGER.error("Error in API response, status not 'success'")
@@ -263,7 +290,7 @@ class CSNetHomeAPI:
                 ) as response:
                     data = await self.check_api_response(response)
                     if data is not None:
-                        _LOGGER.debug("Installation devices data retrieved: %s", data)
+                        _LOGGER.debug("Installation devices data retrieved: %s", redact_data(data))
                         return data
                     _LOGGER.error("Error in installation devices API response")
                     return None
@@ -302,7 +329,7 @@ class CSNetHomeAPI:
                 ) as response:
                     data = await self.check_api_response(response)
                     if data is not None:
-                        _LOGGER.debug("Installation alarms data retrieved: %s", data)
+                        _LOGGER.debug("Installation alarms data retrieved: %s", redact_data(data))
                         return data
                     _LOGGER.error("Error in installation alarms API response")
                     return None
@@ -752,7 +779,7 @@ class CSNetHomeAPI:
                     _LOGGER.debug(
                         "Set hvac_mode=%s with payload=%s, status=%s, response=%s",
                         hvac_mode,
-                        data,
+                        redact_data(data),
                         response.status,
                         response_text,
                     )
@@ -830,7 +857,7 @@ class CSNetHomeAPI:
                         "Set preset_mode=%s for zone=%s with payload=%s, status=%s, response=%s",
                         preset_mode,
                         zone_id,
-                        data,
+                        redact_data(data),
                         response.status,
                         response_text,
                     )
@@ -892,7 +919,7 @@ class CSNetHomeAPI:
             "acceptedCookies": "yes",
         }
 
-        _LOGGER.debug("Sending data (%s): ", data)
+        _LOGGER.debug("Sending data (%s): ", redact_data(data))
 
         try:
             async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
@@ -950,7 +977,7 @@ class CSNetHomeAPI:
                         "Set silent_mode=%s for zone=%s with payload=%s, status=%s, response=%s",
                         silent_mode,
                         zone_id,
-                        data,
+                        redact_data(data),
                         response.status,
                         response_text,
                     )
@@ -1013,7 +1040,7 @@ class CSNetHomeAPI:
                         fan_speed,
                         zone_id,
                         circuit,
-                        data,
+                        redact_data(data),
                         response.status,
                         response_text,
                     )
@@ -1232,7 +1259,9 @@ class CSNetHomeAPI:
         for cookie in cookies:
             if cookie.key == cookie_name:
                 _LOGGER.debug(
-                    "Found cookie %s with value %s", cookie_name, cookie.value
+                    "Found cookie %s with value %s",
+                    cookie_name,
+                    "**REDACTED**" if cookie_name in TO_REDACT else cookie.value,
                 )
                 return cookie.value
         return None
