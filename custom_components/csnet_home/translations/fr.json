@@ -1,0 +1,68 @@
+{
+    "config": {
+        "step": {
+            "user": {
+                "title": "Configurer CSNet Home",
+                "description": "Entrez vos identifiants CSNet Manager pour connecter votre système Hitachi à Home Assistant.",
+                "data": {
+                    "username": "Nom d'utilisateur",
+                    "password": "Mot de passe",
+                    "scan_interval": "Intervalle de scan (secondes)",
+                    "language": "Langue",
+                    "max_temp_override": "Température maximale (°C)",
+                    "fan_coil_model": "Modèle de contrôle du ventilo-convecteur"
+                },
+                "data_description": {
+                    "username": "Votre nom d'utilisateur CSNet Manager",
+                    "password": "Votre mot de passe CSNet Manager",
+                    "scan_interval": "Fréquence de mise à jour des données (par défaut : 60 secondes)",
+                    "language": "Langue préférée pour les noms d'appareils et les alarmes",
+                    "max_temp_override": "Remplacer la limite de température maximale (8-80°C). Laisser vide pour les valeurs par défaut.",
+                    "fan_coil_model": "Sélectionnez le type de contrôle du ventilo-convecteur (standard ou legacy)"
+                }
+            },
+            "reconfigure": {
+                "title": "Reconfigurer CSNet Home",
+                "description": "Mettez à jour votre configuration CSNet Home. Vous pouvez modifier les identifiants, l'intervalle de scan, la langue et d'autres paramètres.",
+                "data": {
+                    "username": "Nom d'utilisateur",
+                    "password": "Mot de passe",
+                    "scan_interval": "Intervalle de scan (secondes)",
+                    "language": "Langue",
+                    "max_temp_override": "Température maximale (°C)",
+                    "fan_coil_model": "Modèle de contrôle du ventilo-convecteur"
+                },
+                "data_description": {
+                    "username": "Votre nom d'utilisateur CSNet Manager",
+                    "password": "Votre mot de passe CSNet Manager",
+                    "scan_interval": "Fréquence de mise à jour des données",
+                    "language": "Langue préférée pour les noms d'appareils et les alarmes",
+                    "max_temp_override": "Remplacer la limite de température maximale (8-80°C)",
+                    "fan_coil_model": "Sélectionnez le type de contrôle du ventilo-convecteur"
+                }
+            },
+            "reauth_confirm": {
+                "title": "Ré-authentifier CSNet Home",
+                "description": "Vos identifiants CSNet Manager ne sont plus valides. Veuillez fournir des identifiants mis à jour pour continuer à utiliser cette intégration.",
+                "data": {
+                    "username": "Nom d'utilisateur",
+                    "password": "Mot de passe"
+                },
+                "data_description": {
+                    "username": "Votre nom d'utilisateur CSNet Manager (mettre à jour si modifié)",
+                    "password": "Votre nouveau mot de passe CSNet Manager"
+                }
+            }
+        },
+        "error": {
+            "cannot_connect": "Impossible de se connecter à CSNet Manager. Veuillez vérifier votre connexion Internet et réessayer.",
+            "invalid_auth": "Nom d'utilisateur ou mot de passe invalide. Veuillez vérifier vos identifiants.",
+            "unknown": "Une erreur inattendue s'est produite. Veuillez réessayer."
+        },
+        "abort": {
+            "already_configured": "Cette intégration CSNet Home est déjà configurée.",
+            "reauth_successful": "Ré-authentification réussie ! Vos identifiants ont été mis à jour.",
+            "reconfigure_successful": "Reconfiguration réussie ! Vos paramètres ont été mis à jour."
+        }
+    }
+}

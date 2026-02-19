@@ -1,0 +1,68 @@
+{
+    "config": {
+        "step": {
+            "user": {
+                "title": "Configurar CSNet Home",
+                "description": "Introduzca sus credenciales de CSNet Manager para conectar su sistema Hitachi a Home Assistant.",
+                "data": {
+                    "username": "Nombre de usuario",
+                    "password": "Contraseña",
+                    "scan_interval": "Intervalo de escaneo (segundos)",
+                    "language": "Idioma",
+                    "max_temp_override": "Anulación de temperatura máxima (°C)",
+                    "fan_coil_model": "Modelo de control del Fan Coil"
+                },
+                "data_description": {
+                    "username": "Su nombre de usuario de CSNet Manager",
+                    "password": "Su contraseña de CSNet Manager",
+                    "scan_interval": "Con qué frecuencia buscar actualizaciones (predeterminado: 60 segundos)",
+                    "language": "Idioma preferido para los nombres de los dispositivos y las alarmas",
+                    "max_temp_override": "Anule el límite máximo de temperatura (8-80°C). Déjelo vacío para los valores predeterminados.",
+                    "fan_coil_model": "Seleccione el tipo de control del fan coil (estándar o heredado)"
+                }
+            },
+            "reconfigure": {
+                "title": "Reconfigurar CSNet Home",
+                "description": "Actualice su configuración de CSNet Home. Puede cambiar las credenciales, el intervalo de escaneo, el idioma y otros ajustes.",
+                "data": {
+                    "username": "Nombre de usuario",
+                    "password": "Contraseña",
+                    "scan_interval": "Intervalo de escaneo (segundos)",
+                    "language": "Idioma",
+                    "max_temp_override": "Anulación de temperatura máxima (°C)",
+                    "fan_coil_model": "Modelo de control del Fan Coil"
+                },
+                "data_description": {
+                    "username": "Su nombre de usuario de CSNet Manager",
+                    "password": "Su contraseña de CSNet Manager",
+                    "scan_interval": "Con qué frecuencia buscar actualizaciones",
+                    "language": "Idioma preferido para los nombres de los dispositivos y las alarmas",
+                    "max_temp_override": "Anule el límite máximo de temperatura (8-80°C)",
+                    "fan_coil_model": "Seleccione el tipo de control del fan coil"
+                }
+            },
+            "reauth_confirm": {
+                "title": "Reautenticar CSNet Home",
+                "description": "Sus credenciales de CSNet Manager ya no son válidas. Por favor, proporcione credenciales actualizadas para seguir utilizando esta integración.",
+                "data": {
+                    "username": "Nombre de usuario",
+                    "password": "Contraseña"
+                },
+                "data_description": {
+                    "username": "Su nombre de usuario de CSNet Manager (actualizar si cambió)",
+                    "password": "Su contraseña actualizada de CSNet Manager"
+                }
+            }
+        },
+        "error": {
+            "cannot_connect": "No se pudo conectar a CSNet Manager. Compruebe su conexión a Internet e inténtelo de nuevo.",
+            "invalid_auth": "Nombre de usuario o contraseña no válidos. Compruebe sus credenciales.",
+            "unknown": "Produjo un error inesperado. Por favor, inténtelo de nuevo."
+        },
+        "abort": {
+            "already_configured": "Esta integración de CSNet Home ya está configurada.",
+            "reauth_successful": "¡Reautenticación exitosa! Sus credenciales han sido actualizadas.",
+            "reconfigure_successful": "¡Reconfiguración exitosa! Sus ajustes han sido actualizados."
+        }
+    }
+}
