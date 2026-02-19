@@ -3,6 +3,7 @@
 import pytest
 from custom_components.csnet_home.api import redact_data
 
+
 def test_redact_data_dictionary():
     """Test redaction of sensitive keys in a dictionary."""
     data = {
@@ -19,6 +20,7 @@ def test_redact_data_dictionary():
     assert redacted["user_dispayableName"] == "**REDACTED**"
     assert redacted["status"] == "success"
     assert redacted["weatherTemperature"] == 9
+
 
 def test_redact_data_recursive():
     """Test recursive redaction of sensitive keys."""
@@ -42,6 +44,7 @@ def test_redact_data_recursive():
     assert redacted["data"]["elements"][0]["deviceName"] == "Device 1"
     assert redacted["_csrf"] == "**REDACTED**"
 
+
 def test_redact_data_list():
     """Test redaction in a list of dictionaries."""
     data = [
@@ -54,11 +57,13 @@ def test_redact_data_list():
     assert redacted[1]["ownerId"] == "**REDACTED**"
     assert redacted[1]["val"] == 2
 
+
 def test_redact_data_no_sensitive_keys():
     """Test that non-sensitive data is left untouched."""
     data = {"temp": 20, "mode": "heat"}
     redacted = redact_data(data)
     assert redacted == data
+
 
 def test_redact_data_mixed_types():
     """Test redaction with mixed data types."""

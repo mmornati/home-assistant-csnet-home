@@ -167,7 +167,9 @@ class CSNetHomeAPI:
                 ) as response:
                     data = await self.check_api_response(response)
                     if data is not None and data.get("status") == "success":
-                        _LOGGER.debug("Sensor data retrieved: %s", redact_data(data["data"]))
+                        _LOGGER.debug(
+                            "Sensor data retrieved: %s", redact_data(data["data"])
+                        )
 
                         # Parse the sensor data from the API response
                         elements = data.get("data", {}).get("elements", [])
@@ -255,7 +257,9 @@ class CSNetHomeAPI:
                             sensors.append(sensor)
                         _LOGGER.debug("Retrieved Sensors: %s", redact_data(sensors))
                         data_elements = {"common_data": common_data, "sensors": sensors}
-                        _LOGGER.debug("Retrieved Data Elements: %s", redact_data(data_elements))
+                        _LOGGER.debug(
+                            "Retrieved Data Elements: %s", redact_data(data_elements)
+                        )
                         return data_elements
 
                     _LOGGER.error("Error in API response, status not 'success'")
@@ -290,7 +294,9 @@ class CSNetHomeAPI:
                 ) as response:
                     data = await self.check_api_response(response)
                     if data is not None:
-                        _LOGGER.debug("Installation devices data retrieved: %s", redact_data(data))
+                        _LOGGER.debug(
+                            "Installation devices data retrieved: %s", redact_data(data)
+                        )
                         return data
                     _LOGGER.error("Error in installation devices API response")
                     return None
@@ -329,7 +335,9 @@ class CSNetHomeAPI:
                 ) as response:
                     data = await self.check_api_response(response)
                     if data is not None:
-                        _LOGGER.debug("Installation alarms data retrieved: %s", redact_data(data))
+                        _LOGGER.debug(
+                            "Installation alarms data retrieved: %s", redact_data(data)
+                        )
                         return data
                     _LOGGER.error("Error in installation alarms API response")
                     return None
