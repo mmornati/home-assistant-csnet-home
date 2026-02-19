@@ -266,6 +266,7 @@ async def test_coordinator_alarm_clearing(hass: HomeAssistant):
     # Verify alarm code was cleared from storage
     assert "123-456-789" not in coordinator._last_alarm_codes
 
+
 @pytest.mark.asyncio
 async def test_coordinator_dhw_temperature_issue(hass: HomeAssistant):
     """Test the DHW temperature enrichment issue (GH#141)."""
@@ -288,19 +289,7 @@ async def test_coordinator_dhw_temperature_issue(hass: HomeAssistant):
 
     # Mock installation devices data returning weird tempDHW -67
     mock_api.async_get_installation_devices_data = AsyncMock(
-        return_value={
-            "data": [
-                {
-                    "indoors": [
-                        {
-                            "heatingStatus": {
-                                "tempDHW": -67
-                            }
-                        }
-                    ]
-                }
-            ]
-        }
+        return_value={"data": [{"indoors": [{"heatingStatus": {"tempDHW": -67}}]}]}
     )
 
     # Mock get_heating_status_from_installation_devices to return the dict directly
