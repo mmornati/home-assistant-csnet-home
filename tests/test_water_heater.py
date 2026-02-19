@@ -1,7 +1,7 @@
 """Test CSNet Home water heater entity."""
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 from homeassistant.components.water_heater import WaterHeaterEntityFeature
@@ -14,14 +14,6 @@ from custom_components.csnet_home.const import (
     WATER_HEATER_MIN_TEMPERATURE,
 )
 from custom_components.csnet_home.water_heater import CSNetHomeWaterHeater
-
-
-@pytest.fixture
-def hass():
-    """Fixture to provide a mock Home Assistant instance."""
-    hass_mock = MagicMock()
-    hass_mock.data = {}
-    return hass_mock
 
 
 def build_water_heater_entity(

@@ -140,11 +140,56 @@ class CSNetHomeAPI:
                     if await self.check_logged_in(response):
                         _LOGGER.info("Login successful")
                         return True
-                    _LOGGER.error("Failed to login. Status code: %s", response.status)
+                    _LOGGER.error("Login failed. Status code: %s", response.status)
                     return False
         except Exception as e:
-            _LOGGER.error("Error during login: %s", e)
+            _LOGGER.error("Login exception: %s", e, exc_info=True)
             return False
+
+    @staticmethod
+    async def async_validate_credentials(
+        hass: HomeAssistant, username: str, password: str, base_url: str = API_URL
+    ) -> bool:
+        """Validate credentials by attempting to login.
+
+        This is a standalone method that creates a temporary API instance,
+        attempts to login, and returns whether the credentials are valid.
+        The session is properly cleaned up after validation.
+
+        Args:
+            hass: HomeAssistant instance
+            username: CSNet username
+            password: CSNet password
+            base_url: Base URL for the API (defaults to API_URL constant)
+
+        Returns:
+            bool: True if credentials are valid, False otherwise
+        """
+        _LOGGER.info("Starting credential validation for user: %s", username)
+        # Create a temporary API instance for validation
+        temp_api = CSNetHomeAPI(hass, username, password, base_url)
+        # Pre-create the session so it is always available for cleanup
+        temp_api.session = aiohttp.ClientSession(cookie_jar=aiohttp.CookieJar())
+
+        try:
+            # Attempt to login with the provided credentials
+            _LOGGER.debug("Attempting login for credential validation")
+            login_success = await temp_api.async_login()
+            _LOGGER.info(
+                "Credential validation result: %s",
+                "SUCCESS" if login_success else "FAILED",
+            )
+            return login_success
+        except Exception as e:
+            _LOGGER.error("Credential validation exception: %s", e, exc_info=True)
+            return False
+        finally:
+            # Always clean up the session
+            try:
+                await temp_api.session.close()
+                _LOGGER.debug("Validation session closed successfully")
+            except Exception as e:
+                _LOGGER.debug("Error closing validation session: %s", e)
 
     async def async_get_elements_data(self):
         """Get sensor data from the cloud service."""
