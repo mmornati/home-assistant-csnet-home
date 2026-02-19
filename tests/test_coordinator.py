@@ -319,3 +319,59 @@ async def test_coordinator_alarm_notification(hass: HomeAssistant):
     assert "Message: Test alarm message" in payload["message"]
     assert "Origin: Unit" in payload["message"]
     assert payload["notification_id"] == "csnet_home_alarm_123-456-789"
+
+
+@pytest.mark.asyncio
+async def test_coordinator_dhw_temperature_issue(hass: HomeAssistant):
+    """Test the DHW temperature enrichment issue (GH#141)."""
+    mock_api = MagicMock()
+
+    # Mock elements data returning correct temperature 48.0
+    mock_api.async_get_elements_data = AsyncMock(
+        return_value={
+            "common_data": {"name": "Test Home", "device_status": {}},
+            "sensors": [
+                {
+                    "device_id": 5684,
+                    "zone_id": 3,
+                    "current_temperature": 48.0,
+                    "room_name": "ballon",
+                }
+            ],
+        }
+    )
+
+    # Mock installation devices data returning weird tempDHW -67
+    mock_api.async_get_installation_devices_data = AsyncMock(
+        return_value={
+            "data": [
+                {
+                    "indoors": [
+                        {
+                            "heatingStatus": {
+                                "tempDHW": -67
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    )
+
+    # Mock get_heating_status_from_installation_devices to return the dict directly
+    mock_api.get_heating_status_from_installation_devices = MagicMock(
+        return_value={"tempDHW": -67}
+    )
+
+    mock_api.async_get_installation_alarms = AsyncMock(return_value=None)
+    mock_api.load_translations = AsyncMock()
+
+    hass.data["csnet_home"] = {"test": {"api": mock_api}}
+
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test")
+    result = await coordinator._async_update_data()
+
+    # Verify that the temperature was NOT overwritten with -67, but kept as 48.0
+    sensors = result["sensors"]
+    assert len(sensors) == 1
+    assert sensors[0]["current_temperature"] == 48.0
