@@ -75,7 +75,9 @@ class CSNetHomeAPI:
 
     async def async_login(self):
         """Log in to the cloud service and return a session cookie."""
-        self.session = aiohttp.ClientSession(cookie_jar=aiohttp.CookieJar())
+        if self.session is None or self.session.closed:
+            self.session = aiohttp.ClientSession(cookie_jar=aiohttp.CookieJar())
+
         if not await self.get_xsrf_token():
             _LOGGER.error("Failed to get XSRF token.")
             return False

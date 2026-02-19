@@ -53,7 +53,7 @@ async def test_login_success(mock_aiohttp_client, hass):
     mock_login_response.text = AsyncMock(return_value="xxx xxx xxx")
 
     api = CSNetHomeAPI(hass, "user", "pass")
-    api._session = mock_client_instance
+    api.session = mock_client_instance
 
     data = await api.async_login()
 
@@ -88,7 +88,7 @@ async def test_login_error(mock_aiohttp_client, hass):
     mock_login_response.text = AsyncMock(return_value='xxx loadContent("login") xxx')
 
     api = CSNetHomeAPI(hass, "user", "pass_wrong")
-    api._session = mock_client_instance
+    api.session = mock_client_instance
 
     data = await api.async_login()
 
@@ -254,7 +254,7 @@ async def test_api_get_elements_data_success(mock_aiohttp_client, hass):
     )
 
     api = CSNetHomeAPI(hass, "user", "pass")
-    api._session = mock_client_instance
+    api.session = mock_client_instance
 
     data = await api.async_get_elements_data()
 
@@ -453,7 +453,7 @@ async def test_api_get_elements_data_empty_names(mock_aiohttp_client, hass):
     )
 
     api = CSNetHomeAPI(hass, "user", "pass")
-    api._session = mock_client_instance
+    api.session = mock_client_instance
 
     data = await api.async_get_elements_data()
 
@@ -544,7 +544,7 @@ async def test_api_get_data_failure(mock_aiohttp_client, hass):
     mock_response.status = 500
 
     api = CSNetHomeAPI(hass, "user", "pass")
-    api._session = mock_client_instance
+    api.session = mock_client_instance
 
     data = await api.async_get_elements_data()
 
@@ -592,7 +592,7 @@ async def test_api_get_installation_devices_data_success(mock_aiohttp_client, ha
     )
 
     api = CSNetHomeAPI(hass, "user", "pass")
-    api._session = mock_client_instance
+    api.session = mock_client_instance
     api.logged_in = True
     api.cookies = {"test": "cookie"}
 
@@ -692,7 +692,7 @@ async def test_api_get_installation_devices_data_failure(mock_aiohttp_client, ha
     mock_response.json = AsyncMock(return_value=None)
 
     api = CSNetHomeAPI(hass, "user", "pass")
-    api._session = mock_client_instance
+    api.session = mock_client_instance
     api.logged_in = True
     api.cookies = {"test": "cookie"}
 
@@ -722,7 +722,7 @@ async def test_api_get_installation_devices_data_exception(mock_aiohttp_client, 
     mock_client_instance.get.side_effect = side_effect
 
     api = CSNetHomeAPI(hass, "user", "pass")
-    api._session = mock_client_instance
+    api.session = mock_client_instance
     api.logged_in = False  # Start as not logged in
 
     data = await api.async_get_installation_devices_data()
@@ -747,7 +747,7 @@ async def test_api_get_installation_devices_data_not_logged_in(
     mock_response.json = AsyncMock(return_value={"test": "data"})
 
     api = CSNetHomeAPI(hass, "user", "pass")
-    api._session = mock_client_instance
+    api.session = mock_client_instance
     api.logged_in = False
 
     data = await api.async_get_installation_devices_data()
@@ -1068,7 +1068,7 @@ async def test_api_get_installation_alarms_success(mock_aiohttp_client, hass):
     )
 
     api = CSNetHomeAPI(hass, "user", "pass")
-    api._session = mock_client_instance
+    api.session = mock_client_instance
     api.logged_in = True
     api.cookies = {"test": "cookie"}
     api.installation_id = 4529
@@ -1117,7 +1117,7 @@ async def test_api_get_installation_alarms_failure(mock_aiohttp_client, hass):
     mock_response.json = AsyncMock(return_value=None)
 
     api = CSNetHomeAPI(hass, "user", "pass")
-    api._session = mock_client_instance
+    api.session = mock_client_instance
     api.logged_in = True
     api.cookies = {"test": "cookie"}
     api.installation_id = 4529
@@ -1944,7 +1944,7 @@ async def test_api_get_elements_data_with_fan_speeds(mock_aiohttp_client, hass):
     )
 
     api = CSNetHomeAPI(hass, "user", "pass")
-    api._session = mock_client_instance
+    api.session = mock_client_instance
 
     data = await api.async_get_elements_data()
 
