@@ -5,7 +5,7 @@ from collections import Counter
 from datetime import datetime, timezone
 
 from homeassistant.components.climate.const import HVACMode
-from homeassistant.components.sensor import SensorDeviceClass
+from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.const import (
     SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
     STATE_OFF,
@@ -17,7 +17,9 @@ from homeassistant.const import (
 from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import dt as dt_util
 
 from .const import (
     DOMAIN,
@@ -633,6 +635,17 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 coordinator,
                 compressor_device_data,
                 common_data,
+                "ou_evo_1",
+                "percentage",
+                "%",
+                "Expansion Valve Opening (EVO)",
+            )
+        )
+        sensors.append(
+            CSNetHomeCompressorSensor(
+                coordinator,
+                compressor_device_data,
+                common_data,
                 "outdoor_fan_rpm",
                 None,
                 "RPM",
@@ -990,6 +1003,10 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, Entity):
             "central_config": ["centralConfig"],
             "lcd_software_version": ["lcdSoft"],
             "unit_model": ["unitModel"],
+            # DHW temperatures (Issue #155)
+            "bottom_dhw_temperature": ["bottomTempDHW"],
+            "top_dhw_temperature": ["topTempDHW"],
+            "heat_exchanger_water_outlet_temperature": ["waterOutletHPTemp"],
         }
 
         # Try to find the value using different possible key names
@@ -1242,6 +1259,319 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, Entity):
     def unique_id(self) -> str:
         """Return unique id."""
         return f"{DOMAIN}-installation-{self._key}"
+
+
+class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
+    """Sensor for calculated instantaneous values (Power, Consumption, COP).
+
+    Introduced in PR #155 by davigar1391.
+    Computes instant_consumption, heating_power and instant_cop from raw
+    compressor telemetry using a physics-based model validated against
+    reported Amperage.
+    """
+
+    def _get_heating_status(self):
+        """Get heatingStatus from installation devices data."""
+        installation_data = self._coordinator.get_installation_devices_data()
+        if not isinstance(installation_data, dict):
+            return None
+        data_array = installation_data.get("data", [])
+        if isinstance(data_array, list) and len(data_array) > 0:
+            first_device = data_array[0]
+            if isinstance(first_device, dict):
+                indoors_array = first_device.get("indoors", [])
+                if isinstance(indoors_array, list) and len(indoors_array) > 0:
+                    first_indoors = indoors_array[0]
+                    if isinstance(first_indoors, dict):
+                        return first_indoors.get("heatingStatus", {})
+        return None
+
+    def _calculate_complex_power(self, heating_status):
+        """Calculate power using the complex physical model with guardrails."""
+        # 1. Inputs
+        hz = heating_status.get("ouHz", 0)
+        p_high = heating_status.get("ouDischargePress", 0)
+        p_low = heating_status.get("ouSuctionPress", 0)
+
+        # Get temp using the module-level helper function
+        t_discharge = _convert_unsigned_to_signed_byte(
+            heating_status.get("ouDischargeTemperature")
+        )
+        if t_discharge is None:
+            t_discharge = 0
+
+        current_amps = heating_status.get("ouCurrent", 0)
+        voltage = 230
+
+        # If compressor is OFF (0 Hz), consumption is 0 W
+        if hz == 0:
+            return 0
+
+        # 2. Efficiency Model (Base)
+        slope = 0.0085
+        k_ref = 1.27
+        hz_ref = 31.0
+
+        k_dynamic = k_ref - ((hz - hz_ref) * slope)
+
+        # Base Limits (1.0 - 1.4)
+        if k_dynamic < 1.00:
+            k_dynamic = 1.00
+        if k_dynamic > 1.40:
+            k_dynamic = 1.40
+
+        # 3. Red Zone Corrections
+
+        # A. RPM Saturation (>115 Hz)
+        factor_rpm = 1.0
+        if hz > 115:
+            excess_hz = hz - 115
+            factor_rpm = 1.0 - (excess_hz * 0.008)
+
+        # B. Temperature Correction (>90°C)
+        factor_temp = 1.0
+        if t_discharge > 90:
+            excess_temp = t_discharge - 90
+            factor_temp = 1.0 - (excess_temp * 0.025)
+
+        # 4. Preliminary Calculation
+        base_power = 50.0  # Electronics + Pumps
+
+        if p_high > p_low:
+            delta_p = p_high - p_low
+
+            # Base Calculation
+            raw_power = base_power + (k_dynamic * hz * delta_p)
+
+            # Apply correction factors
+            calculated_power = raw_power * factor_rpm * factor_temp
+        else:
+            # Fallback for defrost (pressures crossed)
+            calculated_power = base_power + (hz * 15)
+
+        # 5. Guardrail System (Protection)
+        # Lower limit: reported amps * voltage (e.g., 6A -> 1380W)
+        min_watts = current_amps * voltage
+
+        # Upper limit: reported amps + 0.99 (next integer) (e.g., 6A means < 7A)
+        max_watts = (current_amps + 0.99) * voltage
+
+        final_power = calculated_power
+
+        if calculated_power < min_watts:
+            # Error: Formula result too low, correct to minimum
+            final_power = min_watts
+        elif calculated_power > max_watts:
+            # Error: Formula result too high, correct to maximum
+            final_power = max_watts
+
+        return round(final_power)
+
+    @property
+    def state(self):
+        """Calculate and return the state."""
+        heating_status = self._get_heating_status()
+        if not heating_status:
+            return 0
+
+        # Extract raw values for other calculations
+        raw_flow = heating_status.get("waterFlow", 0)
+        flow_rate = raw_flow / 10.0 if raw_flow else 0
+        temp_in = heating_status.get("waterInletTemp", 0)
+
+        # Operation Status needed for deciding temp_out
+        op_status = heating_status.get("operationStatus")
+
+        # 1. Instant Consumption (Watts) - complex model with guardrails
+        instant_consumption = self._calculate_complex_power(heating_status)
+
+        if self._key == "instant_consumption":
+            return instant_consumption
+
+        # 2. Heating Power (Watts)
+        # Logic: If DHW (Status 8) use Exchanger Outlet, else use Normal Outlet
+        if op_status == 8:
+            temp_out = heating_status.get("waterOutletHPTemp", 0)
+        else:
+            temp_out = heating_status.get("waterOutletTemp", 0)
+
+        delta_t = temp_out - temp_in
+        heating_power = 0
+        if delta_t > 0 and flow_rate >= 0.01:
+            heating_power = round(flow_rate * 1160 * delta_t, 2)
+
+        if self._key == "heating_power":
+            return heating_power
+
+        # 3. Instant COP
+        if self._key == "instant_cop":
+            if instant_consumption < 50:
+                return 0.0
+            return round(heating_power / instant_consumption, 2)
+
+        return None
+
+    @property
+    def state_class(self):
+        """Return the state class."""
+        # All calculated sensors (Power, COP) are measurements at a point in time
+        return SensorStateClass.MEASUREMENT
+
+
+class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
+    """Sensor for accumulated daily values (Energy, Daily COP) with reset.
+
+    Introduced in PR #155 by davigar1391.
+    Accumulates daily_consumption, daily_heating, daily_cop_heating and
+    daily_cop_dhw. Resets at local midnight and restores state after HA
+    restarts via RestoreEntity.
+    """
+
+    def __init__(
+        self,
+        coordinator: CSNetHomeCoordinator,
+        device_data,
+        common_data,
+        key,
+        device_class=None,
+        unit=None,
+        friendly_name=None,
+    ):
+        """Initialize the daily sensor."""
+        super().__init__(
+            coordinator,
+            device_data,
+            common_data,
+            key,
+            device_class,
+            unit,
+            friendly_name,
+        )
+        self._state = 0.0
+        # Dedicated accumulators for this instance
+        self._energy_in = 0.0  # Input energy (Electricity)
+        self._energy_out = 0.0  # Output energy (Heat)
+        self._last_update_time = None
+
+    async def async_added_to_hass(self):
+        """Restore state and set up initial values."""
+        await super().async_added_to_hass()
+        last_state = await self.async_get_last_state()
+        if last_state and last_state.state not in (None, "unknown", "unavailable"):
+            try:
+                # If restored state contains comma, it needs parsing
+                clean_state = str(last_state.state).replace(",", ".")
+                self._state = float(clean_state)
+            except ValueError:
+                self._state = 0.0
+        else:
+            self._state = 0.0
+        self._last_update_time = dt_util.now()
+
+    @property
+    def state(self):
+        """Return the accumulated state."""
+        return round(self._state, 2)
+
+    @property
+    def state_class(self):
+        """Return the state class."""
+        if self._key.startswith("daily_cop"):
+            return SensorStateClass.MEASUREMENT
+        # Energy sensors are increasing counters that reset
+        return SensorStateClass.TOTAL_INCREASING
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator to accumulate energy."""
+        # Use local time for everything to match the midnight check
+        now = dt_util.now()
+
+        # Reset at midnight - Comparison is now safe (local vs local)
+        if self._last_update_time and self._last_update_time.date() != now.date():
+            self._state = 0.0
+            self._energy_in = 0.0
+            self._energy_out = 0.0
+
+        # Calculate time difference in hours (for Watts to Watt-hours)
+        if self._last_update_time:
+            time_diff = (now - self._last_update_time).total_seconds() / 3600.0
+        else:
+            time_diff = 0
+
+        self._last_update_time = now
+
+        # Get instantaneous values using the parent logic
+        heating_status = self._get_heating_status()
+        if not heating_status:
+            self.async_write_ha_state()
+            return
+
+        # Re-calculate instant values locally
+
+        # 1. Use the complex model for Consumption Power
+        power_consumption_w = self._calculate_complex_power(heating_status)
+
+        # 2. Heating Power Logic (With DHW Temp Switch)
+        raw_flow = heating_status.get("waterFlow", 0)
+        flow_rate = raw_flow / 10.0 if raw_flow else 0
+        temp_in = heating_status.get("waterInletTemp", 0)
+        op_status = heating_status.get("operationStatus")
+
+        if op_status == 8:
+            temp_out = heating_status.get("waterOutletHPTemp", 0)
+        else:
+            temp_out = heating_status.get("waterOutletTemp", 0)
+
+        delta_t = temp_out - temp_in
+
+        heating_power_w = 0
+        if delta_t > 0 and flow_rate >= 0.01:
+            heating_power_w = flow_rate * 1160 * delta_t
+
+        # Calculate incremental Energy (kWh) -> Watts * Hours / 1000
+        energy_consumption_kwh = (power_consumption_w * time_diff) / 1000.0
+        energy_heating_kwh = (heating_power_w * time_diff) / 1000.0
+
+        if self._key == "daily_consumption":
+            self._state += energy_consumption_kwh
+
+        elif self._key == "daily_heating":
+            self._state += energy_heating_kwh
+
+        # Daily COPs
+        elif self._key in ["daily_cop_heating", "daily_cop_dhw"]:
+            op_status = heating_status.get("operationStatus")
+            defrost_active = heating_status.get("defrosting") == 1
+
+            should_accumulate = False
+
+            if self._key == "daily_cop_heating":
+                # Accumulate if Heating (6)
+                # OR Defrosting is active (AND we are not explicitly in DHW mode)
+                if op_status == 6 or (defrost_active and op_status != 8):
+                    should_accumulate = True
+
+            elif self._key == "daily_cop_dhw":
+                # Accumulate if DHW (8)
+                # OR Defrosting is active (AND we are not explicitly in Heating mode)
+                if op_status == 8 or (defrost_active and op_status != 6):
+                    should_accumulate = True
+
+            if should_accumulate:
+                # Accumulate values ONLY when in the correct mode AND accumulating
+                # positive energy. This prevents accumulation of residual heat
+                # (energy_out) when electric power (energy_in) is zero.
+                if power_consumption_w > 0:
+                    self._energy_in += energy_consumption_kwh
+                    self._energy_out += energy_heating_kwh
+
+            # Calculate COP based on Accumulated totals
+            if self._energy_in > 0.01:
+                self._state = self._energy_out / self._energy_in
+            # If no energy consumed yet, keep previous state or 0
+
+        self.async_write_ha_state()
 
 
 class CSNetHomeDeviceSensor(CoordinatorEntity, Entity):

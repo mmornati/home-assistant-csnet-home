@@ -112,6 +112,7 @@ DEFAULT_LANGUAGE = "en"
 LANGUAGE_FILES = {
     "en": "english.json",
     "fr": "french.json",
+    "es": "spanish.json",
 }
 
 # OTC (Outdoor Temperature Compensation) Constants

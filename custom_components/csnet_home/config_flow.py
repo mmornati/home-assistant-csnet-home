@@ -57,7 +57,7 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL
                     ): int,
                     vol.Optional(CONF_LANGUAGE, default=DEFAULT_LANGUAGE): vol.In(
-                        ["en", "fr"]
+                        ["en", "fr", "es"]
                     ),
                     vol.Optional(CONF_MAX_TEMP_OVERRIDE): vol.All(
                         vol.Coerce(int), vol.Range(min=8, max=80)
