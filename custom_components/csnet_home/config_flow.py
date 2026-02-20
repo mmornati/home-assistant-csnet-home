@@ -4,12 +4,18 @@ import logging
 
 import voluptuous as vol
 from homeassistant import config_entries
-from homeassistant.const import (CONF_PASSWORD, CONF_SCAN_INTERVAL,
-                                 CONF_USERNAME)
+from homeassistant.const import CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_USERNAME
 
-from .const import (CONF_FAN_COIL_MODEL, CONF_LANGUAGE, CONF_MAX_TEMP_OVERRIDE,
-                    DEFAULT_FAN_COIL_MODEL, DEFAULT_LANGUAGE, DOMAIN,
-                    FAN_COIL_MODEL_LEGACY, FAN_COIL_MODEL_STANDARD)
+from .const import (
+    CONF_FAN_COIL_MODEL,
+    CONF_LANGUAGE,
+    CONF_MAX_TEMP_OVERRIDE,
+    DEFAULT_FAN_COIL_MODEL,
+    DEFAULT_LANGUAGE,
+    DOMAIN,
+    FAN_COIL_MODEL_LEGACY,
+    FAN_COIL_MODEL_STANDARD,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
