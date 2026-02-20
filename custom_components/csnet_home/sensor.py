@@ -974,14 +974,24 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, Entity):
         self._name = f"{device_data['device_name']} {device_data['room_name']} {self._friendly_name}"
         _LOGGER.debug("Configuring Installation Sensor %s", self._name)
 
-    @property
-    def state(self):
-        """Return the current state of the sensor."""
-        # Special handling for weather_temperature from cloud service (Issue #79)
-        if self._key == "weather_temperature":
-            common_data = self._coordinator.get_common_data()
-            return common_data.get("weather_temperature")
+    def _get_heating_status(self):
+        """Get heatingStatus from installation devices data."""
+        installation_data = self._coordinator.get_installation_devices_data()
+        if not isinstance(installation_data, dict):
+            return None
+        data_array = installation_data.get("data", [])
+        if isinstance(data_array, list) and len(data_array) > 0:
+            first_device = data_array[0]
+            if isinstance(first_device, dict):
+                indoors_array = first_device.get("indoors", [])
+                if isinstance(indoors_array, list) and len(indoors_array) > 0:
+                    first_indoors = indoors_array[0]
+                    if isinstance(first_indoors, dict):
+                        return first_indoors.get("heatingStatus", {})
+        return None
 
+    def _get_raw_value(self):
+        """Get raw value from installation data or heating status."""
         installation_data = self._coordinator.get_installation_devices_data()
 
         # Map the sensor keys to actual API response keys from indoors/heatingStatus
@@ -1019,44 +1029,20 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, Entity):
             for possible_key in possible_keys:
                 value = installation_data.get(possible_key)
                 if value is not None:
-                    break
+                    return value
 
-            # If not found, try in data[0].indoors[0].heatingStatus structure
-            if value is None:
-                data_array = installation_data.get("data", [])
-                if isinstance(data_array, list) and len(data_array) > 0:
-                    first_device = data_array[0]
-                    if isinstance(first_device, dict):
-                        indoors_array = first_device.get("indoors", [])
-                        if isinstance(indoors_array, list) and len(indoors_array) > 0:
-                            first_indoors = indoors_array[0]
-                            if isinstance(first_indoors, dict):
-                                heating_status = first_indoors.get("heatingStatus", {})
-                                if isinstance(heating_status, dict):
-                                    for possible_key in possible_keys:
-                                        value = heating_status.get(possible_key)
-                                        if value is not None:
-                                            break
+            # If not found, try in heatingStatus structure
+            heating_status = self._get_heating_status()
+            if heating_status:
+                for possible_key in possible_keys:
+                    value = heating_status.get(possible_key)
+                    if value is not None:
+                        return value
 
-        # Handle special cases for different sensor types
-        if self._key == "defrost":
-            # defrosting: 0 = off, 1 = on
-            return STATE_ON if value == 1 else STATE_OFF
-        if self._key == "water_flow":
-            # waterFlow value must be divided by 10 to have the right measurement unit
-            if isinstance(value, (int, float)):
-                return value / 10
-            return value
-        if self._key == "water_pressure":
-            # waterPressure: app shows 4.48bar, value is 224, so divide by 50
-            if isinstance(value, (int, float)):
-                return value / 50
-            return value
-        if self._key in ["pump_speed", "mix_valve_position"]:
-            # These values are already in percentage (0-100) from the API
-            return value
+        return None
 
-        # Central control configuration sensors
+    def _handle_central_control_config(self, value):
+        """Handle central control configuration sensors."""
         if self._key == "unit_model":
             # Decode unit model codes
             unit_models = {
@@ -1089,135 +1075,147 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, Entity):
                 decoded += " ⚠️"  # Warning for insufficient control
             return decoded
 
-        if self._key == "central_control_enabled":
-            # Calculate if central control is properly configured
-            # Based on JavaScript function isCentralWellConfigured()
-            if not isinstance(installation_data, dict):
-                return STATE_OFF
+        return value
 
-            heating_status = None
-            data_array = installation_data.get("data", [])
-            if isinstance(data_array, list) and len(data_array) > 0:
-                first_device = data_array[0]
-                if isinstance(first_device, dict):
-                    indoors_array = first_device.get("indoors", [])
-                    if isinstance(indoors_array, list) and len(indoors_array) > 0:
-                        first_indoors = indoors_array[0]
-                        if isinstance(first_indoors, dict):
-                            heating_status = first_indoors.get("heatingStatus", {})
-
-            if not heating_status:
-                return STATE_OFF
-
-            central_config = heating_status.get("centralConfig", 0)
-
-            # Central config >= 3 means "Total" control is enabled
-            if central_config >= 3:
-                return STATE_ON
-
-            # For non-S80 models, check LCD software version
-            unit_model = heating_status.get("unitModel", 0)
-            code_yutaki_s80 = 2
-
-            if unit_model != code_yutaki_s80:
-                lcd_soft = heating_status.get("lcdSoft", 0)
-
-                # lcdSoft == 0 means not configured yet (during wizard)
-                if lcd_soft == 0:
-                    return STATE_ON
-
-                # Version >= 0x0222 (546 decimal) allows control
-                if lcd_soft >= 0x0222:
-                    return STATE_ON
-
+    def _handle_central_control_enabled(self):
+        """Calculate if central control is properly configured."""
+        heating_status = self._get_heating_status()
+        if not heating_status:
             return STATE_OFF
 
-        # System Configuration Diagnostic sensors (Issue #78)
-        # Extract systemConfigBits from heatingStatus
+        central_config = heating_status.get("centralConfig", 0)
+
+        # Central config >= 3 means "Total" control is enabled
+        if central_config >= 3:
+            return STATE_ON
+
+        # For non-S80 models, check LCD software version
+        unit_model = heating_status.get("unitModel", 0)
+        code_yutaki_s80 = 2
+
+        if unit_model != code_yutaki_s80:
+            lcd_soft = heating_status.get("lcdSoft", 0)
+
+            # lcdSoft == 0 means not configured yet (during wizard)
+            if lcd_soft == 0:
+                return STATE_ON
+
+            # Version >= 0x0222 (546 decimal) allows control
+            if lcd_soft >= 0x0222:
+                return STATE_ON
+
+        return STATE_OFF
+
+    def _handle_diagnostic_sensors(self):
+        """Handle System Configuration Diagnostic sensors (Issue #78)."""
+        heating_status = self._get_heating_status()
+        if not heating_status:
+            return STATE_OFF
+
+        system_config_bits = heating_status.get("systemConfigBits", 0)
+
+        # Decode the specific bit based on the sensor key
+        bit_masks = {
+            "cascade_slave_mode": 0x1000,  # 4096
+            "fan_coil_compatible": 0x2000,  # 8192
+            "c1_thermostat_present": 0x40,  # 64
+            "c2_thermostat_present": 0x80,  # 128
+        }
+
+        mask = bit_masks.get(self._key)
+        if mask:
+            return STATE_ON if (system_config_bits & mask) > 0 else STATE_OFF
+
+        return STATE_OFF
+
+    def _handle_otc_sensors(self):
+        """Handle OTC (Outdoor Temperature Compensation) sensors (Issue #71)."""
+        heating_status = self._get_heating_status()
+        if not heating_status:
+            return "Unknown"
+
+        # Map sensor key to API key
+        otc_key_map = {
+            "otc_heating_type_c1": "otcTypeHeatC1",
+            "otc_cooling_type_c1": "otcTypeCoolC1",
+            "otc_heating_type_c2": "otcTypeHeatC2",
+            "otc_cooling_type_c2": "otcTypeCoolC2",
+        }
+
+        api_key = otc_key_map.get(self._key)
+        if api_key:
+            otc_value = heating_status.get(api_key)
+            if otc_value is not None:
+                # Return the descriptive name for the OTC type
+                if "heating" in self._key:
+                    return OTC_HEATING_TYPE_NAMES.get(
+                        otc_value, f"Unknown ({otc_value})"
+                    )
+                return OTC_COOLING_TYPE_NAMES.get(otc_value, f"Unknown ({otc_value})")
+
+        return "Unknown"
+
+    def _handle_simple_transformations(self, value):
+        """Handle special cases and transformations for different sensor types."""
+        if self._key == "defrost":
+            # defrosting: 0 = off, 1 = on
+            return STATE_ON if value == 1 else STATE_OFF
+
+        if self._key == "water_flow":
+            # waterFlow value must be divided by 10 to have the right measurement unit
+            if isinstance(value, (int, float)):
+                return value / 10
+            return value
+
+        if self._key == "water_pressure":
+            # waterPressure: app shows 4.48bar, value is 224, so divide by 50
+            if isinstance(value, (int, float)):
+                return value / 50
+            return value
+
+        if self._key in ["pump_speed", "mix_valve_position"]:
+            # These values are already in percentage (0-100) from the API
+            return value
+
+        return value
+
+    @property
+    def state(self):
+        """Return the current state of the sensor."""
+        # Special handling for weather_temperature from cloud service (Issue #79)
+        if self._key == "weather_temperature":
+            common_data = self._coordinator.get_common_data()
+            return common_data.get("weather_temperature")
+
+        # 1. Handle complex calculated/logic-based sensors first
+        if self._key == "central_control_enabled":
+            return self._handle_central_control_enabled()
+
         if self._key in [
             "cascade_slave_mode",
             "fan_coil_compatible",
             "c1_thermostat_present",
             "c2_thermostat_present",
         ]:
-            heating_status = None
-            data_array = installation_data.get("data", [])
-            if isinstance(data_array, list) and len(data_array) > 0:
-                first_device = data_array[0]
-                if isinstance(first_device, dict):
-                    indoors_array = first_device.get("indoors", [])
-                    if isinstance(indoors_array, list) and len(indoors_array) > 0:
-                        first_indoors = indoors_array[0]
-                        if isinstance(first_indoors, dict):
-                            heating_status = first_indoors.get("heatingStatus", {})
+            return self._handle_diagnostic_sensors()
 
-            if not heating_status:
-                return STATE_OFF
-
-            system_config_bits = heating_status.get("systemConfigBits", 0)
-
-            # Decode the specific bit based on the sensor key
-            if self._key == "cascade_slave_mode":
-                # Bit 0x1000 (4096) indicates cascade slave mode
-                return STATE_ON if (system_config_bits & 0x1000) > 0 else STATE_OFF
-            if self._key == "fan_coil_compatible":
-                # Bit 0x2000 (8192) indicates fan coil compatibility
-                return STATE_ON if (system_config_bits & 0x2000) > 0 else STATE_OFF
-            if self._key == "c1_thermostat_present":
-                # Bit 0x40 (64) indicates C1 thermostat present
-                return STATE_ON if (system_config_bits & 0x40) > 0 else STATE_OFF
-            if self._key == "c2_thermostat_present":
-                # Bit 0x80 (128) indicates C2 thermostat present
-                return STATE_ON if (system_config_bits & 0x80) > 0 else STATE_OFF
-
-        # OTC (Outdoor Temperature Compensation) sensors (Issue #71)
         if self._key in [
             "otc_heating_type_c1",
             "otc_cooling_type_c1",
             "otc_heating_type_c2",
             "otc_cooling_type_c2",
         ]:
-            if not installation_data:
-                return "Unknown"
+            return self._handle_otc_sensors()
 
-            heating_status = None
-            data_array = installation_data.get("data", [])
-            if isinstance(data_array, list) and len(data_array) > 0:
-                first_device = data_array[0]
-                if isinstance(first_device, dict):
-                    indoors_array = first_device.get("indoors", [])
-                    if isinstance(indoors_array, list) and len(indoors_array) > 0:
-                        first_indoors = indoors_array[0]
-                        if isinstance(first_indoors, dict):
-                            heating_status = first_indoors.get("heatingStatus", {})
+        # 2. Get raw value
+        value = self._get_raw_value()
 
-            if not heating_status:
-                return "Unknown"
+        # 3. Handle config lookups (Unit Model, LCD version, etc)
+        if self._key in ["unit_model", "lcd_software_version", "central_config"]:
+            return self._handle_central_control_config(value)
 
-            # Map sensor key to API key
-            otc_key_map = {
-                "otc_heating_type_c1": "otcTypeHeatC1",
-                "otc_cooling_type_c1": "otcTypeCoolC1",
-                "otc_heating_type_c2": "otcTypeHeatC2",
-                "otc_cooling_type_c2": "otcTypeCoolC2",
-            }
-
-            api_key = otc_key_map.get(self._key)
-            if api_key:
-                otc_value = heating_status.get(api_key)
-                if otc_value is not None:
-                    # Return the descriptive name for the OTC type
-                    if "heating" in self._key:
-                        return OTC_HEATING_TYPE_NAMES.get(
-                            otc_value, f"Unknown ({otc_value})"
-                        )
-                    return OTC_COOLING_TYPE_NAMES.get(
-                        otc_value, f"Unknown ({otc_value})"
-                    )
-
-            return "Unknown"
-
-        return value
+        # 4. Handle standard transformations (division, boolean map)
+        return self._handle_simple_transformations(value)
 
     @property
     def device_class(self):
@@ -1269,22 +1267,6 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
     compressor telemetry using a physics-based model validated against
     reported Amperage.
     """
-
-    def _get_heating_status(self):
-        """Get heatingStatus from installation devices data."""
-        installation_data = self._coordinator.get_installation_devices_data()
-        if not isinstance(installation_data, dict):
-            return None
-        data_array = installation_data.get("data", [])
-        if isinstance(data_array, list) and len(data_array) > 0:
-            first_device = data_array[0]
-            if isinstance(first_device, dict):
-                indoors_array = first_device.get("indoors", [])
-                if isinstance(indoors_array, list) and len(indoors_array) > 0:
-                    first_indoors = indoors_array[0]
-                    if isinstance(first_indoors, dict):
-                        return first_indoors.get("heatingStatus", {})
-        return None
 
     def _calculate_complex_power(self, heating_status):
         """Calculate power using the complex physical model with guardrails."""
