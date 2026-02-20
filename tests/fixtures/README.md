@@ -96,6 +96,7 @@ Create a test that dumps real API responses (run once with real credentials):
 ```python
 import json
 import pytest
+from tests.fixtures.conftest_fixtures import sanitize_api_response
 
 @pytest.mark.skip("Only run manually to record fixtures")
 @pytest.mark.asyncio
@@ -107,7 +108,7 @@ async def test_record_api_response(hass):
     data = await api.async_get_elements_data()
     
     # Sanitize before saving
-    # TODO: Implement sanitization
+    data = sanitize_api_response(data)
     
     # Save to fixture
     with open("tests/fixtures/api_responses/new_fixture.json", "w") as f:
