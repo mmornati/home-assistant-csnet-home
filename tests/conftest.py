@@ -45,15 +45,18 @@ try:
 except ImportError:
     sys.modules["async_timeout"] = MagicMock()
 
+
 @pytest.fixture
 def load_fixture():
     """Fixture to load test fixtures from the fixtures directory."""
     return _load_fixture
 
+
 @pytest.fixture
 def enable_custom_integrations():
     """Mock fixture for enabling custom integrations."""
     yield
+
 
 @pytest.fixture(autouse=True)
 def auto_enable_custom_integrations(enable_custom_integrations):
