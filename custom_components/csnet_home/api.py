@@ -9,20 +9,16 @@ import aiohttp
 import async_timeout
 from homeassistant.core import HomeAssistant
 
-from custom_components.csnet_home.const import (
-    API_URL,
-    COMMON_API_HEADERS,
-    DEFAULT_API_TIMEOUT,
-    ELEMENTS_PATH,
-    HEAT_SETTINGS_PATH,
-    HEATING_MAX_TEMPERATURE,
-    INSTALLATION_ALARMS_PATH,
-    INSTALLATION_DEVICES_PATH,
-    LANGUAGE_FILES,
-    LOGIN_PATH,
-    WATER_CIRCUIT_MAX_HEAT,
-    WATER_HEATER_MAX_TEMPERATURE,
-)
+from custom_components.csnet_home.const import (API_URL, COMMON_API_HEADERS,
+                                                DEFAULT_API_TIMEOUT,
+                                                ELEMENTS_PATH,
+                                                HEAT_SETTINGS_PATH,
+                                                HEATING_MAX_TEMPERATURE,
+                                                INSTALLATION_ALARMS_PATH,
+                                                INSTALLATION_DEVICES_PATH,
+                                                LANGUAGE_FILES, LOGIN_PATH,
+                                                WATER_CIRCUIT_MAX_HEAT,
+                                                WATER_HEATER_MAX_TEMPERATURE)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -322,6 +318,41 @@ class CSNetHomeAPI:
             return element.get("settingTemperature") * 10
         return element.get("settingTemperature")
 
+    def _get_nested_data_from_installation_devices(
+        self, installation_devices_data, key
+    ):
+        """Extract nested data from installation devices data structure.
+
+        Navigates through: data[0].indoors[0].{key}
+
+        Args:
+            installation_devices_data: The installation devices API response
+            key: The key to extract (e.g., "heatingStatus", "heatingSetting")
+
+        Returns:
+            dict or None: The extracted dictionary, or None if not found
+        """
+        if not installation_devices_data:
+            return None
+
+        # Try direct access first (if already extracted)
+        value = installation_devices_data.get(key)
+        if value:
+            return value
+
+        # Navigate through: data[0].indoors[0].{key}
+        data_array = installation_devices_data.get("data", [])
+        if isinstance(data_array, list) and len(data_array) > 0:
+            first_device = data_array[0]
+            if isinstance(first_device, dict):
+                indoors_array = first_device.get("indoors", [])
+                if isinstance(indoors_array, list) and len(indoors_array) > 0:
+                    first_indoors = indoors_array[0]
+                    if isinstance(first_indoors, dict):
+                        return first_indoors.get(key, {})
+
+        return None
+
     def get_heating_status_from_installation_devices(self, installation_devices_data):
         """Extract heatingStatus from installation devices data structure.
 
@@ -333,26 +364,9 @@ class CSNetHomeAPI:
         Returns:
             dict or None: heatingStatus dictionary, or None if not found
         """
-        if not installation_devices_data:
-            return None
-
-        # Try direct access first (if already extracted)
-        heating_status = installation_devices_data.get("heatingStatus")
-        if heating_status:
-            return heating_status
-
-        # Navigate through: data[0].indoors[0].heatingStatus
-        data_array = installation_devices_data.get("data", [])
-        if isinstance(data_array, list) and len(data_array) > 0:
-            first_device = data_array[0]
-            if isinstance(first_device, dict):
-                indoors_array = first_device.get("indoors", [])
-                if isinstance(indoors_array, list) and len(indoors_array) > 0:
-                    first_indoors = indoors_array[0]
-                    if isinstance(first_indoors, dict):
-                        return first_indoors.get("heatingStatus", {})
-
-        return None
+        return self._get_nested_data_from_installation_devices(
+            installation_devices_data, "heatingStatus"
+        )
 
     def get_heating_setting_from_installation_devices(self, installation_devices_data):
         """Extract heatingSetting from installation devices data structure.
@@ -365,26 +379,9 @@ class CSNetHomeAPI:
         Returns:
             dict or None: heatingSetting dictionary, or None if not found
         """
-        if not installation_devices_data:
-            return None
-
-        # Try direct access first (if already extracted)
-        heating_setting = installation_devices_data.get("heatingSetting")
-        if heating_setting:
-            return heating_setting
-
-        # Navigate through: data[0].indoors[0].heatingSetting
-        data_array = installation_devices_data.get("data", [])
-        if isinstance(data_array, list) and len(data_array) > 0:
-            first_device = data_array[0]
-            if isinstance(first_device, dict):
-                indoors_array = first_device.get("indoors", [])
-                if isinstance(indoors_array, list) and len(indoors_array) > 0:
-                    first_indoors = indoors_array[0]
-                    if isinstance(first_indoors, dict):
-                        return first_indoors.get("heatingSetting", {})
-
-        return None
+        return self._get_nested_data_from_installation_devices(
+            installation_devices_data, "heatingSetting"
+        )
 
     def _validate_value(self, value, default):
         """Validate temperature limit value matching JavaScript validateValue logic.

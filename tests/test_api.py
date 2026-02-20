@@ -2411,3 +2411,85 @@ async def test_async_get_elements_data_with_swp(
     assert climate_sensor is not None
     assert climate_sensor["room_name"] == "Living Room"
     assert climate_sensor["unit_type"] == "standard"
+
+
+def test_get_nested_data_none_input(hass):
+    """Test _get_nested_data_from_installation_devices with None input."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+    assert api._get_nested_data_from_installation_devices(None, "key") is None
+
+
+def test_get_nested_data_direct_access(hass):
+    """Test _get_nested_data_from_installation_devices with direct key access."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+    data = {"myKey": "myValue"}
+    assert api._get_nested_data_from_installation_devices(data, "myKey") == "myValue"
+
+
+def test_get_nested_data_nested_access(hass):
+    """Test _get_nested_data_from_installation_devices with nested access."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+    data = {"data": [{"indoors": [{"myKey": "nestedValue"}]}]}
+    assert (
+        api._get_nested_data_from_installation_devices(data, "myKey") == "nestedValue"
+    )
+
+
+def test_get_nested_data_not_found(hass):
+    """Test _get_nested_data_from_installation_devices when key is not found."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+    data = {"data": [{"indoors": [{"otherKey": "value"}]}]}
+    # If path exists but key is missing, it returns default {}
+    assert api._get_nested_data_from_installation_devices(data, "missingKey") == {}
+
+
+def test_get_nested_data_malformed_data_array(hass):
+    """Test _get_nested_data_from_installation_devices with malformed data array."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    # data is not a list
+    data1 = {"data": "not_a_list"}
+    assert api._get_nested_data_from_installation_devices(data1, "key") is None
+
+    # data is empty list
+    data2 = {"data": []}
+    assert api._get_nested_data_from_installation_devices(data2, "key") is None
+
+    # first element is not dict
+    data3 = {"data": ["not_a_dict"]}
+    assert api._get_nested_data_from_installation_devices(data3, "key") is None
+
+
+def test_get_nested_data_malformed_indoors_array(hass):
+    """Test _get_nested_data_from_installation_devices with malformed indoors array."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+
+    # indoors is missing
+    data1 = {"data": [{}]}
+    assert api._get_nested_data_from_installation_devices(data1, "key") is None
+
+    # indoors is not a list
+    data2 = {"data": [{"indoors": "not_a_list"}]}
+    assert api._get_nested_data_from_installation_devices(data2, "key") is None
+
+    # indoors is empty list
+    data3 = {"data": [{"indoors": []}]}
+    assert api._get_nested_data_from_installation_devices(data3, "key") is None
+
+    # first element is not dict
+    data4 = {"data": [{"indoors": ["not_a_dict"]}]}
+    assert api._get_nested_data_from_installation_devices(data4, "key") is None
+
+
+def test_get_heating_status_via_helper(hass):
+    """Test get_heating_status_from_installation_devices uses helper correctly."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+    data = {"heatingStatus": {"status": "ok"}}
+    assert api.get_heating_status_from_installation_devices(data) == {"status": "ok"}
+
+
+def test_get_heating_setting_via_helper(hass):
+    """Test get_heating_setting_from_installation_devices uses helper correctly."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+    data = {"heatingSetting": {"setting": 20}}
+    assert api.get_heating_setting_from_installation_devices(data) == {"setting": 20}
