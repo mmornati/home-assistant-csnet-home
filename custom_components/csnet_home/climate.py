@@ -3,34 +3,20 @@
 import asyncio
 import logging
 
-from homeassistant.components.climate import (
-    FAN_AUTO,
-    ClimateEntity,
-    HVACAction,
-    HVACMode,
-)
+from homeassistant.components.climate import (FAN_AUTO, ClimateEntity,
+                                              HVACAction, HVACMode)
 from homeassistant.components.climate.const import FAN_ON, ClimateEntityFeature
 from homeassistant.const import UnitOfTemperature
 from homeassistant.helpers.device_registry import DeviceInfo
 
-from .const import (
-    CONF_FAN_COIL_MODEL,
-    CONF_MAX_TEMP_OVERRIDE,
-    DEFAULT_FAN_COIL_MODEL,
-    DOMAIN,
-    FAN_COIL_MODEL_LEGACY,
-    FAN_SPEED_MAP_LEGACY,
-    FAN_SPEED_MAP_STANDARD,
-    FAN_SPEED_REVERSE_MAP_LEGACY,
-    FAN_SPEED_REVERSE_MAP_STANDARD,
-    HEATING_MAX_TEMPERATURE,
-    HEATING_MIN_TEMPERATURE,
-    OPERATION_STATUS_MAP,
-    OTC_COOLING_TYPE_NAMES,
-    OTC_HEATING_TYPE_NAMES,
-    WATER_CIRCUIT_MAX_HEAT,
-    WATER_CIRCUIT_MIN_HEAT,
-)
+from .const import (CONF_FAN_COIL_MODEL, CONF_MAX_TEMP_OVERRIDE,
+                    DEFAULT_FAN_COIL_MODEL, DOMAIN, FAN_COIL_MODEL_LEGACY,
+                    FAN_SPEED_MAP_LEGACY, FAN_SPEED_MAP_STANDARD,
+                    FAN_SPEED_REVERSE_MAP_LEGACY,
+                    FAN_SPEED_REVERSE_MAP_STANDARD, HEATING_MAX_TEMPERATURE,
+                    HEATING_MIN_TEMPERATURE, OPERATION_STATUS_MAP,
+                    OTC_COOLING_TYPE_NAMES, OTC_HEATING_TYPE_NAMES,
+                    WATER_CIRCUIT_MAX_HEAT, WATER_CIRCUIT_MIN_HEAT)
 from .helpers import extract_heating_status
 
 _LOGGER = logging.getLogger(__name__)

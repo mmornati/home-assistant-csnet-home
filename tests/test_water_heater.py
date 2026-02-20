@@ -7,12 +7,10 @@ import pytest
 from homeassistant.components.water_heater import WaterHeaterEntityFeature
 from homeassistant.const import PRECISION_WHOLE, UnitOfTemperature
 
-from custom_components.csnet_home.const import (
-    DOMAIN,
-    SWIMMING_POOL_MAX_TEMPERATURE,
-    SWIMMING_POOL_MIN_TEMPERATURE,
-    WATER_HEATER_MIN_TEMPERATURE,
-)
+from custom_components.csnet_home.const import (DOMAIN,
+                                                SWIMMING_POOL_MAX_TEMPERATURE,
+                                                SWIMMING_POOL_MIN_TEMPERATURE,
+                                                WATER_HEATER_MIN_TEMPERATURE)
 from custom_components.csnet_home.water_heater import CSNetHomeWaterHeater
 
 

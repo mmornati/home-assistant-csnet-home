@@ -5,21 +5,15 @@
 import logging
 from typing import Any
 
-from homeassistant.components.water_heater import (
-    WaterHeaterEntity,
-    WaterHeaterEntityFeature,
-)
+from homeassistant.components.water_heater import (WaterHeaterEntity,
+                                                   WaterHeaterEntityFeature)
 from homeassistant.const import PRECISION_WHOLE, UnitOfTemperature
 from homeassistant.helpers.device_registry import DeviceInfo
 
-from .const import (
-    CONF_MAX_TEMP_OVERRIDE,
-    DOMAIN,
-    SWIMMING_POOL_MAX_TEMPERATURE,
-    SWIMMING_POOL_MIN_TEMPERATURE,
-    WATER_HEATER_MAX_TEMPERATURE,
-    WATER_HEATER_MIN_TEMPERATURE,
-)
+from .const import (CONF_MAX_TEMP_OVERRIDE, DOMAIN,
+                    SWIMMING_POOL_MAX_TEMPERATURE,
+                    SWIMMING_POOL_MIN_TEMPERATURE,
+                    WATER_HEATER_MAX_TEMPERATURE, WATER_HEATER_MIN_TEMPERATURE)
 
 _LOGGER = logging.getLogger(__name__)
 
