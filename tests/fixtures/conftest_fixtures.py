@@ -112,7 +112,11 @@ def sanitize_api_response(response: Dict[str, Any]) -> Dict[str, Any]:
     device_map = {}
 
     # Check for main CSNet API structure
-    if isinstance(sanitized, dict) and "data" in sanitized and isinstance(sanitized["data"], dict):
+    if (
+        isinstance(sanitized, dict)
+        and "data" in sanitized
+        and isinstance(sanitized["data"], dict)
+    ):
         data = sanitized["data"]
 
         # Top level PII fields
@@ -206,9 +210,17 @@ def sanitize_api_response(response: Dict[str, Any]) -> Dict[str, Any]:
                     obj[key] = "***"
                 elif key == "email":
                     obj[key] = "test@example.com"
-                elif key == "latitude" and isinstance(value, str) and value != "52.379189":
+                elif (
+                    key == "latitude"
+                    and isinstance(value, str)
+                    and value != "52.379189"
+                ):
                     obj[key] = "52.379189"
-                elif key == "longitude" and isinstance(value, str) and value != "4.899431":
+                elif (
+                    key == "longitude"
+                    and isinstance(value, str)
+                    and value != "4.899431"
+                ):
                     obj[key] = "4.899431"
 
                 if isinstance(value, (dict, list)):
