@@ -1537,13 +1537,6 @@ class CSNetHomeAPI:
         # Default to standard air unit
         return "standard"
 
-    def is_yutaki(
-        self, sensor_data: dict, installation_devices_data: dict = None
-    ) -> bool:
-        """Check if unit is a Yutaki (water module) system."""
-        unit_type = self.get_unit_type(sensor_data, installation_devices_data)
-        return unit_type in ["yutaki", "water_heater"]
-
     def get_alarm_origin(
         self, alarm_code: int, unit_type: str, installation_devices_data: dict = None
     ) -> str:
