@@ -17,9 +17,7 @@ from homeassistant.const import (
 from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
-from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.util import dt as dt_util
 
 from .const import (
     DOMAIN,
@@ -30,6 +28,187 @@ from .const import (
 from .coordinator import CSNetHomeCoordinator
 
 _LOGGER = logging.getLogger(__name__)
+
+
+SENSOR_TYPES = (
+    ("current_temperature", "temperature", UnitOfTemperature.CELSIUS),
+    ("setting_temperature", "temperature", UnitOfTemperature.CELSIUS),
+    ("mode", "enum", None),
+    ("on_off", "enum", None),
+    ("doingBoost", "binary", None),
+    ("alarm_code", "enum", None),
+    ("alarm_active", "binary", None),
+    ("alarm_message", "enum", None),
+    ("alarm_code_formatted", "enum", None),
+    ("alarm_origin", "enum", None),
+    ("unit_type", "enum", None),
+)
+
+DEVICE_SENSOR_TYPES = (
+    (
+        "wifi_signal",
+        SensorDeviceClass.SIGNAL_STRENGTH,
+        SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
+        "WiFi Signal",
+    ),
+    ("connectivity", "binary", None, "Connectivity"),
+    ("last_communication", SensorDeviceClass.TIMESTAMP, None, "Last Communication"),
+)
+
+INSTALLATION_SENSOR_TYPES = (
+    ("pump_speed", "percentage", "%", "Pump Speed"),
+    (
+        "water_flow",
+        "water_debit",
+        UnitOfVolumeFlowRate.CUBIC_METERS_PER_HOUR,
+        "Water Flow",
+    ),
+    (
+        "in_water_temperature",
+        "temperature",
+        UnitOfTemperature.CELSIUS,
+        "In Water Temperature",
+    ),
+    (
+        "out_water_temperature",
+        "temperature",
+        UnitOfTemperature.CELSIUS,
+        "Out Water Temperature",
+    ),
+    (
+        "out_water_temperature_3",
+        "temperature",
+        UnitOfTemperature.CELSIUS,
+        "External Tank Temperature",
+    ),
+    (
+        "set_water_temperature",
+        "temperature",
+        UnitOfTemperature.CELSIUS,
+        "Set Water Temperature",
+    ),
+    ("water_pressure", "pressure", UnitOfPressure.BAR, "Water Pressure"),
+    (
+        "gas_temperature",
+        "temperature",
+        UnitOfTemperature.CELSIUS,
+        "Gas Temperature",
+    ),
+    (
+        "liquid_temperature",
+        "temperature",
+        UnitOfTemperature.CELSIUS,
+        "Liquid Temperature",
+    ),
+    ("defrost", "binary", None, "Defrost"),
+    ("mix_valve_position", "percentage", "%", "Mix Valve Position"),
+    (
+        "external_temperature",
+        "temperature",
+        UnitOfTemperature.CELSIUS,
+        "Outdoor Temperature",
+    ),
+    (
+        "mean_external_temperature",
+        "temperature",
+        UnitOfTemperature.CELSIUS,
+        "Outdoor Average Temperature",
+    ),
+    (
+        "weather_temperature",
+        "temperature",
+        UnitOfTemperature.CELSIUS,
+        "Weather Temperature",
+    ),
+    ("central_config", "enum", None, "Central Config"),
+    ("lcd_software_version", None, None, "LCD Software Version"),
+    ("unit_model", "enum", None, "Unit Model"),
+    ("central_control_enabled", "binary", None, "Central Control Enabled"),
+    ("cascade_slave_mode", "binary", None, "Cascade Slave Mode"),
+    ("fan_coil_compatible", "binary", None, "Fan Coil Compatible"),
+    ("c1_thermostat_present", "binary", None, "C1 Thermostat Present"),
+    ("c2_thermostat_present", "binary", None, "C2 Thermostat Present"),
+    ("otc_heating_type_c1", "enum", None, "OTC Heating Type C1"),
+    ("otc_cooling_type_c1", "enum", None, "OTC Cooling Type C1"),
+    ("otc_heating_type_c2", "enum", None, "OTC Heating Type C2"),
+    ("otc_cooling_type_c2", "enum", None, "OTC Cooling Type C2"),
+)
+
+COMPRESSOR_SENSOR_TYPES = (
+    ("compressor_frequency", "frequency", "Hz", "Compressor Frequency"),
+    ("compressor_current", "current", "A", "Compressor Current"),
+    ("compressor_capacity", None, None, "Compressor Capacity"),
+    (
+        "discharge_temperature",
+        "temperature",
+        UnitOfTemperature.CELSIUS,
+        "Discharge Temperature",
+    ),
+    (
+        "evaporator_temperature",
+        "temperature",
+        UnitOfTemperature.CELSIUS,
+        "Evaporator Temperature",
+    ),
+    (
+        "outdoor_ambient_temperature",
+        "temperature",
+        UnitOfTemperature.CELSIUS,
+        "Outdoor Ambient Temperature",
+    ),
+    ("discharge_pressure", "pressure", UnitOfPressure.BAR, "Discharge Pressure"),
+    ("suction_pressure", "pressure", UnitOfPressure.BAR, "Suction Pressure"),
+    ("suction_pressure_correction", None, None, "Suction Pressure Correction"),
+    ("expansion_valve_opening", "percentage", "%", "Expansion Valve Opening (EVI)"),
+    ("ou_evo_1", "percentage", "%", "Expansion Valve Opening (EVO)"),
+    ("outdoor_fan_rpm", None, "RPM", "Outdoor Fan RPM"),
+    ("operation_status", "enum", None, "Operation Status"),
+    ("system_status_flags", None, None, "System Status Flags"),
+    ("ou_code", "enum", None, "Outdoor Unit Code"),
+    ("ou_capacity_code", None, None, "Outdoor Unit Capacity Code"),
+    ("ou_pcb_software", None, None, "Outdoor Unit PCB Software"),
+    (
+        "secondary_discharge_temp",
+        "temperature",
+        UnitOfTemperature.CELSIUS,
+        "Secondary Discharge Temperature",
+    ),
+    (
+        "secondary_suction_temp",
+        "temperature",
+        UnitOfTemperature.CELSIUS,
+        "Secondary Suction Temperature",
+    ),
+    (
+        "secondary_discharge_pressure",
+        "pressure",
+        UnitOfPressure.BAR,
+        "Secondary Discharge Pressure",
+    ),
+    (
+        "secondary_suction_pressure",
+        "pressure",
+        UnitOfPressure.BAR,
+        "Secondary Suction Pressure",
+    ),
+    (
+        "secondary_compressor_frequency",
+        "frequency",
+        "Hz",
+        "Secondary Compressor Frequency",
+    ),
+    ("secondary_expansion_valve", None, None, "Secondary Expansion Valve"),
+    (
+        "secondary_compressor_current",
+        "current",
+        "A",
+        "Secondary Compressor Current",
+    ),
+    ("secondary_current", "current", "A", "Secondary Current"),
+    ("secondary_superheat", None, None, "Secondary Superheat"),
+    ("secondary_stop_code", "enum", None, "Secondary Stop Code"),
+    ("secondary_retry_code", "enum", None, "Secondary Retry Code"),
+)
 
 
 def _convert_unsigned_to_signed_byte(value):
@@ -74,104 +253,30 @@ async def async_setup_entry(hass, entry, async_add_entities):
             sensor_data["device_id"]
         ]
 
-        sensors.append(
-            CSNetHomeSensor(
-                coordinator,
-                sensor_data,
-                common_data,
-                "current_temperature",
-                "temperature",
-                UnitOfTemperature.CELSIUS,
+        for key, device_class, unit in SENSOR_TYPES:
+            sensors.append(
+                CSNetHomeSensor(
+                    coordinator,
+                    sensor_data,
+                    common_data,
+                    key,
+                    device_class,
+                    unit,
+                )
             )
-        )
-        sensors.append(
-            CSNetHomeSensor(
-                coordinator,
-                sensor_data,
-                common_data,
-                "setting_temperature",
-                "temperature",
-                UnitOfTemperature.CELSIUS,
-            )
-        )
-        sensors.append(
-            CSNetHomeSensor(coordinator, sensor_data, common_data, "mode", "enum")
-        )
-        sensors.append(
-            CSNetHomeSensor(coordinator, sensor_data, common_data, "on_off", "enum")
-        )
-        sensors.append(
-            CSNetHomeSensor(
-                coordinator, sensor_data, common_data, "doingBoost", "binary"
-            )
-        )
-        # expose alarm information
-        sensors.append(
-            CSNetHomeSensor(coordinator, sensor_data, common_data, "alarm_code", "enum")
-        )
-        sensors.append(
-            CSNetHomeSensor(
-                coordinator, sensor_data, common_data, "alarm_active", "binary"
-            )
-        )
-        sensors.append(
-            CSNetHomeSensor(
-                coordinator, sensor_data, common_data, "alarm_message", "enum"
-            )
-        )
-        # Enhanced alarm information
-        sensors.append(
-            CSNetHomeSensor(
-                coordinator, sensor_data, common_data, "alarm_code_formatted", "enum"
-            )
-        )
-        sensors.append(
-            CSNetHomeSensor(
-                coordinator, sensor_data, common_data, "alarm_origin", "enum"
-            )
-        )
-        sensors.append(
-            CSNetHomeSensor(coordinator, sensor_data, common_data, "unit_type", "enum")
-        )
 
-        # Add WiFi signal strength sensor
-        sensors.append(
-            CSNetHomeDeviceSensor(
-                coordinator,
-                sensor_data,
-                common_data,
-                "wifi_signal",
-                SensorDeviceClass.SIGNAL_STRENGTH,
-                SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
-                "WiFi Signal",
+        for key, device_class, unit, friendly_name in DEVICE_SENSOR_TYPES:
+            sensors.append(
+                CSNetHomeDeviceSensor(
+                    coordinator,
+                    sensor_data,
+                    common_data,
+                    key,
+                    device_class,
+                    unit,
+                    friendly_name,
+                )
             )
-        )
-
-        # Add connectivity binary sensor
-        sensors.append(
-            CSNetHomeDeviceSensor(
-                coordinator,
-                sensor_data,
-                common_data,
-                "connectivity",
-                "binary",
-                None,
-                "Connectivity",
-            )
-        )
-
-        # Add last communication timestamp sensor
-        sensors.append(
-            CSNetHomeDeviceSensor(
-                coordinator,
-                sensor_data,
-                common_data,
-                "last_communication",
-                SensorDeviceClass.TIMESTAMP,
-                None,
-                "Last Communication",
-            )
-        )
 
     # Add installation devices sensors
     installation_devices_data = coordinator.get_installation_devices_data()
@@ -184,322 +289,38 @@ async def async_setup_entry(hass, entry, async_add_entities):
             "parent_id": "global",
             "room_id": "global",
         }
+        common_data = coordinator.get_common_data()
 
-        # Water-related sensors
-        sensors.append(
-            CSNetHomeInstallationSensor(
-                coordinator,
-                global_device_data,
-                common_data,
-                "pump_speed",
-                "percentage",
-                "%",
-                "Pump Speed",
+        for key, device_class, unit, friendly_name in INSTALLATION_SENSOR_TYPES:
+            sensors.append(
+                CSNetHomeInstallationSensor(
+                    coordinator,
+                    global_device_data,
+                    common_data,
+                    key,
+                    device_class,
+                    unit,
+                    friendly_name,
+                )
             )
-        )
-        sensors.append(
-            CSNetHomeInstallationSensor(
-                coordinator,
-                global_device_data,
-                common_data,
-                "water_flow",
-                "water_debit",
-                UnitOfVolumeFlowRate.CUBIC_METERS_PER_HOUR,
-                "Water Flow",
-            )
-        )
-        sensors.append(
-            CSNetHomeInstallationSensor(
-                coordinator,
-                global_device_data,
-                common_data,
-                "in_water_temperature",
-                "temperature",
-                UnitOfTemperature.CELSIUS,
-                "In Water Temperature",
-            )
-        )
-        sensors.append(
-            CSNetHomeInstallationSensor(
-                coordinator,
-                global_device_data,
-                common_data,
-                "out_water_temperature",
-                "temperature",
-                UnitOfTemperature.CELSIUS,
-                "Out Water Temperature",
-            )
-        )
-        sensors.append(
-            CSNetHomeInstallationSensor(
-                coordinator,
-                global_device_data,
-                common_data,
-                "out_water_temperature_3",
-                "temperature",
-                UnitOfTemperature.CELSIUS,
-                "External Tank Temperature",
-            )
-        )
-        sensors.append(
-            CSNetHomeInstallationSensor(
-                coordinator,
-                global_device_data,
-                common_data,
-                "set_water_temperature",
-                "temperature",
-                UnitOfTemperature.CELSIUS,
-                "Set Water Temperature",
-            )
-        )
-        sensors.append(
-            CSNetHomeInstallationSensor(
-                coordinator,
-                global_device_data,
-                common_data,
-                "water_pressure",
-                "pressure",
-                UnitOfPressure.BAR,
-                "Water Pressure",
-            )
-        )
-        sensors.append(
-            CSNetHomeInstallationSensor(
-                coordinator,
-                global_device_data,
-                common_data,
-                "gas_temperature",
-                "temperature",
-                UnitOfTemperature.CELSIUS,
-                "Gas Temperature",
-            )
-        )
-        sensors.append(
-            CSNetHomeInstallationSensor(
-                coordinator,
-                global_device_data,
-                common_data,
-                "liquid_temperature",
-                "temperature",
-                UnitOfTemperature.CELSIUS,
-                "Liquid Temperature",
-            )
-        )
-
-        # Heat device sensors
-        sensors.append(
-            CSNetHomeInstallationSensor(
-                coordinator,
-                global_device_data,
-                common_data,
-                "defrost",
-                "binary",
-                None,
-                "Defrost",
-            )
-        )
-        sensors.append(
-            CSNetHomeInstallationSensor(
-                coordinator,
-                global_device_data,
-                common_data,
-                "mix_valve_position",
-                "percentage",
-                "%",
-                "Mix Valve Position",
-            )
-        )
-        sensors.append(
-            CSNetHomeInstallationSensor(
-                coordinator,
-                global_device_data,
-                common_data,
-                "external_temperature",
-                "temperature",
-                UnitOfTemperature.CELSIUS,
-                "Outdoor Temperature",
-            )
-        )
-        sensors.append(
-            CSNetHomeInstallationSensor(
-                coordinator,
-                global_device_data,
-                common_data,
-                "mean_external_temperature",
-                "temperature",
-                UnitOfTemperature.CELSIUS,
-                "Outdoor Average Temperature",
-            )
-        )
-
-        # Weather sensor from cloud service (Issue #79)
-        sensors.append(
-            CSNetHomeInstallationSensor(
-                coordinator,
-                global_device_data,
-                common_data,
-                "weather_temperature",
-                "temperature",
-                UnitOfTemperature.CELSIUS,
-                "Weather Temperature",
-            )
-        )
-
-        # Central Control Configuration sensors
-        sensors.append(
-            CSNetHomeInstallationSensor(
-                coordinator,
-                global_device_data,
-                common_data,
-                "central_config",
-                "enum",
-                None,
-                "Central Config",
-            )
-        )
-        sensors.append(
-            CSNetHomeInstallationSensor(
-                coordinator,
-                global_device_data,
-                common_data,
-                "lcd_software_version",
-                None,
-                None,
-                "LCD Software Version",
-            )
-        )
-        sensors.append(
-            CSNetHomeInstallationSensor(
-                coordinator,
-                global_device_data,
-                common_data,
-                "unit_model",
-                "enum",
-                None,
-                "Unit Model",
-            )
-        )
-        sensors.append(
-            CSNetHomeInstallationSensor(
-                coordinator,
-                global_device_data,
-                common_data,
-                "central_control_enabled",
-                "binary",
-                None,
-                "Central Control Enabled",
-            )
-        )
-
-        # System Configuration Diagnostic sensors (Issue #78)
-        sensors.append(
-            CSNetHomeInstallationSensor(
-                coordinator,
-                global_device_data,
-                common_data,
-                "cascade_slave_mode",
-                "binary",
-                None,
-                "Cascade Slave Mode",
-            )
-        )
-        sensors.append(
-            CSNetHomeInstallationSensor(
-                coordinator,
-                global_device_data,
-                common_data,
-                "fan_coil_compatible",
-                "binary",
-                None,
-                "Fan Coil Compatible",
-            )
-        )
-        sensors.append(
-            CSNetHomeInstallationSensor(
-                coordinator,
-                global_device_data,
-                common_data,
-                "c1_thermostat_present",
-                "binary",
-                None,
-                "C1 Thermostat Present",
-            )
-        )
-        sensors.append(
-            CSNetHomeInstallationSensor(
-                coordinator,
-                global_device_data,
-                common_data,
-                "c2_thermostat_present",
-                "binary",
-                None,
-                "C2 Thermostat Present",
-            )
-        )
-
-        # OTC (Outdoor Temperature Compensation) sensors (Issue #71)
-        sensors.append(
-            CSNetHomeInstallationSensor(
-                coordinator,
-                global_device_data,
-                common_data,
-                "otc_heating_type_c1",
-                "enum",
-                None,
-                "OTC Heating Type C1",
-            )
-        )
-        sensors.append(
-            CSNetHomeInstallationSensor(
-                coordinator,
-                global_device_data,
-                common_data,
-                "otc_cooling_type_c1",
-                "enum",
-                None,
-                "OTC Cooling Type C1",
-            )
-        )
-        sensors.append(
-            CSNetHomeInstallationSensor(
-                coordinator,
-                global_device_data,
-                common_data,
-                "otc_heating_type_c2",
-                "enum",
-                None,
-                "OTC Heating Type C2",
-            )
-        )
-        sensors.append(
-            CSNetHomeInstallationSensor(
-                coordinator,
-                global_device_data,
-                common_data,
-                "otc_cooling_type_c2",
-                "enum",
-                None,
-                "OTC Cooling Type C2",
-            )
-        )
 
     # Add alarm history sensor (shows recent alarms from installation alarms API)
-    sensors.append(CSNetHomeAlarmHistorySensor(coordinator, common_data))
+    sensors.append(CSNetHomeAlarmHistorySensor(coordinator, coordinator.get_common_data()))
 
     # Add alarm statistics sensors (total count, by origin, by device)
     sensors.append(
         CSNetHomeAlarmStatisticsSensor(
-            coordinator, common_data, "total_alarm_count", "Total Alarms"
+            coordinator, coordinator.get_common_data(), "total_alarm_count", "Total Alarms"
         )
     )
     sensors.append(
         CSNetHomeAlarmStatisticsSensor(
-            coordinator, common_data, "active_alarm_count", "Active Alarms"
+            coordinator, coordinator.get_common_data(), "active_alarm_count", "Active Alarms"
         )
     )
     sensors.append(
         CSNetHomeAlarmStatisticsSensor(
-            coordinator, common_data, "alarm_by_origin", "Alarms by Origin"
+            coordinator, coordinator.get_common_data(), "alarm_by_origin", "Alarms by Origin"
         )
     )
 
@@ -512,326 +333,20 @@ async def async_setup_entry(hass, entry, async_add_entities):
             "parent_id": "compressor",
             "room_id": "compressor",
         }
+        common_data = coordinator.get_common_data()
 
-        # Primary Compressor Sensors
-        sensors.append(
-            CSNetHomeCompressorSensor(
-                coordinator,
-                compressor_device_data,
-                common_data,
-                "compressor_frequency",
-                "frequency",
-                "Hz",
-                "Compressor Frequency",
+        for key, device_class, unit, friendly_name in COMPRESSOR_SENSOR_TYPES:
+            sensors.append(
+                CSNetHomeCompressorSensor(
+                    coordinator,
+                    compressor_device_data,
+                    common_data,
+                    key,
+                    device_class,
+                    unit,
+                    friendly_name,
+                )
             )
-        )
-        sensors.append(
-            CSNetHomeCompressorSensor(
-                coordinator,
-                compressor_device_data,
-                common_data,
-                "compressor_current",
-                "current",
-                "A",
-                "Compressor Current",
-            )
-        )
-        sensors.append(
-            CSNetHomeCompressorSensor(
-                coordinator,
-                compressor_device_data,
-                common_data,
-                "compressor_capacity",
-                None,
-                None,
-                "Compressor Capacity",
-            )
-        )
-
-        # Compressor Temperatures
-        sensors.append(
-            CSNetHomeCompressorSensor(
-                coordinator,
-                compressor_device_data,
-                common_data,
-                "discharge_temperature",
-                "temperature",
-                UnitOfTemperature.CELSIUS,
-                "Discharge Temperature",
-            )
-        )
-        sensors.append(
-            CSNetHomeCompressorSensor(
-                coordinator,
-                compressor_device_data,
-                common_data,
-                "evaporator_temperature",
-                "temperature",
-                UnitOfTemperature.CELSIUS,
-                "Evaporator Temperature",
-            )
-        )
-        sensors.append(
-            CSNetHomeCompressorSensor(
-                coordinator,
-                compressor_device_data,
-                common_data,
-                "outdoor_ambient_temperature",
-                "temperature",
-                UnitOfTemperature.CELSIUS,
-                "Outdoor Ambient Temperature",
-            )
-        )
-
-        # Compressor Pressures
-        sensors.append(
-            CSNetHomeCompressorSensor(
-                coordinator,
-                compressor_device_data,
-                common_data,
-                "discharge_pressure",
-                "pressure",
-                UnitOfPressure.BAR,
-                "Discharge Pressure",
-            )
-        )
-        sensors.append(
-            CSNetHomeCompressorSensor(
-                coordinator,
-                compressor_device_data,
-                common_data,
-                "suction_pressure",
-                "pressure",
-                UnitOfPressure.BAR,
-                "Suction Pressure",
-            )
-        )
-        sensors.append(
-            CSNetHomeCompressorSensor(
-                coordinator,
-                compressor_device_data,
-                common_data,
-                "suction_pressure_correction",
-                None,
-                None,
-                "Suction Pressure Correction",
-            )
-        )
-
-        # Expansion Valve and Control
-        sensors.append(
-            CSNetHomeCompressorSensor(
-                coordinator,
-                compressor_device_data,
-                common_data,
-                "expansion_valve_opening",
-                "percentage",
-                "%",
-                "Expansion Valve Opening (EVI)",
-            )
-        )
-        sensors.append(
-            CSNetHomeCompressorSensor(
-                coordinator,
-                compressor_device_data,
-                common_data,
-                "ou_evo_1",
-                "percentage",
-                "%",
-                "Expansion Valve Opening (EVO)",
-            )
-        )
-        sensors.append(
-            CSNetHomeCompressorSensor(
-                coordinator,
-                compressor_device_data,
-                common_data,
-                "outdoor_fan_rpm",
-                None,
-                "RPM",
-                "Outdoor Fan RPM",
-            )
-        )
-
-        # Outdoor Unit Information
-        sensors.append(
-            CSNetHomeCompressorSensor(
-                coordinator,
-                compressor_device_data,
-                common_data,
-                "operation_status",
-                "enum",
-                None,
-                "Operation Status",
-            )
-        )
-        sensors.append(
-            CSNetHomeCompressorSensor(
-                coordinator,
-                compressor_device_data,
-                common_data,
-                "system_status_flags",
-                None,
-                None,
-                "System Status Flags",
-            )
-        )
-        sensors.append(
-            CSNetHomeCompressorSensor(
-                coordinator,
-                compressor_device_data,
-                common_data,
-                "ou_code",
-                "enum",
-                None,
-                "Outdoor Unit Code",
-            )
-        )
-        sensors.append(
-            CSNetHomeCompressorSensor(
-                coordinator,
-                compressor_device_data,
-                common_data,
-                "ou_capacity_code",
-                None,
-                None,
-                "Outdoor Unit Capacity Code",
-            )
-        )
-        sensors.append(
-            CSNetHomeCompressorSensor(
-                coordinator,
-                compressor_device_data,
-                common_data,
-                "ou_pcb_software",
-                None,
-                None,
-                "Outdoor Unit PCB Software",
-            )
-        )
-
-        # Secondary Cycle Sensors (for dual-cycle systems)
-        sensors.append(
-            CSNetHomeCompressorSensor(
-                coordinator,
-                compressor_device_data,
-                common_data,
-                "secondary_discharge_temp",
-                "temperature",
-                UnitOfTemperature.CELSIUS,
-                "Secondary Discharge Temperature",
-            )
-        )
-        sensors.append(
-            CSNetHomeCompressorSensor(
-                coordinator,
-                compressor_device_data,
-                common_data,
-                "secondary_suction_temp",
-                "temperature",
-                UnitOfTemperature.CELSIUS,
-                "Secondary Suction Temperature",
-            )
-        )
-        sensors.append(
-            CSNetHomeCompressorSensor(
-                coordinator,
-                compressor_device_data,
-                common_data,
-                "secondary_discharge_pressure",
-                "pressure",
-                UnitOfPressure.BAR,
-                "Secondary Discharge Pressure",
-            )
-        )
-        sensors.append(
-            CSNetHomeCompressorSensor(
-                coordinator,
-                compressor_device_data,
-                common_data,
-                "secondary_suction_pressure",
-                "pressure",
-                UnitOfPressure.BAR,
-                "Secondary Suction Pressure",
-            )
-        )
-        sensors.append(
-            CSNetHomeCompressorSensor(
-                coordinator,
-                compressor_device_data,
-                common_data,
-                "secondary_compressor_frequency",
-                "frequency",
-                "Hz",
-                "Secondary Compressor Frequency",
-            )
-        )
-        sensors.append(
-            CSNetHomeCompressorSensor(
-                coordinator,
-                compressor_device_data,
-                common_data,
-                "secondary_expansion_valve",
-                None,
-                None,
-                "Secondary Expansion Valve",
-            )
-        )
-        sensors.append(
-            CSNetHomeCompressorSensor(
-                coordinator,
-                compressor_device_data,
-                common_data,
-                "secondary_compressor_current",
-                "current",
-                "A",
-                "Secondary Compressor Current",
-            )
-        )
-        sensors.append(
-            CSNetHomeCompressorSensor(
-                coordinator,
-                compressor_device_data,
-                common_data,
-                "secondary_current",
-                "current",
-                "A",
-                "Secondary Current",
-            )
-        )
-        sensors.append(
-            CSNetHomeCompressorSensor(
-                coordinator,
-                compressor_device_data,
-                common_data,
-                "secondary_superheat",
-                None,
-                None,
-                "Secondary Superheat",
-            )
-        )
-        sensors.append(
-            CSNetHomeCompressorSensor(
-                coordinator,
-                compressor_device_data,
-                common_data,
-                "secondary_stop_code",
-                "enum",
-                None,
-                "Secondary Stop Code",
-            )
-        )
-        sensors.append(
-            CSNetHomeCompressorSensor(
-                coordinator,
-                compressor_device_data,
-                common_data,
-                "secondary_retry_code",
-                "enum",
-                None,
-                "Secondary Retry Code",
-            )
-        )
 
     async_add_entities(sensors)
 
@@ -1259,319 +774,6 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, Entity):
     def unique_id(self) -> str:
         """Return unique id."""
         return f"{DOMAIN}-installation-{self._key}"
-
-
-class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
-    """Sensor for calculated instantaneous values (Power, Consumption, COP).
-
-    Introduced in PR #155 by davigar1391.
-    Computes instant_consumption, heating_power and instant_cop from raw
-    compressor telemetry using a physics-based model validated against
-    reported Amperage.
-    """
-
-    def _get_heating_status(self):
-        """Get heatingStatus from installation devices data."""
-        installation_data = self._coordinator.get_installation_devices_data()
-        if not isinstance(installation_data, dict):
-            return None
-        data_array = installation_data.get("data", [])
-        if isinstance(data_array, list) and len(data_array) > 0:
-            first_device = data_array[0]
-            if isinstance(first_device, dict):
-                indoors_array = first_device.get("indoors", [])
-                if isinstance(indoors_array, list) and len(indoors_array) > 0:
-                    first_indoors = indoors_array[0]
-                    if isinstance(first_indoors, dict):
-                        return first_indoors.get("heatingStatus", {})
-        return None
-
-    def _calculate_complex_power(self, heating_status):
-        """Calculate power using the complex physical model with guardrails."""
-        # 1. Inputs
-        hz = heating_status.get("ouHz", 0)
-        p_high = heating_status.get("ouDischargePress", 0)
-        p_low = heating_status.get("ouSuctionPress", 0)
-
-        # Get temp using the module-level helper function
-        t_discharge = _convert_unsigned_to_signed_byte(
-            heating_status.get("ouDischargeTemperature")
-        )
-        if t_discharge is None:
-            t_discharge = 0
-
-        current_amps = heating_status.get("ouCurrent", 0)
-        voltage = 230
-
-        # If compressor is OFF (0 Hz), consumption is 0 W
-        if hz == 0:
-            return 0
-
-        # 2. Efficiency Model (Base)
-        slope = 0.0085
-        k_ref = 1.27
-        hz_ref = 31.0
-
-        k_dynamic = k_ref - ((hz - hz_ref) * slope)
-
-        # Base Limits (1.0 - 1.4)
-        if k_dynamic < 1.00:
-            k_dynamic = 1.00
-        if k_dynamic > 1.40:
-            k_dynamic = 1.40
-
-        # 3. Red Zone Corrections
-
-        # A. RPM Saturation (>115 Hz)
-        factor_rpm = 1.0
-        if hz > 115:
-            excess_hz = hz - 115
-            factor_rpm = 1.0 - (excess_hz * 0.008)
-
-        # B. Temperature Correction (>90°C)
-        factor_temp = 1.0
-        if t_discharge > 90:
-            excess_temp = t_discharge - 90
-            factor_temp = 1.0 - (excess_temp * 0.025)
-
-        # 4. Preliminary Calculation
-        base_power = 50.0  # Electronics + Pumps
-
-        if p_high > p_low:
-            delta_p = p_high - p_low
-
-            # Base Calculation
-            raw_power = base_power + (k_dynamic * hz * delta_p)
-
-            # Apply correction factors
-            calculated_power = raw_power * factor_rpm * factor_temp
-        else:
-            # Fallback for defrost (pressures crossed)
-            calculated_power = base_power + (hz * 15)
-
-        # 5. Guardrail System (Protection)
-        # Lower limit: reported amps * voltage (e.g., 6A -> 1380W)
-        min_watts = current_amps * voltage
-
-        # Upper limit: reported amps + 0.99 (next integer) (e.g., 6A means < 7A)
-        max_watts = (current_amps + 0.99) * voltage
-
-        final_power = calculated_power
-
-        if calculated_power < min_watts:
-            # Error: Formula result too low, correct to minimum
-            final_power = min_watts
-        elif calculated_power > max_watts:
-            # Error: Formula result too high, correct to maximum
-            final_power = max_watts
-
-        return round(final_power)
-
-    @property
-    def state(self):
-        """Calculate and return the state."""
-        heating_status = self._get_heating_status()
-        if not heating_status:
-            return 0
-
-        # Extract raw values for other calculations
-        raw_flow = heating_status.get("waterFlow", 0)
-        flow_rate = raw_flow / 10.0 if raw_flow else 0
-        temp_in = heating_status.get("waterInletTemp", 0)
-
-        # Operation Status needed for deciding temp_out
-        op_status = heating_status.get("operationStatus")
-
-        # 1. Instant Consumption (Watts) - complex model with guardrails
-        instant_consumption = self._calculate_complex_power(heating_status)
-
-        if self._key == "instant_consumption":
-            return instant_consumption
-
-        # 2. Heating Power (Watts)
-        # Logic: If DHW (Status 8) use Exchanger Outlet, else use Normal Outlet
-        if op_status == 8:
-            temp_out = heating_status.get("waterOutletHPTemp", 0)
-        else:
-            temp_out = heating_status.get("waterOutletTemp", 0)
-
-        delta_t = temp_out - temp_in
-        heating_power = 0
-        if delta_t > 0 and flow_rate >= 0.01:
-            heating_power = round(flow_rate * 1160 * delta_t, 2)
-
-        if self._key == "heating_power":
-            return heating_power
-
-        # 3. Instant COP
-        if self._key == "instant_cop":
-            if instant_consumption < 50:
-                return 0.0
-            return round(heating_power / instant_consumption, 2)
-
-        return None
-
-    @property
-    def state_class(self):
-        """Return the state class."""
-        # All calculated sensors (Power, COP) are measurements at a point in time
-        return SensorStateClass.MEASUREMENT
-
-
-class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
-    """Sensor for accumulated daily values (Energy, Daily COP) with reset.
-
-    Introduced in PR #155 by davigar1391.
-    Accumulates daily_consumption, daily_heating, daily_cop_heating and
-    daily_cop_dhw. Resets at local midnight and restores state after HA
-    restarts via RestoreEntity.
-    """
-
-    def __init__(
-        self,
-        coordinator: CSNetHomeCoordinator,
-        device_data,
-        common_data,
-        key,
-        device_class=None,
-        unit=None,
-        friendly_name=None,
-    ):
-        """Initialize the daily sensor."""
-        super().__init__(
-            coordinator,
-            device_data,
-            common_data,
-            key,
-            device_class,
-            unit,
-            friendly_name,
-        )
-        self._state = 0.0
-        # Dedicated accumulators for this instance
-        self._energy_in = 0.0  # Input energy (Electricity)
-        self._energy_out = 0.0  # Output energy (Heat)
-        self._last_update_time = None
-
-    async def async_added_to_hass(self):
-        """Restore state and set up initial values."""
-        await super().async_added_to_hass()
-        last_state = await self.async_get_last_state()
-        if last_state and last_state.state not in (None, "unknown", "unavailable"):
-            try:
-                # If restored state contains comma, it needs parsing
-                clean_state = str(last_state.state).replace(",", ".")
-                self._state = float(clean_state)
-            except ValueError:
-                self._state = 0.0
-        else:
-            self._state = 0.0
-        self._last_update_time = dt_util.now()
-
-    @property
-    def state(self):
-        """Return the accumulated state."""
-        return round(self._state, 2)
-
-    @property
-    def state_class(self):
-        """Return the state class."""
-        if self._key.startswith("daily_cop"):
-            return SensorStateClass.MEASUREMENT
-        # Energy sensors are increasing counters that reset
-        return SensorStateClass.TOTAL_INCREASING
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator to accumulate energy."""
-        # Use local time for everything to match the midnight check
-        now = dt_util.now()
-
-        # Reset at midnight - Comparison is now safe (local vs local)
-        if self._last_update_time and self._last_update_time.date() != now.date():
-            self._state = 0.0
-            self._energy_in = 0.0
-            self._energy_out = 0.0
-
-        # Calculate time difference in hours (for Watts to Watt-hours)
-        if self._last_update_time:
-            time_diff = (now - self._last_update_time).total_seconds() / 3600.0
-        else:
-            time_diff = 0
-
-        self._last_update_time = now
-
-        # Get instantaneous values using the parent logic
-        heating_status = self._get_heating_status()
-        if not heating_status:
-            self.async_write_ha_state()
-            return
-
-        # Re-calculate instant values locally
-
-        # 1. Use the complex model for Consumption Power
-        power_consumption_w = self._calculate_complex_power(heating_status)
-
-        # 2. Heating Power Logic (With DHW Temp Switch)
-        raw_flow = heating_status.get("waterFlow", 0)
-        flow_rate = raw_flow / 10.0 if raw_flow else 0
-        temp_in = heating_status.get("waterInletTemp", 0)
-        op_status = heating_status.get("operationStatus")
-
-        if op_status == 8:
-            temp_out = heating_status.get("waterOutletHPTemp", 0)
-        else:
-            temp_out = heating_status.get("waterOutletTemp", 0)
-
-        delta_t = temp_out - temp_in
-
-        heating_power_w = 0
-        if delta_t > 0 and flow_rate >= 0.01:
-            heating_power_w = flow_rate * 1160 * delta_t
-
-        # Calculate incremental Energy (kWh) -> Watts * Hours / 1000
-        energy_consumption_kwh = (power_consumption_w * time_diff) / 1000.0
-        energy_heating_kwh = (heating_power_w * time_diff) / 1000.0
-
-        if self._key == "daily_consumption":
-            self._state += energy_consumption_kwh
-
-        elif self._key == "daily_heating":
-            self._state += energy_heating_kwh
-
-        # Daily COPs
-        elif self._key in ["daily_cop_heating", "daily_cop_dhw"]:
-            op_status = heating_status.get("operationStatus")
-            defrost_active = heating_status.get("defrosting") == 1
-
-            should_accumulate = False
-
-            if self._key == "daily_cop_heating":
-                # Accumulate if Heating (6)
-                # OR Defrosting is active (AND we are not explicitly in DHW mode)
-                if op_status == 6 or (defrost_active and op_status != 8):
-                    should_accumulate = True
-
-            elif self._key == "daily_cop_dhw":
-                # Accumulate if DHW (8)
-                # OR Defrosting is active (AND we are not explicitly in Heating mode)
-                if op_status == 8 or (defrost_active and op_status != 6):
-                    should_accumulate = True
-
-            if should_accumulate:
-                # Accumulate values ONLY when in the correct mode AND accumulating
-                # positive energy. This prevents accumulation of residual heat
-                # (energy_out) when electric power (energy_in) is zero.
-                if power_consumption_w > 0:
-                    self._energy_in += energy_consumption_kwh
-                    self._energy_out += energy_heating_kwh
-
-            # Calculate COP based on Accumulated totals
-            if self._energy_in > 0.01:
-                self._state = self._energy_out / self._energy_in
-            # If no energy consumed yet, keep previous state or 0
-
-        self.async_write_ha_state()
 
 
 class CSNetHomeDeviceSensor(CoordinatorEntity, Entity):
