@@ -3,14 +3,16 @@
 from unittest.mock import patch
 
 from homeassistant import config_entries, data_entry_flow
-from homeassistant.const import (CONF_PASSWORD, CONF_SCAN_INTERVAL,
-                                 CONF_USERNAME)
+from homeassistant.const import CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.csnet_home.const import (CONF_FAN_COIL_MODEL,
-                                                CONF_LANGUAGE,
-                                                CONF_MAX_TEMP_OVERRIDE, DOMAIN)
+from custom_components.csnet_home.const import (
+    CONF_FAN_COIL_MODEL,
+    CONF_LANGUAGE,
+    CONF_MAX_TEMP_OVERRIDE,
+    DOMAIN,
+)
 
 # Define test constants
 TEST_USERNAME = "test_user"
