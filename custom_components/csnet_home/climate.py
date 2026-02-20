@@ -12,6 +12,7 @@ from homeassistant.components.climate import (
 from homeassistant.components.climate.const import FAN_ON, ClimateEntityFeature
 from homeassistant.const import UnitOfTemperature
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
     CONF_FAN_COIL_MODEL,
@@ -48,7 +49,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     async_add_entities(
         [
             CSNetHomeClimate(
-                hass,
+                coordinator,
                 entry,
                 sensor_data=sensor_data,
                 common_data=coordinator.get_common_data()["device_status"][
@@ -62,12 +63,12 @@ async def async_setup_entry(hass, entry, async_add_entities):
     )
 
 
-class CSNetHomeClimate(ClimateEntity):
+class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
     """Representation of a thermostat (climate) entity."""
 
-    def __init__(self, hass, entry, sensor_data, common_data):
+    def __init__(self, coordinator, entry, sensor_data, common_data):
         """Initialize the thermostat entity."""
-        self.hass = hass
+        super().__init__(coordinator)
         self._sensor_data = sensor_data
         self._common_data = common_data
         self._attr_name = self._sensor_data.get("room_name", "Unknown")
@@ -90,9 +91,8 @@ class CSNetHomeClimate(ClimateEntity):
         else:
             self._attr_preset_mode = "comfort"
 
-        coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
-        installation_devices_data = coordinator.get_installation_devices_data()
-        cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
+        installation_devices_data = self.coordinator.get_installation_devices_data()
+        cloud_api = self.coordinator.hass.data[DOMAIN][self.entry.entry_id]["api"]
 
         # Determine Fan Coil type from config
         self._fan_model = self.entry.data.get(
@@ -213,7 +213,7 @@ class CSNetHomeClimate(ClimateEntity):
         # For water circuits (zone 5, 6), only return target temperature if OTC type is FIX
         if zone_id in [5, 6]:  # Water circuits (C1_WATER, C2_WATER)
             # Get installation devices data to check OTC type
-            coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
+            coordinator = self.coordinator
             installation_devices_data = coordinator.get_installation_devices_data()
 
             if installation_devices_data:
@@ -329,7 +329,7 @@ class CSNetHomeClimate(ClimateEntity):
         }
 
         # Get installation devices data (used by both fan coil and OTC)
-        coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
+        coordinator = self.coordinator
         installation_devices_data = coordinator.get_installation_devices_data()
 
         # Add fan speed information for fan coil systems
@@ -393,7 +393,7 @@ class CSNetHomeClimate(ClimateEntity):
         # For water circuits (zone 5, 6), only allow temperature changes if OTC type is FIX
         if zone_id in [5, 6]:  # Water circuits (C1_WATER, C2_WATER)
             # Get installation devices data to check OTC type
-            coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
+            coordinator = self.coordinator
             installation_devices_data = coordinator.get_installation_devices_data()
 
             if installation_devices_data:
@@ -430,7 +430,7 @@ class CSNetHomeClimate(ClimateEntity):
                 # Wait a short delay to ensure the server has processed the change
                 await asyncio.sleep(1.5)
                 # Request coordinator refresh to update the value immediately
-                coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
+                coordinator = self.coordinator
                 await coordinator.async_refresh()
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode):
@@ -491,7 +491,7 @@ class CSNetHomeClimate(ClimateEntity):
             circuit = 1 if zone_id == 1 else 2
 
             # Check if fan control is available for this circuit
-            coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
+            coordinator = self.coordinator
             installation_devices_data = coordinator.get_installation_devices_data()
             mode = self._sensor_data.get("mode", 1)
             # Skip the API check if the user has selected Legacy
@@ -551,18 +551,14 @@ class CSNetHomeClimate(ClimateEntity):
             < self._sensor_data.get("current_temperature")
         )
 
-    async def async_update(self):
-        """Update the thermostat data from the API."""
-        _LOGGER.debug("Updating CSNet Home refresh request %s", self._attr_name)
-        coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
-        if not coordinator:
-            _LOGGER.error("No coordinator instance found!")
-            return
-        await coordinator.async_request_refresh()
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        _LOGGER.debug("Updating CSNet Home data for %s", self._attr_name)
+
         self._sensor_data = next(
             (
                 x
-                for x in coordinator.get_sensors_data()
+                for x in self.coordinator.get_sensors_data()
                 if x.get("room_name") == self._attr_name
             ),
             None,
@@ -589,9 +585,10 @@ class CSNetHomeClimate(ClimateEntity):
         else:
             self._assumed_fan_mode = api_fan_mode
 
-        self._common_data = coordinator.get_common_data()
+        self._common_data = self.coordinator.get_common_data()
         # reset cached limits after data refresh
         self._cached_limits = None
+        self.async_write_ha_state()
 
     def _normalize_temperature_limit(self, value: float | int | None) -> float | None:
         """Convert raw API limit values to Celsius and validate."""
@@ -633,7 +630,7 @@ class CSNetHomeClimate(ClimateEntity):
         min_limit = default_min
         max_limit = default_max
 
-        coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
+        coordinator = self.coordinator
         installation_devices_data = coordinator.get_installation_devices_data()
 
         if installation_devices_data:
