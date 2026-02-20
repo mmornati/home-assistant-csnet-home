@@ -21,6 +21,7 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         self.entry_id = entry_id
         self.update_interval = timedelta(seconds=update_interval)
         self._device_data = {"sensors": [], "common_data": {}}
+        self._sensors_by_id = {}
         self._last_alarm_codes: dict[str, int] = {}
         super().__init__(
             hass,
@@ -117,6 +118,12 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
                                 temp_c2_water,
                             )
 
+        # Update fast lookup dictionary
+        self._sensors_by_id = {
+            (s.get("device_id"), s.get("room_id"), s.get("zone_id")): s
+            for s in self._device_data.get("sensors", [])
+        }
+
         # Raise notification if new alarm codes appear
         try:
             for sensor in self._device_data.get("sensors", []):
@@ -182,6 +189,10 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         """Return the list of sensor data."""
 
         return self._device_data["sensors"]
+
+    def get_sensor_data_by_id(self, device_id, room_id, zone_id):
+        """Return sensor data by unique ID combination (O(1) lookup)."""
+        return self._sensors_by_id.get((device_id, room_id, zone_id))
 
     def get_common_data(self):
         """Return common data shared between all sensors."""

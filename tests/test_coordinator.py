@@ -265,3 +265,26 @@ async def test_coordinator_alarm_clearing(hass: HomeAssistant):
 
     # Verify alarm code was cleared from storage
     assert "123-456-789" not in coordinator._last_alarm_codes
+
+
+@pytest.mark.asyncio
+async def test_coordinator_get_sensor_data_by_id(hass: HomeAssistant):
+    """Test getting sensor data by unique ID."""
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test")
+    sensor_1 = {"device_id": 1, "room_id": 10, "zone_id": 1, "name": "Sensor 1"}
+    sensor_2 = {"device_id": 2, "room_id": 20, "zone_id": 2, "name": "Sensor 2"}
+
+    coordinator._device_data = {
+        "sensors": [sensor_1, sensor_2],
+        "common_data": {"name": "Test Home"},
+    }
+
+    # Manually populate the lookup dictionary since we're bypassing _async_update_data
+    coordinator._sensors_by_id = {
+        (s["device_id"], s["room_id"], s["zone_id"]): s
+        for s in coordinator._device_data["sensors"]
+    }
+
+    assert coordinator.get_sensor_data_by_id(1, 10, 1) == sensor_1
+    assert coordinator.get_sensor_data_by_id(2, 20, 2) == sensor_2
+    assert coordinator.get_sensor_data_by_id(3, 30, 3) is None
