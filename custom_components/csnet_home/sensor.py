@@ -1968,147 +1968,161 @@ class CSNetHomeCompressorSensor(CoordinatorEntity, Entity):
                         return first_indoors.get("secondCycle", {})
         return None
 
-    @property
-    def state(self):
-        """Return the current state of the sensor."""
-        heating_status = self._get_heating_status()
-        if not heating_status:
-            return None
-
-        # Primary compressor metrics
-        if self._key == "compressor_frequency":
-            return heating_status.get("ouHz")
-
-        if self._key == "compressor_current":
-            return heating_status.get("ouCurrent")
-
-        if self._key == "compressor_capacity":
-            return heating_status.get("unitCapacity")
-
-        # Temperatures
-        if self._key == "discharge_temperature":
-            return _convert_unsigned_to_signed_byte(
-                heating_status.get("ouDischargeTemperature")
-            )
-
-        if self._key == "evaporator_temperature":
-            return _convert_unsigned_to_signed_byte(
-                heating_status.get("ouEvapTemperature")
-            )
-
-        if self._key == "outdoor_ambient_temperature":
-            return _convert_unsigned_to_signed_byte(
-                heating_status.get("ouAmbientTemperature")
-            )
-
-        # Pressures
-        if self._key == "discharge_pressure":
-            value = heating_status.get("ouDischargePress")
-            # Pressure conversion if needed (assuming value is already in bar)
-            return value
-
-        if self._key == "suction_pressure":
-            value = heating_status.get("ouSuctionPress")
-            # Pressure conversion if needed (assuming value is already in bar)
-            return value
-
-        if self._key == "suction_pressure_correction":
-            return heating_status.get("ouSuctionPressCorrection")
-
-        # Expansion valve and control
-        if self._key == "expansion_valve_opening":
-            # evi is the expansion valve opening (0-100%)
-            return heating_status.get("evi")
-
-        if self._key == "outdoor_fan_rpm":
-            value = heating_status.get("fanRPM")
-            # -1 indicates no data or unavailable
-            return value if value != -1 else None
-
-        # Outdoor unit information
-        if self._key == "operation_status":
-            value = heating_status.get("operationStatus")
-            if value is None:
-                return None
-            return OPERATION_STATUS_MAP.get(value, f"Unknown ({value})")
-
-        if self._key == "system_status_flags":
-            # Return as hex string for easier interpretation
-            value = heating_status.get("systemStatus2Flags")
-            return f"0x{value:04X}" if value is not None else None
-
-        if self._key == "ou_code":
-            value = heating_status.get("ouCode")
-            # Outdoor unit codes
-            ou_code_map = {
+    _SENSOR_MAPPING = {
+        # Primary Compressor Sensors
+        "compressor_frequency": {"key": "ouHz"},
+        "compressor_current": {"key": "ouCurrent"},
+        "compressor_capacity": {"key": "unitCapacity"},
+        # Compressor Temperatures
+        "discharge_temperature": {
+            "key": "ouDischargeTemperature",
+            "transform": _convert_unsigned_to_signed_byte,
+        },
+        "evaporator_temperature": {
+            "key": "ouEvapTemperature",
+            "transform": _convert_unsigned_to_signed_byte,
+        },
+        "outdoor_ambient_temperature": {
+            "key": "ouAmbientTemperature",
+            "transform": _convert_unsigned_to_signed_byte,
+        },
+        # Compressor Pressures
+        "discharge_pressure": {"key": "ouDischargePress"},
+        "suction_pressure": {"key": "ouSuctionPress"},
+        "suction_pressure_correction": {"key": "ouSuctionPressCorrection"},
+        # Expansion Valve and Control
+        "expansion_valve_opening": {"key": "evi"},
+        "outdoor_fan_rpm": {"key": "fanRPM", "invalid": -1},
+        # Outdoor Unit Information
+        "operation_status": {
+            "key": "operationStatus",
+            "map": OPERATION_STATUS_MAP,
+        },
+        "system_status_flags": {
+            "key": "systemStatus2Flags",
+            "transform": lambda x: f"0x{x:04X}" if x is not None else None,
+        },
+        "ou_code": {
+            "key": "ouCode",
+            "map": {
                 0: "Unknown",
                 1: "RAS-1",
                 2: "RAS-2",
                 3: "Yutaki",
                 4: "RAD",
-            }
-            return ou_code_map.get(value, f"Code {value}")
+            },
+            "default_map": lambda x: f"Code {x}",
+        },
+        "ou_capacity_code": {"key": "ouCapacityCode"},
+        "ou_pcb_software": {"key": "ouPcbSoft", "invalid": -1},
+        # Secondary Cycle Sensors
+        "secondary_discharge_temp": {
+            "key": "dischargeTemp",
+            "source": "second_cycle",
+            "transform": _convert_unsigned_to_signed_byte,
+        },
+        "secondary_suction_temp": {
+            "key": "suctionTemp",
+            "source": "second_cycle",
+            "transform": _convert_unsigned_to_signed_byte,
+        },
+        "secondary_discharge_pressure": {
+            "key": "dischargePressure",
+            "source": "second_cycle",
+            "invalid": 127,
+        },
+        "secondary_suction_pressure": {
+            "key": "suctionPressure",
+            "source": "second_cycle",
+            "invalid": 127,
+        },
+        "secondary_compressor_frequency": {
+            "key": "compressorFreq",
+            "source": "second_cycle",
+        },
+        "secondary_expansion_valve": {
+            "key": "expansionValve",
+            "source": "second_cycle",
+            "invalid": 255,
+        },
+        "secondary_compressor_current": {
+            "key": "compressorCurrent",
+            "source": "second_cycle",
+        },
+        "secondary_current": {
+            "key": "secondaryCurrent",
+            "source": "second_cycle",
+        },
+        "secondary_superheat": {
+            "key": "teSH",
+            "source": "second_cycle",
+        },
+        "secondary_stop_code": {
+            "key": "stopCode",
+            "source": "second_cycle",
+            "transform": lambda x: x if x != 0 else "Running",
+        },
+        "secondary_retry_code": {
+            "key": "retryCode",
+            "source": "second_cycle",
+            "transform": lambda x: x if x != 0 else "Normal",
+        },
+    }
 
-        if self._key == "ou_capacity_code":
-            return heating_status.get("ouCapacityCode")
+    @property
+    def state(self):
+        """Return the current state of the sensor."""
+        mapping = self._SENSOR_MAPPING.get(self._key)
+        if not mapping:
+            return None
 
-        if self._key == "ou_pcb_software":
-            value = heating_status.get("ouPcbSoft")
-            # -1 indicates no data
-            return value if value != -1 else None
-
-        # Secondary cycle sensors
-        second_cycle = self._get_second_cycle()
-        if not second_cycle:
-            # If no secondary cycle data, return None
-            if self._key.startswith("secondary_"):
-                return None
+        # Determine source
+        source = mapping.get("source", "heating_status")
+        if source == "heating_status":
+            data = self._get_heating_status()
+        elif source == "second_cycle":
+            data = self._get_second_cycle()
         else:
-            if self._key == "secondary_discharge_temp":
-                # 0°C is a valid temperature reading, don't filter it out
-                return _convert_unsigned_to_signed_byte(
-                    second_cycle.get("dischargeTemp")
-                )
+            return None
 
-            if self._key == "secondary_suction_temp":
-                return _convert_unsigned_to_signed_byte(second_cycle.get("suctionTemp"))
+        if not data:
+            return None
 
-            if self._key == "secondary_discharge_pressure":
-                value = second_cycle.get("dischargePressure")
-                # 127 seems to be a default/invalid value
-                return value if value != 127 else None
+        # Get raw value
+        value = data.get(mapping["key"])
 
-            if self._key == "secondary_suction_pressure":
-                value = second_cycle.get("suctionPressure")
-                # 127 seems to be a default/invalid value
-                return value if value != 127 else None
+        # Check for invalid values
+        invalid = mapping.get("invalid")
+        if invalid is not None:
+            if isinstance(invalid, list):
+                if value in invalid:
+                    return None
+            elif value == invalid:
+                return None
 
-            if self._key == "secondary_compressor_frequency":
-                return second_cycle.get("compressorFreq")
+        # Check for None (unless transform handles it, but safer here generally)
+        # Note: _convert_unsigned_to_signed_byte handles None.
+        # But for maps, we need a value.
+        if value is None:
+            # Some transforms might handle None (like the lambda for flags)
+            # but generally None means no data.
+            # Let's let transform handle it if present, otherwise return None.
+            if "transform" not in mapping:
+                return None
 
-            if self._key == "secondary_expansion_valve":
-                value = second_cycle.get("expansionValve")
-                # 255 seems to be a default/invalid value
-                return value if value != 255 else None
+        # Apply mapping
+        if "map" in mapping:
+            map_dict = mapping["map"]
+            default_map = mapping.get("default_map")
+            if default_map:
+                return map_dict.get(value, default_map(value))
+            return map_dict.get(value, f"Unknown ({value})")
 
-            if self._key == "secondary_compressor_current":
-                return second_cycle.get("compressorCurrent")
+        # Apply transformation
+        if "transform" in mapping:
+            return mapping["transform"](value)
 
-            if self._key == "secondary_current":
-                return second_cycle.get("secondaryCurrent")
-
-            if self._key == "secondary_superheat":
-                return second_cycle.get("teSH")
-
-            if self._key == "secondary_stop_code":
-                value = second_cycle.get("stopCode")
-                return value if value != 0 else "Running"
-
-            if self._key == "secondary_retry_code":
-                value = second_cycle.get("retryCode")
-                return value if value != 0 else "Normal"
-
-        return None
+        return value
 
     @property
     def device_class(self):
