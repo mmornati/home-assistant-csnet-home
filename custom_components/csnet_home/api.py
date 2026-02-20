@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import time
+from dataclasses import dataclass
 
 import aiohttp
 import async_timeout
@@ -25,6 +26,41 @@ from custom_components.csnet_home.const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+
+@dataclass
+class TemperatureLimitConfig:
+    """Configuration for temperature limits for a zone."""
+
+    heat_min_key: str
+    heat_max_key: str
+    cool_min_key: str
+    cool_max_key: str
+    default_max: int
+
+
+TEMPERATURE_LIMIT_CONFIGS = {
+    1: TemperatureLimitConfig(
+        "heatAirMinC1",
+        "heatAirMaxC1",
+        "coolAirMinC1",
+        "coolAirMaxC1",
+        HEATING_MAX_TEMPERATURE,
+    ),
+    2: TemperatureLimitConfig(
+        "heatAirMinC2",
+        "heatAirMaxC2",
+        "coolAirMinC2",
+        "coolAirMaxC2",
+        HEATING_MAX_TEMPERATURE,
+    ),
+    5: TemperatureLimitConfig(
+        "heatMinC1", "heatMaxC1", "coolMinC1", "coolMaxC1", WATER_CIRCUIT_MAX_HEAT
+    ),
+    6: TemperatureLimitConfig(
+        "heatMinC2", "heatMaxC2", "coolMinC2", "coolMaxC2", WATER_CIRCUIT_MAX_HEAT
+    ),
+}
 
 TO_REDACT = {
     "latitude",
@@ -660,72 +696,32 @@ class CSNetHomeAPI:
         if not heating_status:
             return (None, None)
 
-        # Determine if we're in heating or cooling mode
-        is_heating = mode == 1  # mode 1 is heat, mode 0 is cool
-
-        min_temp = None
-        max_temp = None
-
-        if zone_id == 1:  # Air circuit 1 (C1_AIR)
-            if is_heating:
-                raw_min = heating_status.get("heatAirMinC1")
-                raw_max = heating_status.get("heatAirMaxC1")
-                # Validate with RTU_MAX default (35°C) - JavaScript multiplies by 10, but we work in Celsius
-                max_temp = self._validate_value(raw_max, HEATING_MAX_TEMPERATURE)
-                min_temp = raw_min  # Min doesn't have a default in JS code
-            else:
-                raw_min = heating_status.get("coolAirMinC1")
-                raw_max = heating_status.get("coolAirMaxC1")
-                # Validate with RTU_MAX default (35°C)
-                max_temp = self._validate_value(raw_max, HEATING_MAX_TEMPERATURE)
-                min_temp = raw_min  # Min doesn't have a default in JS code
-        elif zone_id == 2:  # Air circuit 2 (C2_AIR)
-            if is_heating:
-                raw_min = heating_status.get("heatAirMinC2")
-                raw_max = heating_status.get("heatAirMaxC2")
-                # Validate with RTU_MAX default (35°C)
-                max_temp = self._validate_value(raw_max, HEATING_MAX_TEMPERATURE)
-                min_temp = raw_min  # Min doesn't have a default in JS code
-            else:
-                raw_min = heating_status.get("coolAirMinC2")
-                raw_max = heating_status.get("coolAirMaxC2")
-                # Validate with RTU_MAX default (35°C)
-                max_temp = self._validate_value(raw_max, HEATING_MAX_TEMPERATURE)
-                min_temp = raw_min  # Min doesn't have a default in JS code
-        elif zone_id == 5:  # Water circuit 1 (C1_WATER)
-            if is_heating:
-                raw_min = heating_status.get("heatMinC1")
-                raw_max = heating_status.get("heatMaxC1")
-                # Validate with C1_MAX_HEAT default (80°C)
-                max_temp = self._validate_value(raw_max, WATER_CIRCUIT_MAX_HEAT)
-                min_temp = raw_min  # Min doesn't have a default in JS code
-            else:
-                raw_min = heating_status.get("coolMinC1")
-                raw_max = heating_status.get("coolMaxC1")
-                # Validate with C1_MAX_COOL default - not defined in constants, use same as heat for now
-                # Note: JavaScript uses C1_MAX_COOL which may differ, but not available in our constants
-                max_temp = self._validate_value(raw_max, WATER_CIRCUIT_MAX_HEAT)
-                min_temp = raw_min  # Min doesn't have a default in JS code
-        elif zone_id == 6:  # Water circuit 2 (C2_WATER)
-            if is_heating:
-                raw_min = heating_status.get("heatMinC2")
-                raw_max = heating_status.get("heatMaxC2")
-                # Validate with C2_MAX_HEAT default (80°C)
-                max_temp = self._validate_value(raw_max, WATER_CIRCUIT_MAX_HEAT)
-                min_temp = raw_min  # Min doesn't have a default in JS code
-            else:
-                raw_min = heating_status.get("coolMinC2")
-                raw_max = heating_status.get("coolMaxC2")
-                # Validate with C2_MAX_COOL default - not defined in constants, use same as heat for now
-                # Note: JavaScript uses C2_MAX_COOL which may differ, but not available in our constants
-                max_temp = self._validate_value(raw_max, WATER_CIRCUIT_MAX_HEAT)
-                min_temp = raw_min  # Min doesn't have a default in JS code
-        elif zone_id == 3:  # DHW (water heater)
+        # Handle DHW (Zone 3) separately as it doesn't follow standard patterns
+        if zone_id == 3:  # DHW (water heater)
             # DHW typically only has a max limit, min is constant
             raw_max = heating_status.get("dhwMax")
             # Validate with DHW_MAX default (80°C)
             max_temp = self._validate_value(raw_max, WATER_HEATER_MAX_TEMPERATURE)
             # Min is typically 30 for DHW, not provided by API
+            return (None, max_temp)
+
+        # Check for configured zone logic
+        config = TEMPERATURE_LIMIT_CONFIGS.get(zone_id)
+        if not config:
+            return (None, None)
+
+        # Determine if we're in heating or cooling mode
+        is_heating = mode == 1  # mode 1 is heat, mode 0 is cool
+
+        if is_heating:
+            raw_min = heating_status.get(config.heat_min_key)
+            raw_max = heating_status.get(config.heat_max_key)
+        else:
+            raw_min = heating_status.get(config.cool_min_key)
+            raw_max = heating_status.get(config.cool_max_key)
+
+        max_temp = self._validate_value(raw_max, config.default_max)
+        min_temp = raw_min
 
         return (min_temp, max_temp)
 
