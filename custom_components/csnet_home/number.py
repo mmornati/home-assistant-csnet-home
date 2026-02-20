@@ -9,13 +9,8 @@ from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import (
-    DOMAIN,
-    OTC_COOLING_TYPE_FIX,
-    OTC_HEATING_TYPE_FIX,
-    WATER_CIRCUIT_MAX_HEAT,
-    WATER_CIRCUIT_MIN_HEAT,
-)
+from .const import (DOMAIN, OTC_COOLING_TYPE_FIX, OTC_HEATING_TYPE_FIX,
+                    WATER_CIRCUIT_MAX_HEAT, WATER_CIRCUIT_MIN_HEAT)
 from .coordinator import CSNetHomeCoordinator
 
 _LOGGER = logging.getLogger(__name__)
