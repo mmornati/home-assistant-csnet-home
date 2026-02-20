@@ -1,5 +1,6 @@
 """Coordinator Class to centralise all data fetching from CSNet Home."""
 
+import asyncio
 import logging
 from datetime import timedelta
 
@@ -41,15 +42,29 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
             _LOGGER.error("No CloudServiceAPI instance found!")
             return
 
-        # ensure translations are loaded before elements to enrich alarm messages
-        await cloud_api.load_translations()
+        # Ensure login is valid before launching parallel tasks to avoid race conditions
+        # with multiple concurrent login attempts.
+        if not cloud_api.logged_in:
+            await cloud_api.async_login()
 
-        # Fetch elements data, installation devices data, and alarms
-        elements_data = await cloud_api.async_get_elements_data()
-        installation_devices_data = (
-            await cloud_api.async_get_installation_devices_data()
+        async def fetch_elements_chain():
+            # ensure translations are loaded before elements to enrich alarm messages
+            await cloud_api.load_translations()
+            # Fetch elements data and alarms
+            elements = await cloud_api.async_get_elements_data()
+            alarms = await cloud_api.async_get_installation_alarms()
+            return elements, alarms
+
+        # Run independent fetch operations in parallel
+        # 1. Elements chain (translations -> elements -> alarms)
+        # 2. Installation devices data (independent)
+        results = await asyncio.gather(
+            fetch_elements_chain(),
+            cloud_api.async_get_installation_devices_data(),
         )
-        installation_alarms_data = await cloud_api.async_get_installation_alarms()
+
+        (elements_data, installation_alarms_data) = results[0]
+        installation_devices_data = results[1]
 
         if elements_data:
             self._device_data = elements_data
