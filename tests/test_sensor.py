@@ -40,10 +40,23 @@ def build_context():
         "current_temperature": 19.5,
         "setting_temperature": 20.0,
         "alarm_message": None,
+        # Ensure ID fields are present for lookup
+        "zone_id": 1,
     }
     common = {"name": "Hitachi PAC", "firmware": "1.0.0"}
+
+    def get_sensor_data_by_id(device_id, room_id, zone_id):
+        if (
+            device_id == sensor_data["device_id"]
+            and room_id == sensor_data["room_id"]
+            and zone_id == sensor_data["zone_id"]
+        ):
+            return sensor_data
+        return None
+
     coordinator = SimpleNamespace(
         get_sensors_data=lambda: [sensor_data],
+        get_sensor_data_by_id=get_sensor_data_by_id,
     )
     return coordinator, sensor_data, common
 
@@ -155,8 +168,16 @@ def test_sensor_device_info_with_missing_sensor_data_keys():
         # Missing device_name and room_name
     }
     common = {"name": "Hitachi PAC", "firmware": "1.0.0"}
+
+    def get_sensor_data_by_id(device_id, room_id, zone_id):
+        # Allow lookup even with missing keys if IDs match
+        if device_id == sensor_data.get("device_id"):
+            return sensor_data
+        return None
+
     coordinator = SimpleNamespace(
         get_sensors_data=lambda: [sensor_data],
+        get_sensor_data_by_id=get_sensor_data_by_id,
     )
     s = CSNetHomeSensor(coordinator, sensor_data, common, "current_temperature")
 

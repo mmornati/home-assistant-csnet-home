@@ -857,6 +857,9 @@ class CSNetHomeSensor(CoordinatorEntity, Entity):
         self._device_class = device_class
         self._unit = unit
         self._name = f"{sensor_data.get('device_name', 'Unknown')} {sensor_data.get('room_name', 'Unknown')} {key}"
+        self._device_id = sensor_data.get("device_id")
+        self._room_id = sensor_data.get("room_id")
+        self._zone_id = sensor_data.get("zone_id")
         _LOGGER.debug("Configuring Sensor %s", self._name)
 
     @property
@@ -890,13 +893,8 @@ class CSNetHomeSensor(CoordinatorEntity, Entity):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Update sensor with latest data from coordinator."""
-        self._sensor_data = next(
-            (
-                x
-                for x in self._coordinator.get_sensors_data()
-                if x.get("room_name") in self._name
-            ),
-            None,
+        self._sensor_data = self._coordinator.get_sensor_data_by_id(
+            self._device_id, self._room_id, self._zone_id
         )
         if self._sensor_data:
             self.async_write_ha_state()
