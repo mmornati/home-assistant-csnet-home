@@ -305,22 +305,33 @@ async def async_setup_entry(hass, entry, async_add_entities):
             )
 
     # Add alarm history sensor (shows recent alarms from installation alarms API)
-    sensors.append(CSNetHomeAlarmHistorySensor(coordinator, coordinator.get_common_data()))
+    sensors.append(
+        CSNetHomeAlarmHistorySensor(coordinator, coordinator.get_common_data())
+    )
 
     # Add alarm statistics sensors (total count, by origin, by device)
     sensors.append(
         CSNetHomeAlarmStatisticsSensor(
-            coordinator, coordinator.get_common_data(), "total_alarm_count", "Total Alarms"
+            coordinator,
+            coordinator.get_common_data(),
+            "total_alarm_count",
+            "Total Alarms",
         )
     )
     sensors.append(
         CSNetHomeAlarmStatisticsSensor(
-            coordinator, coordinator.get_common_data(), "active_alarm_count", "Active Alarms"
+            coordinator,
+            coordinator.get_common_data(),
+            "active_alarm_count",
+            "Active Alarms",
         )
     )
     sensors.append(
         CSNetHomeAlarmStatisticsSensor(
-            coordinator, coordinator.get_common_data(), "alarm_by_origin", "Alarms by Origin"
+            coordinator,
+            coordinator.get_common_data(),
+            "alarm_by_origin",
+            "Alarms by Origin",
         )
     )
 
