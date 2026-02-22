@@ -64,7 +64,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     async def async_handle_delete_alarm(call: ServiceCall):
         """Handle the delete alarm service call."""
-        alarm_id = call.data.get("alarm_id")
+        alarm_id_input = call.data.get("alarm_id")
+
+        # Convert to int if it's a string (handles both direct ID and templates)
+        if alarm_id_input is None:
+            _LOGGER.error("alarm_id is required")
+            return
+        try:
+            alarm_id = int(alarm_id_input)
+        except (ValueError, TypeError):
+            _LOGGER.error("Invalid alarm_id: %s", alarm_id_input)
+            return
 
         # Iterate over all configured entries to find the API
         # In most cases there's only one
