@@ -49,11 +49,14 @@ jobs:
           python-version: "3.12"
           cache: 'pip'
 
-      - name: Install Black
-        run: python3 -m pip install black==25.9.0
+      - name: Install formatter tools
+        run: python3 -m pip install black==25.12.0 isort==5.13.2
 
       - name: Check formatting with Black
         run: black --check --diff .
+
+      - name: Check imports with isort
+        run: isort --check-only --diff .
 
   lint:
     name: Lint with Pylint

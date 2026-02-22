@@ -10,6 +10,8 @@ from homeassistant.const import (
     SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
     STATE_OFF,
     STATE_ON,
+    UnitOfEnergy,
+    UnitOfPower,
     UnitOfPressure,
     UnitOfTemperature,
     UnitOfVolumeFlowRate,
@@ -21,12 +23,7 @@ from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
-from .const import (
-    DOMAIN,
-    OPERATION_STATUS_MAP,
-    OTC_COOLING_TYPE_NAMES,
-    OTC_HEATING_TYPE_NAMES,
-)
+from .const import DOMAIN, OPERATION_STATUS_MAP, OTC_COOLING_TYPE_NAMES, OTC_HEATING_TYPE_NAMES
 from .coordinator import CSNetHomeCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -69,16 +66,15 @@ async def async_setup_entry(hass, entry, async_add_entities):
         return None
 
     sensors = []
+    common_data = coordinator.get_common_data()
     for sensor_data in coordinator.get_sensors_data():
-        common_data = coordinator.get_common_data()["device_status"][
-            sensor_data["device_id"]
-        ]
+        device_common_data = common_data.get("device_status", {}).get(sensor_data["device_id"], {})
 
         sensors.append(
             CSNetHomeSensor(
                 coordinator,
                 sensor_data,
-                common_data,
+                device_common_data,
                 "current_temperature",
                 "temperature",
                 UnitOfTemperature.CELSIUS,
@@ -88,58 +84,38 @@ async def async_setup_entry(hass, entry, async_add_entities):
             CSNetHomeSensor(
                 coordinator,
                 sensor_data,
-                common_data,
+                device_common_data,
                 "setting_temperature",
                 "temperature",
                 UnitOfTemperature.CELSIUS,
             )
         )
-        sensors.append(
-            CSNetHomeSensor(coordinator, sensor_data, common_data, "mode", "enum")
-        )
-        sensors.append(
-            CSNetHomeSensor(coordinator, sensor_data, common_data, "on_off", "enum")
-        )
-        sensors.append(
-            CSNetHomeSensor(
-                coordinator, sensor_data, common_data, "doingBoost", "binary"
-            )
-        )
+        sensors.append(CSNetHomeSensor(coordinator, sensor_data, device_common_data, "mode", "enum"))
+        sensors.append(CSNetHomeSensor(coordinator, sensor_data, device_common_data, "on_off", "enum"))
+        sensors.append(CSNetHomeSensor(coordinator, sensor_data, device_common_data, "doingBoost", "binary"))
         # expose alarm information
-        sensors.append(
-            CSNetHomeSensor(coordinator, sensor_data, common_data, "alarm_code", "enum")
-        )
-        sensors.append(
-            CSNetHomeSensor(
-                coordinator, sensor_data, common_data, "alarm_active", "binary"
-            )
-        )
-        sensors.append(
-            CSNetHomeSensor(
-                coordinator, sensor_data, common_data, "alarm_message", "enum"
-            )
-        )
+        sensors.append(CSNetHomeSensor(coordinator, sensor_data, device_common_data, "alarm_code", "enum"))
+        sensors.append(CSNetHomeSensor(coordinator, sensor_data, device_common_data, "alarm_active", "binary"))
+        sensors.append(CSNetHomeSensor(coordinator, sensor_data, device_common_data, "alarm_message", "enum"))
         # Enhanced alarm information
         sensors.append(
             CSNetHomeSensor(
-                coordinator, sensor_data, common_data, "alarm_code_formatted", "enum"
+                coordinator,
+                sensor_data,
+                device_common_data,
+                "alarm_code_formatted",
+                "enum",
             )
         )
-        sensors.append(
-            CSNetHomeSensor(
-                coordinator, sensor_data, common_data, "alarm_origin", "enum"
-            )
-        )
-        sensors.append(
-            CSNetHomeSensor(coordinator, sensor_data, common_data, "unit_type", "enum")
-        )
+        sensors.append(CSNetHomeSensor(coordinator, sensor_data, device_common_data, "alarm_origin", "enum"))
+        sensors.append(CSNetHomeSensor(coordinator, sensor_data, device_common_data, "unit_type", "enum"))
 
         # Add WiFi signal strength sensor
         sensors.append(
             CSNetHomeDeviceSensor(
                 coordinator,
                 sensor_data,
-                common_data,
+                device_common_data,
                 "wifi_signal",
                 SensorDeviceClass.SIGNAL_STRENGTH,
                 SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
@@ -152,7 +128,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
             CSNetHomeDeviceSensor(
                 coordinator,
                 sensor_data,
-                common_data,
+                device_common_data,
                 "connectivity",
                 "binary",
                 None,
@@ -165,7 +141,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
             CSNetHomeDeviceSensor(
                 coordinator,
                 sensor_data,
-                common_data,
+                device_common_data,
                 "last_communication",
                 SensorDeviceClass.TIMESTAMP,
                 None,
@@ -483,25 +459,98 @@ async def async_setup_entry(hass, entry, async_add_entities):
             )
         )
 
+        # ----------------------------------------------------------------------
+        # Calculated Sensors (Instantaneous)
+        # ----------------------------------------------------------------------
+        sensors.append(
+            CSNetHomeCalculatedSensor(
+                coordinator,
+                global_device_data,
+                common_data,
+                "instant_consumption",
+                SensorDeviceClass.POWER,
+                UnitOfPower.WATT,
+                "Instant Consumption",
+            )
+        )
+        sensors.append(
+            CSNetHomeCalculatedSensor(
+                coordinator,
+                global_device_data,
+                common_data,
+                "heating_power",
+                SensorDeviceClass.POWER,
+                UnitOfPower.WATT,
+                "Output Power",
+            )
+        )
+        sensors.append(
+            CSNetHomeCalculatedSensor(
+                coordinator,
+                global_device_data,
+                common_data,
+                "instant_cop",
+                None,
+                "",  # Force unit to empty string to enable graphing
+                "Instant COP",
+            )
+        )
+
+        # ----------------------------------------------------------------------
+        # Accumulated Sensors (Daily)
+        # ----------------------------------------------------------------------
+        sensors.append(
+            CSNetHomeDailySensor(
+                coordinator,
+                global_device_data,
+                common_data,
+                "daily_consumption",
+                SensorDeviceClass.ENERGY,
+                UnitOfEnergy.KILO_WATT_HOUR,
+                "Daily Consumption",
+            )
+        )
+        sensors.append(
+            CSNetHomeDailySensor(
+                coordinator,
+                global_device_data,
+                common_data,
+                "daily_heating",
+                SensorDeviceClass.ENERGY,
+                UnitOfEnergy.KILO_WATT_HOUR,
+                "Daily Output Energy",
+            )
+        )
+        sensors.append(
+            CSNetHomeDailySensor(
+                coordinator,
+                global_device_data,
+                common_data,
+                "daily_cop_heating",
+                None,
+                "",  # Force unit to empty string to enable graphing
+                "Daily COP",
+            )
+        )
+        sensors.append(
+            CSNetHomeDailySensor(
+                coordinator,
+                global_device_data,
+                common_data,
+                "daily_cop_dhw",
+                None,
+                "",  # Force unit to empty string to enable graphing
+                "DHW Daily COP",
+            )
+        )
+
     # Add alarm history sensor (shows recent alarms from installation alarms API)
     sensors.append(CSNetHomeAlarmHistorySensor(coordinator, common_data))
 
     # Add alarm statistics sensors (total count, by origin, by device)
-    sensors.append(
-        CSNetHomeAlarmStatisticsSensor(
-            coordinator, common_data, "total_alarm_count", "Total Alarms"
-        )
-    )
-    sensors.append(
-        CSNetHomeAlarmStatisticsSensor(
-            coordinator, common_data, "active_alarm_count", "Active Alarms"
-        )
-    )
-    sensors.append(
-        CSNetHomeAlarmStatisticsSensor(
-            coordinator, common_data, "alarm_by_origin", "Alarms by Origin"
-        )
-    )
+    sensors.append(CSNetHomeAlarmStatisticsSensor(coordinator, common_data, "total_alarm_count", "Total Alarms"))
+    sensors.append(CSNetHomeAlarmStatisticsSensor(coordinator, common_data, "active_alarm_count", "Active Alarms"))
+    sensors.append(CSNetHomeAlarmStatisticsSensor(coordinator, common_data, "alarm_by_origin", "Alarms by Origin"))
 
     # Add compressor/outdoor unit sensors
     if installation_devices_data:
@@ -857,6 +906,9 @@ class CSNetHomeSensor(CoordinatorEntity, Entity):
         self._device_class = device_class
         self._unit = unit
         self._name = f"{sensor_data.get('device_name', 'Unknown')} {sensor_data.get('room_name', 'Unknown')} {key}"
+        self._device_id = sensor_data.get("device_id")
+        self._room_id = sensor_data.get("room_id")
+        self._zone_id = sensor_data.get("zone_id")
         _LOGGER.debug("Configuring Sensor %s", self._name)
 
     @property
@@ -890,14 +942,7 @@ class CSNetHomeSensor(CoordinatorEntity, Entity):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Update sensor with latest data from coordinator."""
-        self._sensor_data = next(
-            (
-                x
-                for x in self._coordinator.get_sensors_data()
-                if x.get("room_name") in self._name
-            ),
-            None,
-        )
+        self._sensor_data = self._coordinator.get_sensor_data_by_id(self._device_id, self._room_id, self._zone_id)
         if self._sensor_data:
             self.async_write_ha_state()
 
@@ -913,9 +958,7 @@ class CSNetHomeSensor(CoordinatorEntity, Entity):
         # 2. Full common_data dict (after update): _common_data = {"device_status": {...}}
         if "device_status" in self._common_data:
             # After update: nested structure
-            device_status = self._common_data.get("device_status", {}).get(
-                device_id, {}
-            )
+            device_status = self._common_data.get("device_status", {}).get(device_id, {})
             device_name_from_status = device_status.get("name", "Unknown")
             firmware = device_status.get("firmware")
         else:
@@ -974,14 +1017,24 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, Entity):
         self._name = f"{device_data['device_name']} {device_data['room_name']} {self._friendly_name}"
         _LOGGER.debug("Configuring Installation Sensor %s", self._name)
 
-    @property
-    def state(self):
-        """Return the current state of the sensor."""
-        # Special handling for weather_temperature from cloud service (Issue #79)
-        if self._key == "weather_temperature":
-            common_data = self._coordinator.get_common_data()
-            return common_data.get("weather_temperature")
+    def _get_heating_status(self):
+        """Get heatingStatus from installation devices data."""
+        installation_data = self._coordinator.get_installation_devices_data()
+        if not isinstance(installation_data, dict):
+            return None
+        data_array = installation_data.get("data", [])
+        if isinstance(data_array, list) and len(data_array) > 0:
+            first_device = data_array[0]
+            if isinstance(first_device, dict):
+                indoors_array = first_device.get("indoors", [])
+                if isinstance(indoors_array, list) and len(indoors_array) > 0:
+                    first_indoors = indoors_array[0]
+                    if isinstance(first_indoors, dict):
+                        return first_indoors.get("heatingStatus", {})
+        return None
 
+    def _get_raw_value(self):
+        """Get raw value from installation data or heating status."""
         installation_data = self._coordinator.get_installation_devices_data()
 
         # Map the sensor keys to actual API response keys from indoors/heatingStatus
@@ -1019,44 +1072,20 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, Entity):
             for possible_key in possible_keys:
                 value = installation_data.get(possible_key)
                 if value is not None:
-                    break
+                    return value
 
-            # If not found, try in data[0].indoors[0].heatingStatus structure
-            if value is None:
-                data_array = installation_data.get("data", [])
-                if isinstance(data_array, list) and len(data_array) > 0:
-                    first_device = data_array[0]
-                    if isinstance(first_device, dict):
-                        indoors_array = first_device.get("indoors", [])
-                        if isinstance(indoors_array, list) and len(indoors_array) > 0:
-                            first_indoors = indoors_array[0]
-                            if isinstance(first_indoors, dict):
-                                heating_status = first_indoors.get("heatingStatus", {})
-                                if isinstance(heating_status, dict):
-                                    for possible_key in possible_keys:
-                                        value = heating_status.get(possible_key)
-                                        if value is not None:
-                                            break
+            # If not found, try in heatingStatus structure
+            heating_status = self._get_heating_status()
+            if heating_status:
+                for possible_key in possible_keys:
+                    value = heating_status.get(possible_key)
+                    if value is not None:
+                        return value
 
-        # Handle special cases for different sensor types
-        if self._key == "defrost":
-            # defrosting: 0 = off, 1 = on
-            return STATE_ON if value == 1 else STATE_OFF
-        if self._key == "water_flow":
-            # waterFlow value must be divided by 10 to have the right measurement unit
-            if isinstance(value, (int, float)):
-                return value / 10
-            return value
-        if self._key == "water_pressure":
-            # waterPressure: app shows 4.48bar, value is 224, so divide by 50
-            if isinstance(value, (int, float)):
-                return value / 50
-            return value
-        if self._key in ["pump_speed", "mix_valve_position"]:
-            # These values are already in percentage (0-100) from the API
-            return value
+        return None
 
-        # Central control configuration sensors
+    def _handle_central_control_config(self, value):
+        """Handle central control configuration sensors."""
         if self._key == "unit_model":
             # Decode unit model codes
             unit_models = {
@@ -1089,135 +1118,145 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, Entity):
                 decoded += " ⚠️"  # Warning for insufficient control
             return decoded
 
-        if self._key == "central_control_enabled":
-            # Calculate if central control is properly configured
-            # Based on JavaScript function isCentralWellConfigured()
-            if not isinstance(installation_data, dict):
-                return STATE_OFF
+        return value
 
-            heating_status = None
-            data_array = installation_data.get("data", [])
-            if isinstance(data_array, list) and len(data_array) > 0:
-                first_device = data_array[0]
-                if isinstance(first_device, dict):
-                    indoors_array = first_device.get("indoors", [])
-                    if isinstance(indoors_array, list) and len(indoors_array) > 0:
-                        first_indoors = indoors_array[0]
-                        if isinstance(first_indoors, dict):
-                            heating_status = first_indoors.get("heatingStatus", {})
-
-            if not heating_status:
-                return STATE_OFF
-
-            central_config = heating_status.get("centralConfig", 0)
-
-            # Central config >= 3 means "Total" control is enabled
-            if central_config >= 3:
-                return STATE_ON
-
-            # For non-S80 models, check LCD software version
-            unit_model = heating_status.get("unitModel", 0)
-            code_yutaki_s80 = 2
-
-            if unit_model != code_yutaki_s80:
-                lcd_soft = heating_status.get("lcdSoft", 0)
-
-                # lcdSoft == 0 means not configured yet (during wizard)
-                if lcd_soft == 0:
-                    return STATE_ON
-
-                # Version >= 0x0222 (546 decimal) allows control
-                if lcd_soft >= 0x0222:
-                    return STATE_ON
-
+    def _handle_central_control_enabled(self):
+        """Calculate if central control is properly configured."""
+        heating_status = self._get_heating_status()
+        if not heating_status:
             return STATE_OFF
 
-        # System Configuration Diagnostic sensors (Issue #78)
-        # Extract systemConfigBits from heatingStatus
+        central_config = heating_status.get("centralConfig", 0)
+
+        # Central config >= 3 means "Total" control is enabled
+        if central_config >= 3:
+            return STATE_ON
+
+        # For non-S80 models, check LCD software version
+        unit_model = heating_status.get("unitModel", 0)
+        code_yutaki_s80 = 2
+
+        if unit_model != code_yutaki_s80:
+            lcd_soft = heating_status.get("lcdSoft", 0)
+
+            # lcdSoft == 0 means not configured yet (during wizard)
+            if lcd_soft == 0:
+                return STATE_ON
+
+            # Version >= 0x0222 (546 decimal) allows control
+            if lcd_soft >= 0x0222:
+                return STATE_ON
+
+        return STATE_OFF
+
+    def _handle_diagnostic_sensors(self):
+        """Handle System Configuration Diagnostic sensors (Issue #78)."""
+        heating_status = self._get_heating_status()
+        if not heating_status:
+            return STATE_OFF
+
+        system_config_bits = heating_status.get("systemConfigBits", 0)
+
+        # Decode the specific bit based on the sensor key
+        bit_masks = {
+            "cascade_slave_mode": 0x1000,  # 4096
+            "fan_coil_compatible": 0x2000,  # 8192
+            "c1_thermostat_present": 0x40,  # 64
+            "c2_thermostat_present": 0x80,  # 128
+        }
+
+        mask = bit_masks.get(self._key)
+        if mask:
+            return STATE_ON if (system_config_bits & mask) > 0 else STATE_OFF
+
+        return STATE_OFF
+
+    def _handle_otc_sensors(self):
+        """Handle OTC (Outdoor Temperature Compensation) sensors (Issue #71)."""
+        heating_status = self._get_heating_status()
+        if not heating_status:
+            return "Unknown"
+
+        # Map sensor key to API key
+        otc_key_map = {
+            "otc_heating_type_c1": "otcTypeHeatC1",
+            "otc_cooling_type_c1": "otcTypeCoolC1",
+            "otc_heating_type_c2": "otcTypeHeatC2",
+            "otc_cooling_type_c2": "otcTypeCoolC2",
+        }
+
+        api_key = otc_key_map.get(self._key)
+        if api_key:
+            otc_value = heating_status.get(api_key)
+            if otc_value is not None:
+                # Return the descriptive name for the OTC type
+                if "heating" in self._key:
+                    return OTC_HEATING_TYPE_NAMES.get(otc_value, f"Unknown ({otc_value})")
+                return OTC_COOLING_TYPE_NAMES.get(otc_value, f"Unknown ({otc_value})")
+
+        return "Unknown"
+
+    def _handle_simple_transformations(self, value):
+        """Handle special cases and transformations for different sensor types."""
+        if self._key == "defrost":
+            # defrosting: 0 = off, 1 = on
+            return STATE_ON if value == 1 else STATE_OFF
+
+        if self._key == "water_flow":
+            # waterFlow value must be divided by 10 to have the right measurement unit
+            if isinstance(value, (int, float)):
+                return value / 10
+            return value
+
+        if self._key == "water_pressure":
+            # waterPressure: app shows 4.48bar, value is 224, so divide by 50
+            if isinstance(value, (int, float)):
+                return value / 50
+            return value
+
+        if self._key in ["pump_speed", "mix_valve_position"]:
+            # These values are already in percentage (0-100) from the API
+            return value
+
+        return value
+
+    @property
+    def state(self):
+        """Return the current state of the sensor."""
+        # Special handling for weather_temperature from cloud service (Issue #79)
+        if self._key == "weather_temperature":
+            common_data = self._coordinator.get_common_data()
+            return common_data.get("weather_temperature")
+
+        # 1. Handle complex calculated/logic-based sensors first
+        if self._key == "central_control_enabled":
+            return self._handle_central_control_enabled()
+
         if self._key in [
             "cascade_slave_mode",
             "fan_coil_compatible",
             "c1_thermostat_present",
             "c2_thermostat_present",
         ]:
-            heating_status = None
-            data_array = installation_data.get("data", [])
-            if isinstance(data_array, list) and len(data_array) > 0:
-                first_device = data_array[0]
-                if isinstance(first_device, dict):
-                    indoors_array = first_device.get("indoors", [])
-                    if isinstance(indoors_array, list) and len(indoors_array) > 0:
-                        first_indoors = indoors_array[0]
-                        if isinstance(first_indoors, dict):
-                            heating_status = first_indoors.get("heatingStatus", {})
+            return self._handle_diagnostic_sensors()
 
-            if not heating_status:
-                return STATE_OFF
-
-            system_config_bits = heating_status.get("systemConfigBits", 0)
-
-            # Decode the specific bit based on the sensor key
-            if self._key == "cascade_slave_mode":
-                # Bit 0x1000 (4096) indicates cascade slave mode
-                return STATE_ON if (system_config_bits & 0x1000) > 0 else STATE_OFF
-            if self._key == "fan_coil_compatible":
-                # Bit 0x2000 (8192) indicates fan coil compatibility
-                return STATE_ON if (system_config_bits & 0x2000) > 0 else STATE_OFF
-            if self._key == "c1_thermostat_present":
-                # Bit 0x40 (64) indicates C1 thermostat present
-                return STATE_ON if (system_config_bits & 0x40) > 0 else STATE_OFF
-            if self._key == "c2_thermostat_present":
-                # Bit 0x80 (128) indicates C2 thermostat present
-                return STATE_ON if (system_config_bits & 0x80) > 0 else STATE_OFF
-
-        # OTC (Outdoor Temperature Compensation) sensors (Issue #71)
         if self._key in [
             "otc_heating_type_c1",
             "otc_cooling_type_c1",
             "otc_heating_type_c2",
             "otc_cooling_type_c2",
         ]:
-            if not installation_data:
-                return "Unknown"
+            return self._handle_otc_sensors()
 
-            heating_status = None
-            data_array = installation_data.get("data", [])
-            if isinstance(data_array, list) and len(data_array) > 0:
-                first_device = data_array[0]
-                if isinstance(first_device, dict):
-                    indoors_array = first_device.get("indoors", [])
-                    if isinstance(indoors_array, list) and len(indoors_array) > 0:
-                        first_indoors = indoors_array[0]
-                        if isinstance(first_indoors, dict):
-                            heating_status = first_indoors.get("heatingStatus", {})
+        # 2. Get raw value
+        value = self._get_raw_value()
 
-            if not heating_status:
-                return "Unknown"
+        # 3. Handle config lookups (Unit Model, LCD version, etc)
+        if self._key in ["unit_model", "lcd_software_version", "central_config"]:
+            return self._handle_central_control_config(value)
 
-            # Map sensor key to API key
-            otc_key_map = {
-                "otc_heating_type_c1": "otcTypeHeatC1",
-                "otc_cooling_type_c1": "otcTypeCoolC1",
-                "otc_heating_type_c2": "otcTypeHeatC2",
-                "otc_cooling_type_c2": "otcTypeCoolC2",
-            }
-
-            api_key = otc_key_map.get(self._key)
-            if api_key:
-                otc_value = heating_status.get(api_key)
-                if otc_value is not None:
-                    # Return the descriptive name for the OTC type
-                    if "heating" in self._key:
-                        return OTC_HEATING_TYPE_NAMES.get(
-                            otc_value, f"Unknown ({otc_value})"
-                        )
-                    return OTC_COOLING_TYPE_NAMES.get(
-                        otc_value, f"Unknown ({otc_value})"
-                    )
-
-            return "Unknown"
-
-        return value
+        # 4. Handle standard transformations (division, boolean map)
+        return self._handle_simple_transformations(value)
 
     @property
     def device_class(self):
@@ -1270,22 +1309,6 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
     reported Amperage.
     """
 
-    def _get_heating_status(self):
-        """Get heatingStatus from installation devices data."""
-        installation_data = self._coordinator.get_installation_devices_data()
-        if not isinstance(installation_data, dict):
-            return None
-        data_array = installation_data.get("data", [])
-        if isinstance(data_array, list) and len(data_array) > 0:
-            first_device = data_array[0]
-            if isinstance(first_device, dict):
-                indoors_array = first_device.get("indoors", [])
-                if isinstance(indoors_array, list) and len(indoors_array) > 0:
-                    first_indoors = indoors_array[0]
-                    if isinstance(first_indoors, dict):
-                        return first_indoors.get("heatingStatus", {})
-        return None
-
     def _calculate_complex_power(self, heating_status):
         """Calculate power using the complex physical model with guardrails."""
         # 1. Inputs
@@ -1294,9 +1317,7 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
         p_low = heating_status.get("ouSuctionPress", 0)
 
         # Get temp using the module-level helper function
-        t_discharge = _convert_unsigned_to_signed_byte(
-            heating_status.get("ouDischargeTemperature")
-        )
+        t_discharge = _convert_unsigned_to_signed_byte(heating_status.get("ouDischargeTemperature"))
         if t_discharge is None:
             t_discharge = 0
 
@@ -1638,9 +1659,7 @@ class CSNetHomeDeviceSensor(CoordinatorEntity, Entity):
 
             # Convert from milliseconds to seconds and create datetime
             timestamp_seconds = last_comm / 1000
-            return datetime.fromtimestamp(
-                timestamp_seconds, tz=timezone.utc
-            ).isoformat()
+            return datetime.fromtimestamp(timestamp_seconds, tz=timezone.utc).isoformat()
 
         return None
 
@@ -1659,11 +1678,7 @@ class CSNetHomeDeviceSensor(CoordinatorEntity, Entity):
         """Update sensor with latest data from coordinator."""
         # Update sensor_data reference
         self._sensor_data = next(
-            (
-                x
-                for x in self._coordinator.get_sensors_data()
-                if x.get("device_id") == self._device_id
-            ),
+            (x for x in self._coordinator.get_sensors_data() if x.get("device_id") == self._device_id),
             None,
         )
 
@@ -1680,9 +1695,7 @@ class CSNetHomeDeviceSensor(CoordinatorEntity, Entity):
             name=f"{self._sensor_data['device_name']}-{self._sensor_data.get('room_name', 'Unknown')}",
             manufacturer="Hitachi",
             model=f"{self._common_data.get('device_status', {}).get(self._device_id, {}).get('name', 'Unknown')} Remote Controller",
-            sw_version=self._common_data.get("device_status", {})
-            .get(self._device_id, {})
-            .get("firmware"),
+            sw_version=self._common_data.get("device_status", {}).get(self._device_id, {}).get("firmware"),
             identifiers={
                 (
                     DOMAIN,
@@ -1804,28 +1817,16 @@ class CSNetHomeAlarmStatisticsSensor(CoordinatorEntity, Entity):
         if self._statistic_type == "total_alarm_count":
             # Count all sensors that have ever had an alarm (alarm_code != 0)
             # This is the current active alarm count
-            return sum(
-                1
-                for sensor in sensors
-                if sensor.get("alarm_code") and sensor.get("alarm_code") != 0
-            )
+            return sum(1 for sensor in sensors if sensor.get("alarm_code") and sensor.get("alarm_code") != 0)
 
         if self._statistic_type == "active_alarm_count":
             # Count currently active alarms
-            return sum(
-                1
-                for sensor in sensors
-                if sensor.get("alarm_code") and sensor.get("alarm_code") != 0
-            )
+            return sum(1 for sensor in sensors if sensor.get("alarm_code") and sensor.get("alarm_code") != 0)
 
         if self._statistic_type == "alarm_by_origin":
             # Count alarms by origin
             origins = [
-                sensor.get("alarm_origin")
-                for sensor in sensors
-                if sensor.get("alarm_code")
-                and sensor.get("alarm_code") != 0
-                and sensor.get("alarm_origin")
+                sensor.get("alarm_origin") for sensor in sensors if sensor.get("alarm_code") and sensor.get("alarm_code") != 0 and sensor.get("alarm_origin")
             ]
             if not origins:
                 return 0
@@ -1839,11 +1840,7 @@ class CSNetHomeAlarmStatisticsSensor(CoordinatorEntity, Entity):
     def extra_state_attributes(self):
         """Return detailed statistics as attributes."""
         sensors = self._coordinator.get_sensors_data()
-        active_alarms = [
-            sensor
-            for sensor in sensors
-            if sensor.get("alarm_code") and sensor.get("alarm_code") != 0
-        ]
+        active_alarms = [sensor for sensor in sensors if sensor.get("alarm_code") and sensor.get("alarm_code") != 0]
 
         if self._statistic_type == "total_alarm_count":
             return {
@@ -1859,25 +1856,14 @@ class CSNetHomeAlarmStatisticsSensor(CoordinatorEntity, Entity):
             }
 
         if self._statistic_type == "active_alarm_count":
-            return {
-                "devices_with_alarms": [
-                    f"{sensor.get('device_name')} - {sensor.get('room_name')}"
-                    for sensor in active_alarms
-                ]
-            }
+            return {"devices_with_alarms": [f"{sensor.get('device_name')} - {sensor.get('room_name')}" for sensor in active_alarms]}
 
         if self._statistic_type == "alarm_by_origin":
-            origins = [
-                sensor.get("alarm_origin")
-                for sensor in active_alarms
-                if sensor.get("alarm_origin")
-            ]
+            origins = [sensor.get("alarm_origin") for sensor in active_alarms if sensor.get("alarm_origin")]
             origin_counts = Counter(origins)
             return {
                 "origin_distribution": dict(origin_counts),
-                "most_common_origin": (
-                    origin_counts.most_common(1)[0][0] if origin_counts else None
-                ),
+                "most_common_origin": (origin_counts.most_common(1)[0][0] if origin_counts else None),
             }
 
         return {}
@@ -1987,19 +1973,13 @@ class CSNetHomeCompressorSensor(CoordinatorEntity, Entity):
 
         # Temperatures
         if self._key == "discharge_temperature":
-            return _convert_unsigned_to_signed_byte(
-                heating_status.get("ouDischargeTemperature")
-            )
+            return _convert_unsigned_to_signed_byte(heating_status.get("ouDischargeTemperature"))
 
         if self._key == "evaporator_temperature":
-            return _convert_unsigned_to_signed_byte(
-                heating_status.get("ouEvapTemperature")
-            )
+            return _convert_unsigned_to_signed_byte(heating_status.get("ouEvapTemperature"))
 
         if self._key == "outdoor_ambient_temperature":
-            return _convert_unsigned_to_signed_byte(
-                heating_status.get("ouAmbientTemperature")
-            )
+            return _convert_unsigned_to_signed_byte(heating_status.get("ouAmbientTemperature"))
 
         # Pressures
         if self._key == "discharge_pressure":
@@ -2066,9 +2046,7 @@ class CSNetHomeCompressorSensor(CoordinatorEntity, Entity):
         else:
             if self._key == "secondary_discharge_temp":
                 # 0°C is a valid temperature reading, don't filter it out
-                return _convert_unsigned_to_signed_byte(
-                    second_cycle.get("dischargeTemp")
-                )
+                return _convert_unsigned_to_signed_byte(second_cycle.get("dischargeTemp"))
 
             if self._key == "secondary_suction_temp":
                 return _convert_unsigned_to_signed_byte(second_cycle.get("suctionTemp"))
@@ -2143,9 +2121,7 @@ class CSNetHomeCompressorSensor(CoordinatorEntity, Entity):
                 raw_value = heating_status.get("operationStatus")
                 return {
                     "raw_value": raw_value,
-                    "status_text": OPERATION_STATUS_MAP.get(
-                        raw_value, f"Unknown ({raw_value})"
-                    ),
+                    "status_text": OPERATION_STATUS_MAP.get(raw_value, f"Unknown ({raw_value})"),
                     "defrosting": bool(heating_status.get("defrosting", 0)),
                 }
 

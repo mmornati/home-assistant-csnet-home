@@ -9,13 +9,7 @@ from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import (
-    DOMAIN,
-    OTC_COOLING_TYPE_FIX,
-    OTC_HEATING_TYPE_FIX,
-    WATER_CIRCUIT_MAX_HEAT,
-    WATER_CIRCUIT_MIN_HEAT,
-)
+from .const import DOMAIN, OTC_COOLING_TYPE_FIX, OTC_HEATING_TYPE_FIX, WATER_CIRCUIT_MAX_HEAT, WATER_CIRCUIT_MIN_HEAT
 from .coordinator import CSNetHomeCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -99,9 +93,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
                     CSNetHomeFixedWaterTemperatureNumber(
                         coordinator,
                         sensor_data,
-                        common_data.get("device_status", {}).get(
-                            sensor_data.get("device_id"), {}
-                        ),
+                        common_data.get("device_status", {}).get(sensor_data.get("device_id"), {}),
                         circuit,
                         1,  # Heating mode
                         entry,
@@ -139,9 +131,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
                     CSNetHomeFixedWaterTemperatureNumber(
                         coordinator,
                         sensor_data,
-                        common_data.get("device_status", {}).get(
-                            sensor_data.get("device_id"), {}
-                        ),
+                        common_data.get("device_status", {}).get(sensor_data.get("device_id"), {}),
                         circuit,
                         0,  # Cooling mode
                         entry,
@@ -149,9 +139,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 )
 
     if entities:
-        _LOGGER.info(
-            "Created %d fixed water temperature number entities", len(entities)
-        )
+        _LOGGER.info("Created %d fixed water temperature number entities", len(entities))
         async_add_entities(entities)
     else:
         _LOGGER.debug("No fixed water temperature entities created (OTC type not FIX)")
@@ -191,13 +179,8 @@ class CSNetHomeFixedWaterTemperatureNumber(CoordinatorEntity, NumberEntity):
         circuit_name = f"C{circuit}"
         zone_name = sensor_data.get("room_name", f"Circuit {circuit}")
 
-        self._attr_name = (
-            f"{zone_name} Fixed Water Temperature {mode_name} {circuit_name}"
-        )
-        self._attr_unique_id = (
-            f"{DOMAIN}-fixed-water-temp-{circuit_name.lower()}-"
-            f"{mode_name.lower()}-{sensor_data.get('device_id')}"
-        )
+        self._attr_name = f"{zone_name} Fixed Water Temperature {mode_name} {circuit_name}"
+        self._attr_unique_id = f"{DOMAIN}-fixed-water-temp-{circuit_name.lower()}-" f"{mode_name.lower()}-{sensor_data.get('device_id')}"
 
         _LOGGER.debug(
             "Initialized fixed water temperature number entity: %s (circuit %d, mode %d)",
@@ -249,9 +232,7 @@ class CSNetHomeFixedWaterTemperatureNumber(CoordinatorEntity, NumberEntity):
             return False
 
         cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
-        is_editable = cloud_api.is_fixed_water_temperature_editable(
-            self._circuit, self._mode, installation_devices_data
-        )
+        is_editable = cloud_api.is_fixed_water_temperature_editable(self._circuit, self._mode, installation_devices_data)
 
         return is_editable
 
@@ -263,9 +244,7 @@ class CSNetHomeFixedWaterTemperatureNumber(CoordinatorEntity, NumberEntity):
             return
 
         cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
-        success = await cloud_api.async_set_fixed_water_temperature(
-            self._circuit, parent_id, self._mode, value
-        )
+        success = await cloud_api.async_set_fixed_water_temperature(self._circuit, parent_id, self._mode, value)
 
         if success:
             _LOGGER.debug(
@@ -308,12 +287,7 @@ class CSNetHomeFixedWaterTemperatureNumber(CoordinatorEntity, NumberEntity):
         # Update sensor_data reference
         sensors_data = self._coordinator.get_sensors_data()
         self._sensor_data = next(
-            (
-                x
-                for x in sensors_data
-                if x.get("device_id") == self._sensor_data.get("device_id")
-                and x.get("zone_id") == self._sensor_data.get("zone_id")
-            ),
+            (x for x in sensors_data if x.get("device_id") == self._sensor_data.get("device_id") and x.get("zone_id") == self._sensor_data.get("zone_id")),
             self._sensor_data,
         )
         self.async_write_ha_state()

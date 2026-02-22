@@ -34,9 +34,7 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             # Validate credentials before creating entry
-            validation_error = await self._validate_credentials(
-                user_input[CONF_USERNAME], user_input[CONF_PASSWORD]
-            )
+            validation_error = await self._validate_credentials(user_input[CONF_USERNAME], user_input[CONF_PASSWORD])
 
             if validation_error:
                 errors = validation_error
@@ -51,9 +49,7 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_LANGUAGE: user_input.get(CONF_LANGUAGE, DEFAULT_LANGUAGE),
                         CONF_MAX_TEMP_OVERRIDE: user_input.get(CONF_MAX_TEMP_OVERRIDE),
                         # Store the Fan coil control type
-                        CONF_FAN_COIL_MODEL: user_input.get(
-                            CONF_FAN_COIL_MODEL, DEFAULT_FAN_COIL_MODEL
-                        ),
+                        CONF_FAN_COIL_MODEL: user_input.get(CONF_FAN_COIL_MODEL, DEFAULT_FAN_COIL_MODEL),
                     },
                 )
 
@@ -63,19 +59,11 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 {
                     vol.Required(CONF_USERNAME): str,
                     vol.Required(CONF_PASSWORD): str,
-                    vol.Optional(
-                        CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL
-                    ): int,
-                    vol.Optional(CONF_LANGUAGE, default=DEFAULT_LANGUAGE): vol.In(
-                        ["en", "fr", "es"]
-                    ),
-                    vol.Optional(CONF_MAX_TEMP_OVERRIDE): vol.All(
-                        vol.Coerce(int), vol.Range(min=8, max=80)
-                    ),
+                    vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): int,
+                    vol.Optional(CONF_LANGUAGE, default=DEFAULT_LANGUAGE): vol.In(["en", "fr", "es"]),
+                    vol.Optional(CONF_MAX_TEMP_OVERRIDE): vol.All(vol.Coerce(int), vol.Range(min=8, max=80)),
                     # Selection of Fan coil control type
-                    vol.Optional(
-                        CONF_FAN_COIL_MODEL, default=DEFAULT_FAN_COIL_MODEL
-                    ): vol.In([FAN_COIL_MODEL_STANDARD, FAN_COIL_MODEL_LEGACY]),
+                    vol.Optional(CONF_FAN_COIL_MODEL, default=DEFAULT_FAN_COIL_MODEL): vol.In([FAN_COIL_MODEL_STANDARD, FAN_COIL_MODEL_LEGACY]),
                 }
             ),
             description_placeholders={
@@ -84,9 +72,7 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    async def _validate_credentials(
-        self, username: str, password: str
-    ) -> dict[str, str] | None:
+    async def _validate_credentials(self, username: str, password: str) -> dict[str, str] | None:
         """Validate credentials with the CSNet API.
 
         Args:
@@ -101,9 +87,7 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         _LOGGER.info("Config flow: Validating credentials for user: %s", username)
         try:
             # Validate credentials using the API
-            is_valid = await CSNetHomeAPI.async_validate_credentials(
-                self.hass, username, password
-            )
+            is_valid = await CSNetHomeAPI.async_validate_credentials(self.hass, username, password)
 
             if not is_valid:
                 _LOGGER.warning("Config flow: Credential validation returned False")
@@ -113,9 +97,7 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return None  # No errors
 
         except Exception as e:
-            _LOGGER.error(
-                "Config flow: Error during credential validation: %s", e, exc_info=True
-            )
+            _LOGGER.error("Config flow: Error during credential validation: %s", e, exc_info=True)
             return {"base": "cannot_connect"}
 
     async def async_step_reconfigure(self, user_input=None):
@@ -125,9 +107,7 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             # Validate credentials before saving
-            validation_error = await self._validate_credentials(
-                user_input[CONF_USERNAME], user_input[CONF_PASSWORD]
-            )
+            validation_error = await self._validate_credentials(user_input[CONF_USERNAME], user_input[CONF_PASSWORD])
 
             if validation_error:
                 errors = validation_error
@@ -141,9 +121,7 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_SCAN_INTERVAL: user_input[CONF_SCAN_INTERVAL],
                         CONF_LANGUAGE: user_input.get(CONF_LANGUAGE, DEFAULT_LANGUAGE),
                         CONF_MAX_TEMP_OVERRIDE: user_input.get(CONF_MAX_TEMP_OVERRIDE),
-                        CONF_FAN_COIL_MODEL: user_input.get(
-                            CONF_FAN_COIL_MODEL, DEFAULT_FAN_COIL_MODEL
-                        ),
+                        CONF_FAN_COIL_MODEL: user_input.get(CONF_FAN_COIL_MODEL, DEFAULT_FAN_COIL_MODEL),
                     },
                 )
 
@@ -152,23 +130,15 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="reconfigure",
             data_schema=vol.Schema(
                 {
-                    vol.Required(
-                        CONF_USERNAME, default=reconfigure_entry.data.get(CONF_USERNAME)
-                    ): str,
-                    vol.Required(
-                        CONF_PASSWORD, default=reconfigure_entry.data.get(CONF_PASSWORD)
-                    ): str,
+                    vol.Required(CONF_USERNAME, default=reconfigure_entry.data.get(CONF_USERNAME)): str,
+                    vol.Required(CONF_PASSWORD, default=reconfigure_entry.data.get(CONF_PASSWORD)): str,
                     vol.Optional(
                         CONF_SCAN_INTERVAL,
-                        default=reconfigure_entry.data.get(
-                            CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
-                        ),
+                        default=reconfigure_entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
                     ): int,
                     vol.Optional(
                         CONF_LANGUAGE,
-                        default=reconfigure_entry.data.get(
-                            CONF_LANGUAGE, DEFAULT_LANGUAGE
-                        ),
+                        default=reconfigure_entry.data.get(CONF_LANGUAGE, DEFAULT_LANGUAGE),
                     ): vol.In(["en", "fr"]),
                     vol.Optional(
                         CONF_MAX_TEMP_OVERRIDE,
@@ -176,15 +146,11 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     ): vol.All(vol.Coerce(int), vol.Range(min=8, max=80)),
                     vol.Optional(
                         CONF_FAN_COIL_MODEL,
-                        default=reconfigure_entry.data.get(
-                            CONF_FAN_COIL_MODEL, DEFAULT_FAN_COIL_MODEL
-                        ),
+                        default=reconfigure_entry.data.get(CONF_FAN_COIL_MODEL, DEFAULT_FAN_COIL_MODEL),
                     ): vol.In([FAN_COIL_MODEL_STANDARD, FAN_COIL_MODEL_LEGACY]),
                 }
             ),
-            description_placeholders={
-                "max_temp_override_desc": "Optional: Override maximum temperature limit (8-80°C). Leave empty to use device defaults."
-            },
+            description_placeholders={"max_temp_override_desc": "Optional: Override maximum temperature limit (8-80°C). Leave empty to use device defaults."},
             errors=errors,
         )
 
@@ -197,15 +163,11 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_reauth_confirm(self, user_input=None):
         """Handle reauthentication confirmation."""
         errors = {}
-        reauth_entry = self.hass.config_entries.async_get_entry(
-            self.context["entry_id"]
-        )
+        reauth_entry = self.hass.config_entries.async_get_entry(self.context["entry_id"])
 
         if user_input is not None:
             # Validate new credentials
-            validation_error = await self._validate_credentials(
-                user_input[CONF_USERNAME], user_input[CONF_PASSWORD]
-            )
+            validation_error = await self._validate_credentials(user_input[CONF_USERNAME], user_input[CONF_PASSWORD])
 
             if validation_error:
                 errors = validation_error
@@ -229,9 +191,7 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 {
                     vol.Required(
                         CONF_USERNAME,
-                        default=(
-                            reauth_entry.data.get(CONF_USERNAME) if reauth_entry else ""
-                        ),
+                        default=(reauth_entry.data.get(CONF_USERNAME) if reauth_entry else ""),
                     ): str,
                     vol.Required(CONF_PASSWORD): str,
                 }
