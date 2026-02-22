@@ -265,3 +265,57 @@ async def test_coordinator_alarm_clearing(hass: HomeAssistant):
 
     # Verify alarm code was cleared from storage
     assert "123-456-789" not in coordinator._last_alarm_codes
+
+
+@pytest.mark.asyncio
+async def test_coordinator_alarm_notification(hass: HomeAssistant):
+    """Test alarm notification is sent when a new alarm is detected."""
+    mock_api = MagicMock()
+    mock_api.load_translations = AsyncMock()
+    mock_api.async_get_elements_data = AsyncMock(
+        return_value={
+            "common_data": {"name": "Test Home"},
+            "sensors": [
+                {
+                    "device_id": 123,
+                    "room_id": 456,
+                    "zone_id": 789,
+                    "device_name": "Test Device",
+                    "room_name": "Test Room",
+                    "alarm_code": 42,
+                    "alarm_code_formatted": "E42",
+                    "alarm_message": "Test alarm message",
+                    "unit_type": "standard",
+                    "alarm_origin": "Unit",
+                }
+            ],
+        }
+    )
+    mock_api.async_get_installation_devices_data = AsyncMock(return_value=None)
+    mock_api.async_get_installation_alarms = AsyncMock(return_value=None)
+
+    hass.data["csnet_home"] = {"test": {"api": mock_api}}
+    # Mock services.async_call needs to be an AsyncMock
+    hass.services.async_call = AsyncMock()
+
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test")
+
+    # Trigger update with new alarm
+    await coordinator._async_update_data()
+
+    # Verify alarm code was stored
+    assert coordinator._last_alarm_codes["123-456-789"] == 42
+
+    # Verify notification service was called
+    hass.services.async_call.assert_called_once()
+    call_args = hass.services.async_call.call_args
+    assert call_args[0][0] == "persistent_notification"
+    assert call_args[0][1] == "create"
+
+    payload = call_args[0][2]
+    assert payload["title"] == "Hitachi Device Alarm"
+    assert "Device: Test Device | Room: Test Room" in payload["message"]
+    assert "Code: E42 (raw: 42)" in payload["message"]
+    assert "Message: Test alarm message" in payload["message"]
+    assert "Origin: Unit" in payload["message"]
+    assert payload["notification_id"] == "csnet_home_alarm_123-456-789"
