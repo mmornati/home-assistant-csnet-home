@@ -618,20 +618,22 @@ When an alarm notification is dismissed in Home Assistant, you can automatically
 
 ```yaml
 automation:
-  - alias: "Delete CSNet Alarm When Dismissed"
-    trigger:
-      - platform: event
+  - description: "Delete CSNet alarm when notification is dismissed"
+    mode: single
+    triggers:
+      - trigger: event
         event_type: persistent_notification.updated
         event_data:
           update_type: removed
-    condition:
+    conditions:
       - condition: template
         value_template: "{{ 'csnet_home_inst_alarm_' in trigger.event.data.notification_id }}"
-    action:
-      - variables:
+    actions:
+      - action: variables
+        variables:
           notification_id: "{{ trigger.event.data.notification_id }}"
           alarm_id: "{{ notification_id.split('_')[-1] | int }}"
-      - service: csnet_home.delete_alarm
+      - action: csnet_home.delete_alarm
         data:
           alarm_id: "{{ alarm_id }}"
 ```
