@@ -23,8 +23,12 @@ from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
-from .const import (DOMAIN, OPERATION_STATUS_MAP, OTC_COOLING_TYPE_NAMES,
-                    OTC_HEATING_TYPE_NAMES)
+from .const import (
+    DOMAIN,
+    OPERATION_STATUS_MAP,
+    OTC_COOLING_TYPE_NAMES,
+    OTC_HEATING_TYPE_NAMES,
+)
 from .coordinator import CSNetHomeCoordinator
 
 _LOGGER = logging.getLogger(__name__)

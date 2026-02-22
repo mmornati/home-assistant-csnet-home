@@ -10,19 +10,26 @@ import pytest
 
 # Define distinct mock classes to avoid duplicate base class error
 class MockCoordinatorEntity:
+    """Mock CoordinatorEntity for testing."""
+
     def __init__(self, coordinator):
+        """Initialize the mock coordinator entity."""
         self.coordinator = coordinator
         self.hass = None
 
     @property
     def available(self):
+        """Return availability."""
         return True
 
     def async_write_ha_state(self):
+        """Mock writing HA state."""
         pass
 
 
 class MockNumberEntity:
+    """Mock NumberEntity for testing."""
+
     _attr_native_min_value = None
     _attr_native_max_value = None
     _attr_native_step = None
@@ -33,38 +40,47 @@ class MockNumberEntity:
 
     @property
     def native_min_value(self):
+        """Return min value."""
         return self._attr_native_min_value
 
     @property
     def native_max_value(self):
+        """Return max value."""
         return self._attr_native_max_value
 
     @property
     def native_step(self):
+        """Return step value."""
         return self._attr_native_step
 
     @property
     def native_unit_of_measurement(self):
+        """Return unit of measurement."""
         return self._attr_native_unit_of_measurement
 
     @property
     def mode(self):
+        """Return number mode."""
         return self._attr_mode
 
     @property
     def name(self):
+        """Return entity name."""
         return self._attr_name
 
     @property
     def unique_id(self):
+        """Return unique id."""
         return self._attr_unique_id
 
     @property
     def native_value(self):
+        """Return native value."""
         return None
 
     @property
     def device_info(self):
+        """Return device info."""
         return None
 
 
@@ -104,11 +120,11 @@ def mock_deps():
         sys.modules["homeassistant.core"].callback = lambda x: x
 
         # Import or reload the module under test
-        import custom_components.csnet_home.number
-        import custom_components.csnet_home.const
-
         # Reload to ensure it uses our patched dependencies
         import importlib
+
+        import custom_components.csnet_home.const
+        import custom_components.csnet_home.number
 
         importlib.reload(custom_components.csnet_home.number)
 
