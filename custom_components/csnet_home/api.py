@@ -10,17 +10,21 @@ import aiohttp
 import async_timeout
 from homeassistant.core import HomeAssistant
 
-from custom_components.csnet_home.const import (API_URL, COMMON_API_HEADERS,
-                                                DEFAULT_API_TIMEOUT,
-                                                DELETESPECIFICALARM_PATH,
-                                                ELEMENTS_PATH,
-                                                HEAT_SETTINGS_PATH,
-                                                HEATING_MAX_TEMPERATURE,
-                                                INSTALLATION_ALARMS_PATH,
-                                                INSTALLATION_DEVICES_PATH,
-                                                LANGUAGE_FILES, LOGIN_PATH,
-                                                WATER_CIRCUIT_MAX_HEAT,
-                                                WATER_HEATER_MAX_TEMPERATURE)
+from custom_components.csnet_home.const import (
+    API_URL,
+    COMMON_API_HEADERS,
+    DEFAULT_API_TIMEOUT,
+    DELETESPECIFICALARM_PATH,
+    ELEMENTS_PATH,
+    HEAT_SETTINGS_PATH,
+    HEATING_MAX_TEMPERATURE,
+    INSTALLATION_ALARMS_PATH,
+    INSTALLATION_DEVICES_PATH,
+    LANGUAGE_FILES,
+    LOGIN_PATH,
+    WATER_CIRCUIT_MAX_HEAT,
+    WATER_HEATER_MAX_TEMPERATURE,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -520,9 +524,7 @@ class CSNetHomeAPI:
 
         try:
             async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
-                async with self.session.post(
-                    delete_url, headers=headers, cookies=cookies, data=data
-                ) as response:
+                async with self.session.post(delete_url, headers=headers, cookies=cookies, data=data) as response:
                     response_text = await response.text()
                     _LOGGER.debug(
                         "Delete alarm response: %s (status %s)",

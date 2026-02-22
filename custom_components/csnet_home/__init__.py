@@ -78,9 +78,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                     alarm_id,
                     api_instance.installation_id,
                 )
-                success = await api_instance.async_delete_alarm(
-                    api_instance.installation_id, alarm_id
-                )
+                success = await api_instance.async_delete_alarm(api_instance.installation_id, alarm_id)
                 if success:
                     _LOGGER.info("Successfully deleted alarm %s", alarm_id)
                     # Refresh data to remove the alarm from sensors/notifications

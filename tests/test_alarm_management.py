@@ -3,8 +3,6 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from homeassistant.const import STATE_ON
-from homeassistant.core import HomeAssistant
 
 from custom_components.csnet_home.api import CSNetHomeAPI
 from custom_components.csnet_home.const import DOMAIN
@@ -51,29 +49,34 @@ def mock_api(hass):
     """Mock the CSNetHomeAPI."""
     api = MagicMock(spec=CSNetHomeAPI)
     api.hass = hass
+    api.logged_in = True
     # Ensure common_data is not empty so the coordinator processes alarms
-    api.async_get_elements_data = AsyncMock(
-        return_value={"sensors": [], "common_data": {"name": "Test Home"}}
-    )
+    api.async_get_elements_data = AsyncMock(return_value={"sensors": [], "common_data": {"name": "Test Home"}})
     api.async_get_installation_devices_data = AsyncMock(return_value={})
     api.async_get_installation_alarms = AsyncMock(return_value=MOCK_ALARMS_RESPONSE)
     api.load_translations = AsyncMock()
-    api.translate_alarm = MagicMock(
-        side_effect=lambda x: f"Alarm {x}" if x != -1 else None
-    )
+    api.translate_alarm = MagicMock(side_effect=lambda x: f"Alarm {x}" if x != -1 else None)
     api.get_heating_status_from_installation_devices = MagicMock(return_value={})
     return api
+
+
+def setup_hass_services(hass):
+    """Set up hass.services mock to support async_call."""
+    mock_service = MagicMock()
+    # Make async_call return an awaitable
+    mock_service.async_call = AsyncMock()
+    hass.services = MagicMock()
+    hass.services.async_call = mock_service.async_call
+    hass.services.__getitem__ = lambda self, key: mock_service
 
 
 @pytest.mark.asyncio
 async def test_alarm_history_sensor(hass, mock_api):
     """Test that the alarm history sensor correctly counts alarms from 'data' key."""
     # Setup coordinator
+    setup_hass_services(hass)
     coordinator = CSNetHomeCoordinator(hass, 60, "test_entry")
     hass.data[DOMAIN] = {"test_entry": {"api": mock_api, "coordinator": coordinator}}
-
-    # Make async_call awaitable (mocking it for the coordinator init/update)
-    hass.services.async_call = AsyncMock()
 
     # Trigger update
     await coordinator._async_update_data()
@@ -98,21 +101,18 @@ async def test_alarm_history_sensor(hass, mock_api):
 async def test_coordinator_alarm_notifications(hass, mock_api):
     """Test that coordinator triggers notifications for active alarms."""
     # Setup coordinator
+    setup_hass_services(hass)
     coordinator = CSNetHomeCoordinator(hass, 60, "test_entry")
     hass.data[DOMAIN] = {"test_entry": {"api": mock_api, "coordinator": coordinator}}
-
-    # Use AsyncMock for async_call
-    mock_call = AsyncMock()
-    hass.services.async_call = mock_call
 
     # Trigger update
     await coordinator._async_update_data()
 
     # Should call persistent_notification.create twice (for 2 active alarms)
-    assert mock_call.call_count == 2
+    assert hass.services.async_call.call_count == 2
 
     # Verify call arguments
-    call_args_list = mock_call.call_args_list
+    call_args_list = hass.services.async_call.call_args_list
 
     messages = []
     for args, kwargs in call_args_list:
@@ -135,9 +135,9 @@ async def test_coordinator_alarm_notifications(hass, mock_api):
     assert 138669 in coordinator._notified_installation_alarm_ids
 
     # Reset mock and update again - should NOT trigger notifications again
-    mock_call.reset_mock()
+    hass.services.async_call.reset_mock()
     await coordinator._async_update_data()
-    mock_call.assert_not_called()
+    hass.services.async_call.assert_not_called()
 
 
 @pytest.mark.asyncio
