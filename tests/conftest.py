@@ -1,15 +1,16 @@
 """Pytest configuration and fixtures for CSNet Home tests."""
 
-import pytest
 import sys
 from types import SimpleNamespace
 from unittest.mock import MagicMock
+
+import pytest
 
 from tests.fixtures.conftest_fixtures import load_fixture as _load_fixture
 
 # Mock external dependencies if not available
 try:
-    import homeassistant
+    import homeassistant  # noqa: F401
 except ImportError:
     mock_hass = MagicMock()
     sys.modules["homeassistant"] = mock_hass
@@ -36,12 +37,12 @@ except ImportError:
     )
 
 try:
-    import aiohttp
+    import aiohttp  # noqa: F401
 except ImportError:
     sys.modules["aiohttp"] = MagicMock()
 
 try:
-    import async_timeout
+    import async_timeout  # noqa: F401
 except ImportError:
     sys.modules["async_timeout"] = MagicMock()
 
@@ -50,12 +51,6 @@ except ImportError:
 def load_fixture():
     """Fixture to load test fixtures from the fixtures directory."""
     return _load_fixture
-
-
-@pytest.fixture
-def enable_custom_integrations():
-    """Mock fixture for enabling custom integrations."""
-    yield
 
 
 @pytest.fixture(autouse=True)
