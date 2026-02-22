@@ -1,7 +1,5 @@
 """Tests for security and PII redaction."""
 
-import pytest
-
 from custom_components.csnet_home.api import redact_data
 
 
