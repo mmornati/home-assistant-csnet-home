@@ -178,6 +178,16 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
 
         return self._device_data
 
+    def _is_valid_temperature(self, value):
+        """Validate if temperature value is reasonable."""
+        if value is None:
+            return False
+        # Filter out clearly invalid/error values like -67°C (likely 189 unsigned)
+        # Water circuits shouldn't be this cold
+        if isinstance(value, (int, float)) and value < -20:
+            return False
+        return True
+
     def get_sensors_data(self):
         """Return the list of sensor data."""
 
@@ -197,13 +207,3 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         """Return installation alarms data."""
 
         return self._device_data.get("common_data", {}).get("installation_alarms", {})
-
-    def _is_valid_temperature(self, value):
-        """Validate if temperature value is reasonable."""
-        if value is None:
-            return False
-        # Filter out clearly invalid/error values like -67°C (likely 189 unsigned)
-        # Water circuits shouldn't be this cold
-        if isinstance(value, (int, float)) and value < -20:
-            return False
-        return True

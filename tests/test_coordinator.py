@@ -295,30 +295,41 @@ async def test_coordinator_alarm_notification(hass: HomeAssistant):
     mock_api.async_get_installation_alarms = AsyncMock(return_value=None)
 
     hass.data["csnet_home"] = {"test": {"api": mock_api}}
-    # Mock services.async_call needs to be an AsyncMock
-    hass.services.async_call = AsyncMock()
 
     coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test")
 
     # Trigger update with new alarm
-    await coordinator._async_update_data()
+    # Patch ServiceRegistry.async_call as it's typically read-only on the instance
+    with patch(
+        "homeassistant.core.ServiceRegistry.async_call", new_callable=AsyncMock
+    ) as mock_async_call:
+        await coordinator._async_update_data()
 
-    # Verify alarm code was stored
-    assert coordinator._last_alarm_codes["123-456-789"] == 42
+        # Verify alarm code was stored
+        assert coordinator._last_alarm_codes["123-456-789"] == 42
 
-    # Verify notification service was called
-    hass.services.async_call.assert_called_once()
-    call_args = hass.services.async_call.call_args
-    assert call_args[0][0] == "persistent_notification"
-    assert call_args[0][1] == "create"
+        # Verify notification service was called
+        mock_async_call.assert_called_once()
+        args, kwargs = mock_async_call.call_args
+        # Depending on how the mock is bound, domain might be at index 0 or 1
+        # In the previous failure, 'create' (arg[2]) matched 'persistent_notification' (arg[1]) failure message
+        # Wait, the failure said: AssertionError: assert 'create' == 'persistent_notification'
+        # which means I asserted call_args[0][1] == "persistent_notification" and it was 'create'.
+        # So arg[0] was "persistent_notification" and arg[1] was "create".
+        # This confirms arg[0] is DOMAIN, NOT SELF.
+        # So the class-level patch on ServiceRegistry.async_call DOES NOT receive self in call_args when called on instance?
+        # That's unusual but possible if HA/pytest-asyncio wraps it.
 
-    payload = call_args[0][2]
-    assert payload["title"] == "Hitachi Device Alarm"
-    assert "Device: Test Device | Room: Test Room" in payload["message"]
-    assert "Code: E42 (raw: 42)" in payload["message"]
-    assert "Message: Test alarm message" in payload["message"]
-    assert "Origin: Unit" in payload["message"]
-    assert payload["notification_id"] == "csnet_home_alarm_123-456-789"
+        assert args[0] == "persistent_notification"
+        assert args[1] == "create"
+
+        payload = args[2]
+        assert payload["title"] == "Hitachi Device Alarm"
+        assert "Device: Test Device | Room: Test Room" in payload["message"]
+        assert "Code: E42 (raw: 42)" in payload["message"]
+        assert "Message: Test alarm message" in payload["message"]
+        assert "Origin: Unit" in payload["message"]
+        assert payload["notification_id"] == "csnet_home_alarm_123-456-789"
 
 
 @pytest.mark.asyncio
@@ -343,19 +354,7 @@ async def test_coordinator_dhw_temperature_issue(hass: HomeAssistant):
 
     # Mock installation devices data returning weird tempDHW -67
     mock_api.async_get_installation_devices_data = AsyncMock(
-        return_value={
-            "data": [
-                {
-                    "indoors": [
-                        {
-                            "heatingStatus": {
-                                "tempDHW": -67
-                            }
-                        }
-                    ]
-                }
-            ]
-        }
+        return_value={"data": [{"indoors": [{"heatingStatus": {"tempDHW": -67}}]}]}
     )
 
     # Mock get_heating_status_from_installation_devices to return the dict directly
@@ -369,6 +368,8 @@ async def test_coordinator_dhw_temperature_issue(hass: HomeAssistant):
     hass.data["csnet_home"] = {"test": {"api": mock_api}}
 
     coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test")
+
+    # We need to make sure _is_valid_temperature is called
     result = await coordinator._async_update_data()
 
     # Verify that the temperature was NOT overwritten with -67, but kept as 48.0
