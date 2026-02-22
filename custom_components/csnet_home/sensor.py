@@ -10,6 +10,8 @@ from homeassistant.const import (
     SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
     STATE_OFF,
     STATE_ON,
+    UnitOfEnergy,
+    UnitOfPower,
     UnitOfPressure,
     UnitOfTemperature,
     UnitOfVolumeFlowRate,
@@ -480,6 +482,91 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 "enum",
                 None,
                 "OTC Cooling Type C2",
+            )
+        )
+
+        # ----------------------------------------------------------------------
+        # Calculated Sensors (Instantaneous)
+        # ----------------------------------------------------------------------
+        sensors.append(
+            CSNetHomeCalculatedSensor(
+                coordinator,
+                global_device_data,
+                common_data,
+                "instant_consumption",
+                SensorDeviceClass.POWER,
+                UnitOfPower.WATT,
+                "Instant Consumption",
+            )
+        )
+        sensors.append(
+            CSNetHomeCalculatedSensor(
+                coordinator,
+                global_device_data,
+                common_data,
+                "heating_power",
+                SensorDeviceClass.POWER,
+                UnitOfPower.WATT,
+                "Output Power",
+            )
+        )
+        sensors.append(
+            CSNetHomeCalculatedSensor(
+                coordinator,
+                global_device_data,
+                common_data,
+                "instant_cop",
+                None,
+                "",  # Force unit to empty string to enable graphing
+                "Instant COP",
+            )
+        )
+
+        # ----------------------------------------------------------------------
+        # Accumulated Sensors (Daily)
+        # ----------------------------------------------------------------------
+        sensors.append(
+            CSNetHomeDailySensor(
+                coordinator,
+                global_device_data,
+                common_data,
+                "daily_consumption",
+                SensorDeviceClass.ENERGY,
+                UnitOfEnergy.KILO_WATT_HOUR,
+                "Daily Consumption",
+            )
+        )
+        sensors.append(
+            CSNetHomeDailySensor(
+                coordinator,
+                global_device_data,
+                common_data,
+                "daily_heating",
+                SensorDeviceClass.ENERGY,
+                UnitOfEnergy.KILO_WATT_HOUR,
+                "Daily Output Energy",
+            )
+        )
+        sensors.append(
+            CSNetHomeDailySensor(
+                coordinator,
+                global_device_data,
+                common_data,
+                "daily_cop_heating",
+                None,
+                "",  # Force unit to empty string to enable graphing
+                "Daily COP",
+            )
+        )
+        sensors.append(
+            CSNetHomeDailySensor(
+                coordinator,
+                global_device_data,
+                common_data,
+                "daily_cop_dhw",
+                None,
+                "",  # Force unit to empty string to enable graphing
+                "DHW Daily COP",
             )
         )
 

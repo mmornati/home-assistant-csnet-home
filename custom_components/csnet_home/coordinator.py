@@ -81,7 +81,7 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
                     # For zone_id 3 (DHW/water heater), use tempDHW from heatingStatus
                     if zone_id == 3:
                         temp_dhw = heating_status.get("tempDHW")
-                        if temp_dhw is not None:
+                        if self._is_valid_temperature(temp_dhw):
                             sensor["current_temperature"] = temp_dhw
                             _LOGGER.debug(
                                 "Enriched zone_id 3 (DHW) current_temperature: %s",
@@ -96,7 +96,7 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
                         # Only enrich actual water circuits
                         if "heat" not in room_name:
                             temp_c1_water = heating_status.get("waterOutletHPTemp")
-                            if temp_c1_water is not None:
+                            if self._is_valid_temperature(temp_c1_water):
                                 sensor["current_temperature"] = temp_c1_water
                                 _LOGGER.debug(
                                     "Enriched zone_id 5 (C1_WATER) current_temperature: %s",
@@ -110,7 +110,7 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
                     # For zone_id 6 (C2_WATER), use waterOutlet2Temp from heatingStatus
                     elif zone_id == 6:
                         temp_c2_water = heating_status.get("waterOutlet2Temp")
-                        if temp_c2_water is not None:
+                        if self._is_valid_temperature(temp_c2_water):
                             sensor["current_temperature"] = temp_c2_water
                             _LOGGER.debug(
                                 "Enriched zone_id 6 (C2_WATER) current_temperature: %s",
@@ -177,6 +177,16 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
             _LOGGER.debug("Alarm notification handling error: %s", exc)
 
         return self._device_data
+
+    def _is_valid_temperature(self, value):
+        """Validate if temperature value is reasonable."""
+        if value is None:
+            return False
+        # Filter out clearly invalid/error values like -67°C (likely 189 unsigned)
+        # Water circuits shouldn't be this cold
+        if isinstance(value, (int, float)) and value < -20:
+            return False
+        return True
 
     def get_sensors_data(self):
         """Return the list of sensor data."""

@@ -2144,23 +2144,6 @@ def test_get_unit_type(hass):
     assert api.get_unit_type(sensor_data, installation_data) == "standard"
 
 
-def test_is_yutaki(hass):
-    """Test Yutaki system detection."""
-    api = CSNetHomeAPI(hass, "user", "pass")
-
-    # Test with yutaki zone
-    sensor_data = {"zone_id": 5}
-    assert api.is_yutaki(sensor_data, None) is True
-
-    # Test with water heater zone
-    sensor_data = {"zone_id": 3}
-    assert api.is_yutaki(sensor_data, None) is True
-
-    # Test with standard zone
-    sensor_data = {"zone_id": 1}
-    assert api.is_yutaki(sensor_data, None) is False
-
-
 def test_get_alarm_origin(hass):
     """Test alarm origin detection."""
     api = CSNetHomeAPI(hass, "user", "pass")

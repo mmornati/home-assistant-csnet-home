@@ -265,3 +265,114 @@ async def test_coordinator_alarm_clearing(hass: HomeAssistant):
 
     # Verify alarm code was cleared from storage
     assert "123-456-789" not in coordinator._last_alarm_codes
+
+
+@pytest.mark.asyncio
+async def test_coordinator_alarm_notification(hass: HomeAssistant):
+    """Test alarm notification is sent when a new alarm is detected."""
+    mock_api = MagicMock()
+    mock_api.load_translations = AsyncMock()
+    mock_api.async_get_elements_data = AsyncMock(
+        return_value={
+            "common_data": {"name": "Test Home"},
+            "sensors": [
+                {
+                    "device_id": 123,
+                    "room_id": 456,
+                    "zone_id": 789,
+                    "device_name": "Test Device",
+                    "room_name": "Test Room",
+                    "alarm_code": 42,
+                    "alarm_code_formatted": "E42",
+                    "alarm_message": "Test alarm message",
+                    "unit_type": "standard",
+                    "alarm_origin": "Unit",
+                }
+            ],
+        }
+    )
+    mock_api.async_get_installation_devices_data = AsyncMock(return_value=None)
+    mock_api.async_get_installation_alarms = AsyncMock(return_value=None)
+
+    hass.data["csnet_home"] = {"test": {"api": mock_api}}
+
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test")
+
+    # Trigger update with new alarm
+    # Patch ServiceRegistry.async_call as it's typically read-only on the instance
+    with patch(
+        "homeassistant.core.ServiceRegistry.async_call", new_callable=AsyncMock
+    ) as mock_async_call:
+        await coordinator._async_update_data()
+
+        # Verify alarm code was stored
+        assert coordinator._last_alarm_codes["123-456-789"] == 42
+
+        # Verify notification service was called
+        mock_async_call.assert_called_once()
+        args, kwargs = mock_async_call.call_args
+        # Depending on how the mock is bound, domain might be at index 0 or 1
+        # In the previous failure, 'create' (arg[2]) matched 'persistent_notification' (arg[1]) failure message
+        # Wait, the failure said: AssertionError: assert 'create' == 'persistent_notification'
+        # which means I asserted call_args[0][1] == "persistent_notification" and it was 'create'.
+        # So arg[0] was "persistent_notification" and arg[1] was "create".
+        # This confirms arg[0] is DOMAIN, NOT SELF.
+        # So the class-level patch on ServiceRegistry.async_call DOES NOT receive self in call_args when called on instance?
+        # That's unusual but possible if HA/pytest-asyncio wraps it.
+
+        assert args[0] == "persistent_notification"
+        assert args[1] == "create"
+
+        payload = args[2]
+        assert payload["title"] == "Hitachi Device Alarm"
+        assert "Device: Test Device | Room: Test Room" in payload["message"]
+        assert "Code: E42 (raw: 42)" in payload["message"]
+        assert "Message: Test alarm message" in payload["message"]
+        assert "Origin: Unit" in payload["message"]
+        assert payload["notification_id"] == "csnet_home_alarm_123-456-789"
+
+
+@pytest.mark.asyncio
+async def test_coordinator_dhw_temperature_issue(hass: HomeAssistant):
+    """Test the DHW temperature enrichment issue (GH#141)."""
+    mock_api = MagicMock()
+
+    # Mock elements data returning correct temperature 48.0
+    mock_api.async_get_elements_data = AsyncMock(
+        return_value={
+            "common_data": {"name": "Test Home", "device_status": {}},
+            "sensors": [
+                {
+                    "device_id": 5684,
+                    "zone_id": 3,
+                    "current_temperature": 48.0,
+                    "room_name": "ballon",
+                }
+            ],
+        }
+    )
+
+    # Mock installation devices data returning weird tempDHW -67
+    mock_api.async_get_installation_devices_data = AsyncMock(
+        return_value={"data": [{"indoors": [{"heatingStatus": {"tempDHW": -67}}]}]}
+    )
+
+    # Mock get_heating_status_from_installation_devices to return the dict directly
+    mock_api.get_heating_status_from_installation_devices = MagicMock(
+        return_value={"tempDHW": -67}
+    )
+
+    mock_api.async_get_installation_alarms = AsyncMock(return_value=None)
+    mock_api.load_translations = AsyncMock()
+
+    hass.data["csnet_home"] = {"test": {"api": mock_api}}
+
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test")
+
+    # We need to make sure _is_valid_temperature is called
+    result = await coordinator._async_update_data()
+
+    # Verify that the temperature was NOT overwritten with -67, but kept as 48.0
+    sensors = result["sensors"]
+    assert len(sensors) == 1
+    assert sensors[0]["current_temperature"] == 48.0
