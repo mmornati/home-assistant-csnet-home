@@ -629,19 +629,15 @@ automation:
       - condition: template
         value_template: "{{ 'csnet_home_inst_alarm_' in trigger.event.data.notification_id }}"
     actions:
-      - action: variables
-        variables:
-          notification_id: "{{ trigger.event.data.notification_id }}"
-          alarm_id: "{{ notification_id.split('_')[-1] | int }}"
       - action: csnet_home.delete_alarm
         data:
-          alarm_id: "{{ alarm_id }}"
+          alarm_id: "{{ trigger.event.data.notification_id.split('_')[-1] | int }}"
 ```
 
 **How it works**:
 1. The integration creates persistent notifications with ID `csnet_home_inst_alarm_{alarm_id}`
 2. When the notification is dismissed (update_type: removed), this automation triggers
-3. It extracts the alarm_id from the notification_id
+3. It extracts the alarm_id directly in the service call using template
 4. Calls the delete_alarm service to remove it from CSNet Manager
 
 ---
