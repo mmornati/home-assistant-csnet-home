@@ -614,46 +614,27 @@ To find alarm IDs, check the **Alarm History** sensor's attributes (`recent_alar
 
 #### Auto-Delete on Notification Dismiss
 
-When an alarm notification is dismissed in Home Assistant, you can automatically delete it from CSNet Manager:
+When an alarm notification is dismissed in Home Assistant, you can automatically delete it from CSNet Manager.
 
-**Option 1: Using persistent_notification trigger (UI-style)**
-
-```yaml
-automation:
-  - description: "Delete CSNet alarm when notification is dismissed"
-    mode: single
-    triggers:
-      - trigger: persistent_notification
-        update_type:
-          - removed
-        notification_id: ""
-    conditions:
-      - condition: template
-        value_template: "{{ 'csnet_home_inst_alarm_' in this.attributes.notification_id }}"
-    actions:
-      - action: csnet_home.delete_alarm
-        data:
-          alarm_id: "{{ this.attributes.notification_id.split('_')[-1] | int }}"
-```
-
-**Option 2: Using event trigger (manual YAML)**
+**Note**: Due to file locking issues in some environments, it's recommended to add this automation manually to your `automations.yaml` file rather than using the UI.
 
 ```yaml
-automation:
-  - description: "Delete CSNet alarm when notification is dismissed"
-    mode: single
-    triggers:
-      - trigger: event
-        event_type: persistent_notification.updated
-        event_data:
-          update_type: removed
-    conditions:
-      - condition: template
-        value_template: "{{ 'csnet_home_inst_alarm_' in trigger.event.data.notification_id }}"
-    actions:
-      - action: csnet_home.delete_alarm
-        data:
-          alarm_id: "{{ trigger.event.data.notification_id.split('_')[-1] | int }}"
+# Add to your automations.yaml file
+- id: delete_csnet_alarm_on_dismiss
+  alias: "Delete CSNet alarm when notification is dismissed"
+  description: "Delete CSNet alarm when notification is dismissed"
+  mode: single
+  triggers:
+    - trigger: persistent_notification
+      update_type:
+        - removed
+  conditions:
+    - condition: template
+      value_template: "{{ 'csnet_home_inst_alarm_' in this.attributes.notification_id }}"
+  actions:
+    - action: csnet_home.delete_alarm
+      data:
+        alarm_id: "{{ this.attributes.notification_id.split('_')[-1] | int }}"
 ```
 
 **How it works**:
