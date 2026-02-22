@@ -18,6 +18,7 @@ from custom_components.csnet_home.const import (
     HEAT_SETTINGS_PATH,
     HEATING_MAX_TEMPERATURE,
     INSTALLATION_ALARMS_PATH,
+    DELETESPECIFICALARM_PATH,
     INSTALLATION_DEVICES_PATH,
     LANGUAGE_FILES,
     LOGIN_PATH,
@@ -498,6 +499,45 @@ class CSNetHomeAPI:
             _LOGGER.error("Error during installation alarms data retrieval: %s", e)
             self.logged_in = False
             return None
+
+    async def async_delete_alarm(self, installation_id, alarm_id):
+        """Delete an installation alarm."""
+        delete_url = f"{self.base_url}{DELETESPECIFICALARM_PATH}"
+
+        data = {
+            "installationId": installation_id,
+            "alarmId": alarm_id,
+            "_csrf": self.xsrf_token,
+        }
+
+        headers = COMMON_API_HEADERS | {
+            "accept": "*/*",
+            "x-requested-with": "XMLHttpRequest",
+            "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "origin": self.base_url,
+        }
+
+        cookies = {
+            "XSRF-TOKEN": self.xsrf_token,
+            "acceptedCookies": "yes",
+        }
+
+        try:
+            async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+                async with self.session.post(
+                    delete_url, headers=headers, cookies=cookies, data=data
+                ) as response:
+                    response_text = await response.text()
+                    _LOGGER.debug(
+                        "Delete alarm response: %s (status %s)",
+                        response_text,
+                        response.status,
+                    )
+                    response.raise_for_status()
+                    return True
+        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+            _LOGGER.error("Error deleting alarm %s: %s", alarm_id, err)
+            return False
 
     def get_current_temperature(self, element):
         """Return target/setting temperature normalized per element type.
