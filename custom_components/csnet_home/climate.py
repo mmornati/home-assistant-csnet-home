@@ -3,12 +3,7 @@
 import asyncio
 import logging
 
-from homeassistant.components.climate import (
-    FAN_AUTO,
-    ClimateEntity,
-    HVACAction,
-    HVACMode,
-)
+from homeassistant.components.climate import FAN_AUTO, ClimateEntity, HVACAction, HVACMode
 from homeassistant.components.climate.const import FAN_ON, ClimateEntityFeature
 from homeassistant.const import UnitOfTemperature
 from homeassistant.helpers.device_registry import DeviceInfo

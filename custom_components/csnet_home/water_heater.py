@@ -5,10 +5,7 @@
 import logging
 from typing import Any
 
-from homeassistant.components.water_heater import (
-    WaterHeaterEntity,
-    WaterHeaterEntityFeature,
-)
+from homeassistant.components.water_heater import WaterHeaterEntity, WaterHeaterEntityFeature
 from homeassistant.const import PRECISION_WHOLE, UnitOfTemperature
 from homeassistant.helpers.device_registry import DeviceInfo
 
