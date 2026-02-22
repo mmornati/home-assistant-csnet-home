@@ -54,12 +54,8 @@ TEMPERATURE_LIMIT_CONFIGS = {
         "coolAirMaxC2",
         HEATING_MAX_TEMPERATURE,
     ),
-    5: TemperatureLimitConfig(
-        "heatMinC1", "heatMaxC1", "coolMinC1", "coolMaxC1", WATER_CIRCUIT_MAX_HEAT
-    ),
-    6: TemperatureLimitConfig(
-        "heatMinC2", "heatMaxC2", "coolMinC2", "coolMaxC2", WATER_CIRCUIT_MAX_HEAT
-    ),
+    5: TemperatureLimitConfig("heatMinC1", "heatMaxC1", "coolMinC1", "coolMaxC1", WATER_CIRCUIT_MAX_HEAT),
+    6: TemperatureLimitConfig("heatMinC2", "heatMaxC2", "coolMinC2", "coolMaxC2", WATER_CIRCUIT_MAX_HEAT),
 }
 
 TO_REDACT = {
