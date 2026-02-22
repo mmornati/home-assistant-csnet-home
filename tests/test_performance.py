@@ -1,15 +1,19 @@
-import sys
-import os
+"""Performance benchmark tests for CSNet Home coordinator."""
+
 import asyncio
+import os
+import sys
 import time
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 # Add current directory to path
 sys.path.append(os.getcwd())
 
 # Handle missing homeassistant dependency in restricted environments
 try:
-    import homeassistant.core
+    import homeassistant.core  # noqa: F401
 except ImportError:
     import types
 
@@ -42,22 +46,19 @@ except ImportError:
     sys.modules["homeassistant.helpers"] = ha.helpers
 
     # Mock device_registry
-    ha.helpers.device_registry = types.ModuleType(
-        "homeassistant.helpers.device_registry"
-    )
+    ha.helpers.device_registry = types.ModuleType("homeassistant.helpers.device_registry")
     sys.modules["homeassistant.helpers.device_registry"] = ha.helpers.device_registry
     ha.helpers.device_registry.DeviceEntry = MagicMock()
 
     # Mock update_coordinator
-    ha.helpers.update_coordinator = types.ModuleType(
-        "homeassistant.helpers.update_coordinator"
-    )
-    sys.modules["homeassistant.helpers.update_coordinator"] = (
-        ha.helpers.update_coordinator
-    )
+    ha.helpers.update_coordinator = types.ModuleType("homeassistant.helpers.update_coordinator")
+    sys.modules["homeassistant.helpers.update_coordinator"] = ha.helpers.update_coordinator
 
     class MockDataUpdateCoordinator:
+        """Mock DataUpdateCoordinator for testing."""
+
         def __init__(self, hass, logger, name, update_method, update_interval):
+            """Initialize mock coordinator."""
             self.hass = hass
             self.logger = logger
             self.name = name
@@ -66,23 +67,25 @@ except ImportError:
             self._listeners = []
 
         async def _async_update_data(self):
+            """Raise NotImplementedError."""
             raise NotImplementedError
 
     ha.helpers.update_coordinator.DataUpdateCoordinator = MockDataUpdateCoordinator
 
     # Also mock aiohttp if missing
     try:
-        import aiohttp
+        import aiohttp  # noqa: F401
     except ImportError:
         sys.modules["aiohttp"] = MagicMock()
 
     try:
-        import async_timeout
+        import async_timeout  # noqa: F401
     except ImportError:
         sys.modules["async_timeout"] = MagicMock()
 
+
 # Now import coordinator
-from custom_components.csnet_home.coordinator import CSNetHomeCoordinator
+from custom_components.csnet_home.coordinator import CSNetHomeCoordinator  # noqa: E402
 
 # Define simulated latencies
 LATENCY_LOAD_TRANSLATIONS = 0.1
@@ -117,9 +120,7 @@ async def run_benchmark(hass=None):
 
     mock_api.load_translations = AsyncMock(side_effect=slow_load_translations)
     mock_api.async_get_elements_data = AsyncMock(side_effect=slow_get_elements)
-    mock_api.async_get_installation_devices_data = AsyncMock(
-        side_effect=slow_get_devices
-    )
+    mock_api.async_get_installation_devices_data = AsyncMock(side_effect=slow_get_devices)
     mock_api.async_get_installation_alarms = AsyncMock(side_effect=slow_get_alarms)
     # Ensure translate_alarm doesn't fail
     mock_api.translate_alarm = MagicMock(return_value="Translated Alarm")
@@ -146,23 +147,16 @@ async def run_benchmark(hass=None):
     mock_api.async_get_installation_alarms.assert_called_once()
 
     # Assert performance is optimized (should be < sum of latencies)
-    assert (
-        duration < 1.0
-    ), f"Performance regression! Time: {duration:.4f}s (expected < 1.0s)"
+    assert duration < 1.0, f"Performance regression! Time: {duration:.4f}s (expected < 1.0s)"
 
     return duration
 
 
-# For pytest execution
-try:
-    import pytest
+@pytest.mark.asyncio
+async def test_coordinator_performance(hass):
+    """Test coordinator performance optimization."""
+    await run_benchmark(hass)
 
-    @pytest.mark.asyncio
-    async def test_coordinator_performance(hass):
-        await run_benchmark(hass)
-
-except ImportError:
-    pass
 
 # For standalone execution
 if __name__ == "__main__":
