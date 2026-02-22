@@ -32,10 +32,7 @@ def load_fixture(fixture_path: str) -> Dict[str, Any]:
     if not fixture_file.exists():
         raise FileNotFoundError(
             f"Fixture file not found: {fixture_file}\n"
-            f"Available fixtures in {FIXTURES_DIR}:\n"
-            + "\n".join(
-                str(f.relative_to(FIXTURES_DIR)) for f in FIXTURES_DIR.rglob("*.json")
-            )
+            f"Available fixtures in {FIXTURES_DIR}:\n" + "\n".join(str(f.relative_to(FIXTURES_DIR)) for f in FIXTURES_DIR.rglob("*.json"))
         )
 
     with open(fixture_file, "r", encoding="utf-8") as f:
@@ -124,9 +121,6 @@ def sanitize_api_response(response: Dict[str, Any]) -> Dict[str, Any]:
             if isinstance(value, dict):
                 sanitized[key] = sanitize_api_response(value)
             elif isinstance(value, list):
-                sanitized[key] = [
-                    sanitize_api_response(item) if isinstance(item, dict) else item
-                    for item in value
-                ]
+                sanitized[key] = [sanitize_api_response(item) if isinstance(item, dict) else item for item in value]
 
     return sanitized

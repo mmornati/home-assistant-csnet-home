@@ -43,9 +43,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     api.preferred_language = entry.data.get(CONF_LANGUAGE)
 
     _LOGGER.debug("Starting CSNet Home sensor setup")
-    coordinator = CSNetHomeCoordinator(
-        hass, entry.data.get(CONF_SCAN_INTERVAL, SCAN_INTERVAL), entry.entry_id
-    )
+    coordinator = CSNetHomeCoordinator(hass, entry.data.get(CONF_SCAN_INTERVAL, SCAN_INTERVAL), entry.entry_id)
 
     # Initialise a listener for config flow options changes.
     # See config_flow for defining an options setting that shows up as configure on the integration.
@@ -70,9 +68,7 @@ async def _async_update_listener(hass: HomeAssistant, config_entry):
     await hass.config_entries.async_reload(config_entry.entry_id)
 
 
-async def async_remove_config_entry_device(
-    hass: HomeAssistant, config_entry: ConfigEntry, device_entry: DeviceEntry
-) -> bool:
+async def async_remove_config_entry_device(hass: HomeAssistant, config_entry: ConfigEntry, device_entry: DeviceEntry) -> bool:
     """Delete device if selected from UI."""
     # Adding this function shows the delete device option in the UI.
     # Remove this function if you do not want that option.

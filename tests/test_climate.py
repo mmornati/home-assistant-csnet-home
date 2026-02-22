@@ -4,28 +4,35 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
-from homeassistant.components.climate import (FAN_AUTO, FAN_ON, HVACAction,
-                                              HVACMode)
+from homeassistant.components.climate import FAN_AUTO, FAN_ON, HVACAction, HVACMode
 from homeassistant.components.climate.const import ClimateEntityFeature
 
 from custom_components.csnet_home.climate import CSNetHomeClimate
-from custom_components.csnet_home.const import (CONF_MAX_TEMP_OVERRIDE, DOMAIN,
-                                                HEATING_MAX_TEMPERATURE,
-                                                HEATING_MIN_TEMPERATURE,
-                                                OPST_ALARM, OPST_COOL_D_OFF,
-                                                OPST_COOL_T_OFF,
-                                                OPST_COOL_T_ON, OPST_DHW_OFF,
-                                                OPST_DHW_ON, OPST_HEAT_D_OFF,
-                                                OPST_HEAT_T_OFF,
-                                                OPST_HEAT_T_ON, OPST_OFF,
-                                                OPST_SWP_OFF, OPST_SWP_ON,
-                                                OTC_COOLING_TYPE_FIX,
-                                                OTC_COOLING_TYPE_NONE,
-                                                OTC_COOLING_TYPE_POINTS,
-                                                OTC_HEATING_TYPE_FIX,
-                                                OTC_HEATING_TYPE_GRADIENT,
-                                                OTC_HEATING_TYPE_NONE,
-                                                OTC_HEATING_TYPE_POINTS)
+from custom_components.csnet_home.const import (
+    CONF_MAX_TEMP_OVERRIDE,
+    DOMAIN,
+    HEATING_MAX_TEMPERATURE,
+    HEATING_MIN_TEMPERATURE,
+    OPST_ALARM,
+    OPST_COOL_D_OFF,
+    OPST_COOL_T_OFF,
+    OPST_COOL_T_ON,
+    OPST_DHW_OFF,
+    OPST_DHW_ON,
+    OPST_HEAT_D_OFF,
+    OPST_HEAT_T_OFF,
+    OPST_HEAT_T_ON,
+    OPST_OFF,
+    OPST_SWP_OFF,
+    OPST_SWP_ON,
+    OTC_COOLING_TYPE_FIX,
+    OTC_COOLING_TYPE_NONE,
+    OTC_COOLING_TYPE_POINTS,
+    OTC_HEATING_TYPE_FIX,
+    OTC_HEATING_TYPE_GRADIENT,
+    OTC_HEATING_TYPE_NONE,
+    OTC_HEATING_TYPE_POINTS,
+)
 
 
 def build_entity(
@@ -41,7 +48,7 @@ def build_entity(
     fan2_speed=None,
     is_fan_coil=False,
     zone_id=1,
-    operation_status=5
+    operation_status=5,
 ):
     """Create a CSNetHomeClimate with minimal surroundings."""
     sensor_data = {
@@ -351,9 +358,7 @@ def test_dynamic_temperature_limits_heating_mode(hass):
             }
         },
         get_sensors_data=lambda: [entity._sensor_data],
-        get_common_data=lambda: {
-            "device_status": {1234: {"name": "Hitachi PAC", "firmware": "1.0.0"}}
-        },
+        get_common_data=lambda: {"device_status": {1234: {"name": "Hitachi PAC", "firmware": "1.0.0"}}},
         async_request_refresh=AsyncMock(return_value=None),
     )
 
@@ -385,9 +390,7 @@ def test_dynamic_temperature_limits_cooling_mode(hass):
             }
         },
         get_sensors_data=lambda: [entity._sensor_data],
-        get_common_data=lambda: {
-            "device_status": {1234: {"name": "Hitachi PAC", "firmware": "1.0.0"}}
-        },
+        get_common_data=lambda: {"device_status": {1234: {"name": "Hitachi PAC", "firmware": "1.0.0"}}},
         async_request_refresh=AsyncMock(return_value=None),
     )
 
@@ -414,9 +417,7 @@ def test_dynamic_temperature_limits_fallback_to_defaults(hass):
     mock_coordinator = SimpleNamespace(
         get_installation_devices_data=lambda: {},
         get_sensors_data=lambda: [entity._sensor_data],
-        get_common_data=lambda: {
-            "device_status": {1234: {"name": "Hitachi PAC", "firmware": "1.0.0"}}
-        },
+        get_common_data=lambda: {"device_status": {1234: {"name": "Hitachi PAC", "firmware": "1.0.0"}}},
         async_request_refresh=AsyncMock(return_value=None),
     )
 
@@ -1340,9 +1341,7 @@ def test_device_info_after_update_with_nested_structure(hass):
     entity = build_entity(hass)
 
     # Simulate update: replace _common_data with full common_data dict
-    entity._common_data = {
-        "device_status": {1234: {"name": "Hitachi PAC", "firmware": "2.0.0"}}
-    }
+    entity._common_data = {"device_status": {1234: {"name": "Hitachi PAC", "firmware": "2.0.0"}}}
 
     device_info = entity.device_info
 

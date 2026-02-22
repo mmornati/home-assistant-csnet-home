@@ -29,14 +29,9 @@ def test_get_current_temperature_scaling(hass):
     """Scale or return settingTemperature according to elementType."""
     api = CSNetHomeAPI(hass, "u", "p")
     # type 5 multiplies by 10
-    assert (
-        api.get_current_temperature({"elementType": 5, "settingTemperature": 25}) == 250
-    )
+    assert api.get_current_temperature({"elementType": 5, "settingTemperature": 25}) == 250
     # other types return raw value
-    assert (
-        api.get_current_temperature({"elementType": 1, "settingTemperature": 19.5})
-        == 19.5
-    )
+    assert api.get_current_temperature({"elementType": 1, "settingTemperature": 19.5}) == 19.5
 
 
 @pytest.mark.asyncio
@@ -111,15 +106,11 @@ async def test_login_error(mock_aiohttp_client, hass):
 @pytest.mark.asyncio
 async def test_validate_credentials_success(hass):
     """Test successful credential validation."""
-    with patch.object(
-        CSNetHomeAPI, "async_login", return_value=True
-    ) as mock_login, patch("aiohttp.ClientSession") as mock_session:
+    with patch.object(CSNetHomeAPI, "async_login", return_value=True) as mock_login, patch("aiohttp.ClientSession") as mock_session:
         mock_session_instance = mock_session.return_value
         mock_session_instance.close = AsyncMock()
 
-        result = await CSNetHomeAPI.async_validate_credentials(
-            hass, "valid_user", "valid_pass"
-        )
+        result = await CSNetHomeAPI.async_validate_credentials(hass, "valid_user", "valid_pass")
 
         assert result is True
         mock_login.assert_called_once()
@@ -130,15 +121,11 @@ async def test_validate_credentials_success(hass):
 @pytest.mark.asyncio
 async def test_validate_credentials_failure(hass):
     """Test failed credential validation."""
-    with patch.object(
-        CSNetHomeAPI, "async_login", return_value=False
-    ) as mock_login, patch("aiohttp.ClientSession") as mock_session:
+    with patch.object(CSNetHomeAPI, "async_login", return_value=False) as mock_login, patch("aiohttp.ClientSession") as mock_session:
         mock_session_instance = mock_session.return_value
         mock_session_instance.close = AsyncMock()
 
-        result = await CSNetHomeAPI.async_validate_credentials(
-            hass, "invalid_user", "invalid_pass"
-        )
+        result = await CSNetHomeAPI.async_validate_credentials(hass, "invalid_user", "invalid_pass")
 
         assert result is False
         mock_login.assert_called_once()
@@ -149,15 +136,11 @@ async def test_validate_credentials_failure(hass):
 @pytest.mark.asyncio
 async def test_validate_credentials_exception(hass):
     """Test credential validation with exception during login."""
-    with patch.object(
-        CSNetHomeAPI, "async_login", side_effect=Exception("Connection error")
-    ) as mock_login, patch("aiohttp.ClientSession") as mock_session:
+    with patch.object(CSNetHomeAPI, "async_login", side_effect=Exception("Connection error")) as mock_login, patch("aiohttp.ClientSession") as mock_session:
         mock_session_instance = mock_session.return_value
         mock_session_instance.close = AsyncMock()
 
-        result = await CSNetHomeAPI.async_validate_credentials(
-            hass, "test_user", "test_pass"
-        )
+        result = await CSNetHomeAPI.async_validate_credentials(hass, "test_user", "test_pass")
 
         assert result is False
         mock_login.assert_called_once()
@@ -168,17 +151,13 @@ async def test_validate_credentials_exception(hass):
 @pytest.mark.asyncio
 async def test_validate_credentials_cleanup_failure(hass):
     """Test credential validation when session cleanup fails."""
-    with patch.object(
-        CSNetHomeAPI, "async_login", return_value=True
-    ) as mock_login, patch("aiohttp.ClientSession") as mock_session:
+    with patch.object(CSNetHomeAPI, "async_login", return_value=True) as mock_login, patch("aiohttp.ClientSession") as mock_session:
         mock_session_instance = mock_session.return_value
         # Simulate session close failure
         mock_session_instance.close = AsyncMock(side_effect=Exception("Close failed"))
 
         # Should still return the validation result despite cleanup error
-        result = await CSNetHomeAPI.async_validate_credentials(
-            hass, "test_user", "test_pass"
-        )
+        result = await CSNetHomeAPI.async_validate_credentials(hass, "test_user", "test_pass")
 
         assert result is True
         mock_login.assert_called_once()
@@ -409,9 +388,7 @@ async def test_api_get_elements_data_success(mock_aiohttp_client, hass):
             },
         ],
     }
-    mock_client_instance.get.assert_called_with(
-        "https://www.csnetmanager.com/data/elements", headers=ANY, cookies=ANY
-    )
+    mock_client_instance.get.assert_called_with("https://www.csnetmanager.com/data/elements", headers=ANY, cookies=ANY)
 
 
 @pytest.mark.asyncio
@@ -608,9 +585,7 @@ async def test_api_get_elements_data_empty_names(mock_aiohttp_client, hass):
             },
         ],
     }
-    mock_client_instance.get.assert_called_with(
-        "https://www.csnetmanager.com/data/elements", headers=ANY, cookies=ANY
-    )
+    mock_client_instance.get.assert_called_with("https://www.csnetmanager.com/data/elements", headers=ANY, cookies=ANY)
 
 
 @pytest.mark.asyncio
@@ -809,9 +784,7 @@ async def test_api_get_installation_devices_data_exception(mock_aiohttp_client, 
 
 
 @pytest.mark.asyncio
-async def test_api_get_installation_devices_data_not_logged_in(
-    mock_aiohttp_client, hass
-):
+async def test_api_get_installation_devices_data_not_logged_in(mock_aiohttp_client, hass):
     """Test installation devices data retrieval when not logged in."""
     mock_client_instance = mock_aiohttp_client.return_value
 
@@ -1172,9 +1145,7 @@ async def test_api_get_installation_alarms_success(mock_aiohttp_client, hass):
 
 
 @pytest.mark.asyncio
-async def test_api_get_installation_alarms_no_installation_id(
-    mock_aiohttp_client, hass
-):
+async def test_api_get_installation_alarms_no_installation_id(mock_aiohttp_client, hass):
     """Test installation alarms retrieval when no installation ID is available."""
     api = CSNetHomeAPI(hass, "user", "pass")
     api.installation_id = None
@@ -1825,9 +1796,7 @@ def test_is_fan_coil_compatible_true(hass):
     """Test fan coil compatibility check when systemConfigBits has 0x2000 bit set."""
     api = CSNetHomeAPI(hass, "user", "pass")
 
-    installation_data = {
-        "heatingStatus": {"systemConfigBits": 0x2000}  # Fan coil compatible
-    }
+    installation_data = {"heatingStatus": {"systemConfigBits": 0x2000}}  # Fan coil compatible
 
     assert api.is_fan_coil_compatible(installation_data) is True
 
@@ -1836,9 +1805,7 @@ def test_is_fan_coil_compatible_false(hass):
     """Test fan coil compatibility check when systemConfigBits does not have 0x2000 bit."""
     api = CSNetHomeAPI(hass, "user", "pass")
 
-    installation_data = {
-        "heatingStatus": {"systemConfigBits": 0x1000}  # Not fan coil compatible
-    }
+    installation_data = {"heatingStatus": {"systemConfigBits": 0x1000}}  # Not fan coil compatible
 
     assert api.is_fan_coil_compatible(installation_data) is False
 
@@ -2130,9 +2097,7 @@ def test_get_unit_type(hass):
 
     # Test fan coil detection from installation data
     sensor_data = {"zone_id": 1}
-    installation_data = {
-        "heatingStatus": {"systemConfigBits": 0x2000}  # Fan coil bit set
-    }
+    installation_data = {"heatingStatus": {"systemConfigBits": 0x2000}}  # Fan coil bit set
     assert api.get_unit_type(sensor_data, installation_data) == "fan_coil"
 
     # Test standard unit (default)
@@ -2210,9 +2175,7 @@ def test_get_alarm_origin_bcd(hass):
 
 
 @pytest.mark.asyncio
-async def test_async_get_elements_data_with_enhanced_alarm_fields(
-    mock_aiohttp_client, hass
-):
+async def test_async_get_elements_data_with_enhanced_alarm_fields(mock_aiohttp_client, hass):
     """Test that async_get_elements_data includes enhanced alarm fields."""
     mock_client_instance = mock_aiohttp_client.return_value
 
@@ -2430,9 +2393,7 @@ async def test_set_water_heater_mode_swp_off(mock_aiohttp_client, hass):
 
 
 @pytest.mark.asyncio
-async def test_async_get_elements_data_with_swp(
-    mock_aiohttp_client, hass, load_fixture
-):
+async def test_async_get_elements_data_with_swp(mock_aiohttp_client, hass, load_fixture):
     """Test elements data parsing with swimming pool."""
     mock_client_instance = mock_aiohttp_client.return_value
 
@@ -2490,9 +2451,7 @@ def test_get_nested_data_nested_access(hass):
     """Test _get_nested_data_from_installation_devices with nested access."""
     api = CSNetHomeAPI(hass, "user", "pass")
     data = {"data": [{"indoors": [{"myKey": "nestedValue"}]}]}
-    assert (
-        api._get_nested_data_from_installation_devices(data, "myKey") == "nestedValue"
-    )
+    assert api._get_nested_data_from_installation_devices(data, "myKey") == "nestedValue"
 
 
 def test_get_nested_data_not_found(hass):

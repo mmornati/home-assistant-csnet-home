@@ -43,12 +43,8 @@ async def test_coordinator_update_success(hass: HomeAssistant):
             "sensors": [{"device_id": 1, "room_name": "Test Room"}],
         }
     )
-    mock_api.async_get_installation_devices_data = AsyncMock(
-        return_value={"waterSpeed": 100, "defrost": True}
-    )
-    mock_api.async_get_installation_alarms = AsyncMock(
-        return_value={"alarms": [{"code": 42, "message": "Test alarm"}]}
-    )
+    mock_api.async_get_installation_devices_data = AsyncMock(return_value={"waterSpeed": 100, "defrost": True})
+    mock_api.async_get_installation_alarms = AsyncMock(return_value={"alarms": [{"code": 42, "message": "Test alarm"}]})
     mock_api.load_translations = AsyncMock()
 
     hass.data["csnet_home"] = {"test": {"api": mock_api}}
@@ -65,9 +61,7 @@ async def test_coordinator_update_success(hass: HomeAssistant):
         "defrost": True,
     }
     assert "installation_alarms" in result["common_data"]
-    assert result["common_data"]["installation_alarms"] == {
-        "alarms": [{"code": 42, "message": "Test alarm"}]
-    }
+    assert result["common_data"]["installation_alarms"] == {"alarms": [{"code": 42, "message": "Test alarm"}]}
     mock_api.async_get_elements_data.assert_called_once()
     mock_api.async_get_installation_devices_data.assert_called_once()
     mock_api.async_get_installation_alarms.assert_called_once()
@@ -300,9 +294,7 @@ async def test_coordinator_alarm_notification(hass: HomeAssistant):
 
     # Trigger update with new alarm
     # Patch ServiceRegistry.async_call as it's typically read-only on the instance
-    with patch(
-        "homeassistant.core.ServiceRegistry.async_call", new_callable=AsyncMock
-    ) as mock_async_call:
+    with patch("homeassistant.core.ServiceRegistry.async_call", new_callable=AsyncMock) as mock_async_call:
         await coordinator._async_update_data()
 
         # Verify alarm code was stored
@@ -353,14 +345,10 @@ async def test_coordinator_dhw_temperature_issue(hass: HomeAssistant):
     )
 
     # Mock installation devices data returning weird tempDHW -67
-    mock_api.async_get_installation_devices_data = AsyncMock(
-        return_value={"data": [{"indoors": [{"heatingStatus": {"tempDHW": -67}}]}]}
-    )
+    mock_api.async_get_installation_devices_data = AsyncMock(return_value={"data": [{"indoors": [{"heatingStatus": {"tempDHW": -67}}]}]})
 
     # Mock get_heating_status_from_installation_devices to return the dict directly
-    mock_api.get_heating_status_from_installation_devices = MagicMock(
-        return_value={"tempDHW": -67}
-    )
+    mock_api.get_heating_status_from_installation_devices = MagicMock(return_value={"tempDHW": -67})
 
     mock_api.async_get_installation_alarms = AsyncMock(return_value=None)
     mock_api.load_translations = AsyncMock()
@@ -391,10 +379,7 @@ async def test_coordinator_get_sensor_data_by_id(hass: HomeAssistant):
     }
 
     # Manually populate the lookup dictionary since we're bypassing _async_update_data
-    coordinator._sensors_by_id = {
-        (s["device_id"], s["room_id"], s["zone_id"]): s
-        for s in coordinator._device_data["sensors"]
-    }
+    coordinator._sensors_by_id = {(s["device_id"], s["room_id"], s["zone_id"]): s for s in coordinator._device_data["sensors"]}
 
     assert coordinator.get_sensor_data_by_id(1, 10, 1) == sensor_1
     assert coordinator.get_sensor_data_by_id(2, 20, 2) == sensor_2

@@ -36,10 +36,8 @@ install-dev:
 
 format:
 	@echo "Formatting code..."
-	black custom_components/csnet_home/
-	black tests/
-	isort custom_components/csnet_home/
-	isort tests/
+	.venv/bin/black .
+	.venv/bin/isort .
 
 lint:
 	@echo "Running linters..."
