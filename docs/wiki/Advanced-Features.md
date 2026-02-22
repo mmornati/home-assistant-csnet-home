@@ -630,11 +630,11 @@ When an alarm notification is dismissed in Home Assistant, you can automatically
         - removed
   conditions:
     - condition: template
-      value_template: "{{ 'csnet_home_inst_alarm_' in this.attributes.notification_id }}"
+      value_template: "{{ 'csnet_home_inst_alarm_' in trigger.notification.notification_id }}"
   actions:
     - action: csnet_home.delete_alarm
       data:
-        alarm_id: "{{ this.attributes.notification_id.split('_')[-1] | int }}"
+        alarm_id: "{{ trigger.notification.notification_id.split('_')[-1] | int }}"
 ```
 
 **How it works**:
