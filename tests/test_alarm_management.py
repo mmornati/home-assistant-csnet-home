@@ -1,6 +1,6 @@
 """Test alarm notifications and sensor logic."""
 
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from homeassistant.const import STATE_ON
@@ -52,11 +52,15 @@ def mock_api(hass):
     api = MagicMock(spec=CSNetHomeAPI)
     api.hass = hass
     # Ensure common_data is not empty so the coordinator processes alarms
-    api.async_get_elements_data = AsyncMock(return_value={"sensors": [], "common_data": {"name": "Test Home"}})
+    api.async_get_elements_data = AsyncMock(
+        return_value={"sensors": [], "common_data": {"name": "Test Home"}}
+    )
     api.async_get_installation_devices_data = AsyncMock(return_value={})
     api.async_get_installation_alarms = AsyncMock(return_value=MOCK_ALARMS_RESPONSE)
     api.load_translations = AsyncMock()
-    api.translate_alarm = MagicMock(side_effect=lambda x: f"Alarm {x}" if x != -1 else None)
+    api.translate_alarm = MagicMock(
+        side_effect=lambda x: f"Alarm {x}" if x != -1 else None
+    )
     api.get_heating_status_from_installation_devices = MagicMock(return_value={})
     return api
 

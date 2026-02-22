@@ -7,7 +7,12 @@ import pytest
 from homeassistant.components.water_heater import WaterHeaterEntityFeature
 from homeassistant.const import PRECISION_WHOLE, UnitOfTemperature
 
-from custom_components.csnet_home.const import DOMAIN, SWIMMING_POOL_MAX_TEMPERATURE, SWIMMING_POOL_MIN_TEMPERATURE, WATER_HEATER_MIN_TEMPERATURE
+from custom_components.csnet_home.const import (
+    DOMAIN,
+    SWIMMING_POOL_MAX_TEMPERATURE,
+    SWIMMING_POOL_MIN_TEMPERATURE,
+    WATER_HEATER_MIN_TEMPERATURE,
+)
 from custom_components.csnet_home.water_heater import CSNetHomeWaterHeater
 
 
@@ -82,7 +87,10 @@ def test_water_heater_initialization(hass):
     assert entity._attr_name == "DHW"
     assert not entity._is_swimming_pool
     assert entity._attr_temperature_unit == UnitOfTemperature.CELSIUS
-    assert entity._attr_supported_features == (WaterHeaterEntityFeature.TARGET_TEMPERATURE | WaterHeaterEntityFeature.OPERATION_MODE)
+    assert entity._attr_supported_features == (
+        WaterHeaterEntityFeature.TARGET_TEMPERATURE
+        | WaterHeaterEntityFeature.OPERATION_MODE
+    )
     assert entity._attr_operation_list == ["off", "eco", "performance"]
 
 
@@ -92,7 +100,10 @@ def test_swimming_pool_initialization(hass):
     assert entity._attr_name == "Pool"
     assert entity._is_swimming_pool
     assert entity._attr_temperature_unit == UnitOfTemperature.CELSIUS
-    assert entity._attr_supported_features == (WaterHeaterEntityFeature.TARGET_TEMPERATURE | WaterHeaterEntityFeature.OPERATION_MODE)
+    assert entity._attr_supported_features == (
+        WaterHeaterEntityFeature.TARGET_TEMPERATURE
+        | WaterHeaterEntityFeature.OPERATION_MODE
+    )
     assert entity._attr_operation_list == ["off", "on"]
 
 
@@ -250,7 +261,9 @@ async def test_swimming_pool_set_operation_mode_on(hass):
     assert entity._sensor_data["on_off"] == 1
     assert entity._attr_operation_mode == "on"
     # Swimming pool should not have doingBoost attribute set
-    assert "doingBoost" not in entity._sensor_data or not entity._sensor_data.get("doingBoost")
+    assert "doingBoost" not in entity._sensor_data or not entity._sensor_data.get(
+        "doingBoost"
+    )
 
 
 @pytest.mark.asyncio

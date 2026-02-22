@@ -23,7 +23,12 @@ from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN, OPERATION_STATUS_MAP, OTC_COOLING_TYPE_NAMES, OTC_HEATING_TYPE_NAMES
+from .const import (
+    DOMAIN,
+    OPERATION_STATUS_MAP,
+    OTC_COOLING_TYPE_NAMES,
+    OTC_HEATING_TYPE_NAMES,
+)
 from .coordinator import CSNetHomeCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -249,7 +254,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
     sensors = []
     common_data = coordinator.get_common_data()
     for sensor_data in coordinator.get_sensors_data():
-        device_common_data = common_data.get("device_status", {}).get(sensor_data["device_id"], {})
+        device_common_data = common_data.get("device_status", {}).get(
+            sensor_data["device_id"], {}
+        )
 
         for key, device_class, unit in SENSOR_TYPES:
             sensors.append(
@@ -388,7 +395,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
         )
 
     # Add alarm history sensor (shows recent alarms from installation alarms API)
-    sensors.append(CSNetHomeAlarmHistorySensor(coordinator, coordinator.get_common_data()))
+    sensors.append(
+        CSNetHomeAlarmHistorySensor(coordinator, coordinator.get_common_data())
+    )
 
     # Add alarm statistics sensors (total count, by origin, by device)
     sensors.append(
@@ -500,7 +509,9 @@ class CSNetHomeSensor(CoordinatorEntity, Entity):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Update sensor with latest data from coordinator."""
-        self._sensor_data = self._coordinator.get_sensor_data_by_id(self._device_id, self._room_id, self._zone_id)
+        self._sensor_data = self._coordinator.get_sensor_data_by_id(
+            self._device_id, self._room_id, self._zone_id
+        )
         if self._sensor_data:
             self.async_write_ha_state()
 
@@ -516,7 +527,9 @@ class CSNetHomeSensor(CoordinatorEntity, Entity):
         # 2. Full common_data dict (after update): _common_data = {"device_status": {...}}
         if "device_status" in self._common_data:
             # After update: nested structure
-            device_status = self._common_data.get("device_status", {}).get(device_id, {})
+            device_status = self._common_data.get("device_status", {}).get(
+                device_id, {}
+            )
             device_name_from_status = device_status.get("name", "Unknown")
             firmware = device_status.get("firmware")
         else:
@@ -749,7 +762,9 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, Entity):
             if otc_value is not None:
                 # Return the descriptive name for the OTC type
                 if "heating" in self._key:
-                    return OTC_HEATING_TYPE_NAMES.get(otc_value, f"Unknown ({otc_value})")
+                    return OTC_HEATING_TYPE_NAMES.get(
+                        otc_value, f"Unknown ({otc_value})"
+                    )
                 return OTC_COOLING_TYPE_NAMES.get(otc_value, f"Unknown ({otc_value})")
 
         return "Unknown"
@@ -875,7 +890,9 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
         p_low = heating_status.get("ouSuctionPress", 0)
 
         # Get temp using the module-level helper function
-        t_discharge = _convert_unsigned_to_signed_byte(heating_status.get("ouDischargeTemperature"))
+        t_discharge = _convert_unsigned_to_signed_byte(
+            heating_status.get("ouDischargeTemperature")
+        )
         if t_discharge is None:
             t_discharge = 0
 
@@ -1217,7 +1234,9 @@ class CSNetHomeDeviceSensor(CoordinatorEntity, Entity):
 
             # Convert from milliseconds to seconds and create datetime
             timestamp_seconds = last_comm / 1000
-            return datetime.fromtimestamp(timestamp_seconds, tz=timezone.utc).isoformat()
+            return datetime.fromtimestamp(
+                timestamp_seconds, tz=timezone.utc
+            ).isoformat()
 
         return None
 
@@ -1236,7 +1255,11 @@ class CSNetHomeDeviceSensor(CoordinatorEntity, Entity):
         """Update sensor with latest data from coordinator."""
         # Update sensor_data reference
         self._sensor_data = next(
-            (x for x in self._coordinator.get_sensors_data() if x.get("device_id") == self._device_id),
+            (
+                x
+                for x in self._coordinator.get_sensors_data()
+                if x.get("device_id") == self._device_id
+            ),
             None,
         )
 
@@ -1253,7 +1276,9 @@ class CSNetHomeDeviceSensor(CoordinatorEntity, Entity):
             name=f"{self._sensor_data['device_name']}-{self._sensor_data.get('room_name', 'Unknown')}",
             manufacturer="Hitachi",
             model=f"{self._common_data.get('device_status', {}).get(self._device_id, {}).get('name', 'Unknown')} Remote Controller",
-            sw_version=self._common_data.get("device_status", {}).get(self._device_id, {}).get("firmware"),
+            sw_version=self._common_data.get("device_status", {})
+            .get(self._device_id, {})
+            .get("firmware"),
             identifiers={
                 (
                     DOMAIN,
@@ -1391,16 +1416,28 @@ class CSNetHomeAlarmStatisticsSensor(CoordinatorEntity, Entity):
         if self._statistic_type == "total_alarm_count":
             # Count all sensors that have ever had an alarm (alarm_code != 0)
             # This is the current active alarm count
-            return sum(1 for sensor in sensors if sensor.get("alarm_code") and sensor.get("alarm_code") != 0)
+            return sum(
+                1
+                for sensor in sensors
+                if sensor.get("alarm_code") and sensor.get("alarm_code") != 0
+            )
 
         if self._statistic_type == "active_alarm_count":
             # Count currently active alarms
-            return sum(1 for sensor in sensors if sensor.get("alarm_code") and sensor.get("alarm_code") != 0)
+            return sum(
+                1
+                for sensor in sensors
+                if sensor.get("alarm_code") and sensor.get("alarm_code") != 0
+            )
 
         if self._statistic_type == "alarm_by_origin":
             # Count alarms by origin
             origins = [
-                sensor.get("alarm_origin") for sensor in sensors if sensor.get("alarm_code") and sensor.get("alarm_code") != 0 and sensor.get("alarm_origin")
+                sensor.get("alarm_origin")
+                for sensor in sensors
+                if sensor.get("alarm_code")
+                and sensor.get("alarm_code") != 0
+                and sensor.get("alarm_origin")
             ]
             if not origins:
                 return 0
@@ -1414,7 +1451,11 @@ class CSNetHomeAlarmStatisticsSensor(CoordinatorEntity, Entity):
     def extra_state_attributes(self):
         """Return detailed statistics as attributes."""
         sensors = self._coordinator.get_sensors_data()
-        active_alarms = [sensor for sensor in sensors if sensor.get("alarm_code") and sensor.get("alarm_code") != 0]
+        active_alarms = [
+            sensor
+            for sensor in sensors
+            if sensor.get("alarm_code") and sensor.get("alarm_code") != 0
+        ]
 
         if self._statistic_type == "total_alarm_count":
             return {
@@ -1430,14 +1471,25 @@ class CSNetHomeAlarmStatisticsSensor(CoordinatorEntity, Entity):
             }
 
         if self._statistic_type == "active_alarm_count":
-            return {"devices_with_alarms": [f"{sensor.get('device_name')} - {sensor.get('room_name')}" for sensor in active_alarms]}
+            return {
+                "devices_with_alarms": [
+                    f"{sensor.get('device_name')} - {sensor.get('room_name')}"
+                    for sensor in active_alarms
+                ]
+            }
 
         if self._statistic_type == "alarm_by_origin":
-            origins = [sensor.get("alarm_origin") for sensor in active_alarms if sensor.get("alarm_origin")]
+            origins = [
+                sensor.get("alarm_origin")
+                for sensor in active_alarms
+                if sensor.get("alarm_origin")
+            ]
             origin_counts = Counter(origins)
             return {
                 "origin_distribution": dict(origin_counts),
-                "most_common_origin": (origin_counts.most_common(1)[0][0] if origin_counts else None),
+                "most_common_origin": (
+                    origin_counts.most_common(1)[0][0] if origin_counts else None
+                ),
             }
 
         return {}
@@ -1717,7 +1769,9 @@ class CSNetHomeCompressorSensor(CoordinatorEntity, Entity):
                 raw_value = heating_status.get("operationStatus")
                 return {
                     "raw_value": raw_value,
-                    "status_text": OPERATION_STATUS_MAP.get(raw_value, f"Unknown ({raw_value})"),
+                    "status_text": OPERATION_STATUS_MAP.get(
+                        raw_value, f"Unknown ({raw_value})"
+                    ),
                     "defrosting": bool(heating_status.get("defrosting", 0)),
                 }
 

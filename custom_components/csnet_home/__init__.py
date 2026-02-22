@@ -5,6 +5,7 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_SCAN_INTERVAL, Platform
 from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.device_registry import DeviceEntry
 
 from custom_components.csnet_home.api import CSNetHomeAPI
@@ -12,6 +13,8 @@ from custom_components.csnet_home.const import CONF_LANGUAGE, DOMAIN
 from custom_components.csnet_home.coordinator import CSNetHomeCoordinator
 
 _LOGGER = logging.getLogger(__name__)
+
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 SCAN_INTERVAL = 60
 PLATFORMS: list[Platform] = [

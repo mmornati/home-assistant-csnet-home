@@ -22,8 +22,12 @@ except ImportError:
     sys.modules["homeassistant.const"].UnitOfTemperature = SimpleNamespace(CELSIUS="°C")
     sys.modules["homeassistant.const"].UnitOfPressure = SimpleNamespace(BAR="bar")
     sys.modules["homeassistant.const"].UnitOfPower = SimpleNamespace(WATT="W")
-    sys.modules["homeassistant.const"].UnitOfEnergy = SimpleNamespace(KILO_WATT_HOUR="kWh")
-    sys.modules["homeassistant.const"].UnitOfVolumeFlowRate = SimpleNamespace(CUBIC_METERS_PER_HOUR="m³/h")
+    sys.modules["homeassistant.const"].UnitOfEnergy = SimpleNamespace(
+        KILO_WATT_HOUR="kWh"
+    )
+    sys.modules["homeassistant.const"].UnitOfVolumeFlowRate = SimpleNamespace(
+        CUBIC_METERS_PER_HOUR="m³/h"
+    )
 
     sys.modules["homeassistant.const"].STATE_ON = "on"
     sys.modules["homeassistant.const"].STATE_OFF = "off"
@@ -34,6 +38,7 @@ except ImportError:
     # Callback mock must return the function itself when used as a decorator
     def callback(func):
         return func
+
     sys.modules["homeassistant.core"].callback = callback
 
     sys.modules["homeassistant.helpers"] = MagicMock()
@@ -49,6 +54,7 @@ except ImportError:
     class MockEntity:
         def __init__(self, *args, **kwargs):
             pass
+
         def async_write_ha_state(self):
             pass
 
@@ -61,7 +67,15 @@ except ImportError:
             return None
 
     class MockDataUpdateCoordinator:
-        def __init__(self, hass, logger, name, update_interval=None, update_method=None, request_refresh_debouncer=None):
+        def __init__(
+            self,
+            hass,
+            logger,
+            name,
+            update_interval=None,
+            update_method=None,
+            request_refresh_debouncer=None,
+        ):
             self.hass = hass
             self.logger = logger
             self.name = name
@@ -137,15 +151,18 @@ def load_fixture():
     """Fixture to load test fixtures from the fixtures directory."""
     return _load_fixture
 
+
 @pytest.fixture
 def enable_custom_integrations():
     """Enable custom integrations."""
     return True
 
+
 @pytest.fixture(autouse=True)
 def auto_enable_custom_integrations(enable_custom_integrations):
     """Enable custom integrations for all tests."""
     yield
+
 
 @pytest.fixture
 def hass():

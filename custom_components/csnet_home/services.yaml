@@ -1,0 +1,13 @@
+delete_alarm:
+  name: Delete Alarm
+  description: Deletes a specific installation alarm from CSNet Home.
+  fields:
+    alarm_id:
+      name: Alarm ID
+      description: The ID of the alarm to delete.
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 999999999
+          mode: box

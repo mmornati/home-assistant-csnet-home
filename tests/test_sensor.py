@@ -6,25 +6,18 @@ from unittest.mock import MagicMock
 from homeassistant.components.climate.const import HVACMode
 from homeassistant.const import STATE_OFF, STATE_ON, UnitOfTemperature
 
-from custom_components.csnet_home.const import (
-    DOMAIN,
-    OTC_COOLING_TYPE_FIX,
-    OTC_COOLING_TYPE_NONE,
-    OTC_COOLING_TYPE_POINTS,
-    OTC_HEATING_TYPE_FIX,
-    OTC_HEATING_TYPE_GRADIENT,
-    OTC_HEATING_TYPE_NONE,
-    OTC_HEATING_TYPE_POINTS,
-)
+from custom_components.csnet_home.const import (DOMAIN, OTC_COOLING_TYPE_FIX,
+                                                OTC_COOLING_TYPE_NONE,
+                                                OTC_COOLING_TYPE_POINTS,
+                                                OTC_HEATING_TYPE_FIX,
+                                                OTC_HEATING_TYPE_GRADIENT,
+                                                OTC_HEATING_TYPE_NONE,
+                                                OTC_HEATING_TYPE_POINTS)
 from custom_components.csnet_home.sensor import (
-    CSNetHomeAlarmHistorySensor,
-    CSNetHomeAlarmStatisticsSensor,
-    CSNetHomeCompressorSensor,
-    CSNetHomeDeviceSensor,
-    CSNetHomeInstallationSensor,
-    CSNetHomeSensor,
-    _convert_unsigned_to_signed_byte,
-)
+    CSNetHomeAlarmHistorySensor, CSNetHomeAlarmStatisticsSensor,
+    CSNetHomeCompressorSensor, CSNetHomeDeviceSensor,
+    CSNetHomeInstallationSensor, CSNetHomeSensor,
+    _convert_unsigned_to_signed_byte)
 
 
 def build_context():
@@ -54,7 +47,7 @@ def build_context():
     coordinator = SimpleNamespace(
         get_sensors_data=lambda: [sensor_data],
         get_sensor_data_by_id=get_sensor_data_by_id,
-        get_common_data=lambda: common, # Add get_common_data
+        get_common_data=lambda: common,  # Add get_common_data
     )
     return coordinator, sensor_data, common
 
@@ -1599,7 +1592,7 @@ def test_alarm_history_sensor():
                     "device": "Device2",
                 },
             ],
-            "timestamp": "2024-01-01T14:00:00", # Changed from last_updated to timestamp
+            "timestamp": "2024-01-01T14:00:00",  # Changed from last_updated to timestamp
         },
     )
 
