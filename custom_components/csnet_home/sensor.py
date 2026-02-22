@@ -71,16 +71,17 @@ async def async_setup_entry(hass, entry, async_add_entities):
         return None
 
     sensors = []
+    common_data = coordinator.get_common_data()
     for sensor_data in coordinator.get_sensors_data():
-        common_data = coordinator.get_common_data()["device_status"][
-            sensor_data["device_id"]
-        ]
+        device_common_data = common_data.get("device_status", {}).get(
+            sensor_data["device_id"], {}
+        )
 
         sensors.append(
             CSNetHomeSensor(
                 coordinator,
                 sensor_data,
-                common_data,
+                device_common_data,
                 "current_temperature",
                 "temperature",
                 UnitOfTemperature.CELSIUS,
@@ -90,50 +91,62 @@ async def async_setup_entry(hass, entry, async_add_entities):
             CSNetHomeSensor(
                 coordinator,
                 sensor_data,
-                common_data,
+                device_common_data,
                 "setting_temperature",
                 "temperature",
                 UnitOfTemperature.CELSIUS,
             )
         )
         sensors.append(
-            CSNetHomeSensor(coordinator, sensor_data, common_data, "mode", "enum")
-        )
-        sensors.append(
-            CSNetHomeSensor(coordinator, sensor_data, common_data, "on_off", "enum")
+            CSNetHomeSensor(
+                coordinator, sensor_data, device_common_data, "mode", "enum"
+            )
         )
         sensors.append(
             CSNetHomeSensor(
-                coordinator, sensor_data, common_data, "doingBoost", "binary"
+                coordinator, sensor_data, device_common_data, "on_off", "enum"
+            )
+        )
+        sensors.append(
+            CSNetHomeSensor(
+                coordinator, sensor_data, device_common_data, "doingBoost", "binary"
             )
         )
         # expose alarm information
         sensors.append(
-            CSNetHomeSensor(coordinator, sensor_data, common_data, "alarm_code", "enum")
-        )
-        sensors.append(
             CSNetHomeSensor(
-                coordinator, sensor_data, common_data, "alarm_active", "binary"
+                coordinator, sensor_data, device_common_data, "alarm_code", "enum"
             )
         )
         sensors.append(
             CSNetHomeSensor(
-                coordinator, sensor_data, common_data, "alarm_message", "enum"
+                coordinator, sensor_data, device_common_data, "alarm_active", "binary"
+            )
+        )
+        sensors.append(
+            CSNetHomeSensor(
+                coordinator, sensor_data, device_common_data, "alarm_message", "enum"
             )
         )
         # Enhanced alarm information
         sensors.append(
             CSNetHomeSensor(
-                coordinator, sensor_data, common_data, "alarm_code_formatted", "enum"
+                coordinator,
+                sensor_data,
+                device_common_data,
+                "alarm_code_formatted",
+                "enum",
             )
         )
         sensors.append(
             CSNetHomeSensor(
-                coordinator, sensor_data, common_data, "alarm_origin", "enum"
+                coordinator, sensor_data, device_common_data, "alarm_origin", "enum"
             )
         )
         sensors.append(
-            CSNetHomeSensor(coordinator, sensor_data, common_data, "unit_type", "enum")
+            CSNetHomeSensor(
+                coordinator, sensor_data, device_common_data, "unit_type", "enum"
+            )
         )
 
         # Add WiFi signal strength sensor
@@ -141,7 +154,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
             CSNetHomeDeviceSensor(
                 coordinator,
                 sensor_data,
-                common_data,
+                device_common_data,
                 "wifi_signal",
                 SensorDeviceClass.SIGNAL_STRENGTH,
                 SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
@@ -154,7 +167,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
             CSNetHomeDeviceSensor(
                 coordinator,
                 sensor_data,
-                common_data,
+                device_common_data,
                 "connectivity",
                 "binary",
                 None,
@@ -167,7 +180,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
             CSNetHomeDeviceSensor(
                 coordinator,
                 sensor_data,
-                common_data,
+                device_common_data,
                 "last_communication",
                 SensorDeviceClass.TIMESTAMP,
                 None,
