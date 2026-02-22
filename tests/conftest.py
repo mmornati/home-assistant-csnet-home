@@ -21,10 +21,45 @@ except ImportError:
     sys.modules["homeassistant.const"].STATE_ON = "on"
     sys.modules["homeassistant.const"].STATE_OFF = "off"
 
+    sys.modules["homeassistant.util"] = MagicMock()
+    sys.modules["homeassistant.util.dt"] = MagicMock()
+
     sys.modules["homeassistant.core"] = MagicMock()
     sys.modules["homeassistant.helpers"] = MagicMock()
-    sys.modules["homeassistant.helpers.device_registry"] = MagicMock()
-    sys.modules["homeassistant.helpers.update_coordinator"] = MagicMock()
+
+    # Define Mock classes to avoid metaclass conflicts
+    class MockEntity:
+        pass
+
+    class MockCoordinatorEntity:
+        def __init__(self, coordinator):
+            self.coordinator = coordinator
+
+    mock_entity_mod = MagicMock()
+    mock_entity_mod.Entity = MockEntity
+
+    class MockDeviceInfo(dict):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+
+    mock_entity_mod.DeviceInfo = MockDeviceInfo
+    sys.modules["homeassistant.helpers.entity"] = mock_entity_mod
+
+    class MockRestoreEntity:
+        pass
+
+    mock_restore_state_mod = MagicMock()
+    mock_restore_state_mod.RestoreEntity = MockRestoreEntity
+    sys.modules["homeassistant.helpers.restore_state"] = mock_restore_state_mod
+
+    mock_dr = MagicMock()
+    mock_dr.DeviceInfo = MockDeviceInfo
+    sys.modules["homeassistant.helpers.device_registry"] = mock_dr
+
+    mock_coordinator_mod = MagicMock()
+    mock_coordinator_mod.CoordinatorEntity = MockCoordinatorEntity
+    mock_coordinator_mod.DataUpdateCoordinator = MagicMock
+    sys.modules["homeassistant.helpers.update_coordinator"] = mock_coordinator_mod
 
     sys.modules["homeassistant.components"] = MagicMock()
     sys.modules["homeassistant.components.number"] = MagicMock()
@@ -49,6 +84,12 @@ except ImportError:
 def load_fixture():
     """Fixture to load test fixtures from the fixtures directory."""
     return _load_fixture
+
+
+@pytest.fixture
+def enable_custom_integrations():
+    """Mock enable_custom_integrations fixture."""
+    yield
 
 
 @pytest.fixture(autouse=True)

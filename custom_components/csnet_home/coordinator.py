@@ -42,14 +42,48 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
             _LOGGER.error("No CloudServiceAPI instance found!")
             return
 
-        # ensure translations are loaded before elements to enrich alarm messages
-        await cloud_api.load_translations()
+        # Fetch data
+        (
+            elements_data,
+            installation_devices_data,
+            installation_alarms_data,
+        ) = await self._fetch_data(cloud_api)
 
-        # Fetch elements data, installation devices data, and alarms
-        elements_data = await cloud_api.async_get_elements_data()
-        installation_devices_data = await cloud_api.async_get_installation_devices_data()
-        installation_alarms_data = await cloud_api.async_get_installation_alarms()
+        # Update internal data
+        self._update_internal_data(
+            elements_data, installation_devices_data, installation_alarms_data
+        )
 
+        # Enrich sensor data
+        self._enrich_sensor_data(cloud_api, installation_devices_data)
+
+        # Handle alarm notifications
+        await self._handle_alarm_notifications()
+
+        return self._device_data
+
+    async def _fetch_data(self, cloud_api):
+        """Fetch all data from the API."""
+        try:
+            # ensure translations are loaded before elements to enrich alarm messages
+            await cloud_api.load_translations()
+
+            # Fetch elements data, installation devices data, and alarms
+            elements_data = await cloud_api.async_get_elements_data()
+            installation_devices_data = (
+                await cloud_api.async_get_installation_devices_data()
+            )
+            installation_alarms_data = await cloud_api.async_get_installation_alarms()
+
+            return elements_data, installation_devices_data, installation_alarms_data
+        except Exception as exc:
+            _LOGGER.error("Error fetching data from API: %s", exc)
+            return None, None, None
+
+    def _update_internal_data(
+        self, elements_data, installation_devices_data, installation_alarms_data
+    ):
+        """Update internal data structures with fetched data."""
         if elements_data:
             self._device_data = elements_data
         else:
@@ -57,63 +91,81 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
 
         # Add installation devices data to common_data
         if installation_devices_data and self._device_data.get("common_data"):
-            self._device_data["common_data"]["installation_devices"] = installation_devices_data
+            self._device_data["common_data"][
+                "installation_devices"
+            ] = installation_devices_data
 
         # Add installation alarms data to common_data
         if installation_alarms_data and self._device_data.get("common_data"):
-            self._device_data["common_data"]["installation_alarms"] = installation_alarms_data
-
-        # Enrich sensor data with correct temperatures from installation devices data
-        # This fixes issue #137: water heater (zone_id 3) and water circuits (zone_id 5, 6)
-        # need temperatures from heatingStatus, not from elements API
-        if installation_devices_data and self._device_data.get("sensors"):
-            heating_status = cloud_api.get_heating_status_from_installation_devices(installation_devices_data)
-            if heating_status:
-                for sensor in self._device_data["sensors"]:
-                    zone_id = sensor.get("zone_id")
-                    # For zone_id 3 (DHW/water heater), use tempDHW from heatingStatus
-                    if zone_id == 3:
-                        temp_dhw = heating_status.get("tempDHW")
-                        if self._is_valid_temperature(temp_dhw):
-                            sensor["current_temperature"] = temp_dhw
-                            _LOGGER.debug(
-                                "Enriched zone_id 3 (DHW) current_temperature: %s",
-                                temp_dhw,
-                            )
-                    # For zone_id 5 (C1_WATER), use waterOutletHPTemp from heatingStatus
-                    # BUT: elementType 5 can also represent HEAT elements (parentName "Heat")
-                    # Only enrich if it's actually a water circuit, not a heat circuit
-                    elif zone_id == 5:
-                        room_name = sensor.get("room_name", "").lower()
-                        # Skip enrichment for HEAT elements (parentName "Heat")
-                        # Only enrich actual water circuits
-                        if "heat" not in room_name:
-                            temp_c1_water = heating_status.get("waterOutletHPTemp")
-                            if self._is_valid_temperature(temp_c1_water):
-                                sensor["current_temperature"] = temp_c1_water
-                                _LOGGER.debug(
-                                    "Enriched zone_id 5 (C1_WATER) current_temperature: %s",
-                                    temp_c1_water,
-                                )
-                        else:
-                            _LOGGER.debug(
-                                "Skipping enrichment for zone_id 5 with room_name '%s' (HEAT element, not water circuit)",
-                                sensor.get("room_name"),
-                            )
-                    # For zone_id 6 (C2_WATER), use waterOutlet2Temp from heatingStatus
-                    elif zone_id == 6:
-                        temp_c2_water = heating_status.get("waterOutlet2Temp")
-                        if self._is_valid_temperature(temp_c2_water):
-                            sensor["current_temperature"] = temp_c2_water
-                            _LOGGER.debug(
-                                "Enriched zone_id 6 (C2_WATER) current_temperature: %s",
-                                temp_c2_water,
-                            )
+            self._device_data["common_data"][
+                "installation_alarms"
+            ] = installation_alarms_data
 
         # Update fast lookup dictionary
-        self._sensors_by_id = {(s.get("device_id"), s.get("room_id"), s.get("zone_id")): s for s in self._device_data.get("sensors", [])}
+        self._sensors_by_id = {
+            (s.get("device_id"), s.get("room_id"), s.get("zone_id")): s
+            for s in self._device_data.get("sensors", [])
+        }
 
-        # Raise notification if new alarm codes appear
+    def _enrich_sensor_data(self, cloud_api, installation_devices_data):
+        """Enrich sensor data with correct temperatures from installation devices data."""
+        # This fixes issue #137: water heater (zone_id 3) and water circuits (zone_id 5, 6)
+        # need temperatures from heatingStatus, not from elements API
+        if not (installation_devices_data and self._device_data.get("sensors")):
+            return
+
+        try:
+            heating_status = cloud_api.get_heating_status_from_installation_devices(
+                installation_devices_data
+            )
+            if not heating_status:
+                return
+
+            for sensor in self._device_data["sensors"]:
+                zone_id = sensor.get("zone_id")
+                # For zone_id 3 (DHW/water heater), use tempDHW from heatingStatus
+                if zone_id == 3:
+                    temp_dhw = heating_status.get("tempDHW")
+                    if self._is_valid_temperature(temp_dhw):
+                        sensor["current_temperature"] = temp_dhw
+                        _LOGGER.debug(
+                            "Enriched zone_id 3 (DHW) current_temperature: %s",
+                            temp_dhw,
+                        )
+                # For zone_id 5 (C1_WATER), use waterOutletHPTemp from heatingStatus
+                # BUT: elementType 5 can also represent HEAT elements (parentName "Heat")
+                # Only enrich if it's actually a water circuit, not a heat circuit
+                elif zone_id == 5:
+                    room_name = sensor.get("room_name", "").lower()
+                    # Skip enrichment for HEAT elements (parentName "Heat")
+                    # Only enrich actual water circuits
+                    if "heat" not in room_name:
+                        temp_c1_water = heating_status.get("waterOutletHPTemp")
+                        if self._is_valid_temperature(temp_c1_water):
+                            sensor["current_temperature"] = temp_c1_water
+                            _LOGGER.debug(
+                                "Enriched zone_id 5 (C1_WATER) current_temperature: %s",
+                                temp_c1_water,
+                            )
+                    else:
+                        _LOGGER.debug(
+                            "Skipping enrichment for zone_id 5 with room_name '%s' (HEAT element, not water circuit)",
+                            sensor.get("room_name"),
+                        )
+                # For zone_id 6 (C2_WATER), use waterOutlet2Temp from heatingStatus
+                elif zone_id == 6:
+                    temp_c2_water = heating_status.get("waterOutlet2Temp")
+                    if self._is_valid_temperature(temp_c2_water):
+                        sensor["current_temperature"] = temp_c2_water
+                        _LOGGER.debug(
+                            "Enriched zone_id 6 (C2_WATER) current_temperature: %s",
+                            temp_c2_water,
+                        )
+        except Exception as exc:
+            _LOGGER.error("Error enriching sensor data: %s", exc)
+
+    async def _handle_alarm_notifications(self):
+        """Raise notification if new alarm codes appear."""
         try:
             for sensor in self._device_data.get("sensors", []):
                 key = f"{sensor.get('device_id')}-{sensor.get('room_id')}-{sensor.get('zone_id')}"
@@ -137,7 +189,9 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
                     # Add formatted alarm code
                     alarm_code_formatted = sensor.get("alarm_code_formatted")
                     if alarm_code_formatted and alarm_code_formatted != "0":
-                        message_parts.append(f"Code: {alarm_code_formatted} (raw: {alarm_code})")
+                        message_parts.append(
+                            f"Code: {alarm_code_formatted} (raw: {alarm_code})"
+                        )
                     else:
                         message_parts.append(f"Code: {alarm_code}")
 
@@ -169,8 +223,6 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
                     )
         except Exception as exc:  # pragma: no cover - do not fail updates on notify
             _LOGGER.debug("Alarm notification handling error: %s", exc)
-
-        return self._device_data
 
     def _is_valid_temperature(self, value):
         """Validate if temperature value is reasonable."""
