@@ -616,6 +616,28 @@ To find alarm IDs, check the **Alarm History** sensor's attributes (`recent_alar
 
 When an alarm notification is dismissed in Home Assistant, you can automatically delete it from CSNet Manager:
 
+**Option 1: Using persistent_notification trigger (UI-style)**
+
+```yaml
+automation:
+  - description: "Delete CSNet alarm when notification is dismissed"
+    mode: single
+    triggers:
+      - trigger: persistent_notification
+        update_type:
+          - removed
+        notification_id: ""
+    conditions:
+      - condition: template
+        value_template: "{{ 'csnet_home_inst_alarm_' in this.attributes.notification_id }}"
+    actions:
+      - action: csnet_home.delete_alarm
+        data:
+          alarm_id: "{{ this.attributes.notification_id.split('_')[-1] | int }}"
+```
+
+**Option 2: Using event trigger (manual YAML)**
+
 ```yaml
 automation:
   - description: "Delete CSNet alarm when notification is dismissed"
@@ -637,7 +659,7 @@ automation:
 **How it works**:
 1. The integration creates persistent notifications with ID `csnet_home_inst_alarm_{alarm_id}`
 2. When the notification is dismissed (update_type: removed), this automation triggers
-3. It extracts the alarm_id directly in the service call using template
+3. It extracts the alarm_id from the notification_id
 4. Calls the delete_alarm service to remove it from CSNet Manager
 
 ---
