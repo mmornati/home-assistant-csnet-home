@@ -1,0 +1,13 @@
+---
+delete_alarm:
+  name: Delete Alarm
+  description: Deletes a specific installation alarm from CSNet Home.
+  fields:
+    alarm_id:
+      name: Alarm ID
+      description: >
+        The ID of the alarm to delete. Can be an integer or a template
+        like "{{ trigger.event.data.notification_id.split('_')[-1] | int }}".
+      required: true
+      selector:
+        text:

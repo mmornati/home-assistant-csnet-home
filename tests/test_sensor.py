@@ -7,6 +7,7 @@ from homeassistant.components.climate.const import HVACMode
 from homeassistant.const import STATE_OFF, STATE_ON, UnitOfTemperature
 
 from custom_components.csnet_home.const import (
+    DOMAIN,
     OTC_COOLING_TYPE_FIX,
     OTC_COOLING_TYPE_NONE,
     OTC_COOLING_TYPE_POINTS,
@@ -53,6 +54,7 @@ def build_context():
     coordinator = SimpleNamespace(
         get_sensors_data=lambda: [sensor_data],
         get_sensor_data_by_id=get_sensor_data_by_id,
+        get_common_data=lambda: common,  # Add get_common_data
     )
     return coordinator, sensor_data, common
 
@@ -170,6 +172,7 @@ def test_sensor_device_info_with_missing_sensor_data_keys():
     coordinator = SimpleNamespace(
         get_sensors_data=lambda: [sensor_data],
         get_sensor_data_by_id=get_sensor_data_by_id,
+        get_common_data=lambda: common,
     )
     s = CSNetHomeSensor(coordinator, sensor_data, common, "current_temperature")
 
@@ -249,6 +252,7 @@ def test_installation_sensor():
 
     coordinator = SimpleNamespace(
         get_installation_devices_data=lambda: installation_data,
+        get_common_data=lambda: common_data,
     )
 
     # Test pump speed sensor
@@ -369,6 +373,7 @@ def test_installation_sensor_edge_cases():
 
     coordinator = SimpleNamespace(
         get_installation_devices_data=lambda: installation_data,
+        get_common_data=lambda: common_data,
     )
 
     # Test pump speed with conversion
@@ -438,6 +443,7 @@ def test_installation_sensor_no_data():
     # Test with empty data
     coordinator = SimpleNamespace(
         get_installation_devices_data=lambda: {},
+        get_common_data=lambda: common_data,
     )
 
     s = CSNetHomeInstallationSensor(
@@ -454,6 +460,7 @@ def test_installation_sensor_no_data():
     # Test with None data
     coordinator = SimpleNamespace(
         get_installation_devices_data=lambda: None,
+        get_common_data=lambda: common_data,
     )
 
     s = CSNetHomeInstallationSensor(
@@ -499,6 +506,7 @@ def test_installation_sensor_nested_data():
 
     coordinator = SimpleNamespace(
         get_installation_devices_data=lambda: installation_data,
+        get_common_data=lambda: common_data,
     )
 
     # Test pump speed from nested data
@@ -567,6 +575,7 @@ def test_installation_sensor_metadata():
                 }
             ]
         },
+        get_common_data=lambda: common_data,
     )
 
     s = CSNetHomeInstallationSensor(
@@ -612,6 +621,7 @@ def test_central_config_sensor():
 
     coordinator = SimpleNamespace(
         get_installation_devices_data=lambda: installation_data,
+        get_common_data=lambda: common_data,
     )
 
     s = CSNetHomeInstallationSensor(
@@ -664,6 +674,7 @@ def test_lcd_software_version_sensor():
 
     coordinator = SimpleNamespace(
         get_installation_devices_data=lambda: installation_data,
+        get_common_data=lambda: common_data,
     )
 
     s = CSNetHomeInstallationSensor(
@@ -705,6 +716,7 @@ def test_unit_model_sensor():
 
     coordinator = SimpleNamespace(
         get_installation_devices_data=lambda: installation_data,
+        get_common_data=lambda: common_data,
     )
 
     s = CSNetHomeInstallationSensor(
@@ -770,6 +782,7 @@ def test_central_control_enabled_sensor():
 
     coordinator = SimpleNamespace(
         get_installation_devices_data=lambda: installation_data,
+        get_common_data=lambda: common_data,
     )
 
     s = CSNetHomeInstallationSensor(
@@ -827,6 +840,7 @@ def test_central_control_enabled_no_data():
     # Test with empty data
     coordinator = SimpleNamespace(
         get_installation_devices_data=lambda: {},
+        get_common_data=lambda: common_data,
     )
 
     s = CSNetHomeInstallationSensor(
@@ -843,6 +857,7 @@ def test_central_control_enabled_no_data():
     # Test with None data
     coordinator = SimpleNamespace(
         get_installation_devices_data=lambda: None,
+        get_common_data=lambda: common_data,
     )
     s = CSNetHomeInstallationSensor(
         coordinator,
@@ -858,6 +873,7 @@ def test_central_control_enabled_no_data():
     # Test with missing heatingStatus
     coordinator = SimpleNamespace(
         get_installation_devices_data=lambda: {"data": [{"indoors": [{}]}]},
+        get_common_data=lambda: common_data,
     )
     s = CSNetHomeInstallationSensor(
         coordinator,
@@ -900,6 +916,7 @@ def test_central_control_sensors_metadata():
 
     coordinator = SimpleNamespace(
         get_installation_devices_data=lambda: installation_data,
+        get_common_data=lambda: common_data,
     )
 
     # Test central config sensor metadata
@@ -1552,25 +1569,37 @@ def test_alarm_history_sensor():
         "firmware": "1.0.0",
     }
 
-    # Mock coordinator with alarm history
+    # Mock API to return translated alarm
+    mock_api = MagicMock()
+    mock_api.translate_alarm.side_effect = lambda code: f"Test Alarm {code}"
+
+    # Mock hass structure to hold API
+    mock_hass = MagicMock()
+    mock_hass.data = {DOMAIN: {"test_entry": {"api": mock_api}}}
+
+    # Mock coordinator with alarm history and hass reference
     coordinator = SimpleNamespace(
+        hass=mock_hass,
+        entry_id="test_entry",
         get_common_data=lambda: common_data,
         get_installation_alarms_data=lambda: {
             "alarms": [
                 {
+                    "id": 1,
                     "code": "62",
                     "description": "Test Alarm 1",
                     "timestamp": "2024-01-01T12:00:00",
                     "device": "Device1",
                 },
                 {
+                    "id": 2,
                     "code": "100",
                     "description": "Test Alarm 2",
                     "timestamp": "2024-01-01T13:00:00",
                     "device": "Device2",
                 },
             ],
-            "last_updated": "2024-01-01T14:00:00",
+            "timestamp": "2024-01-01T14:00:00",  # Changed from last_updated to timestamp
         },
     )
 
@@ -1585,8 +1614,12 @@ def test_alarm_history_sensor():
     assert len(attrs["recent_alarms"]) == 2
     assert attrs["total_alarms"] == 2
     assert attrs["last_updated"] == "2024-01-01T14:00:00"
+
+    # Note: Description is now fetched via API in extra_state_attributes
     assert attrs["recent_alarms"][0]["code"] == "62"
+    assert attrs["recent_alarms"][0]["description"] == "Test Alarm 62"
     assert attrs["recent_alarms"][1]["code"] == "100"
+    assert attrs["recent_alarms"][1]["description"] == "Test Alarm 100"
 
 
 def test_alarm_history_sensor_empty():

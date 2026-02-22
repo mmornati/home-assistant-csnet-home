@@ -4,7 +4,8 @@ import logging
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_SCAN_INTERVAL, Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.device_registry import DeviceEntry
 
 from custom_components.csnet_home.api import CSNetHomeAPI
@@ -12,6 +13,8 @@ from custom_components.csnet_home.const import CONF_LANGUAGE, DOMAIN
 from custom_components.csnet_home.coordinator import CSNetHomeCoordinator
 
 _LOGGER = logging.getLogger(__name__)
+
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 SCAN_INTERVAL = 60
 PLATFORMS: list[Platform] = [
@@ -58,6 +61,46 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     await coordinator.async_config_entry_first_refresh()
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    async def async_handle_delete_alarm(call: ServiceCall):
+        """Handle the delete alarm service call."""
+        alarm_id_input = call.data.get("alarm_id")
+
+        # Convert to int if it's a string (handles both direct ID and templates)
+        if alarm_id_input is None:
+            _LOGGER.error("alarm_id is required")
+            return
+        try:
+            alarm_id = int(alarm_id_input)
+        except (ValueError, TypeError):
+            _LOGGER.error("Invalid alarm_id: %s", alarm_id_input)
+            return
+
+        # Iterate over all configured entries to find the API
+        # In most cases there's only one
+        for entry_data in hass.data[DOMAIN].values():
+            api_instance = entry_data.get("api")
+            coordinator_instance = entry_data.get("coordinator")
+
+            if api_instance and api_instance.installation_id:
+                _LOGGER.debug(
+                    "Attempting to delete alarm %s for installation %s",
+                    alarm_id,
+                    api_instance.installation_id,
+                )
+                success = await api_instance.async_delete_alarm(api_instance.installation_id, alarm_id)
+                if success:
+                    _LOGGER.info("Successfully deleted alarm %s", alarm_id)
+                    # Refresh data to remove the alarm from sensors/notifications
+                    await coordinator_instance.async_request_refresh()
+                    return
+
+        _LOGGER.error(
+            "Could not delete alarm %s: No active session or installation ID found",
+            alarm_id,
+        )
+
+    hass.services.async_register(DOMAIN, "delete_alarm", async_handle_delete_alarm)
 
     return True
 

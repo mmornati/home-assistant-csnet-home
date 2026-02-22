@@ -1291,7 +1291,10 @@ class CSNetHomeAlarmHistorySensor(CoordinatorEntity, Entity):
             return 0
 
         # Count alarms in the data
-        alarms = alarms_data.get("alarms", [])
+        # Check both "alarms" (original implementation) and "data" (user reported API change)
+        alarms = alarms_data.get("data")
+        if alarms is None:
+            alarms = alarms_data.get("alarms", [])
         return len(alarms)
 
     @property
@@ -1301,26 +1304,39 @@ class CSNetHomeAlarmHistorySensor(CoordinatorEntity, Entity):
         if not alarms_data:
             return {}
 
-        alarms = alarms_data.get("alarms", [])
+        # Check both keys
+        alarms = alarms_data.get("data")
+        if alarms is None:
+            alarms = alarms_data.get("alarms", [])
 
         # Limit to most recent 10 alarms
         recent_alarms = alarms[:10] if len(alarms) > 10 else alarms
 
         # Format alarm history for display
         alarm_list = []
+        api = self._coordinator.hass.data[DOMAIN][self._coordinator.entry_id]["api"]
+
         for alarm in recent_alarms:
+            code = alarm.get("code")
+            if code == -1:
+                description = "System/Communication Error"
+            else:
+                description = api.translate_alarm(code) if code else None
+
             alarm_entry = {
-                "code": alarm.get("code"),
-                "description": alarm.get("description"),
-                "timestamp": alarm.get("timestamp"),
-                "device": alarm.get("device"),
+                "id": alarm.get("id"),
+                "code": code,
+                "description": description,
+                "timestamp": alarm.get("createdAtString"),
+                "recovered": alarm.get("recoveredAtString"),
+                "device": alarm.get("unitId"),
             }
             alarm_list.append(alarm_entry)
 
         return {
             "recent_alarms": alarm_list,
             "total_alarms": len(alarms),
-            "last_updated": alarms_data.get("last_updated"),
+            "last_updated": alarms_data.get("timestamp"),
         }
 
     @callback

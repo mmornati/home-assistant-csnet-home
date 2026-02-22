@@ -24,6 +24,7 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         self._device_data = {"sensors": [], "common_data": {}}
         self._sensors_by_id = {}
         self._last_alarm_codes: dict[str, int] = {}
+        self._notified_installation_alarm_ids: set[int] = set()
         super().__init__(
             hass,
             _LOGGER,
@@ -75,6 +76,9 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
 
         # Handle alarm notifications
         await self._handle_alarm_notifications()
+
+        # Handle installation-level alarms
+        await self._handle_installation_alarms(cloud_api)
 
         return self._device_data
 
@@ -224,6 +228,57 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
                     )
         except Exception as exc:  # pragma: no cover - do not fail updates on notify
             _LOGGER.debug("Alarm notification handling error: %s", exc)
+
+    async def _handle_installation_alarms(self, api):
+        """Handle notifications for installation-level alarms."""
+        installation_alarms_data = self.get_installation_alarms_data()
+        alarms = installation_alarms_data.get("data", [])
+        if not alarms:
+            alarms = installation_alarms_data.get("alarms", [])
+
+        current_active_ids = set()
+
+        for alarm in alarms:
+            # Check if active
+            # User provided: "recoveredAtString": "1980-01-01 00:00:00" means active
+            is_active = alarm.get("recoveredAtString") == "1980-01-01 00:00:00"
+            if not is_active:
+                continue
+
+            alarm_id = alarm.get("id")
+            if alarm_id is None:
+                continue
+
+            current_active_ids.add(alarm_id)
+
+            if alarm_id in self._notified_installation_alarm_ids:
+                continue
+
+            # New active alarm found
+            self._notified_installation_alarm_ids.add(alarm_id)
+
+            # Generate notification
+            code = alarm.get("code")
+            unit_id = alarm.get("unitId")
+
+            description = api.translate_alarm(code) if code != -1 else "System/Communication Error"
+
+            message = f"Installation Alarm ID: {alarm_id}\nCode: {code}\nDescription: {description}\nUnit ID: {unit_id}"
+
+            await self.hass.services.async_call(
+                "persistent_notification",
+                "create",
+                {
+                    "title": "CSNet Home Installation Alarm",
+                    "message": message,
+                    "notification_id": f"csnet_home_inst_alarm_{alarm_id}",
+                },
+                blocking=False,
+            )
+
+        # Clean up notified IDs for alarms that are no longer active
+        # We only keep IDs that are currently active
+        self._notified_installation_alarm_ids = self._notified_installation_alarm_ids.intersection(current_active_ids)
 
     def get_sensors_data(self):
         """Return the list of sensor data."""
