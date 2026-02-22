@@ -47,9 +47,7 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
 
         # Fetch elements data, installation devices data, and alarms
         elements_data = await cloud_api.async_get_elements_data()
-        installation_devices_data = (
-            await cloud_api.async_get_installation_devices_data()
-        )
+        installation_devices_data = await cloud_api.async_get_installation_devices_data()
         installation_alarms_data = await cloud_api.async_get_installation_alarms()
 
         if elements_data:
@@ -59,23 +57,17 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
 
         # Add installation devices data to common_data
         if installation_devices_data and self._device_data.get("common_data"):
-            self._device_data["common_data"][
-                "installation_devices"
-            ] = installation_devices_data
+            self._device_data["common_data"]["installation_devices"] = installation_devices_data
 
         # Add installation alarms data to common_data
         if installation_alarms_data and self._device_data.get("common_data"):
-            self._device_data["common_data"][
-                "installation_alarms"
-            ] = installation_alarms_data
+            self._device_data["common_data"]["installation_alarms"] = installation_alarms_data
 
         # Enrich sensor data with correct temperatures from installation devices data
         # This fixes issue #137: water heater (zone_id 3) and water circuits (zone_id 5, 6)
         # need temperatures from heatingStatus, not from elements API
         if installation_devices_data and self._device_data.get("sensors"):
-            heating_status = cloud_api.get_heating_status_from_installation_devices(
-                installation_devices_data
-            )
+            heating_status = cloud_api.get_heating_status_from_installation_devices(installation_devices_data)
             if heating_status:
                 for sensor in self._device_data["sensors"]:
                     zone_id = sensor.get("zone_id")
@@ -119,10 +111,7 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
                             )
 
         # Update fast lookup dictionary
-        self._sensors_by_id = {
-            (s.get("device_id"), s.get("room_id"), s.get("zone_id")): s
-            for s in self._device_data.get("sensors", [])
-        }
+        self._sensors_by_id = {(s.get("device_id"), s.get("room_id"), s.get("zone_id")): s for s in self._device_data.get("sensors", [])}
 
         # Raise notification if new alarm codes appear
         try:
@@ -148,9 +137,7 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
                     # Add formatted alarm code
                     alarm_code_formatted = sensor.get("alarm_code_formatted")
                     if alarm_code_formatted and alarm_code_formatted != "0":
-                        message_parts.append(
-                            f"Code: {alarm_code_formatted} (raw: {alarm_code})"
-                        )
+                        message_parts.append(f"Code: {alarm_code_formatted} (raw: {alarm_code})")
                     else:
                         message_parts.append(f"Code: {alarm_code}")
 

@@ -7,12 +7,7 @@ from homeassistant.const import CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.csnet_home.const import (
-    CONF_FAN_COIL_MODEL,
-    CONF_LANGUAGE,
-    CONF_MAX_TEMP_OVERRIDE,
-    DOMAIN,
-)
+from custom_components.csnet_home.const import CONF_FAN_COIL_MODEL, CONF_LANGUAGE, CONF_MAX_TEMP_OVERRIDE, DOMAIN
 
 # Define test constants
 TEST_USERNAME = "test_user"
@@ -34,9 +29,7 @@ TEST_CONFIG = {
 
 async def test_config_flow_user_init(hass: HomeAssistant):
     """Test the initial step of the config flow."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
 
     assert result["type"] == data_entry_flow.FlowResultType.FORM
     assert result["step_id"] == "user"
@@ -48,16 +41,12 @@ async def test_config_flow_user_success(hass: HomeAssistant):
         "custom_components.csnet_home.api.CSNetHomeAPI.async_validate_credentials",
         return_value=True,
     ):
-        result = await hass.config_entries.flow.async_init(
-            DOMAIN, context={"source": config_entries.SOURCE_USER}
-        )
+        result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
 
         assert result["type"] == data_entry_flow.FlowResultType.FORM
         assert result["step_id"] == "user"
 
-        result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], user_input=TEST_CONFIG
-        )
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=TEST_CONFIG)
 
         assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
         assert result["title"] == "CSNet Home"
@@ -97,9 +86,7 @@ async def test_reconfigure_flow_success(hass: HomeAssistant):
         new_config[CONF_SCAN_INTERVAL] = 120  # Changed from 60 to 120
         new_config[CONF_PASSWORD] = "new_password"
 
-        result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], user_input=new_config
-        )
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=new_config)
 
         assert result["type"] == data_entry_flow.FlowResultType.ABORT
         assert result["reason"] == "reconfigure_successful"
@@ -138,9 +125,7 @@ async def test_reconfigure_flow_invalid_credentials(hass: HomeAssistant):
         invalid_config = TEST_CONFIG.copy()
         invalid_config[CONF_PASSWORD] = "wrong_password"
 
-        result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], user_input=invalid_config
-        )
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=invalid_config)
 
         assert result["type"] == data_entry_flow.FlowResultType.FORM
         assert result["errors"] == {"base": "invalid_auth"}
@@ -174,9 +159,7 @@ async def test_reconfigure_preserves_entry_id(hass: HomeAssistant):
             },
         )
 
-        result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], user_input=TEST_CONFIG
-        )
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=TEST_CONFIG)
 
         # Verify no new entry was created
         assert len(hass.config_entries.async_entries(DOMAIN)) == original_entry_count
@@ -216,9 +199,7 @@ async def test_reauth_flow_success(hass: HomeAssistant):
             CONF_PASSWORD: "new_password",
         }
 
-        result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], user_input=new_credentials
-        )
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=new_credentials)
 
         assert result["type"] == data_entry_flow.FlowResultType.ABORT
         assert result["reason"] == "reauth_successful"
@@ -258,9 +239,7 @@ async def test_reauth_flow_invalid_password(hass: HomeAssistant):
             CONF_PASSWORD: "wrong_password",
         }
 
-        result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], user_input=invalid_credentials
-        )
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=invalid_credentials)
 
         assert result["type"] == data_entry_flow.FlowResultType.FORM
         assert result["errors"] == {"base": "invalid_auth"}
@@ -276,13 +255,9 @@ async def test_validate_credentials_connection_error(hass: HomeAssistant):
         "custom_components.csnet_home.api.CSNetHomeAPI.async_validate_credentials",
         side_effect=Exception("Connection failed"),
     ):
-        result = await hass.config_entries.flow.async_init(
-            DOMAIN, context={"source": config_entries.SOURCE_USER}
-        )
+        result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
 
-        result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], user_input=TEST_CONFIG
-        )
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=TEST_CONFIG)
 
         # Should show form with connection error
         assert result["type"] == data_entry_flow.FlowResultType.FORM

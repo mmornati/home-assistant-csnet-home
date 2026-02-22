@@ -10,19 +10,26 @@ import pytest
 
 # Define distinct mock classes to avoid duplicate base class error
 class MockCoordinatorEntity:
+    """Mock CoordinatorEntity for testing."""
+
     def __init__(self, coordinator):
+        """Initialize the mock coordinator entity."""
         self.coordinator = coordinator
         self.hass = None
 
     @property
     def available(self):
+        """Return availability."""
         return True
 
     def async_write_ha_state(self):
+        """Mock writing HA state."""
         pass
 
 
 class MockNumberEntity:
+    """Mock NumberEntity for testing."""
+
     _attr_native_min_value = None
     _attr_native_max_value = None
     _attr_native_step = None
@@ -33,38 +40,47 @@ class MockNumberEntity:
 
     @property
     def native_min_value(self):
+        """Return min value."""
         return self._attr_native_min_value
 
     @property
     def native_max_value(self):
+        """Return max value."""
         return self._attr_native_max_value
 
     @property
     def native_step(self):
+        """Return step value."""
         return self._attr_native_step
 
     @property
     def native_unit_of_measurement(self):
+        """Return unit of measurement."""
         return self._attr_native_unit_of_measurement
 
     @property
     def mode(self):
+        """Return number mode."""
         return self._attr_mode
 
     @property
     def name(self):
+        """Return entity name."""
         return self._attr_name
 
     @property
     def unique_id(self):
+        """Return unique id."""
         return self._attr_unique_id
 
     @property
     def native_value(self):
+        """Return native value."""
         return None
 
     @property
     def device_info(self):
+        """Return device info."""
         return None
 
 
@@ -78,9 +94,7 @@ def mock_deps():
             sys.modules["homeassistant"] = mock_hass
             sys.modules["homeassistant.config_entries"] = MagicMock()
             sys.modules["homeassistant.const"] = MagicMock()
-            sys.modules["homeassistant.const"].UnitOfTemperature = SimpleNamespace(
-                CELSIUS="°C"
-            )
+            sys.modules["homeassistant.const"].UnitOfTemperature = SimpleNamespace(CELSIUS="°C")
             sys.modules["homeassistant.core"] = MagicMock()
             sys.modules["homeassistant.helpers"] = MagicMock()
             sys.modules["homeassistant.helpers.device_registry"] = MagicMock()
@@ -91,24 +105,20 @@ def mock_deps():
             sys.modules["async_timeout"] = MagicMock()
 
         # Update specific mocks for this test file
-        sys.modules["homeassistant.helpers.update_coordinator"].CoordinatorEntity = (
-            MockCoordinatorEntity
-        )
+        sys.modules["homeassistant.helpers.update_coordinator"].CoordinatorEntity = MockCoordinatorEntity
         sys.modules["homeassistant.components.number"].NumberEntity = MockNumberEntity
-        sys.modules["homeassistant.components.number"].NumberMode = SimpleNamespace(
-            AUTO="auto"
-        )
+        sys.modules["homeassistant.components.number"].NumberMode = SimpleNamespace(AUTO="auto")
         # Ensure DeviceInfo is a dict for property testing
         sys.modules["homeassistant.helpers.device_registry"].DeviceInfo = dict
         # Ensure callback is an identity function (decorator)
         sys.modules["homeassistant.core"].callback = lambda x: x
 
         # Import or reload the module under test
-        import custom_components.csnet_home.number
-        import custom_components.csnet_home.const
-
         # Reload to ensure it uses our patched dependencies
         import importlib
+
+        import custom_components.csnet_home.const
+        import custom_components.csnet_home.number
 
         importlib.reload(custom_components.csnet_home.number)
 
@@ -158,55 +168,32 @@ def test_setup_no_coordinator(mock_deps, mock_hass_instance, mock_entry):
         # DOMAIN constant needs to be imported from module or mocked
         domain = mock_deps.DOMAIN
         mock_hass_instance.data[domain][mock_entry.entry_id]["coordinator"] = None
-        assert (
-            await mock_deps.async_setup_entry(
-                mock_hass_instance, mock_entry, MagicMock()
-            )
-            is None
-        )
+        assert await mock_deps.async_setup_entry(mock_hass_instance, mock_entry, MagicMock()) is None
 
     asyncio.run(run_test())
 
 
-def test_setup_no_installation_data(
-    mock_deps, mock_hass_instance, mock_entry, mock_coordinator
-):
+def test_setup_no_installation_data(mock_deps, mock_hass_instance, mock_entry, mock_coordinator):
     """Test setup without installation data."""
 
     async def run_test():
         mock_coordinator.get_installation_devices_data.return_value = None
-        assert (
-            await mock_deps.async_setup_entry(
-                mock_hass_instance, mock_entry, MagicMock()
-            )
-            is None
-        )
+        assert await mock_deps.async_setup_entry(mock_hass_instance, mock_entry, MagicMock()) is None
 
     asyncio.run(run_test())
 
 
-def test_setup_no_heating_status(
-    mock_deps, mock_hass_instance, mock_entry, mock_coordinator
-):
+def test_setup_no_heating_status(mock_deps, mock_hass_instance, mock_entry, mock_coordinator):
     """Test setup without heating status."""
 
     async def run_test():
-        mock_coordinator.get_installation_devices_data.return_value = {
-            "data": [{"indoors": [{}]}]
-        }
-        assert (
-            await mock_deps.async_setup_entry(
-                mock_hass_instance, mock_entry, MagicMock()
-            )
-            is None
-        )
+        mock_coordinator.get_installation_devices_data.return_value = {"data": [{"indoors": [{}]}]}
+        assert await mock_deps.async_setup_entry(mock_hass_instance, mock_entry, MagicMock()) is None
 
     asyncio.run(run_test())
 
 
-def test_setup_heating_mode_c1(
-    mock_deps, mock_hass_instance, mock_entry, mock_coordinator
-):
+def test_setup_heating_mode_c1(mock_deps, mock_hass_instance, mock_entry, mock_coordinator):
     """Test setup for C1 in heating mode (FIX type)."""
 
     async def run_test():
@@ -239,14 +226,10 @@ def test_setup_heating_mode_c1(
         ]
 
         # Mock common data
-        mock_coordinator.get_common_data.return_value = {
-            "device_status": {123: {"firmware": "1.0"}}
-        }
+        mock_coordinator.get_common_data.return_value = {"device_status": {123: {"firmware": "1.0"}}}
 
         async_add_entities = MagicMock()
-        await mock_deps.async_setup_entry(
-            mock_hass_instance, mock_entry, async_add_entities
-        )
+        await mock_deps.async_setup_entry(mock_hass_instance, mock_entry, async_add_entities)
 
         assert async_add_entities.called
         entities = async_add_entities.call_args[0][0]
@@ -258,9 +241,7 @@ def test_setup_heating_mode_c1(
     asyncio.run(run_test())
 
 
-def test_setup_cooling_mode_c2(
-    mock_deps, mock_hass_instance, mock_entry, mock_coordinator
-):
+def test_setup_cooling_mode_c2(mock_deps, mock_hass_instance, mock_entry, mock_coordinator):
     """Test setup for C2 in cooling mode (FIX type)."""
 
     async def run_test():
@@ -289,9 +270,7 @@ def test_setup_cooling_mode_c2(
         ]
 
         async_add_entities = MagicMock()
-        await mock_deps.async_setup_entry(
-            mock_hass_instance, mock_entry, async_add_entities
-        )
+        await mock_deps.async_setup_entry(mock_hass_instance, mock_entry, async_add_entities)
 
         assert async_add_entities.called
         entities = async_add_entities.call_args[0][0]
@@ -326,18 +305,14 @@ def test_setup_no_fix_type(mock_deps, mock_hass_instance, mock_entry, mock_coord
         }
 
         async_add_entities = MagicMock()
-        await mock_deps.async_setup_entry(
-            mock_hass_instance, mock_entry, async_add_entities
-        )
+        await mock_deps.async_setup_entry(mock_hass_instance, mock_entry, async_add_entities)
 
         assert not async_add_entities.called
 
     asyncio.run(run_test())
 
 
-def test_number_entity_properties(
-    mock_deps, mock_hass_instance, mock_entry, mock_coordinator
-):
+def test_number_entity_properties(mock_deps, mock_hass_instance, mock_entry, mock_coordinator):
     """Test properties of the number entity."""
     sensor_data = {
         "zone_id": 1,
@@ -382,19 +357,13 @@ def test_number_entity_properties(
     assert info["sw_version"] == "1.0"
 
 
-def test_number_native_value(
-    mock_deps, mock_hass_instance, mock_entry, mock_coordinator
-):
+def test_number_native_value(mock_deps, mock_hass_instance, mock_entry, mock_coordinator):
     """Test native_value property."""
     sensor_data = {"zone_id": 1, "device_id": 123, "room_name": "Living Room"}
-    entity = mock_deps.CSNetHomeFixedWaterTemperatureNumber(
-        mock_coordinator, sensor_data, {}, circuit=1, mode=1, entry=mock_entry
-    )
+    entity = mock_deps.CSNetHomeFixedWaterTemperatureNumber(mock_coordinator, sensor_data, {}, circuit=1, mode=1, entry=mock_entry)
 
     # Mock installation data with value
-    mock_coordinator.get_installation_devices_data.return_value = {
-        "data": [{"indoors": [{"heatingSetting": {"fixTempHeatC1": 42}}]}]
-    }
+    mock_coordinator.get_installation_devices_data.return_value = {"data": [{"indoors": [{"heatingSetting": {"fixTempHeatC1": 42}}]}]}
 
     assert entity.native_value == 42.0
 
@@ -406,9 +375,7 @@ def test_number_native_value(
 def test_number_available(mock_deps, mock_hass_instance, mock_entry, mock_coordinator):
     """Test available property."""
     sensor_data = {"zone_id": 1, "device_id": 123, "room_name": "Living Room"}
-    entity = mock_deps.CSNetHomeFixedWaterTemperatureNumber(
-        mock_coordinator, sensor_data, {}, circuit=1, mode=1, entry=mock_entry
-    )
+    entity = mock_deps.CSNetHomeFixedWaterTemperatureNumber(mock_coordinator, sensor_data, {}, circuit=1, mode=1, entry=mock_entry)
     entity.hass = mock_hass_instance
 
     api = mock_hass_instance.data[mock_deps.DOMAIN][mock_entry.entry_id]["api"]
@@ -438,9 +405,7 @@ def test_set_native_value(mock_deps, mock_hass_instance, mock_entry, mock_coordi
             "room_name": "Living Room",
             "parent_id": 100,
         }
-        entity = mock_deps.CSNetHomeFixedWaterTemperatureNumber(
-            mock_coordinator, sensor_data, {}, circuit=1, mode=1, entry=mock_entry
-        )
+        entity = mock_deps.CSNetHomeFixedWaterTemperatureNumber(mock_coordinator, sensor_data, {}, circuit=1, mode=1, entry=mock_entry)
         entity.hass = mock_hass_instance
 
         api = mock_hass_instance.data[mock_deps.DOMAIN][mock_entry.entry_id]["api"]
@@ -456,9 +421,7 @@ def test_set_native_value(mock_deps, mock_hass_instance, mock_entry, mock_coordi
     asyncio.run(run_test())
 
 
-def test_set_native_value_failure(
-    mock_deps, mock_hass_instance, mock_entry, mock_coordinator
-):
+def test_set_native_value_failure(mock_deps, mock_hass_instance, mock_entry, mock_coordinator):
     """Test setting native value failure."""
 
     async def run_test():
@@ -468,9 +431,7 @@ def test_set_native_value_failure(
             "room_name": "Living Room",
             "parent_id": 100,
         }
-        entity = mock_deps.CSNetHomeFixedWaterTemperatureNumber(
-            mock_coordinator, sensor_data, {}, circuit=1, mode=1, entry=mock_entry
-        )
+        entity = mock_deps.CSNetHomeFixedWaterTemperatureNumber(mock_coordinator, sensor_data, {}, circuit=1, mode=1, entry=mock_entry)
         entity.hass = mock_hass_instance
 
         api = mock_hass_instance.data[mock_deps.DOMAIN][mock_entry.entry_id]["api"]
@@ -491,9 +452,7 @@ def test_set_native_value_failure(
 def test_handle_coordinator_update(mock_deps, mock_entry, mock_coordinator):
     """Test handling coordinator update."""
     sensor_data = {"zone_id": 1, "device_id": 123, "room_name": "Living Room"}
-    entity = mock_deps.CSNetHomeFixedWaterTemperatureNumber(
-        mock_coordinator, sensor_data, {}, circuit=1, mode=1, entry=mock_entry
-    )
+    entity = mock_deps.CSNetHomeFixedWaterTemperatureNumber(mock_coordinator, sensor_data, {}, circuit=1, mode=1, entry=mock_entry)
     entity.async_write_ha_state = MagicMock()
 
     # Update sensor data in coordinator

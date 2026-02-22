@@ -48,7 +48,7 @@ def build_entity(
     fan2_speed=None,
     is_fan_coil=False,
     zone_id=1,
-    operation_status=5
+    operation_status=5,
 ):
     """Create a CSNetHomeClimate with minimal surroundings."""
     sensor_data = {
@@ -358,9 +358,7 @@ def test_dynamic_temperature_limits_heating_mode(hass):
             }
         },
         get_sensors_data=lambda: [entity._sensor_data],
-        get_common_data=lambda: {
-            "device_status": {1234: {"name": "Hitachi PAC", "firmware": "1.0.0"}}
-        },
+        get_common_data=lambda: {"device_status": {1234: {"name": "Hitachi PAC", "firmware": "1.0.0"}}},
         async_request_refresh=AsyncMock(return_value=None),
     )
 
@@ -392,9 +390,7 @@ def test_dynamic_temperature_limits_cooling_mode(hass):
             }
         },
         get_sensors_data=lambda: [entity._sensor_data],
-        get_common_data=lambda: {
-            "device_status": {1234: {"name": "Hitachi PAC", "firmware": "1.0.0"}}
-        },
+        get_common_data=lambda: {"device_status": {1234: {"name": "Hitachi PAC", "firmware": "1.0.0"}}},
         async_request_refresh=AsyncMock(return_value=None),
     )
 
@@ -421,9 +417,7 @@ def test_dynamic_temperature_limits_fallback_to_defaults(hass):
     mock_coordinator = SimpleNamespace(
         get_installation_devices_data=lambda: {},
         get_sensors_data=lambda: [entity._sensor_data],
-        get_common_data=lambda: {
-            "device_status": {1234: {"name": "Hitachi PAC", "firmware": "1.0.0"}}
-        },
+        get_common_data=lambda: {"device_status": {1234: {"name": "Hitachi PAC", "firmware": "1.0.0"}}},
         async_request_refresh=AsyncMock(return_value=None),
     )
 
@@ -1347,9 +1341,7 @@ def test_device_info_after_update_with_nested_structure(hass):
     entity = build_entity(hass)
 
     # Simulate update: replace _common_data with full common_data dict
-    entity._common_data = {
-        "device_status": {1234: {"name": "Hitachi PAC", "firmware": "2.0.0"}}
-    }
+    entity._common_data = {"device_status": {1234: {"name": "Hitachi PAC", "firmware": "2.0.0"}}}
 
     device_info = entity.device_info
 

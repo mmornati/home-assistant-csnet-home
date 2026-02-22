@@ -5,10 +5,7 @@
 import logging
 from typing import Any
 
-from homeassistant.components.water_heater import (
-    WaterHeaterEntity,
-    WaterHeaterEntityFeature,
-)
+from homeassistant.components.water_heater import WaterHeaterEntity, WaterHeaterEntityFeature
 from homeassistant.const import PRECISION_WHOLE, UnitOfTemperature
 from homeassistant.helpers.device_registry import DeviceInfo
 
@@ -36,14 +33,10 @@ async def async_setup_entry(hass, entry, async_add_entities):
     sensors_data = coordinator.get_sensors_data()
 
     # Include both water heater (zone_id=3) and swimming pool (zone_id=4)
-    water_heater_sensors = [
-        sensor for sensor in sensors_data if sensor.get("zone_id") in [3, 4]
-    ]
+    water_heater_sensors = [sensor for sensor in sensors_data if sensor.get("zone_id") in [3, 4]]
 
     if not water_heater_sensors:
-        _LOGGER.warning(
-            "No water heater or swimming pool sensors found in coordinator data."
-        )
+        _LOGGER.warning("No water heater or swimming pool sensors found in coordinator data.")
 
     async_add_entities(
         CSNetHomeWaterHeater(
@@ -76,10 +69,7 @@ class CSNetHomeWaterHeater(WaterHeaterEntity):
 
         # Temperature limits will be computed dynamically from API data
         self._attr_temperature_unit = UnitOfTemperature.CELSIUS
-        self._attr_supported_features = (
-            WaterHeaterEntityFeature.TARGET_TEMPERATURE
-            | WaterHeaterEntityFeature.OPERATION_MODE
-        )
+        self._attr_supported_features = WaterHeaterEntityFeature.TARGET_TEMPERATURE | WaterHeaterEntityFeature.OPERATION_MODE
 
         # Swimming pools only support on/off, not eco/performance modes
         if self._is_swimming_pool:
@@ -104,9 +94,7 @@ class CSNetHomeWaterHeater(WaterHeaterEntity):
                 self._attr_operation_mode = "eco"
 
         entity_type = "swimming-pool" if self._is_swimming_pool else "water-heater"
-        self._attr_unique_id = (
-            f"{DOMAIN}-{entity_type}-{sensor_data.get('room_name', 'unknown')}"
-        )
+        self._attr_unique_id = f"{DOMAIN}-{entity_type}-{sensor_data.get('room_name', 'unknown')}"
         self._attr_device_info = DeviceInfo(
             name=f"{sensor_data.get('device_name', 'Unknown')}-{sensor_data.get('room_name', 'Unknown')}",
             manufacturer="Hitachi",
@@ -123,9 +111,7 @@ class CSNetHomeWaterHeater(WaterHeaterEntity):
         self._update_attributes()
 
         _LOGGER.debug("Water heater entity initialized: %s", self._attr_name)
-        _LOGGER.debug(
-            "Water heater doingBoost: %s", self._sensor_data.get("doingBoost", False)
-        )
+        _LOGGER.debug("Water heater doingBoost: %s", self._sensor_data.get("doingBoost", False))
 
     def _update_attributes(self):
         """Update the entity attributes from sensor data."""
@@ -161,22 +147,15 @@ class CSNetHomeWaterHeater(WaterHeaterEntity):
 
         expected_zone_id = 4 if self._is_swimming_pool else 3
         for sensor in sensors_data:
-            if (
-                sensor.get("zone_id") == expected_zone_id
-                and sensor.get("room_name") == self._attr_name
-            ):
+            if sensor.get("zone_id") == expected_zone_id and sensor.get("room_name") == self._attr_name:
                 self._sensor_data = sensor
                 self._update_attributes()
-                entity_type = (
-                    "swimming pool" if self._is_swimming_pool else "water heater"
-                )
+                entity_type = "swimming pool" if self._is_swimming_pool else "water heater"
                 _LOGGER.debug("Updated %s data: %s", entity_type, self._attr_name)
                 return
 
         entity_type = "swimming pool" if self._is_swimming_pool else "water heater"
-        _LOGGER.warning(
-            "No updated data found for %s: %s", entity_type, self._attr_name
-        )
+        _LOGGER.warning("No updated data found for %s: %s", entity_type, self._attr_name)
 
     @property
     def precision(self) -> float:
@@ -225,9 +204,7 @@ class CSNetHomeWaterHeater(WaterHeaterEntity):
 
         # Get temperature limits from API
         cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
-        _, max_limit = cloud_api.get_temperature_limits(
-            zone_id, mode, installation_devices_data
-        )
+        _, max_limit = cloud_api.get_temperature_limits(zone_id, mode, installation_devices_data)
 
         # Return API limit if available, otherwise use static default
         return max_limit if max_limit is not None else WATER_HEATER_MAX_TEMPERATURE
@@ -257,9 +234,7 @@ class CSNetHomeWaterHeater(WaterHeaterEntity):
         """Set new target operation mode."""
         cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
         _LOGGER.warning("Operation mode: %s", operation_mode)
-        response = await cloud_api.set_water_heater_mode(
-            self._sensor_data["zone_id"], self._sensor_data["parent_id"], operation_mode
-        )
+        response = await cloud_api.set_water_heater_mode(self._sensor_data["zone_id"], self._sensor_data["parent_id"], operation_mode)
         if response:
             if operation_mode == "off":
                 self._sensor_data["on_off"] = 0

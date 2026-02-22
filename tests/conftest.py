@@ -32,9 +32,7 @@ except ImportError:
 
     sys.modules["homeassistant.components.climate"] = MagicMock()
     sys.modules["homeassistant.components.climate.const"] = MagicMock()
-    sys.modules["homeassistant.components.climate.const"].HVACMode = SimpleNamespace(
-        HEAT="heat", COOL="cool", OFF="off", AUTO="auto", HEAT_COOL="heat_cool"
-    )
+    sys.modules["homeassistant.components.climate.const"].HVACMode = SimpleNamespace(HEAT="heat", COOL="cool", OFF="off", AUTO="auto", HEAT_COOL="heat_cool")
 
 try:
     import aiohttp  # noqa: F401

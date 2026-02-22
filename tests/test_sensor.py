@@ -46,11 +46,7 @@ def build_context():
     common = {"name": "Hitachi PAC", "firmware": "1.0.0"}
 
     def get_sensor_data_by_id(device_id, room_id, zone_id):
-        if (
-            device_id == sensor_data["device_id"]
-            and room_id == sensor_data["room_id"]
-            and zone_id == sensor_data["zone_id"]
-        ):
+        if device_id == sensor_data["device_id"] and room_id == sensor_data["room_id"] and zone_id == sensor_data["zone_id"]:
             return sensor_data
         return None
 
@@ -120,9 +116,7 @@ def test_sensor_device_info_with_missing_firmware():
     coordinator, sensor_data, common = build_context()
     # Remove firmware key
     common_no_firmware = {"name": "Hitachi PAC"}
-    s = CSNetHomeSensor(
-        coordinator, sensor_data, common_no_firmware, "current_temperature"
-    )
+    s = CSNetHomeSensor(coordinator, sensor_data, common_no_firmware, "current_temperature")
 
     device_info = s.device_info
     # Should not raise KeyError, firmware should be None
@@ -136,9 +130,7 @@ def test_sensor_device_info_after_update_with_nested_structure():
     s = CSNetHomeSensor(coordinator, sensor_data, common, "current_temperature")
 
     # Simulate update: replace _common_data with full common_data dict
-    s._common_data = {
-        "device_status": {1234: {"name": "Hitachi PAC", "firmware": "2.0.0"}}
-    }
+    s._common_data = {"device_status": {1234: {"name": "Hitachi PAC", "firmware": "2.0.0"}}}
 
     device_info = s.device_info
     assert device_info is not None
@@ -205,9 +197,7 @@ def test_alarm_code_and_active():
     sensor_data["alarm_code"] = 0
 
     alarm_code = CSNetHomeSensor(coordinator, sensor_data, common, "alarm_code", "enum")
-    alarm_active = CSNetHomeSensor(
-        coordinator, sensor_data, common, "alarm_active", "binary"
-    )
+    alarm_active = CSNetHomeSensor(coordinator, sensor_data, common, "alarm_active", "binary")
 
     # no alarm
     assert alarm_code.state == 0
@@ -301,9 +291,7 @@ def test_installation_sensor():
     assert s.state == 4.48  # 224 / 50 = 4.48
 
     # Test defrost sensor
-    s = CSNetHomeInstallationSensor(
-        coordinator, device_data, common_data, "defrost", "binary", None, "Defrost"
-    )
+    s = CSNetHomeInstallationSensor(coordinator, device_data, common_data, "defrost", "binary", None, "Defrost")
     assert s.state == STATE_ON  # defrosting = 1
 
     # Test gas temperature sensor
@@ -420,9 +408,7 @@ def test_installation_sensor_edge_cases():
     assert s.state == 3.2  # 160 / 50 = 3.2
 
     # Test defrost with 0 value (off)
-    s = CSNetHomeInstallationSensor(
-        coordinator, device_data, common_data, "defrost", "binary", None, "Defrost"
-    )
+    s = CSNetHomeInstallationSensor(coordinator, device_data, common_data, "defrost", "binary", None, "Defrost")
     assert s.state == STATE_OFF
 
     # Test mix valve position with conversion
@@ -528,9 +514,7 @@ def test_installation_sensor_nested_data():
     assert s.state == 80  # 80%
 
     # Test defrost from nested data
-    s = CSNetHomeInstallationSensor(
-        coordinator, device_data, common_data, "defrost", "binary", None, "Defrost"
-    )
+    s = CSNetHomeInstallationSensor(coordinator, device_data, common_data, "defrost", "binary", None, "Defrost")
     assert s.state == STATE_ON  # defrosting = 1
 
     # Test water flow from nested data
@@ -624,9 +608,7 @@ def test_central_config_sensor():
     common_data = {"name": "Hitachi Installation", "firmware": "1.0.0"}
 
     # Test with centralConfig = 0 (Unit Only)
-    installation_data = {
-        "data": [{"indoors": [{"heatingStatus": {"centralConfig": 0}}]}]
-    }
+    installation_data = {"data": [{"indoors": [{"heatingStatus": {"centralConfig": 0}}]}]}
 
     coordinator = SimpleNamespace(
         get_installation_devices_data=lambda: installation_data,
@@ -803,12 +785,8 @@ def test_central_control_enabled_sensor():
 
     # Test with centralConfig < 3 but non-S80 model and recent firmware (should be ON)
     installation_data["data"][0]["indoors"][0]["heatingStatus"]["centralConfig"] = 2
-    installation_data["data"][0]["indoors"][0]["heatingStatus"][
-        "unitModel"
-    ] = 0  # Yutaki S
-    installation_data["data"][0]["indoors"][0]["heatingStatus"][
-        "lcdSoft"
-    ] = 546  # >= 0x0222
+    installation_data["data"][0]["indoors"][0]["heatingStatus"]["unitModel"] = 0  # Yutaki S
+    installation_data["data"][0]["indoors"][0]["heatingStatus"]["lcdSoft"] = 546  # >= 0x0222
     assert s.state == STATE_ON
 
     # Test with centralConfig < 3, non-S80, and lcdSoft = 0 (should be ON - not configured yet)
@@ -820,16 +798,12 @@ def test_central_control_enabled_sensor():
     # Test with centralConfig < 3, non-S80, old firmware (should be OFF)
     installation_data["data"][0]["indoors"][0]["heatingStatus"]["centralConfig"] = 2
     installation_data["data"][0]["indoors"][0]["heatingStatus"]["unitModel"] = 0
-    installation_data["data"][0]["indoors"][0]["heatingStatus"][
-        "lcdSoft"
-    ] = 500  # < 0x0222
+    installation_data["data"][0]["indoors"][0]["heatingStatus"]["lcdSoft"] = 500  # < 0x0222
     assert s.state == STATE_OFF
 
     # Test with centralConfig < 3 and S80 model (should be OFF)
     installation_data["data"][0]["indoors"][0]["heatingStatus"]["centralConfig"] = 2
-    installation_data["data"][0]["indoors"][0]["heatingStatus"][
-        "unitModel"
-    ] = 2  # Yutaki S80
+    installation_data["data"][0]["indoors"][0]["heatingStatus"]["unitModel"] = 2  # Yutaki S80
     installation_data["data"][0]["indoors"][0]["heatingStatus"]["lcdSoft"] = 546
     assert s.state == STATE_OFF
 
@@ -1553,9 +1527,7 @@ def test_enhanced_alarm_sensors():
     sensor_data["unit_type"] = "yutaki"
 
     # Test alarm_code_formatted sensor
-    s_formatted = CSNetHomeSensor(
-        coordinator, sensor_data, common, "alarm_code_formatted", "enum"
-    )
+    s_formatted = CSNetHomeSensor(coordinator, sensor_data, common, "alarm_code_formatted", "enum")
     assert s_formatted.state == "62"
 
     # Test alarm_origin sensor
@@ -1569,9 +1541,7 @@ def test_enhanced_alarm_sensors():
     # Test with BCD alarm code
     sensor_data["alarm_code"] = 0x0162
     sensor_data["alarm_code_formatted"] = "62"
-    s_formatted = CSNetHomeSensor(
-        coordinator, sensor_data, common, "alarm_code_formatted", "enum"
-    )
+    s_formatted = CSNetHomeSensor(coordinator, sensor_data, common, "alarm_code_formatted", "enum")
     assert s_formatted.state == "62"
 
 
@@ -1676,9 +1646,7 @@ def test_alarm_statistics_sensor_total_count():
         get_sensors_data=lambda: sensors_data,
     )
 
-    s = CSNetHomeAlarmStatisticsSensor(
-        coordinator, common_data, "total_alarm_count", "Total Alarms"
-    )
+    s = CSNetHomeAlarmStatisticsSensor(coordinator, common_data, "total_alarm_count", "Total Alarms")
 
     # Test state (count of active alarms)
     assert s.state == 2
@@ -1725,9 +1693,7 @@ def test_alarm_statistics_sensor_by_origin():
         get_sensors_data=lambda: sensors_data,
     )
 
-    s = CSNetHomeAlarmStatisticsSensor(
-        coordinator, common_data, "alarm_by_origin", "Alarms by Origin"
-    )
+    s = CSNetHomeAlarmStatisticsSensor(coordinator, common_data, "alarm_by_origin", "Alarms by Origin")
 
     # Test state (count of most common origin)
     assert s.state == 2  # "Indoor Unit" appears twice
@@ -1766,14 +1732,10 @@ def test_alarm_statistics_sensor_no_alarms():
         get_sensors_data=lambda: sensors_data,
     )
 
-    s_total = CSNetHomeAlarmStatisticsSensor(
-        coordinator, common_data, "total_alarm_count", "Total Alarms"
-    )
+    s_total = CSNetHomeAlarmStatisticsSensor(coordinator, common_data, "total_alarm_count", "Total Alarms")
     assert s_total.state == 0
 
-    s_origin = CSNetHomeAlarmStatisticsSensor(
-        coordinator, common_data, "alarm_by_origin", "Alarms by Origin"
-    )
+    s_origin = CSNetHomeAlarmStatisticsSensor(coordinator, common_data, "alarm_by_origin", "Alarms by Origin")
     assert s_origin.state == 0
 
 
@@ -2169,22 +2131,14 @@ def test_outdoor_temperature_sensors_various_values():
     assert s_avg.state == -3
 
     # Test with high temperature (summer conditions)
-    installation_data["data"][0]["indoors"][0]["heatingStatus"][
-        "outdoorAmbientTemp"
-    ] = 35
-    installation_data["data"][0]["indoors"][0]["heatingStatus"][
-        "outdoorAmbientAverageTemp"
-    ] = 32
+    installation_data["data"][0]["indoors"][0]["heatingStatus"]["outdoorAmbientTemp"] = 35
+    installation_data["data"][0]["indoors"][0]["heatingStatus"]["outdoorAmbientAverageTemp"] = 32
     assert s_outdoor.state == 35
     assert s_avg.state == 32
 
     # Test with zero temperature
-    installation_data["data"][0]["indoors"][0]["heatingStatus"][
-        "outdoorAmbientTemp"
-    ] = 0
-    installation_data["data"][0]["indoors"][0]["heatingStatus"][
-        "outdoorAmbientAverageTemp"
-    ] = 0
+    installation_data["data"][0]["indoors"][0]["heatingStatus"]["outdoorAmbientTemp"] = 0
+    installation_data["data"][0]["indoors"][0]["heatingStatus"]["outdoorAmbientAverageTemp"] = 0
     assert s_outdoor.state == 0
     assert s_avg.state == 0
 
@@ -2286,15 +2240,11 @@ def test_otc_cooling_type_c2_sensor():
     assert sensor.state == "Fixed"
 
     # Test with NONE type
-    installation_data["data"][0]["indoors"][0]["heatingStatus"][
-        "otcTypeCoolC2"
-    ] = OTC_COOLING_TYPE_NONE
+    installation_data["data"][0]["indoors"][0]["heatingStatus"]["otcTypeCoolC2"] = OTC_COOLING_TYPE_NONE
     assert sensor.state == "None"
 
     # Test with POINTS type
-    installation_data["data"][0]["indoors"][0]["heatingStatus"][
-        "otcTypeCoolC2"
-    ] = OTC_COOLING_TYPE_POINTS
+    installation_data["data"][0]["indoors"][0]["heatingStatus"]["otcTypeCoolC2"] = OTC_COOLING_TYPE_POINTS
     assert sensor.state == "Points"
 
 
@@ -2343,21 +2293,15 @@ def test_otc_heating_type_c1_sensor():
     assert sensor.state == "Fixed"
 
     # Test with NONE type
-    installation_data["data"][0]["indoors"][0]["heatingStatus"][
-        "otcTypeHeatC1"
-    ] = OTC_HEATING_TYPE_NONE
+    installation_data["data"][0]["indoors"][0]["heatingStatus"]["otcTypeHeatC1"] = OTC_HEATING_TYPE_NONE
     assert sensor.state == "None"
 
     # Test with POINTS type
-    installation_data["data"][0]["indoors"][0]["heatingStatus"][
-        "otcTypeHeatC1"
-    ] = OTC_HEATING_TYPE_POINTS
+    installation_data["data"][0]["indoors"][0]["heatingStatus"]["otcTypeHeatC1"] = OTC_HEATING_TYPE_POINTS
     assert sensor.state == "Points"
 
     # Test with GRADIENT type
-    installation_data["data"][0]["indoors"][0]["heatingStatus"][
-        "otcTypeHeatC1"
-    ] = OTC_HEATING_TYPE_GRADIENT
+    installation_data["data"][0]["indoors"][0]["heatingStatus"]["otcTypeHeatC1"] = OTC_HEATING_TYPE_GRADIENT
     assert sensor.state == "Gradient"
 
 
@@ -2403,15 +2347,11 @@ def test_otc_cooling_type_c1_sensor():
     assert sensor.state == "Fixed"
 
     # Test with NONE type
-    installation_data["data"][0]["indoors"][0]["heatingStatus"][
-        "otcTypeCoolC1"
-    ] = OTC_COOLING_TYPE_NONE
+    installation_data["data"][0]["indoors"][0]["heatingStatus"]["otcTypeCoolC1"] = OTC_COOLING_TYPE_NONE
     assert sensor.state == "None"
 
     # Test with POINTS type
-    installation_data["data"][0]["indoors"][0]["heatingStatus"][
-        "otcTypeCoolC1"
-    ] = OTC_COOLING_TYPE_POINTS
+    installation_data["data"][0]["indoors"][0]["heatingStatus"]["otcTypeCoolC1"] = OTC_COOLING_TYPE_POINTS
     assert sensor.state == "Points"
 
 
@@ -2457,9 +2397,7 @@ def test_otc_heating_type_c2_sensor():
     assert sensor.state == "Gradient"
 
     # Test with FIX type
-    installation_data["data"][0]["indoors"][0]["heatingStatus"][
-        "otcTypeHeatC2"
-    ] = OTC_HEATING_TYPE_FIX
+    installation_data["data"][0]["indoors"][0]["heatingStatus"]["otcTypeHeatC2"] = OTC_HEATING_TYPE_FIX
     assert sensor.state == "Fixed"
 
 
@@ -2880,15 +2818,9 @@ def test_compressor_temperatures_extreme_values():
     assert s_ambient.state == -31
 
     # Test extreme heat
-    installation_data["data"][0]["indoors"][0]["heatingStatus"][
-        "ouEvapTemperature"
-    ] = 100  # 100°C
-    installation_data["data"][0]["indoors"][0]["heatingStatus"][
-        "ouDischargeTemperature"
-    ] = 80  # 80°C
-    installation_data["data"][0]["indoors"][0]["heatingStatus"][
-        "ouAmbientTemperature"
-    ] = 50  # 50°C
+    installation_data["data"][0]["indoors"][0]["heatingStatus"]["ouEvapTemperature"] = 100  # 100°C
+    installation_data["data"][0]["indoors"][0]["heatingStatus"]["ouDischargeTemperature"] = 80  # 80°C
+    installation_data["data"][0]["indoors"][0]["heatingStatus"]["ouAmbientTemperature"] = 50  # 50°C
 
     assert s_evap.state == 100
     assert s_discharge.state == 80
