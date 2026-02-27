@@ -86,7 +86,7 @@ jobs:
           EOF
 
       - name: Upload Documentation Preview
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: documentation-preview-pr${{ github.event.pull_request.number }}
           path: ./site
