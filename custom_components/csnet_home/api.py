@@ -468,11 +468,12 @@ class CSNetHomeAPI:
 
     async def async_get_installation_alarms(self):
         """Get installation alarms data from the cloud service."""
-        if not self.installation_id:
-            _LOGGER.debug("No installation ID available, skipping alarm fetch")
-            return None
+        installation_id = self.installation_id
+        if not installation_id:
+            _LOGGER.debug("No installation ID available, falling back to installationId=-1")
+            installation_id = -1
 
-        installation_alarms_url = f"{self.base_url}{INSTALLATION_ALARMS_PATH}" f"?installationId={self.installation_id}&_csrf={self.xsrf_token}"
+        installation_alarms_url = f"{self.base_url}{INSTALLATION_ALARMS_PATH}" f"?installationId={installation_id}&_csrf={self.xsrf_token}"
 
         if not self.session or not self.logged_in:
             _LOGGER.warning("No active session found.")
