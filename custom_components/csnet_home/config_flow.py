@@ -133,6 +133,13 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_LANGUAGE: user_input.get(CONF_LANGUAGE, DEFAULT_LANGUAGE),
                         CONF_MAX_TEMP_OVERRIDE: user_input.get(CONF_MAX_TEMP_OVERRIDE),
                         CONF_FAN_COIL_MODEL: user_input.get(CONF_FAN_COIL_MODEL, DEFAULT_FAN_COIL_MODEL),
+                        CONF_ENABLE_ALARM_NOTIFICATIONS: user_input.get(
+                            CONF_ENABLE_ALARM_NOTIFICATIONS,
+                            reconfigure_entry.data.get(
+                                CONF_ENABLE_ALARM_NOTIFICATIONS,
+                                DEFAULT_ENABLE_ALARM_NOTIFICATIONS,
+                            ),
+                        ),
                     },
                 )
 
@@ -159,9 +166,19 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_FAN_COIL_MODEL,
                         default=reconfigure_entry.data.get(CONF_FAN_COIL_MODEL, DEFAULT_FAN_COIL_MODEL),
                     ): vol.In([FAN_COIL_MODEL_STANDARD, FAN_COIL_MODEL_LEGACY]),
+                    vol.Required(
+                        CONF_ENABLE_ALARM_NOTIFICATIONS,
+                        default=reconfigure_entry.data.get(
+                            CONF_ENABLE_ALARM_NOTIFICATIONS,
+                            DEFAULT_ENABLE_ALARM_NOTIFICATIONS,
+                        ),
+                    ): bool,
                 }
             ),
-            description_placeholders={"max_temp_override_desc": "Optional: Override maximum temperature limit (8-80°C). Leave empty to use device defaults."},
+            description_placeholders={
+                "max_temp_override_desc": "Optional: Override maximum temperature limit (8-80°C). Leave empty to use device defaults.",
+                "alarm_notifications_desc": "When enabled, you will receive a Home Assistant notification when a new installation alarm is detected. The alarm data will still be available in the Alarm History sensor regardless of this setting.",
+            },
             errors=errors,
         )
 
