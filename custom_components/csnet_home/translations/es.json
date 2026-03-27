@@ -30,7 +30,8 @@
                     "scan_interval": "Intervalo de escaneo (segundos)",
                     "language": "Idioma",
                     "max_temp_override": "Anulación de temperatura máxima (°C)",
-                    "fan_coil_model": "Modelo de control del Fan Coil"
+                    "fan_coil_model": "Modelo de control del Fan Coil",
+                    "enable_alarm_notifications": "Activar notificaciones de alarma"
                 },
                 "data_description": {
                     "username": "Su nombre de usuario de CSNet Manager",
@@ -38,7 +39,8 @@
                     "scan_interval": "Con qué frecuencia buscar actualizaciones",
                     "language": "Idioma preferido para los nombres de los dispositivos y las alarmas",
                     "max_temp_override": "Anule el límite máximo de temperatura (8-80°C)",
-                    "fan_coil_model": "Seleccione el tipo de control del fan coil"
+                    "fan_coil_model": "Seleccione el tipo de control del fan coil",
+                    "enable_alarm_notifications": "Cuando esté activado, recibirá una notificación cuando se detecte una nueva alarma"
                 }
             },
             "reauth_confirm": {
@@ -51,6 +53,16 @@
                 "data_description": {
                     "username": "Su nombre de usuario de CSNet Manager (actualizar si cambió)",
                     "password": "Su contraseña actualizada de CSNet Manager"
+                }
+            },
+            "options": {
+                "title": "Opciones de CSNet Home",
+                "description": "Configure los ajustes de notificación de alarmas. El sensor de historial de alarmas seguirá mostrando los datos de alarmas independientemente de este ajuste.",
+                "data": {
+                    "enable_alarm_notifications": "Activar notificaciones de alarma"
+                },
+                "data_description": {
+                    "enable_alarm_notifications": "Cuando esté activado, recibirá una notificación de Home Assistant cuando se detecte una nueva alarma de instalación."
                 }
             }
         },

@@ -30,7 +30,8 @@
                     "scan_interval": "Intervalle de scan (secondes)",
                     "language": "Langue",
                     "max_temp_override": "Température maximale (°C)",
-                    "fan_coil_model": "Modèle de contrôle du ventilo-convecteur"
+                    "fan_coil_model": "Modèle de contrôle du ventilo-convecteur",
+                    "enable_alarm_notifications": "Activer les notifications d'alarme"
                 },
                 "data_description": {
                     "username": "Votre nom d'utilisateur CSNet Manager",
@@ -38,7 +39,8 @@
                     "scan_interval": "Fréquence de mise à jour des données",
                     "language": "Langue préférée pour les noms d'appareils et les alarmes",
                     "max_temp_override": "Remplacer la limite de température maximale (8-80°C)",
-                    "fan_coil_model": "Sélectionnez le type de contrôle du ventilo-convecteur"
+                    "fan_coil_model": "Sélectionnez le type de contrôle du ventilo-convecteur",
+                    "enable_alarm_notifications": "Lorsqu'activé, vous recevrez une notification lorsqu'une nouvelle alarme est détectée"
                 }
             },
             "reauth_confirm": {
@@ -51,6 +53,16 @@
                 "data_description": {
                     "username": "Votre nom d'utilisateur CSNet Manager (mettre à jour si modifié)",
                     "password": "Votre nouveau mot de passe CSNet Manager"
+                }
+            },
+            "options": {
+                "title": "Options CSNet Home",
+                "description": "Configurez les paramètres de notification d'alarme. Le capteur d'historique des alarmes affichera toujours les données d'alarme indépendamment de ce paramètre.",
+                "data": {
+                    "enable_alarm_notifications": "Activer les notifications d'alarme"
+                },
+                "data_description": {
+                    "enable_alarm_notifications": "Lorsqu'activé, vous recevrez une notification Home Assistant lorsqu'une nouvelle alarme d'installation est détectée."
                 }
             }
         },
