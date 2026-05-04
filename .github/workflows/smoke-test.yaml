@@ -90,7 +90,12 @@ jobs:
           echo "HA $VERSION requires: $PY_REQ"
 
           # Determine Python version
-          if [[ "$PY_REQ" == *"3.13"* ]]; then
+          # HA 2026.3+ requires Python 3.14.2+
+          # HA 2025.6-2026.2 requires Python 3.13.2+
+          # HA 2024.12-2025.5 requires Python 3.12+
+          if [[ "$PY_REQ" == *"3.14"* ]]; then
+            PYTHON_VERSION="3.14"
+          elif [[ "$PY_REQ" == *"3.13"* ]]; then
             PYTHON_VERSION="3.13"
           else
             PYTHON_VERSION="3.12"
