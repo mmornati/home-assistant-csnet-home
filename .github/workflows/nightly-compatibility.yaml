@@ -474,7 +474,7 @@ jobs:
           failure() &&
           (github.event_name == 'schedule' ||
            (github.event_name == 'workflow_dispatch' && inputs.send_notification))
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
@@ -515,7 +515,7 @@ jobs:
 
       - name: Comment on Success After Previous Failure
         if: success() && github.event_name == 'schedule'
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         continue-on-error: true
         with:
           script: |
