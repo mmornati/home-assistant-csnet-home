@@ -219,7 +219,7 @@ jobs:
           zipinfo hass-custom-csnet-home.zip | head -20
 
       - name: Upload Zip to Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: ./custom_components/csnet_home/hass-custom-csnet-home.zip
           tag_name: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.version }}
