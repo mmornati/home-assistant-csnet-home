@@ -5,9 +5,13 @@ import logging
 from datetime import timedelta
 
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
-from .const import DOMAIN
+from .const import CONF_ENABLE_ALARM_NOTIFICATIONS, DEFAULT_ENABLE_ALARM_NOTIFICATIONS, DOMAIN
+
+STORAGE_VERSION = 1
+STORAGE_KEY = "csnet_home_notified_alarms"
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -25,6 +29,8 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         self._sensors_by_id = {}
         self._last_alarm_codes: dict[str, int] = {}
         self._notified_installation_alarm_ids: set[int] = set()
+        self._alarm_store: Store | None = None
+        self._enable_alarm_notifications: bool = DEFAULT_ENABLE_ALARM_NOTIFICATIONS
         super().__init__(
             hass,
             _LOGGER,
@@ -32,6 +38,50 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
             update_method=self._async_update_data,
             update_interval=self.update_interval,
         )
+
+    async def _async_config_entry_first_refresh(self):
+        """Load persisted alarm notification IDs on first refresh."""
+        await super()._async_config_entry_first_refresh()
+        await self._load_notified_alarm_ids()
+        self._load_alarm_notification_setting()
+
+    def _load_alarm_notification_setting(self):
+        """Load alarm notification setting from config entry."""
+        entry = self.hass.config_entries.async_get_entry(self.entry_id)
+        if entry:
+            self._enable_alarm_notifications = entry.data.get(CONF_ENABLE_ALARM_NOTIFICATIONS, DEFAULT_ENABLE_ALARM_NOTIFICATIONS)
+            _LOGGER.debug("Alarm notifications enabled: %s", self._enable_alarm_notifications)
+
+    async def _load_notified_alarm_ids(self):
+        """Load notified alarm IDs from persistent storage."""
+        if self._alarm_store is None:
+            self._alarm_store = Store(self.hass, STORAGE_VERSION, STORAGE_KEY)
+
+        try:
+            data = await self._alarm_store.async_load()
+            if data and "notified_alarm_ids" in data:
+                self._notified_installation_alarm_ids = set(data["notified_alarm_ids"])
+                _LOGGER.debug(
+                    "Loaded %d notified alarm IDs from storage",
+                    len(self._notified_installation_alarm_ids),
+                )
+        except Exception as exc:
+            _LOGGER.debug("Could not load notified alarm IDs: %s", exc)
+            self._notified_installation_alarm_ids = set()
+
+    async def _save_notified_alarm_ids(self):
+        """Save notified alarm IDs to persistent storage."""
+        if self._alarm_store is None:
+            self._alarm_store = Store(self.hass, STORAGE_VERSION, STORAGE_KEY)
+
+        try:
+            await self._alarm_store.async_save({"notified_alarm_ids": list(self._notified_installation_alarm_ids)})
+            _LOGGER.debug(
+                "Saved %d notified alarm IDs to storage",
+                len(self._notified_installation_alarm_ids),
+            )
+        except Exception as exc:
+            _LOGGER.debug("Could not save notified alarm IDs: %s", exc)
 
     async def _async_update_data(self):
         """Fetch data for all sensors."""
@@ -237,6 +287,7 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
             alarms = installation_alarms_data.get("alarms", [])
 
         current_active_ids = set()
+        notified_ids_changed = False
 
         for alarm in alarms:
             # Check if active
@@ -256,6 +307,15 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
 
             # New active alarm found
             self._notified_installation_alarm_ids.add(alarm_id)
+            notified_ids_changed = True
+
+            # Only create notification if alarm notifications are enabled
+            if not self._enable_alarm_notifications:
+                _LOGGER.debug(
+                    "Alarm notification disabled, not creating notification for alarm %s",
+                    alarm_id,
+                )
+                continue
 
             # Generate notification
             code = alarm.get("code")
@@ -278,7 +338,14 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
 
         # Clean up notified IDs for alarms that are no longer active
         # We only keep IDs that are currently active
+        old_count = len(self._notified_installation_alarm_ids)
         self._notified_installation_alarm_ids = self._notified_installation_alarm_ids.intersection(current_active_ids)
+        if len(self._notified_installation_alarm_ids) != old_count:
+            notified_ids_changed = True
+
+        # Persist changes to storage
+        if notified_ids_changed:
+            await self._save_notified_alarm_ids()
 
     def get_sensors_data(self):
         """Return the list of sensor data."""

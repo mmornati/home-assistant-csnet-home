@@ -7,9 +7,11 @@ from homeassistant import config_entries
 from homeassistant.const import CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_USERNAME
 
 from .const import (
+    CONF_ENABLE_ALARM_NOTIFICATIONS,
     CONF_FAN_COIL_MODEL,
     CONF_LANGUAGE,
     CONF_MAX_TEMP_OVERRIDE,
+    DEFAULT_ENABLE_ALARM_NOTIFICATIONS,
     DEFAULT_FAN_COIL_MODEL,
     DEFAULT_LANGUAGE,
     DOMAIN,
@@ -27,6 +29,13 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     def __init__(self):
         """Initialize the config flow."""
+        self._reauth_entry = None
+
+    @staticmethod
+    @config_entries.HANDLERS.register(DOMAIN)
+    async def async_get_options_flow(config_entry):
+        """Get the options flow for this integration."""
+        return CsnetHomeOptionsFlowHandler(config_entry)
 
     async def async_step_user(self, user_input=None):
         """Handle user input for login credentials."""
@@ -50,6 +59,8 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_MAX_TEMP_OVERRIDE: user_input.get(CONF_MAX_TEMP_OVERRIDE),
                         # Store the Fan coil control type
                         CONF_FAN_COIL_MODEL: user_input.get(CONF_FAN_COIL_MODEL, DEFAULT_FAN_COIL_MODEL),
+                        # Alarm notifications enabled by default
+                        CONF_ENABLE_ALARM_NOTIFICATIONS: DEFAULT_ENABLE_ALARM_NOTIFICATIONS,
                     },
                 )
 
@@ -122,6 +133,13 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_LANGUAGE: user_input.get(CONF_LANGUAGE, DEFAULT_LANGUAGE),
                         CONF_MAX_TEMP_OVERRIDE: user_input.get(CONF_MAX_TEMP_OVERRIDE),
                         CONF_FAN_COIL_MODEL: user_input.get(CONF_FAN_COIL_MODEL, DEFAULT_FAN_COIL_MODEL),
+                        CONF_ENABLE_ALARM_NOTIFICATIONS: user_input.get(
+                            CONF_ENABLE_ALARM_NOTIFICATIONS,
+                            reconfigure_entry.data.get(
+                                CONF_ENABLE_ALARM_NOTIFICATIONS,
+                                DEFAULT_ENABLE_ALARM_NOTIFICATIONS,
+                            ),
+                        ),
                     },
                 )
 
@@ -148,9 +166,19 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_FAN_COIL_MODEL,
                         default=reconfigure_entry.data.get(CONF_FAN_COIL_MODEL, DEFAULT_FAN_COIL_MODEL),
                     ): vol.In([FAN_COIL_MODEL_STANDARD, FAN_COIL_MODEL_LEGACY]),
+                    vol.Required(
+                        CONF_ENABLE_ALARM_NOTIFICATIONS,
+                        default=reconfigure_entry.data.get(
+                            CONF_ENABLE_ALARM_NOTIFICATIONS,
+                            DEFAULT_ENABLE_ALARM_NOTIFICATIONS,
+                        ),
+                    ): bool,
                 }
             ),
-            description_placeholders={"max_temp_override_desc": "Optional: Override maximum temperature limit (8-80°C). Leave empty to use device defaults."},
+            description_placeholders={
+                "max_temp_override_desc": "Optional: Override maximum temperature limit (8-80°C). Leave empty to use device defaults.",
+                "alarm_notifications_desc": "When enabled, you will receive a Home Assistant notification when a new installation alarm is detected. The alarm data will still be available in the Alarm History sensor regardless of this setting.",
+            },
             errors=errors,
         )
 
@@ -197,4 +225,96 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 }
             ),
             errors=errors,
+        )
+
+    async def async_step_init(self, user_input=None):
+        """Handle options flow init."""
+        return await self.async_step_options(user_input)
+
+    async def async_step_options(self, user_input=None):
+        """Handle options flow for integration settings."""
+        entry = self.hass.config_entries.async_get_entry(self.context["entry_id"])
+
+        if user_input is not None:
+            # Update the config entry with new options
+            self.hass.config_entries.async_update_entry(
+                entry,
+                data={
+                    **entry.data,
+                    CONF_ENABLE_ALARM_NOTIFICATIONS: user_input.get(
+                        CONF_ENABLE_ALARM_NOTIFICATIONS,
+                        DEFAULT_ENABLE_ALARM_NOTIFICATIONS,
+                    ),
+                },
+            )
+            await self.hass.config_entries.async_reload(entry.entry_id)
+            return self.async_create_entry(title="", data={})
+
+        # Show form with current values
+        return self.async_show_form(
+            step_id="options",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_ENABLE_ALARM_NOTIFICATIONS,
+                        default=entry.data.get(
+                            CONF_ENABLE_ALARM_NOTIFICATIONS,
+                            DEFAULT_ENABLE_ALARM_NOTIFICATIONS,
+                        ),
+                    ): bool,
+                }
+            ),
+            description_placeholders={
+                "alarm_notifications_desc": "When enabled, you will receive a Home Assistant notification when a new installation alarm is detected. The alarm data will still be available in the Alarm History sensor regardless of this setting."
+            },
+        )
+
+
+class CsnetHomeOptionsFlowHandler(config_entries.OptionsFlow):
+    """Handle an options flow for CSNet Home."""
+
+    def __init__(self, config_entry: config_entries.ConfigEntry):
+        """Initialize options flow."""
+        self.config_entry = config_entry
+
+    async def async_step_init(self, user_input=None):
+        """Handle options flow init."""
+        return await self.async_step_options(user_input)
+
+    async def async_step_options(self, user_input=None):
+        """Handle options flow for integration settings."""
+        entry = self.config_entry
+
+        if user_input is not None:
+            # Update the config entry with new options
+            self.hass.config_entries.async_update_entry(
+                entry,
+                data={
+                    **entry.data,
+                    CONF_ENABLE_ALARM_NOTIFICATIONS: user_input.get(
+                        CONF_ENABLE_ALARM_NOTIFICATIONS,
+                        DEFAULT_ENABLE_ALARM_NOTIFICATIONS,
+                    ),
+                },
+            )
+            await self.hass.config_entries.async_reload(entry.entry_id)
+            return self.async_create_entry(title="", data={})
+
+        # Show form with current values
+        return self.async_show_form(
+            step_id="options",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_ENABLE_ALARM_NOTIFICATIONS,
+                        default=entry.data.get(
+                            CONF_ENABLE_ALARM_NOTIFICATIONS,
+                            DEFAULT_ENABLE_ALARM_NOTIFICATIONS,
+                        ),
+                    ): bool,
+                }
+            ),
+            description_placeholders={
+                "alarm_notifications_desc": "When enabled, you will receive a Home Assistant notification when a new installation alarm is detected. The alarm data will still be available in the Alarm History sensor regardless of this setting."
+            },
         )

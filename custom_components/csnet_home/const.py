@@ -11,9 +11,11 @@ HEAT_SETTINGS_PATH = "/data/indoor/heat_setting"
 CONF_ENABLE_DEVICE_LOGGING = "enable_device_logging"
 CONF_MAX_TEMP_OVERRIDE = "max_temp_override"
 CONF_FAN_COIL_MODEL = "fan_coil_model"
+CONF_ENABLE_ALARM_NOTIFICATIONS = "enable_alarm_notifications"
 FAN_COIL_MODEL_STANDARD = "standard"
 FAN_COIL_MODEL_LEGACY = "legacy"
 DEFAULT_FAN_COIL_MODEL = FAN_COIL_MODEL_STANDARD
+DEFAULT_ENABLE_ALARM_NOTIFICATIONS = True
 
 COMMON_API_HEADERS = {
     "accept-language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",

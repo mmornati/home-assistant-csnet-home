@@ -38,22 +38,22 @@ jobs:
       - name: Create PR Preview Zip
         run: |
           cd custom_components/csnet_home
-          rm -f hass-custom-csnet-home.zip
-          zip -r hass-custom-csnet-home.zip . \
+          rm -f csnet_home.zip
+          zip -r csnet_home.zip . \
             -x "*.git*" \
             -x "*__pycache__*" \
             -x "*.pyc" \
             -x "*.pyo" \
             -x "*.DS_Store" \
             -x "*.pytest_cache*"
-          ls -lh hass-custom-csnet-home.zip
+          ls -lh csnet_home.zip
           echo "✅ Preview zip created successfully"
 
       - name: Upload PR Preview Artifact
         uses: actions/upload-artifact@v7
         with:
           name: csnet_home-pr-preview
-          path: ./custom_components/csnet_home/hass-custom-csnet-home.zip
+          path: ./custom_components/csnet_home/csnet_home.zip
           if-no-files-found: error
           retention-days: 30
 
@@ -86,8 +86,9 @@ jobs:
 
             **Installation:**
             1. Stop Home Assistant
-            2. Extract the ZIP to `config/custom_components/csnet_home`
-            3. Restart Home Assistant
-            4. Test the changes
+            2. Extract the ZIP - the folder inside will be named `csnet_home`
+            3. Place it in `config/custom_components/csnet_home`
+            4. Restart Home Assistant
+            5. Test the changes
 
             ⚠️ **Note:** This is a preview build. Use for testing purposes only.

@@ -30,7 +30,8 @@
                     "scan_interval": "Scan Interval (seconds)",
                     "language": "Language",
                     "max_temp_override": "Maximum Temperature Override (°C)",
-                    "fan_coil_model": "Fan Coil Control Model"
+                    "fan_coil_model": "Fan Coil Control Model",
+                    "enable_alarm_notifications": "Enable Alarm Notifications"
                 },
                 "data_description": {
                     "username": "Your CSNet Manager username",
@@ -38,7 +39,8 @@
                     "scan_interval": "How often to poll for updates",
                     "language": "Preferred language for device names and alarms",
                     "max_temp_override": "Override the maximum temperature limit (8-80°C)",
-                    "fan_coil_model": "Select the fan coil control type"
+                    "fan_coil_model": "Select the fan coil control type",
+                    "enable_alarm_notifications": "When enabled, you will receive a notification when a new alarm is detected"
                 }
             },
             "reauth_confirm": {
@@ -51,6 +53,16 @@
                 "data_description": {
                     "username": "Your CSNet Manager username (update if changed)",
                     "password": "Your updated CSNet Manager password"
+                }
+            },
+            "options": {
+                "title": "CSNet Home Options",
+                "description": "Configure alarm notification settings. The Alarm History sensor will still show alarm data regardless of this setting.",
+                "data": {
+                    "enable_alarm_notifications": "Enable Alarm Notifications"
+                },
+                "data_description": {
+                    "enable_alarm_notifications": "When enabled, you will receive a Home Assistant notification when a new installation alarm is detected."
                 }
             }
         },
