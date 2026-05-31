@@ -116,6 +116,12 @@ def mock_deps():
         # Import or reload the module under test
         # Reload to ensure it uses our patched dependencies
         import importlib
+        from pathlib import Path
+
+        # Add project root to sys.path if not already there
+        project_root = str(Path(__file__).parent.parent)
+        if project_root not in sys.path:
+            sys.path.insert(0, project_root)
 
         import custom_components.csnet_home.const
         import custom_components.csnet_home.number
@@ -355,6 +361,45 @@ def test_number_entity_properties(mock_deps, mock_hass_instance, mock_entry, moc
     assert info["manufacturer"] == "Hitachi"
     assert info["name"] == "Controller-Living Room"
     assert info["sw_version"] == "1.0"
+
+
+def test_number_entity_cooling_mode_properties(mock_deps, mock_hass_instance, mock_entry, mock_coordinator):
+    """Test properties of the number entity in cooling mode."""
+    sensor_data = {
+        "zone_id": 1,
+        "device_id": 123,
+        "room_name": "Living Room",
+        "device_name": "Controller",
+        "parent_id": 100,
+    }
+    common_data = {
+        "name": "House",
+        "firmware": "1.0",
+        "device_status": {123: {"firmware": "2.0"}},
+    }
+
+    entity = mock_deps.CSNetHomeFixedWaterTemperatureNumber(
+        mock_coordinator,
+        sensor_data,
+        common_data,
+        circuit=1,
+        mode=0,  # Cooling
+        entry=mock_entry,
+    )
+    entity.hass = mock_hass_instance
+
+    # Verify cooling mode uses correct limits
+    assert entity.native_min_value == mock_deps.WATER_CIRCUIT_MIN_COOL
+    assert entity.native_max_value == mock_deps.WATER_CIRCUIT_MAX_COOL
+    assert entity.native_step == 1.0
+    from homeassistant.const import UnitOfTemperature
+
+    assert entity.native_unit_of_measurement == UnitOfTemperature.CELSIUS
+    from homeassistant.components.number import NumberMode
+
+    assert entity.mode == NumberMode.AUTO
+    assert entity.name == "Living Room Fixed Water Temperature Cooling C1"
+    assert entity.unique_id == f"{mock_deps.DOMAIN}-fixed-water-temp-c1-cooling-123"
 
 
 def test_number_native_value(mock_deps, mock_hass_instance, mock_entry, mock_coordinator):
