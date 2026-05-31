@@ -9,7 +9,14 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.device_registry import DeviceEntry
 
 from custom_components.csnet_home.api import CSNetHomeAPI
-from custom_components.csnet_home.const import CONF_LANGUAGE, DOMAIN
+from custom_components.csnet_home.const import (
+    CONF_ENABLE_ALARM_NOTIFICATIONS,
+    CONF_FILTERED_ALARM_CODES,
+    CONF_LANGUAGE,
+    DEFAULT_ENABLE_ALARM_NOTIFICATIONS,
+    DEFAULT_FILTERED_ALARM_CODES,
+    DOMAIN,
+)
 from custom_components.csnet_home.coordinator import CSNetHomeCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -46,7 +53,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     api.preferred_language = entry.data.get(CONF_LANGUAGE)
 
     _LOGGER.debug("Starting CSNet Home sensor setup")
-    coordinator = CSNetHomeCoordinator(hass, entry.data.get(CONF_SCAN_INTERVAL, SCAN_INTERVAL), entry.entry_id)
+    coordinator = CSNetHomeCoordinator(
+        hass,
+        entry.data.get(CONF_SCAN_INTERVAL, SCAN_INTERVAL),
+        entry.entry_id,
+        entry.data.get(CONF_ENABLE_ALARM_NOTIFICATIONS, DEFAULT_ENABLE_ALARM_NOTIFICATIONS),
+        entry.data.get(CONF_FILTERED_ALARM_CODES, DEFAULT_FILTERED_ALARM_CODES),
+    )
 
     # Initialise a listener for config flow options changes.
     # See config_flow for defining an options setting that shows up as configure on the integration.
