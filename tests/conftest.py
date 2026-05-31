@@ -1,12 +1,18 @@
 """Pytest configuration and fixtures for CSNet Home tests."""
 
 import sys
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
 
-from tests.fixtures.conftest_fixtures import load_fixture as _load_fixture
+# Add project root to sys.path so custom_components can be imported
+project_root = Path(__file__).parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
+from tests.fixtures.conftest_fixtures import load_fixture as _load_fixture  # noqa: E402  # noqa: E402
 
 # Mock external dependencies if not available
 try:

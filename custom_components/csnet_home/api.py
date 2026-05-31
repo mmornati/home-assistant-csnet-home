@@ -18,11 +18,15 @@ from custom_components.csnet_home.const import (
     ELEMENTS_PATH,
     HEAT_SETTINGS_PATH,
     HEATING_MAX_TEMPERATURE,
+    HEATING_MIN_TEMPERATURE,
     INSTALLATION_ALARMS_PATH,
     INSTALLATION_DEVICES_PATH,
     LANGUAGE_FILES,
     LOGIN_PATH,
+    WATER_CIRCUIT_MAX_COOL,
     WATER_CIRCUIT_MAX_HEAT,
+    WATER_CIRCUIT_MIN_COOL,
+    WATER_CIRCUIT_MIN_HEAT,
     WATER_HEATER_MAX_TEMPERATURE,
 )
 
@@ -31,13 +35,20 @@ _LOGGER = logging.getLogger(__name__)
 
 @dataclass
 class TemperatureLimitConfig:
-    """Configuration for temperature limits for a zone."""
+    """Configuration for temperature limits for a zone.
+
+    Matches JavaScript getUnitMinimumSettingComplex / getUnitMaximumSettingComplex.
+    Each zone has separate defaults for heating vs cooling min/max.
+    """
 
     heat_min_key: str
     heat_max_key: str
     cool_min_key: str
     cool_max_key: str
-    default_max: int
+    default_heat_max: int
+    default_cool_max: int
+    default_heat_min: int
+    default_cool_min: int
 
 
 TEMPERATURE_LIMIT_CONFIGS = {
@@ -47,6 +58,9 @@ TEMPERATURE_LIMIT_CONFIGS = {
         "coolAirMinC1",
         "coolAirMaxC1",
         HEATING_MAX_TEMPERATURE,
+        HEATING_MAX_TEMPERATURE,
+        HEATING_MIN_TEMPERATURE,
+        HEATING_MIN_TEMPERATURE,
     ),
     2: TemperatureLimitConfig(
         "heatAirMinC2",
@@ -54,9 +68,30 @@ TEMPERATURE_LIMIT_CONFIGS = {
         "coolAirMinC2",
         "coolAirMaxC2",
         HEATING_MAX_TEMPERATURE,
+        HEATING_MAX_TEMPERATURE,
+        HEATING_MIN_TEMPERATURE,
+        HEATING_MIN_TEMPERATURE,
     ),
-    5: TemperatureLimitConfig("heatMinC1", "heatMaxC1", "coolMinC1", "coolMaxC1", WATER_CIRCUIT_MAX_HEAT),
-    6: TemperatureLimitConfig("heatMinC2", "heatMaxC2", "coolMinC2", "coolMaxC2", WATER_CIRCUIT_MAX_HEAT),
+    5: TemperatureLimitConfig(
+        "heatMinC1",
+        "heatMaxC1",
+        "coolMinC1",
+        "coolMaxC1",
+        WATER_CIRCUIT_MAX_HEAT,
+        WATER_CIRCUIT_MAX_COOL,
+        WATER_CIRCUIT_MIN_HEAT,
+        WATER_CIRCUIT_MIN_COOL,
+    ),
+    6: TemperatureLimitConfig(
+        "heatMinC2",
+        "heatMaxC2",
+        "coolMinC2",
+        "coolMaxC2",
+        WATER_CIRCUIT_MAX_HEAT,
+        WATER_CIRCUIT_MAX_COOL,
+        WATER_CIRCUIT_MIN_HEAT,
+        WATER_CIRCUIT_MIN_COOL,
+    ),
 }
 
 TO_REDACT = {
@@ -684,12 +719,13 @@ class CSNetHomeAPI:
         if is_heating:
             raw_min = heating_status.get(config.heat_min_key)
             raw_max = heating_status.get(config.heat_max_key)
+            min_temp = self._validate_value(raw_min, config.default_heat_min)
+            max_temp = self._validate_value(raw_max, config.default_heat_max)
         else:
             raw_min = heating_status.get(config.cool_min_key)
             raw_max = heating_status.get(config.cool_max_key)
-
-        max_temp = self._validate_value(raw_max, config.default_max)
-        min_temp = raw_min
+            min_temp = self._validate_value(raw_min, config.default_cool_min)
+            max_temp = self._validate_value(raw_max, config.default_cool_max)
 
         return (min_temp, max_temp)
 

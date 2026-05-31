@@ -36,11 +36,13 @@ SWIMMING_POOL_MIN_TEMPERATURE = 24
 
 # Air circuit (RTU) temperature limits - for zones 1, 2 (C1_AIR, C2_AIR)
 HEATING_MAX_TEMPERATURE = 35  # RTU_MAX from JavaScript
-HEATING_MIN_TEMPERATURE = 8
+HEATING_MIN_TEMPERATURE = 11  # RTU_MIN from JavaScript
 
 # Water circuit temperature limits - for zones 5, 6 (C1_WATER, C2_WATER)
 WATER_CIRCUIT_MAX_HEAT = 80  # C1_MAX_HEAT / C2_MAX_HEAT from JavaScript
-WATER_CIRCUIT_MIN_HEAT = 20
+WATER_CIRCUIT_MIN_HEAT = 20  # C1_MIN_HEAT / C2_MIN_HEAT from JavaScript
+WATER_CIRCUIT_MAX_COOL = 22  # C1_MAX_COOL / C2_MAX_COOL from JavaScript
+WATER_CIRCUIT_MIN_COOL = 5  # C1_MIN_COOL / C2_MIN_COOL from JavaScript
 
 # Fan Speed Control (for fan coil systems)
 FAN_SPEED_OFF = "0"
