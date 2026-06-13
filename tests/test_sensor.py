@@ -6,13 +6,7 @@ from unittest.mock import MagicMock
 
 from homeassistant.components.climate.const import HVACMode
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntityDescription, SensorStateClass
-from homeassistant.const import (
-    STATE_OFF,
-    STATE_ON,
-    UnitOfEnergy,
-    UnitOfPower,
-    UnitOfTemperature,
-)
+from homeassistant.const import STATE_OFF, STATE_ON, UnitOfEnergy, UnitOfPower, UnitOfTemperature
 from homeassistant.util import dt as dt_util
 
 from custom_components.csnet_home.const import (
