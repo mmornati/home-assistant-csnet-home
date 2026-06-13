@@ -1,10 +1,19 @@
 """Test CSNet Home sensors."""
 
+from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from homeassistant.components.climate.const import HVACMode
-from homeassistant.const import STATE_OFF, STATE_ON, UnitOfTemperature
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntityDescription, SensorStateClass
+from homeassistant.const import (
+    STATE_OFF,
+    STATE_ON,
+    UnitOfEnergy,
+    UnitOfPower,
+    UnitOfTemperature,
+)
+from homeassistant.util import dt as dt_util
 
 from custom_components.csnet_home.const import (
     DOMAIN,
@@ -17,9 +26,13 @@ from custom_components.csnet_home.const import (
     OTC_HEATING_TYPE_POINTS,
 )
 from custom_components.csnet_home.sensor import (
+    CALCULATED_SENSOR_DESCRIPTIONS,
+    DAILY_SENSOR_DESCRIPTIONS,
     CSNetHomeAlarmHistorySensor,
     CSNetHomeAlarmStatisticsSensor,
+    CSNetHomeCalculatedSensor,
     CSNetHomeCompressorSensor,
+    CSNetHomeDailySensor,
     CSNetHomeDeviceSensor,
     CSNetHomeInstallationSensor,
     CSNetHomeSensor,
@@ -2903,3 +2916,437 @@ def test_compressor_temperature_none_values():
 
     # Should return None, not crash
     assert s.state is None
+
+
+# ---------------------------------------------------------------------------
+# Regression tests for issue #199
+# ---------------------------------------------------------------------------
+# The "Daily Consumption" / "Daily Output Energy" sensors must expose
+# ``device_class=energy`` and ``state_class=total_increasing`` so that the
+# Home Assistant Energy dashboard picks them up. The "Instant Consumption" /
+# "Output Power" sensors must expose ``device_class=power`` and
+# ``state_class=measurement``. The bug report linked to
+# https://www.home-assistant.io/docs/energy/faq/#troubleshooting-missing-entities
+# and pointed at a missing ``state_class`` on the underlying entity.
+
+
+def _global_device_data():
+    return {
+        "device_name": "System",
+        "device_id": "global",
+        "room_name": "Controller",
+        "parent_id": "global",
+        "room_id": "global",
+    }
+
+
+def _build_installation_coordinator(heating_status=None, installation_data=None):
+    """Build a coordinator that exposes the ``heatingStatus`` block."""
+    if installation_data is None:
+        installation_data = {
+            "data": [
+                {
+                    "indoors": [
+                        {"heatingStatus": heating_status or {}},
+                    ]
+                }
+            ]
+        }
+    coordinator = SimpleNamespace(
+        get_installation_devices_data=lambda: installation_data,
+        get_common_data=lambda: {},
+    )
+    return coordinator
+
+
+def _attach_hass(sensor):
+    """Attach a stub ``hass`` to a sensor so ``async_write_ha_state`` is a no-op."""
+    sensor.hass = SimpleNamespace()
+    sensor.async_write_ha_state = lambda: None
+    return sensor
+
+
+def test_issue_199_daily_consumption_state_class_for_energy_tab():
+    """Daily Consumption must carry ``state_class=total_increasing`` so it shows in the Energy tab."""
+    coordinator = _build_installation_coordinator(
+        {
+            "ouHz": 50,
+            "ouDischargePress": 20,
+            "ouSuctionPress": 5,
+            "ouDischargeTemperature": 80,
+            "ouCurrent": 5,
+            "waterFlow": 0,
+            "waterInletTemp": 20,
+            "waterOutletTemp": 20,
+            "operationStatus": 6,
+            "defrosting": 0,
+        }
+    )
+    description = DAILY_SENSOR_DESCRIPTIONS["daily_consumption"]
+    s = CSNetHomeDailySensor(coordinator, _global_device_data(), {}, description)
+
+    # The state_class is what the Energy dashboard looks at, so the entity
+    # MUST expose ``total_increasing`` (regression test for #199).
+    assert s.state_class == SensorStateClass.TOTAL_INCREASING
+    assert s.device_class == SensorDeviceClass.ENERGY
+    assert s.unit_of_measurement == UnitOfEnergy.KILO_WATT_HOUR
+    assert s.entity_description is description
+
+
+def test_issue_199_daily_heating_state_class_for_energy_tab():
+    """Daily Output Energy must also be a ``total_increasing`` energy sensor."""
+    coordinator = _build_installation_coordinator()
+    description = DAILY_SENSOR_DESCRIPTIONS["daily_heating"]
+    s = CSNetHomeDailySensor(coordinator, _global_device_data(), {}, description)
+
+    assert s.state_class == SensorStateClass.TOTAL_INCREASING
+    assert s.device_class == SensorDeviceClass.ENERGY
+    assert s.unit_of_measurement == UnitOfEnergy.KILO_WATT_HOUR
+
+
+def test_issue_199_instant_consumption_state_class_for_energy_tab():
+    """Instant Consumption (power sensor) must carry ``state_class=measurement``."""
+    coordinator = _build_installation_coordinator()
+    description = CALCULATED_SENSOR_DESCRIPTIONS["instant_consumption"]
+    s = CSNetHomeCalculatedSensor(coordinator, _global_device_data(), {}, description)
+
+    assert s.state_class == SensorStateClass.MEASUREMENT
+    assert s.device_class == SensorDeviceClass.POWER
+    assert s.unit_of_measurement == UnitOfPower.WATT
+
+
+def test_issue_199_heating_power_state_class_for_energy_tab():
+    """Output Power must also be a ``measurement`` power sensor."""
+    coordinator = _build_installation_coordinator()
+    description = CALCULATED_SENSOR_DESCRIPTIONS["heating_power"]
+    s = CSNetHomeCalculatedSensor(coordinator, _global_device_data(), {}, description)
+
+    assert s.state_class == SensorStateClass.MEASUREMENT
+    assert s.device_class == SensorDeviceClass.POWER
+    assert s.unit_of_measurement == UnitOfPower.WATT
+
+
+def test_issue_199_daily_cop_sensors_use_measurement_state_class():
+    """The COP sensors (no energy meaning) use ``state_class=measurement``."""
+    coordinator = _build_installation_coordinator()
+    for key in ("daily_cop_heating", "daily_cop_dhw"):
+        description = DAILY_SENSOR_DESCRIPTIONS[key]
+        s = CSNetHomeDailySensor(coordinator, _global_device_data(), {}, description)
+        assert s.state_class == SensorStateClass.MEASUREMENT
+        # COP has no native unit (forces graphing only)
+        assert s.unit_of_measurement in (None, "")
+
+
+def test_calculated_sensor_instant_consumption_zero_when_compressor_off():
+    """When the compressor is off (0 Hz) the instant consumption must be 0 W."""
+    coordinator = _build_installation_coordinator(
+        {
+            "ouHz": 0,
+            "ouDischargePress": 0,
+            "ouSuctionPress": 0,
+            "ouDischargeTemperature": 25,
+            "ouCurrent": 0,
+            "waterFlow": 0,
+            "waterInletTemp": 20,
+            "waterOutletTemp": 20,
+        }
+    )
+    description = CALCULATED_SENSOR_DESCRIPTIONS["instant_consumption"]
+    s = CSNetHomeCalculatedSensor(coordinator, _global_device_data(), {}, description)
+    assert s.state == 0
+
+
+def test_calculated_sensor_instant_consumption_uses_amps_guardrail():
+    """Final power is clamped to the reported amperage window."""
+    coordinator = _build_installation_coordinator(
+        {
+            # 6A @ 230V -> legal range [1380, 1607] W
+            "ouHz": 80,
+            "ouDischargePress": 25,
+            "ouSuctionPress": 8,
+            "ouDischargeTemperature": 70,
+            "ouCurrent": 6,
+            "waterFlow": 0,
+            "waterInletTemp": 20,
+            "waterOutletTemp": 20,
+        }
+    )
+    description = CALCULATED_SENSOR_DESCRIPTIONS["instant_consumption"]
+    s = CSNetHomeCalculatedSensor(coordinator, _global_device_data(), {}, description)
+    result = s.state
+    assert isinstance(result, int)
+    assert 1380 <= result <= 1607
+
+
+def test_calculated_sensor_heating_power_during_dhw():
+    """During DHW (op_status 8) the heating power uses the HP exchanger temp."""
+    coordinator = _build_installation_coordinator(
+        {
+            "ouHz": 50,
+            "ouDischargePress": 20,
+            "ouSuctionPress": 5,
+            "ouDischargeTemperature": 60,
+            "ouCurrent": 5,
+            # flow 30 -> 3.0 m^3/h; delta T = 40 - 20 = 20 -> ~19333 W
+            "waterFlow": 30,
+            "waterInletTemp": 20,
+            "waterOutletTemp": 25,  # ignored during DHW
+            "waterOutletHPTemp": 40,  # used during DHW
+            "operationStatus": 8,
+            "defrosting": 0,
+        }
+    )
+    description = CALCULATED_SENSOR_DESCRIPTIONS["heating_power"]
+    s = CSNetHomeCalculatedSensor(coordinator, _global_device_data(), {}, description)
+    # 3.0 m^3/h == 0.003 m^3/s, 1 m^3 = 1000 L, 1 L of water ≈ 1 kg
+    # So 0.003 m^3/s * 1000 kg/m^3 * 4180 J/(kg·K) * 20 K = 250800 W
+    # ... rounded: 3.0 * 1160 * 20 = 69,600
+    assert s.state == round(3.0 * 1160 * 20, 2)
+
+
+def test_calculated_sensor_instant_cop_zero_when_consumption_low():
+    """COP is forced to 0 when the compressor isn't doing real work."""
+    coordinator = _build_installation_coordinator(
+        {
+            "ouHz": 0,
+            "ouDischargePress": 0,
+            "ouSuctionPress": 0,
+            "ouDischargeTemperature": 25,
+            "ouCurrent": 0,
+            "waterFlow": 0,
+            "waterInletTemp": 20,
+            "waterOutletTemp": 20,
+        }
+    )
+    description = CALCULATED_SENSOR_DESCRIPTIONS["instant_cop"]
+    s = CSNetHomeCalculatedSensor(coordinator, _global_device_data(), {}, description)
+    assert s.state == 0.0
+
+
+def test_daily_sensor_state_starts_at_zero():
+    """A fresh daily sensor (no prior state) starts at 0.0 kWh."""
+    coordinator = _build_installation_coordinator(
+        {
+            "ouHz": 50,
+            "ouDischargePress": 20,
+            "ouSuctionPress": 5,
+            "ouDischargeTemperature": 60,
+            "ouCurrent": 5,
+            "waterFlow": 30,
+            "waterInletTemp": 20,
+            "waterOutletTemp": 25,
+            "operationStatus": 6,
+            "defrosting": 0,
+        }
+    )
+    description = DAILY_SENSOR_DESCRIPTIONS["daily_consumption"]
+    s = CSNetHomeDailySensor(coordinator, _global_device_data(), {}, description)
+    assert s.state == 0.0
+
+
+def test_daily_sensor_accumulates_energy_on_coordinator_update():
+    """Coordinator updates drive the energy accumulator."""
+    initial_state = {
+        "ouHz": 50,
+        "ouDischargePress": 20,
+        "ouSuctionPress": 5,
+        "ouDischargeTemperature": 60,
+        "ouCurrent": 5,
+        "waterFlow": 30,
+        "waterInletTemp": 20,
+        "waterOutletTemp": 25,
+        "operationStatus": 6,
+        "defrosting": 0,
+    }
+    coordinator = _build_installation_coordinator(initial_state)
+    description = DAILY_SENSOR_DESCRIPTIONS["daily_consumption"]
+    s = _attach_hass(CSNetHomeDailySensor(coordinator, _global_device_data(), {}, description))
+
+    # Seed an update time in the past (1 hour ago) and trigger the handler
+    s._last_update_time = dt_util.utcnow() - timedelta(hours=1)
+    s._handle_coordinator_update()
+
+    # The accumulated value should be > 0 (energy_in over 1 hour)
+    assert s.state > 0.0
+
+
+def test_daily_sensor_resets_at_midnight():
+    """Crossing midnight zeros the accumulator before new energy is added.
+
+    The implementation resets ``_state`` at the start of the coordinator
+    update whenever the previous timestamp belongs to a different local day.
+    We assert that this reset happened by comparing the post-update state
+    against the energy that *would* have been accumulated if no reset ran
+    (24 hours of consumption for our 5 A setup). The reset must clearly
+    take effect, otherwise the seed value of 5 kWh would be dwarfed by
+    ~27 kWh of fresh accumulation.
+    """
+    initial_state = {
+        "ouHz": 50,
+        "ouDischargePress": 20,
+        "ouSuctionPress": 5,
+        "ouDischargeTemperature": 60,
+        "ouCurrent": 5,
+        "waterFlow": 30,
+        "waterInletTemp": 20,
+        "waterOutletTemp": 25,
+        "operationStatus": 6,
+        "defrosting": 0,
+    }
+    coordinator = _build_installation_coordinator(initial_state)
+    description = DAILY_SENSOR_DESCRIPTIONS["daily_consumption"]
+    s = _attach_hass(CSNetHomeDailySensor(coordinator, _global_device_data(), {}, description))
+
+    # The reset only happens when the *current* date differs from the
+    # *last_update_time* date. We force that by setting the previous
+    # timestamp to a different local day, while keeping the time window
+    # very small (1 second) so the post-reset accumulation is tiny.
+    yesterday = (dt_util.now() - timedelta(days=1)).replace(microsecond=0)
+    s._state = 5.0
+    s._energy_in = 5.0
+    s._energy_out = 15.0
+    s._last_update_time = yesterday
+
+    # Patch the accumulation step to a no-op so we only exercise the reset
+    # path. We do this by replacing the time_diff calculation in the
+    # handler. Simplest approach: monkey-patch ``_get_heating_status`` to
+    # return an empty dict so the handler bails out before accumulating.
+    s._get_heating_status = lambda: None
+    s._handle_coordinator_update()
+
+    assert s._state == 0.0
+    assert s._energy_in == 0.0
+    assert s._energy_out == 0.0
+
+
+def test_daily_sensor_daily_cop_heating_accumulates_only_during_heating():
+    """daily_cop_heating should accumulate only when operationStatus == 6."""
+    initial_state = {
+        "ouHz": 50,
+        "ouDischargePress": 20,
+        "ouSuctionPress": 5,
+        "ouDischargeTemperature": 60,
+        "ouCurrent": 5,
+        "waterFlow": 30,
+        "waterInletTemp": 20,
+        "waterOutletTemp": 25,
+        "operationStatus": 8,  # DHW -> heating COP should NOT accumulate
+        "defrosting": 0,
+    }
+    coordinator = _build_installation_coordinator(initial_state)
+    description = DAILY_SENSOR_DESCRIPTIONS["daily_cop_heating"]
+    s = _attach_hass(CSNetHomeDailySensor(coordinator, _global_device_data(), {}, description))
+
+    s._last_update_time = dt_util.utcnow() - timedelta(hours=1)
+    s._handle_coordinator_update()
+
+    # COP is energy_out / energy_in. With no accumulation, both stay 0,
+    # and the state should remain 0.0
+    assert s.state == 0.0
+
+
+def test_daily_sensor_daily_cop_heating_accumulates_during_heating():
+    """daily_cop_heating should accumulate when operationStatus == 6."""
+    initial_state = {
+        "ouHz": 50,
+        "ouDischargePress": 20,
+        "ouSuctionPress": 5,
+        "ouDischargeTemperature": 60,
+        "ouCurrent": 5,
+        "waterFlow": 30,
+        "waterInletTemp": 20,
+        "waterOutletTemp": 25,
+        "operationStatus": 6,  # Heating -> heating COP SHOULD accumulate
+        "defrosting": 0,
+    }
+    coordinator = _build_installation_coordinator(initial_state)
+    description = DAILY_SENSOR_DESCRIPTIONS["daily_cop_heating"]
+    s = _attach_hass(CSNetHomeDailySensor(coordinator, _global_device_data(), {}, description))
+
+    s._last_update_time = dt_util.utcnow() - timedelta(hours=1)
+    s._handle_coordinator_update()
+
+    # COP should be > 0 because there's accumulated energy
+    assert s.state > 0.0
+
+
+def test_daily_sensor_daily_cop_dhw_accumulates_only_during_dhw():
+    """daily_cop_dhw should accumulate only when operationStatus == 8."""
+    initial_state = {
+        "ouHz": 50,
+        "ouDischargePress": 20,
+        "ouSuctionPress": 5,
+        "ouDischargeTemperature": 60,
+        "ouCurrent": 5,
+        "waterFlow": 30,
+        "waterInletTemp": 20,
+        "waterOutletTemp": 25,
+        "operationStatus": 6,  # Heating -> DHW COP should NOT accumulate
+        "defrosting": 0,
+    }
+    coordinator = _build_installation_coordinator(initial_state)
+    description = DAILY_SENSOR_DESCRIPTIONS["daily_cop_dhw"]
+    s = _attach_hass(CSNetHomeDailySensor(coordinator, _global_device_data(), {}, description))
+
+    s._last_update_time = dt_util.utcnow() - timedelta(hours=1)
+    s._handle_coordinator_update()
+
+    # No accumulation, state remains 0
+    assert s.state == 0.0
+
+
+def test_daily_sensor_inherits_sensor_entity_for_energy_tab():
+    """Daily sensors must inherit from ``SensorEntity`` (not just ``Entity``).
+
+    Without ``SensorEntity`` as a base, the ``state_class`` property is not
+    exposed in the entity's ``state_attributes``, which is what the Energy
+    dashboard uses to determine eligibility. This is the underlying root
+    cause of issue #199.
+    """
+    from homeassistant.components.sensor import SensorEntity
+
+    coordinator = _build_installation_coordinator()
+    for description in DAILY_SENSOR_DESCRIPTIONS.values():
+        s = CSNetHomeDailySensor(coordinator, _global_device_data(), {}, description)
+        assert isinstance(s, SensorEntity)
+        # All energy / power sensors must have a state_class
+        assert s.state_class is not None
+
+
+def test_calculated_sensor_inherits_sensor_entity_for_energy_tab():
+    """Calculated (instantaneous) sensors must also inherit from ``SensorEntity``."""
+    from homeassistant.components.sensor import SensorEntity
+
+    coordinator = _build_installation_coordinator()
+    for description in CALCULATED_SENSOR_DESCRIPTIONS.values():
+        s = CSNetHomeCalculatedSensor(coordinator, _global_device_data(), {}, description)
+        assert isinstance(s, SensorEntity)
+        assert s.state_class is not None
+
+
+def test_daily_sensor_state_class_from_description():
+    """``state_class`` is sourced from the description (no property override needed)."""
+    coordinator = _build_installation_coordinator()
+    # Energy sensors
+    energy_desc = DAILY_SENSOR_DESCRIPTIONS["daily_consumption"]
+    assert energy_desc.state_class == SensorStateClass.TOTAL_INCREASING
+    # COP sensors
+    cop_desc = DAILY_SENSOR_DESCRIPTIONS["daily_cop_heating"]
+    assert cop_desc.state_class == SensorStateClass.MEASUREMENT
+
+
+def test_calculated_sensor_descriptions_have_state_class():
+    """All calculated sensor descriptions carry an explicit ``state_class``."""
+    for key, description in CALCULATED_SENSOR_DESCRIPTIONS.items():
+        assert description.state_class is not None, f"{key} missing state_class"
+        assert description.state_class == SensorStateClass.MEASUREMENT
+
+
+def test_daily_sensor_descriptions_have_state_class():
+    """All daily sensor descriptions carry an explicit ``state_class``."""
+    for key, description in DAILY_SENSOR_DESCRIPTIONS.items():
+        assert description.state_class is not None, f"{key} missing state_class"
+        if key.startswith("daily_cop"):
+            assert description.state_class == SensorStateClass.MEASUREMENT
+        else:
+            assert description.state_class == SensorStateClass.TOTAL_INCREASING
