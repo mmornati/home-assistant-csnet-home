@@ -757,6 +757,8 @@ class CSNetHomeSensor(CoordinatorEntity, SensorEntity):
             return HVACMode.OFF
         if self._key == "on_off":
             return STATE_ON if value == 1 else STATE_OFF
+        if self._key == "doingBoost":
+            return STATE_ON if value else STATE_OFF
         if self._key == "alarm_active":
             # computed from alarm_code
             alarm_code = self._sensor_data.get("alarm_code")
