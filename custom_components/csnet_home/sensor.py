@@ -5,12 +5,15 @@ from collections import Counter
 from datetime import datetime, timezone
 
 from homeassistant.components.climate.const import HVACMode
-from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorEntityDescription, SensorStateClass
 from homeassistant.const import (
+    PERCENTAGE,
     SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
     STATE_OFF,
     STATE_ON,
+    UnitOfElectricCurrent,
     UnitOfEnergy,
+    UnitOfFrequency,
     UnitOfPower,
     UnitOfPressure,
     UnitOfTemperature,
@@ -18,7 +21,6 @@ from homeassistant.const import (
 )
 from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
@@ -29,185 +31,464 @@ from .coordinator import CSNetHomeCoordinator
 _LOGGER = logging.getLogger(__name__)
 
 
-SENSOR_TYPES = (
-    ("current_temperature", "temperature", UnitOfTemperature.CELSIUS),
-    ("setting_temperature", "temperature", UnitOfTemperature.CELSIUS),
-    ("mode", "enum", None),
-    ("on_off", "enum", None),
-    ("doingBoost", "binary", None),
-    ("alarm_code", "enum", None),
-    ("alarm_active", "binary", None),
-    ("alarm_message", "enum", None),
-    ("alarm_code_formatted", "enum", None),
-    ("alarm_origin", "enum", None),
-    ("unit_type", "enum", None),
+# Per-zone sensor descriptions (current_temperature, mode, alarm_code, etc.)
+ZONE_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
+    SensorEntityDescription(
+        key="current_temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    SensorEntityDescription(
+        key="setting_temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    SensorEntityDescription(
+        key="mode",
+        device_class=SensorDeviceClass.ENUM,
+        options=[HVACMode.COOL, HVACMode.HEAT, HVACMode.OFF],
+    ),
+    SensorEntityDescription(
+        key="on_off",
+        device_class=SensorDeviceClass.ENUM,
+        options=[STATE_OFF, STATE_ON],
+    ),
+    SensorEntityDescription(
+        key="doingBoost",
+        device_class=SensorDeviceClass.ENUM,
+        options=[STATE_OFF, STATE_ON],
+    ),
+    SensorEntityDescription(
+        key="alarm_code",
+        device_class=SensorDeviceClass.ENUM,
+    ),
+    SensorEntityDescription(
+        key="alarm_active",
+        device_class=SensorDeviceClass.ENUM,
+        options=[STATE_OFF, STATE_ON],
+    ),
+    SensorEntityDescription(
+        key="alarm_message",
+        device_class=SensorDeviceClass.ENUM,
+    ),
+    SensorEntityDescription(
+        key="alarm_code_formatted",
+        device_class=SensorDeviceClass.ENUM,
+    ),
+    SensorEntityDescription(
+        key="alarm_origin",
+        device_class=SensorDeviceClass.ENUM,
+    ),
+    SensorEntityDescription(
+        key="unit_type",
+        device_class=SensorDeviceClass.ENUM,
+    ),
 )
 
-DEVICE_SENSOR_TYPES = (
-    (
-        "wifi_signal",
-        SensorDeviceClass.SIGNAL_STRENGTH,
-        SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
-        "WiFi Signal",
+# Per-device sensor descriptions (WiFi signal, connectivity, last communication)
+DEVICE_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
+    SensorEntityDescription(
+        key="wifi_signal",
+        name="WiFi Signal",
+        device_class=SensorDeviceClass.SIGNAL_STRENGTH,
+        native_unit_of_measurement=SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
+        state_class=SensorStateClass.MEASUREMENT,
     ),
-    ("connectivity", "binary", None, "Connectivity"),
-    ("last_communication", SensorDeviceClass.TIMESTAMP, None, "Last Communication"),
+    SensorEntityDescription(
+        key="connectivity",
+        name="Connectivity",
+        device_class=SensorDeviceClass.ENUM,
+        options=[STATE_OFF, STATE_ON],
+    ),
+    SensorEntityDescription(
+        key="last_communication",
+        name="Last Communication",
+        device_class=SensorDeviceClass.TIMESTAMP,
+    ),
 )
 
-INSTALLATION_SENSOR_TYPES = (
-    ("pump_speed", "percentage", "%", "Pump Speed"),
-    (
-        "water_flow",
-        "water_debit",
-        UnitOfVolumeFlowRate.CUBIC_METERS_PER_HOUR,
-        "Water Flow",
+# Installation-level (System Controller) sensor descriptions
+INSTALLATION_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
+    SensorEntityDescription(
+        key="pump_speed",
+        name="Pump Speed",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
     ),
-    (
-        "in_water_temperature",
-        "temperature",
-        UnitOfTemperature.CELSIUS,
-        "In Water Temperature",
+    SensorEntityDescription(
+        key="water_flow",
+        name="Water Flow",
+        device_class=SensorDeviceClass.VOLUME_FLOW_RATE,
+        native_unit_of_measurement=UnitOfVolumeFlowRate.CUBIC_METERS_PER_HOUR,
+        state_class=SensorStateClass.MEASUREMENT,
     ),
-    (
-        "out_water_temperature",
-        "temperature",
-        UnitOfTemperature.CELSIUS,
-        "Out Water Temperature",
+    SensorEntityDescription(
+        key="in_water_temperature",
+        name="In Water Temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
     ),
-    (
-        "out_water_temperature_3",
-        "temperature",
-        UnitOfTemperature.CELSIUS,
-        "External Tank Temperature",
+    SensorEntityDescription(
+        key="out_water_temperature",
+        name="Out Water Temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
     ),
-    (
-        "set_water_temperature",
-        "temperature",
-        UnitOfTemperature.CELSIUS,
-        "Set Water Temperature",
+    SensorEntityDescription(
+        key="out_water_temperature_3",
+        name="External Tank Temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
     ),
-    ("water_pressure", "pressure", UnitOfPressure.BAR, "Water Pressure"),
-    (
-        "gas_temperature",
-        "temperature",
-        UnitOfTemperature.CELSIUS,
-        "Gas Temperature",
+    SensorEntityDescription(
+        key="set_water_temperature",
+        name="Set Water Temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
     ),
-    (
-        "liquid_temperature",
-        "temperature",
-        UnitOfTemperature.CELSIUS,
-        "Liquid Temperature",
+    SensorEntityDescription(
+        key="water_pressure",
+        name="Water Pressure",
+        device_class=SensorDeviceClass.PRESSURE,
+        native_unit_of_measurement=UnitOfPressure.BAR,
+        state_class=SensorStateClass.MEASUREMENT,
     ),
-    ("defrost", "binary", None, "Defrost"),
-    ("mix_valve_position", "percentage", "%", "Mix Valve Position"),
-    (
-        "external_temperature",
-        "temperature",
-        UnitOfTemperature.CELSIUS,
-        "Outdoor Temperature",
+    SensorEntityDescription(
+        key="gas_temperature",
+        name="Gas Temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
     ),
-    (
-        "mean_external_temperature",
-        "temperature",
-        UnitOfTemperature.CELSIUS,
-        "Outdoor Average Temperature",
+    SensorEntityDescription(
+        key="liquid_temperature",
+        name="Liquid Temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
     ),
-    (
-        "weather_temperature",
-        "temperature",
-        UnitOfTemperature.CELSIUS,
-        "Weather Temperature",
+    SensorEntityDescription(
+        key="defrost",
+        name="Defrost",
+        device_class=SensorDeviceClass.ENUM,
+        options=[STATE_OFF, STATE_ON],
     ),
-    ("central_config", "enum", None, "Central Config"),
-    ("lcd_software_version", None, None, "LCD Software Version"),
-    ("unit_model", "enum", None, "Unit Model"),
-    ("central_control_enabled", "binary", None, "Central Control Enabled"),
-    ("cascade_slave_mode", "binary", None, "Cascade Slave Mode"),
-    ("fan_coil_compatible", "binary", None, "Fan Coil Compatible"),
-    ("c1_thermostat_present", "binary", None, "C1 Thermostat Present"),
-    ("c2_thermostat_present", "binary", None, "C2 Thermostat Present"),
-    ("otc_heating_type_c1", "enum", None, "OTC Heating Type C1"),
-    ("otc_cooling_type_c1", "enum", None, "OTC Cooling Type C1"),
-    ("otc_heating_type_c2", "enum", None, "OTC Heating Type C2"),
-    ("otc_cooling_type_c2", "enum", None, "OTC Cooling Type C2"),
+    SensorEntityDescription(
+        key="mix_valve_position",
+        name="Mix Valve Position",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    SensorEntityDescription(
+        key="external_temperature",
+        name="Outdoor Temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    SensorEntityDescription(
+        key="mean_external_temperature",
+        name="Outdoor Average Temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    SensorEntityDescription(
+        key="weather_temperature",
+        name="Weather Temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    SensorEntityDescription(
+        key="central_config",
+        name="Central Config",
+        device_class=SensorDeviceClass.ENUM,
+    ),
+    SensorEntityDescription(
+        key="lcd_software_version",
+        name="LCD Software Version",
+    ),
+    SensorEntityDescription(
+        key="unit_model",
+        name="Unit Model",
+        device_class=SensorDeviceClass.ENUM,
+    ),
+    SensorEntityDescription(
+        key="central_control_enabled",
+        name="Central Control Enabled",
+        device_class=SensorDeviceClass.ENUM,
+        options=[STATE_OFF, STATE_ON],
+    ),
+    SensorEntityDescription(
+        key="cascade_slave_mode",
+        name="Cascade Slave Mode",
+        device_class=SensorDeviceClass.ENUM,
+        options=[STATE_OFF, STATE_ON],
+    ),
+    SensorEntityDescription(
+        key="fan_coil_compatible",
+        name="Fan Coil Compatible",
+        device_class=SensorDeviceClass.ENUM,
+        options=[STATE_OFF, STATE_ON],
+    ),
+    SensorEntityDescription(
+        key="c1_thermostat_present",
+        name="C1 Thermostat Present",
+        device_class=SensorDeviceClass.ENUM,
+        options=[STATE_OFF, STATE_ON],
+    ),
+    SensorEntityDescription(
+        key="c2_thermostat_present",
+        name="C2 Thermostat Present",
+        device_class=SensorDeviceClass.ENUM,
+        options=[STATE_OFF, STATE_ON],
+    ),
+    SensorEntityDescription(
+        key="otc_heating_type_c1",
+        name="OTC Heating Type C1",
+        device_class=SensorDeviceClass.ENUM,
+    ),
+    SensorEntityDescription(
+        key="otc_cooling_type_c1",
+        name="OTC Cooling Type C1",
+        device_class=SensorDeviceClass.ENUM,
+    ),
+    SensorEntityDescription(
+        key="otc_heating_type_c2",
+        name="OTC Heating Type C2",
+        device_class=SensorDeviceClass.ENUM,
+    ),
+    SensorEntityDescription(
+        key="otc_cooling_type_c2",
+        name="OTC Cooling Type C2",
+        device_class=SensorDeviceClass.ENUM,
+    ),
 )
 
-COMPRESSOR_SENSOR_TYPES = (
-    ("compressor_frequency", "frequency", "Hz", "Compressor Frequency"),
-    ("compressor_current", "current", "A", "Compressor Current"),
-    ("compressor_capacity", None, None, "Compressor Capacity"),
-    (
-        "discharge_temperature",
-        "temperature",
-        UnitOfTemperature.CELSIUS,
-        "Discharge Temperature",
+# Compressor / outdoor unit sensor descriptions
+COMPRESSOR_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
+    SensorEntityDescription(
+        key="compressor_frequency",
+        name="Compressor Frequency",
+        device_class=SensorDeviceClass.FREQUENCY,
+        native_unit_of_measurement=UnitOfFrequency.HERTZ,
+        state_class=SensorStateClass.MEASUREMENT,
     ),
-    (
-        "evaporator_temperature",
-        "temperature",
-        UnitOfTemperature.CELSIUS,
-        "Evaporator Temperature",
+    SensorEntityDescription(
+        key="compressor_current",
+        name="Compressor Current",
+        device_class=SensorDeviceClass.CURRENT,
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        state_class=SensorStateClass.MEASUREMENT,
     ),
-    (
-        "outdoor_ambient_temperature",
-        "temperature",
-        UnitOfTemperature.CELSIUS,
-        "Outdoor Ambient Temperature",
+    SensorEntityDescription(
+        key="compressor_capacity",
+        name="Compressor Capacity",
     ),
-    ("discharge_pressure", "pressure", UnitOfPressure.BAR, "Discharge Pressure"),
-    ("suction_pressure", "pressure", UnitOfPressure.BAR, "Suction Pressure"),
-    ("suction_pressure_correction", None, None, "Suction Pressure Correction"),
-    ("expansion_valve_opening", "percentage", "%", "Expansion Valve Opening (EVI)"),
-    ("ou_evo_1", "percentage", "%", "Expansion Valve Opening (EVO)"),
-    ("outdoor_fan_rpm", None, "RPM", "Outdoor Fan RPM"),
-    ("operation_status", "enum", None, "Operation Status"),
-    ("system_status_flags", None, None, "System Status Flags"),
-    ("ou_code", "enum", None, "Outdoor Unit Code"),
-    ("ou_capacity_code", None, None, "Outdoor Unit Capacity Code"),
-    ("ou_pcb_software", None, None, "Outdoor Unit PCB Software"),
-    (
-        "secondary_discharge_temp",
-        "temperature",
-        UnitOfTemperature.CELSIUS,
-        "Secondary Discharge Temperature",
+    SensorEntityDescription(
+        key="discharge_temperature",
+        name="Discharge Temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
     ),
-    (
-        "secondary_suction_temp",
-        "temperature",
-        UnitOfTemperature.CELSIUS,
-        "Secondary Suction Temperature",
+    SensorEntityDescription(
+        key="evaporator_temperature",
+        name="Evaporator Temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
     ),
-    (
-        "secondary_discharge_pressure",
-        "pressure",
-        UnitOfPressure.BAR,
-        "Secondary Discharge Pressure",
+    SensorEntityDescription(
+        key="outdoor_ambient_temperature",
+        name="Outdoor Ambient Temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
     ),
-    (
-        "secondary_suction_pressure",
-        "pressure",
-        UnitOfPressure.BAR,
-        "Secondary Suction Pressure",
+    SensorEntityDescription(
+        key="discharge_pressure",
+        name="Discharge Pressure",
+        device_class=SensorDeviceClass.PRESSURE,
+        native_unit_of_measurement=UnitOfPressure.BAR,
+        state_class=SensorStateClass.MEASUREMENT,
     ),
-    (
-        "secondary_compressor_frequency",
-        "frequency",
-        "Hz",
-        "Secondary Compressor Frequency",
+    SensorEntityDescription(
+        key="suction_pressure",
+        name="Suction Pressure",
+        device_class=SensorDeviceClass.PRESSURE,
+        native_unit_of_measurement=UnitOfPressure.BAR,
+        state_class=SensorStateClass.MEASUREMENT,
     ),
-    ("secondary_expansion_valve", None, None, "Secondary Expansion Valve"),
-    (
-        "secondary_compressor_current",
-        "current",
-        "A",
-        "Secondary Compressor Current",
+    SensorEntityDescription(
+        key="suction_pressure_correction",
+        name="Suction Pressure Correction",
     ),
-    ("secondary_current", "current", "A", "Secondary Current"),
-    ("secondary_superheat", None, None, "Secondary Superheat"),
-    ("secondary_stop_code", "enum", None, "Secondary Stop Code"),
-    ("secondary_retry_code", "enum", None, "Secondary Retry Code"),
+    SensorEntityDescription(
+        key="expansion_valve_opening",
+        name="Expansion Valve Opening (EVI)",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    SensorEntityDescription(
+        key="ou_evo_1",
+        name="Expansion Valve Opening (EVO)",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    SensorEntityDescription(
+        key="outdoor_fan_rpm",
+        name="Outdoor Fan RPM",
+        native_unit_of_measurement="RPM",
+    ),
+    SensorEntityDescription(
+        key="operation_status",
+        name="Operation Status",
+        device_class=SensorDeviceClass.ENUM,
+    ),
+    SensorEntityDescription(
+        key="system_status_flags",
+        name="System Status Flags",
+    ),
+    SensorEntityDescription(
+        key="ou_code",
+        name="Outdoor Unit Code",
+        device_class=SensorDeviceClass.ENUM,
+    ),
+    SensorEntityDescription(
+        key="ou_capacity_code",
+        name="Outdoor Unit Capacity Code",
+    ),
+    SensorEntityDescription(
+        key="ou_pcb_software",
+        name="Outdoor Unit PCB Software",
+    ),
+    SensorEntityDescription(
+        key="secondary_discharge_temp",
+        name="Secondary Discharge Temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    SensorEntityDescription(
+        key="secondary_suction_temp",
+        name="Secondary Suction Temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    SensorEntityDescription(
+        key="secondary_discharge_pressure",
+        name="Secondary Discharge Pressure",
+        device_class=SensorDeviceClass.PRESSURE,
+        native_unit_of_measurement=UnitOfPressure.BAR,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    SensorEntityDescription(
+        key="secondary_suction_pressure",
+        name="Secondary Suction Pressure",
+        device_class=SensorDeviceClass.PRESSURE,
+        native_unit_of_measurement=UnitOfPressure.BAR,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    SensorEntityDescription(
+        key="secondary_compressor_frequency",
+        name="Secondary Compressor Frequency",
+        device_class=SensorDeviceClass.FREQUENCY,
+        native_unit_of_measurement=UnitOfFrequency.HERTZ,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    SensorEntityDescription(
+        key="secondary_expansion_valve",
+        name="Secondary Expansion Valve",
+    ),
+    SensorEntityDescription(
+        key="secondary_compressor_current",
+        name="Secondary Compressor Current",
+        device_class=SensorDeviceClass.CURRENT,
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    SensorEntityDescription(
+        key="secondary_current",
+        name="Secondary Current",
+        device_class=SensorDeviceClass.CURRENT,
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    SensorEntityDescription(
+        key="secondary_superheat",
+        name="Secondary Superheat",
+    ),
+    SensorEntityDescription(
+        key="secondary_stop_code",
+        name="Secondary Stop Code",
+        device_class=SensorDeviceClass.ENUM,
+    ),
+    SensorEntityDescription(
+        key="secondary_retry_code",
+        name="Secondary Retry Code",
+        device_class=SensorDeviceClass.ENUM,
+    ),
 )
+
+# Calculated instantaneous power / COP sensor descriptions
+CALCULATED_SENSOR_DESCRIPTIONS: dict[str, SensorEntityDescription] = {
+    "instant_consumption": SensorEntityDescription(
+        key="instant_consumption",
+        name="Instant Consumption",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    "heating_power": SensorEntityDescription(
+        key="heating_power",
+        name="Output Power",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    "instant_cop": SensorEntityDescription(
+        key="instant_cop",
+        name="Instant COP",
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+}
+
+# Daily accumulating energy / COP sensor descriptions
+DAILY_SENSOR_DESCRIPTIONS: dict[str, SensorEntityDescription] = {
+    "daily_consumption": SensorEntityDescription(
+        key="daily_consumption",
+        name="Daily Consumption",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+    ),
+    "daily_heating": SensorEntityDescription(
+        key="daily_heating",
+        name="Daily Output Energy",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+    ),
+    "daily_cop_heating": SensorEntityDescription(
+        key="daily_cop_heating",
+        name="Daily COP",
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    "daily_cop_dhw": SensorEntityDescription(
+        key="daily_cop_dhw",
+        name="DHW Daily COP",
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+}
 
 
 def _convert_unsigned_to_signed_byte(value):
@@ -237,6 +518,71 @@ def _convert_unsigned_to_signed_byte(value):
     return value
 
 
+def _name_for(zone_name: str, friendly_name: str) -> str:
+    """Build a backward-compatible entity name.
+
+    Older versions of this integration composed entity names by concatenating
+    the device name, the room name and the friendly name (``"Hitachi PAC Living
+    Pump Speed"``). We preserve that exact format to avoid changing
+    ``entity_id`` and user-visible names for existing users.
+    """
+    return f"{zone_name} {friendly_name}"
+
+
+def _coerce_description(
+    description_or_key,
+    device_class=None,
+    unit=None,
+    friendly_name=None,
+):
+    """Build a ``SensorEntityDescription`` from either the new or legacy API.
+
+    The integration was refactored in issue #199 to use
+    :class:`SensorEntityDescription` objects. To avoid breaking existing tests
+    (and any third-party automations that may rely on the old constructor
+    signature) we still accept the legacy positional arguments and translate
+    them into a description on the fly.
+
+    Note: ``SensorEntityDescription`` uses the ``FrozenOrThawed`` metaclass
+    which can produce two flavours of instances (a regular class instance and
+    a frozen dataclass instance). A plain ``isinstance`` check is therefore
+    unreliable - we duck-type on the ``key`` attribute instead.
+    """
+    if hasattr(description_or_key, "key") and not isinstance(description_or_key, str):
+        return description_or_key
+    return SensorEntityDescription(
+        key=description_or_key,
+        device_class=device_class,
+        native_unit_of_measurement=unit,
+        name=friendly_name,
+    )
+
+
+def _apply_description_attrs(entity: SensorEntity, description: SensorEntityDescription) -> None:
+    """Copy the relevant description fields onto the entity's ``_attr_*`` slots.
+
+    :class:`homeassistant.components.sensor.SensorEntity` exposes its
+    ``device_class``/``state_class``/``native_unit_of_measurement`` via
+    ``_attr_*`` attributes. Assigning the description to
+    ``self.entity_description`` is not enough; the values must also be copied
+    to the entity attributes so that the framework (and the Energy dashboard)
+    can pick them up. This is the root cause of issue #199.
+    """
+    # IMPORTANT: Set the _attr_* slots BEFORE assigning ``entity_description``,
+    # because some metaclass descriptors in ``SensorEntity`` reset the
+    # ``_attr_*`` cache when ``entity_description`` is replaced. Doing it in
+    # this order keeps the values visible to the framework.
+    if description.device_class is not None:
+        entity._attr_device_class = description.device_class
+    if description.state_class is not None:
+        entity._attr_state_class = description.state_class
+    if description.native_unit_of_measurement is not None:
+        entity._attr_native_unit_of_measurement = description.native_unit_of_measurement
+    if description.options is not None:
+        entity._attr_options = description.options
+    entity.entity_description = description
+
+
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up sensors for CSNet Home."""
     _LOGGER.debug("Starting CSNet Home sensor setup")
@@ -251,28 +597,23 @@ async def async_setup_entry(hass, entry, async_add_entities):
     for sensor_data in coordinator.get_sensors_data():
         device_common_data = common_data.get("device_status", {}).get(sensor_data["device_id"], {})
 
-        for key, device_class, unit in SENSOR_TYPES:
+        for description in ZONE_SENSOR_DESCRIPTIONS:
             sensors.append(
                 CSNetHomeSensor(
                     coordinator,
                     sensor_data,
                     device_common_data,
-                    key,
-                    device_class,
-                    unit,
+                    description,
                 )
             )
 
-        for key, device_class, unit, friendly_name in DEVICE_SENSOR_TYPES:
+        for description in DEVICE_SENSOR_DESCRIPTIONS:
             sensors.append(
                 CSNetHomeDeviceSensor(
                     coordinator,
                     sensor_data,
                     device_common_data,
-                    key,
-                    device_class,
-                    unit,
-                    friendly_name,
+                    description,
                 )
             )
 
@@ -289,103 +630,41 @@ async def async_setup_entry(hass, entry, async_add_entities):
         }
         common_data = coordinator.get_common_data()
 
-        for key, device_class, unit, friendly_name in INSTALLATION_SENSOR_TYPES:
+        for description in INSTALLATION_SENSOR_DESCRIPTIONS:
             sensors.append(
                 CSNetHomeInstallationSensor(
                     coordinator,
                     global_device_data,
                     common_data,
-                    key,
-                    device_class,
-                    unit,
-                    friendly_name,
+                    description,
                 )
             )
 
         # ----------------------------------------------------------------------
         # Calculated Sensors (Instantaneous)
         # ----------------------------------------------------------------------
-        sensors.append(
-            CSNetHomeCalculatedSensor(
-                coordinator,
-                global_device_data,
-                common_data,
-                "instant_consumption",
-                SensorDeviceClass.POWER,
-                UnitOfPower.WATT,
-                "Instant Consumption",
+        for description in CALCULATED_SENSOR_DESCRIPTIONS.values():
+            sensors.append(
+                CSNetHomeCalculatedSensor(
+                    coordinator,
+                    global_device_data,
+                    common_data,
+                    description,
+                )
             )
-        )
-        sensors.append(
-            CSNetHomeCalculatedSensor(
-                coordinator,
-                global_device_data,
-                common_data,
-                "heating_power",
-                SensorDeviceClass.POWER,
-                UnitOfPower.WATT,
-                "Output Power",
-            )
-        )
-        sensors.append(
-            CSNetHomeCalculatedSensor(
-                coordinator,
-                global_device_data,
-                common_data,
-                "instant_cop",
-                None,
-                "",  # Force unit to empty string to enable graphing
-                "Instant COP",
-            )
-        )
 
         # ----------------------------------------------------------------------
         # Accumulated Sensors (Daily)
         # ----------------------------------------------------------------------
-        sensors.append(
-            CSNetHomeDailySensor(
-                coordinator,
-                global_device_data,
-                common_data,
-                "daily_consumption",
-                SensorDeviceClass.ENERGY,
-                UnitOfEnergy.KILO_WATT_HOUR,
-                "Daily Consumption",
+        for description in DAILY_SENSOR_DESCRIPTIONS.values():
+            sensors.append(
+                CSNetHomeDailySensor(
+                    coordinator,
+                    global_device_data,
+                    common_data,
+                    description,
+                )
             )
-        )
-        sensors.append(
-            CSNetHomeDailySensor(
-                coordinator,
-                global_device_data,
-                common_data,
-                "daily_heating",
-                SensorDeviceClass.ENERGY,
-                UnitOfEnergy.KILO_WATT_HOUR,
-                "Daily Output Energy",
-            )
-        )
-        sensors.append(
-            CSNetHomeDailySensor(
-                coordinator,
-                global_device_data,
-                common_data,
-                "daily_cop_heating",
-                None,
-                "",  # Force unit to empty string to enable graphing
-                "Daily COP",
-            )
-        )
-        sensors.append(
-            CSNetHomeDailySensor(
-                coordinator,
-                global_device_data,
-                common_data,
-                "daily_cop_dhw",
-                None,
-                "",  # Force unit to empty string to enable graphing
-                "DHW Daily COP",
-            )
-        )
 
     # Add alarm history sensor (shows recent alarms from installation alarms API)
     sensors.append(CSNetHomeAlarmHistorySensor(coordinator, coordinator.get_common_data()))
@@ -396,7 +675,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
             coordinator,
             coordinator.get_common_data(),
             "total_alarm_count",
-            "Total Alarms",
         )
     )
     sensors.append(
@@ -404,7 +682,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
             coordinator,
             coordinator.get_common_data(),
             "active_alarm_count",
-            "Active Alarms",
         )
     )
     sensors.append(
@@ -412,7 +689,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
             coordinator,
             coordinator.get_common_data(),
             "alarm_by_origin",
-            "Alarms by Origin",
         )
     )
 
@@ -427,51 +703,51 @@ async def async_setup_entry(hass, entry, async_add_entities):
         }
         common_data = coordinator.get_common_data()
 
-        for key, device_class, unit, friendly_name in COMPRESSOR_SENSOR_TYPES:
+        for description in COMPRESSOR_SENSOR_DESCRIPTIONS:
             sensors.append(
                 CSNetHomeCompressorSensor(
                     coordinator,
                     compressor_device_data,
                     common_data,
-                    key,
-                    device_class,
-                    unit,
-                    friendly_name,
+                    description,
                 )
             )
 
     async_add_entities(sensors)
 
 
-class CSNetHomeSensor(CoordinatorEntity, Entity):
-    """Representation of a sensor from the CSNet Home integration."""
+class CSNetHomeSensor(CoordinatorEntity, SensorEntity):
+    """Representation of a per-zone sensor from the CSNet Home integration."""
 
     def __init__(
         self,
         coordinator: CSNetHomeCoordinator,
         sensor_data,
         common_data,
-        key,
+        description_or_key: SensorEntityDescription | str,
         device_class=None,
         unit=None,
     ):
         """Initialize the sensor."""
         super().__init__(coordinator)
+        description = _coerce_description(description_or_key, device_class=device_class, unit=unit)
+        _apply_description_attrs(self, description)
         self._coordinator = coordinator
         self._sensor_data = sensor_data
         self._common_data = common_data
-        self._key = key
-        self._device_class = device_class
-        self._unit = unit
-        self._name = f"{sensor_data.get('device_name', 'Unknown')} {sensor_data.get('room_name', 'Unknown')} {key}"
+        self._key = description.key
         self._device_id = sensor_data.get("device_id")
         self._room_id = sensor_data.get("room_id")
         self._zone_id = sensor_data.get("zone_id")
+        self._name = _name_for(
+            f"{sensor_data.get('device_name', 'Unknown')} {sensor_data.get('room_name', 'Unknown')}",
+            self._key,
+        )
         _LOGGER.debug("Configuring Sensor %s", self._name)
 
     @property
-    def state(self):
-        """Return the current temperature as the state of the sensor."""
+    def native_value(self):
+        """Return the current state of the sensor."""
         value = self._sensor_data.get(self._key)
         if self._key == "mode":
             if value == 0:
@@ -481,21 +757,13 @@ class CSNetHomeSensor(CoordinatorEntity, Entity):
             return HVACMode.OFF
         if self._key == "on_off":
             return STATE_ON if value == 1 else STATE_OFF
+        if self._key == "doingBoost":
+            return STATE_ON if value else STATE_OFF
         if self._key == "alarm_active":
             # computed from alarm_code
             alarm_code = self._sensor_data.get("alarm_code")
             return STATE_ON if alarm_code not in (None, 0) else STATE_OFF
         return value
-
-    @property
-    def device_class(self):
-        """Return the device class of the sensor."""
-        return self._device_class
-
-    @property
-    def unit_of_measurement(self):
-        """Return the unit of measurement for the sensor."""
-        return self._unit
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -550,7 +818,7 @@ class CSNetHomeSensor(CoordinatorEntity, Entity):
         return f"{DOMAIN}-{self._sensor_data.get('room_name', 'unknown')}-{self._key}"
 
 
-class CSNetHomeInstallationSensor(CoordinatorEntity, Entity):
+class CSNetHomeInstallationSensor(CoordinatorEntity, SensorEntity):
     """Representation of an installation-level sensor from the CSNet Home integration."""
 
     def __init__(
@@ -558,21 +826,28 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, Entity):
         coordinator: CSNetHomeCoordinator,
         device_data,
         common_data,
-        key,
+        description_or_key: SensorEntityDescription | str,
         device_class=None,
         unit=None,
         friendly_name=None,
     ):
         """Initialize the installation sensor."""
         super().__init__(coordinator)
+        description = _coerce_description(
+            description_or_key,
+            device_class=device_class,
+            unit=unit,
+            friendly_name=friendly_name,
+        )
+        _apply_description_attrs(self, description)
         self._coordinator = coordinator
         self._device_data = device_data
         self._common_data = common_data
-        self._key = key
-        self._device_class = device_class
-        self._unit = unit
-        self._friendly_name = friendly_name or key
-        self._name = f"{device_data['device_name']} {device_data['room_name']} {self._friendly_name}"
+        self._key = description.key
+        self._name = _name_for(
+            f"{device_data['device_name']} {device_data['room_name']}",
+            description.name or description.key,
+        )
         _LOGGER.debug("Configuring Installation Sensor %s", self._name)
 
     def _get_heating_status(self):
@@ -779,7 +1054,7 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, Entity):
         return value
 
     @property
-    def state(self):
+    def native_value(self):
         """Return the current state of the sensor."""
         # Special handling for weather_temperature from cloud service (Issue #79)
         if self._key == "weather_temperature":
@@ -815,16 +1090,6 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, Entity):
 
         # 4. Handle standard transformations (division, boolean map)
         return self._handle_simple_transformations(value)
-
-    @property
-    def device_class(self):
-        """Return the device class of the sensor."""
-        return self._device_class
-
-    @property
-    def unit_of_measurement(self):
-        """Return the unit of measurement for the sensor."""
-        return self._unit
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -947,7 +1212,7 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
         return round(final_power)
 
     @property
-    def state(self):
+    def native_value(self):
         """Calculate and return the state."""
         heating_status = self._get_heating_status()
         if not heating_status:
@@ -990,12 +1255,6 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
 
         return None
 
-    @property
-    def state_class(self):
-        """Return the state class."""
-        # All calculated sensors (Power, COP) are measurements at a point in time
-        return SensorStateClass.MEASUREMENT
-
 
 class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
     """Sensor for accumulated daily values (Energy, Daily COP) with reset.
@@ -1003,7 +1262,7 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
     Introduced in PR #155 by davigar1391.
     Accumulates daily_consumption, daily_heating, daily_cop_heating and
     daily_cop_dhw. Resets at local midnight and restores state after HA
-    restarts via RestoreEntity.
+    restarts via SensorState restoration.
     """
 
     def __init__(
@@ -1011,21 +1270,10 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
         coordinator: CSNetHomeCoordinator,
         device_data,
         common_data,
-        key,
-        device_class=None,
-        unit=None,
-        friendly_name=None,
+        description: SensorEntityDescription,
     ):
         """Initialize the daily sensor."""
-        super().__init__(
-            coordinator,
-            device_data,
-            common_data,
-            key,
-            device_class,
-            unit,
-            friendly_name,
-        )
+        super().__init__(coordinator, device_data, common_data, description)
         self._state = 0.0
         # Dedicated accumulators for this instance
         self._energy_in = 0.0  # Input energy (Electricity)
@@ -1035,30 +1283,26 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
     async def async_added_to_hass(self):
         """Restore state and set up initial values."""
         await super().async_added_to_hass()
+        # Restore the last known state. We still use the legacy
+        # ``async_get_last_state`` API because the current Home Assistant
+        # release (2026.2) does not expose ``async_get_last_sensor_data``
+        # on ``RestoreEntity``. The ``_attr_native_value`` cache is what
+        # ``SensorEntity`` reads on the next ``native_value`` access.
         last_state = await self.async_get_last_state()
         if last_state and last_state.state not in (None, "unknown", "unavailable"):
             try:
-                # If restored state contains comma, it needs parsing
                 clean_state = str(last_state.state).replace(",", ".")
                 self._state = float(clean_state)
-            except ValueError:
+            except (TypeError, ValueError):
                 self._state = 0.0
         else:
             self._state = 0.0
         self._last_update_time = dt_util.now()
 
     @property
-    def state(self):
+    def native_value(self):
         """Return the accumulated state."""
         return round(self._state, 2)
-
-    @property
-    def state_class(self):
-        """Return the state class."""
-        if self._key.startswith("daily_cop"):
-            return SensorStateClass.MEASUREMENT
-        # Energy sensors are increasing counters that reset
-        return SensorStateClass.TOTAL_INCREASING
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -1153,7 +1397,7 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
         self.async_write_ha_state()
 
 
-class CSNetHomeDeviceSensor(CoordinatorEntity, Entity):
+class CSNetHomeDeviceSensor(CoordinatorEntity, SensorEntity):
     """Representation of a device-level sensor (WiFi, connectivity) from CSNet Home."""
 
     def __init__(
@@ -1161,26 +1405,33 @@ class CSNetHomeDeviceSensor(CoordinatorEntity, Entity):
         coordinator: CSNetHomeCoordinator,
         sensor_data,
         common_data,
-        key,
+        description_or_key: SensorEntityDescription | str,
         device_class=None,
         unit=None,
         friendly_name=None,
     ):
         """Initialize the device sensor."""
         super().__init__(coordinator)
+        description = _coerce_description(
+            description_or_key,
+            device_class=device_class,
+            unit=unit,
+            friendly_name=friendly_name,
+        )
+        _apply_description_attrs(self, description)
         self._coordinator = coordinator
         self._sensor_data = sensor_data
         self._common_data = common_data
-        self._key = key
-        self._device_class = device_class
-        self._unit = unit
-        self._friendly_name = friendly_name or key
+        self._key = description.key
         self._device_id = sensor_data.get("device_id")
-        self._name = f"{sensor_data['device_name']} {self._friendly_name}"
+        self._name = _name_for(
+            f"{sensor_data['device_name']}",
+            description.name or description.key,
+        )
         _LOGGER.debug("Configuring Device Sensor %s", self._name)
 
     @property
-    def state(self):
+    def native_value(self):
         """Return the current state of the sensor."""
         # Get the device status from common_data
         device_status = self._common_data.get("device_status", {}).get(self._device_id)
@@ -1210,26 +1461,18 @@ class CSNetHomeDeviceSensor(CoordinatorEntity, Entity):
             return STATE_ON if time_diff_minutes <= 10 else STATE_OFF
 
         if self._key == "last_communication":
-            # Return last communication timestamp as ISO 8601 datetime
+            # Return last communication as a timezone-aware datetime object
+            # (the SensorEntity timestamp device class requires datetime, not
+            # stringified ISO 8601).
             last_comm = device_status.get("lastComm")
             if last_comm is None:
                 return None
 
             # Convert from milliseconds to seconds and create datetime
             timestamp_seconds = last_comm / 1000
-            return datetime.fromtimestamp(timestamp_seconds, tz=timezone.utc).isoformat()
+            return datetime.fromtimestamp(timestamp_seconds, tz=timezone.utc)
 
         return None
-
-    @property
-    def device_class(self):
-        """Return the device class of the sensor."""
-        return self._device_class
-
-    @property
-    def unit_of_measurement(self):
-        """Return the unit of measurement for the sensor."""
-        return self._unit
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -1273,7 +1516,7 @@ class CSNetHomeDeviceSensor(CoordinatorEntity, Entity):
         return f"{DOMAIN}-{self._sensor_data.get('room_name', 'unknown')}-{self._key}"
 
 
-class CSNetHomeAlarmHistorySensor(CoordinatorEntity, Entity):
+class CSNetHomeAlarmHistorySensor(CoordinatorEntity, SensorEntity):
     """Sensor showing alarm history from installation alarms API."""
 
     def __init__(self, coordinator: CSNetHomeCoordinator, common_data):
@@ -1284,7 +1527,7 @@ class CSNetHomeAlarmHistorySensor(CoordinatorEntity, Entity):
         self._name = "Alarm History"
 
     @property
-    def state(self):
+    def native_value(self):
         """Return the number of alarms in history."""
         alarms_data = self._coordinator.get_installation_alarms_data()
         if not alarms_data:
@@ -1366,25 +1609,34 @@ class CSNetHomeAlarmHistorySensor(CoordinatorEntity, Entity):
         return f"{DOMAIN}-installation-alarm-history"
 
 
-class CSNetHomeAlarmStatisticsSensor(CoordinatorEntity, Entity):
+class CSNetHomeAlarmStatisticsSensor(CoordinatorEntity, SensorEntity):
     """Sensor showing alarm statistics."""
+
+    _STATISTIC_FRIENDLY = {
+        "total_alarm_count": "Total Alarms",
+        "active_alarm_count": "Active Alarms",
+        "alarm_by_origin": "Alarms by Origin",
+    }
 
     def __init__(
         self,
         coordinator: CSNetHomeCoordinator,
         common_data,
         statistic_type: str,
-        friendly_name: str,
+        friendly_name: str | None = None,
     ):
         """Initialize the alarm statistics sensor."""
         super().__init__(coordinator)
         self._coordinator = coordinator
         self._common_data = common_data
         self._statistic_type = statistic_type
-        self._name = friendly_name
+        # ``friendly_name`` is kept for backward compatibility with the legacy
+        # 4-arg signature but the canonical name is derived from the
+        # statistic type.
+        self._name = friendly_name or self._STATISTIC_FRIENDLY.get(statistic_type, statistic_type)
 
     @property
-    def state(self):
+    def native_value(self):
         """Return the statistic value."""
         sensors = self._coordinator.get_sensors_data()
 
@@ -1469,64 +1721,8 @@ class CSNetHomeAlarmStatisticsSensor(CoordinatorEntity, Entity):
         return f"{DOMAIN}-{self._statistic_type}"
 
 
-class CSNetHomeCompressorSensor(CoordinatorEntity, Entity):
+class CSNetHomeCompressorSensor(CoordinatorEntity, SensorEntity):
     """Representation of a compressor/outdoor unit sensor from CSNet Home."""
-
-    def __init__(
-        self,
-        coordinator: CSNetHomeCoordinator,
-        device_data,
-        common_data,
-        key,
-        device_class=None,
-        unit=None,
-        friendly_name=None,
-    ):
-        """Initialize the compressor sensor."""
-        super().__init__(coordinator)
-        self._coordinator = coordinator
-        self._device_data = device_data
-        self._common_data = common_data
-        self._key = key
-        self._device_class = device_class
-        self._unit = unit
-        self._friendly_name = friendly_name or key
-        self._name = f"{device_data['device_name']} {device_data['room_name']} {self._friendly_name}"
-        _LOGGER.debug("Configuring Compressor Sensor %s", self._name)
-
-    def _get_heating_status(self):
-        """Get heatingStatus from installation devices data."""
-        installation_data = self._coordinator.get_installation_devices_data()
-        if not isinstance(installation_data, dict):
-            return None
-
-        data_array = installation_data.get("data", [])
-        if isinstance(data_array, list) and len(data_array) > 0:
-            first_device = data_array[0]
-            if isinstance(first_device, dict):
-                indoors_array = first_device.get("indoors", [])
-                if isinstance(indoors_array, list) and len(indoors_array) > 0:
-                    first_indoors = indoors_array[0]
-                    if isinstance(first_indoors, dict):
-                        return first_indoors.get("heatingStatus", {})
-        return None
-
-    def _get_second_cycle(self):
-        """Get secondCycle from installation devices data."""
-        installation_data = self._coordinator.get_installation_devices_data()
-        if not isinstance(installation_data, dict):
-            return None
-
-        data_array = installation_data.get("data", [])
-        if isinstance(data_array, list) and len(data_array) > 0:
-            first_device = data_array[0]
-            if isinstance(first_device, dict):
-                indoors_array = first_device.get("indoors", [])
-                if isinstance(indoors_array, list) and len(indoors_array) > 0:
-                    first_indoors = indoors_array[0]
-                    if isinstance(first_indoors, dict):
-                        return first_indoors.get("secondCycle", {})
-        return None
 
     _SENSOR_MAPPING = {
         # Primary Compressor Sensors
@@ -1629,8 +1825,69 @@ class CSNetHomeCompressorSensor(CoordinatorEntity, Entity):
         },
     }
 
+    def __init__(
+        self,
+        coordinator: CSNetHomeCoordinator,
+        device_data,
+        common_data,
+        description_or_key: SensorEntityDescription | str,
+        device_class=None,
+        unit=None,
+        friendly_name=None,
+    ):
+        """Initialize the compressor sensor."""
+        super().__init__(coordinator)
+        description = _coerce_description(
+            description_or_key,
+            device_class=device_class,
+            unit=unit,
+            friendly_name=friendly_name,
+        )
+        _apply_description_attrs(self, description)
+        self._coordinator = coordinator
+        self._device_data = device_data
+        self._common_data = common_data
+        self._key = description.key
+        self._name = _name_for(
+            f"{device_data['device_name']} {device_data['room_name']}",
+            description.name or description.key,
+        )
+        _LOGGER.debug("Configuring Compressor Sensor %s", self._name)
+
+    def _get_heating_status(self):
+        """Get heatingStatus from installation devices data."""
+        installation_data = self._coordinator.get_installation_devices_data()
+        if not isinstance(installation_data, dict):
+            return None
+        data_array = installation_data.get("data", [])
+        if isinstance(data_array, list) and len(data_array) > 0:
+            first_device = data_array[0]
+            if isinstance(first_device, dict):
+                indoors_array = first_device.get("indoors", [])
+                if isinstance(indoors_array, list) and len(indoors_array) > 0:
+                    first_indoors = indoors_array[0]
+                    if isinstance(first_indoors, dict):
+                        return first_indoors.get("heatingStatus", {})
+        return None
+
+    def _get_second_cycle(self):
+        """Get secondCycle from installation devices data."""
+        installation_data = self._coordinator.get_installation_devices_data()
+        if not isinstance(installation_data, dict):
+            return None
+        data_array = installation_data.get("data", [])
+        if isinstance(data_array, list) and len(data_array) > 0:
+            first_device = data_array[0]
+            if isinstance(first_device, dict):
+                indoors_array = first_device.get("indoors", [])
+                if isinstance(indoors_array, list) and len(indoors_array) > 0:
+                    first_indoors = indoors_array[0]
+                    if isinstance(first_indoors, dict):
+                        return first_indoors.get("secondCycle", {})
+        return None
+
     @property
-    def state(self):
+    def native_value(self):
         """Return the current state of the sensor."""
         mapping = self._SENSOR_MAPPING.get(self._key)
         if not mapping:
@@ -1683,16 +1940,6 @@ class CSNetHomeCompressorSensor(CoordinatorEntity, Entity):
             return mapping["transform"](value)
 
         return value
-
-    @property
-    def device_class(self):
-        """Return the device class of the sensor."""
-        return self._device_class
-
-    @property
-    def unit_of_measurement(self):
-        """Return the unit of measurement for the sensor."""
-        return self._unit
 
     @property
     def extra_state_attributes(self):
