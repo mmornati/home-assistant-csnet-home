@@ -802,9 +802,7 @@ class CSNetHomeSensor(CoordinatorEntity, SensorEntity):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Update sensor with latest data from coordinator."""
-        self._sensor_data = self._coordinator.get_sensor_data_by_id(
-            self._device_id, self._room_id, self._zone_id
-        )
+        self._sensor_data = self._coordinator.get_sensor_data_by_id(self._device_id, self._room_id, self._zone_id)
         if self._sensor_data:
             self.async_write_ha_state()
 
@@ -1531,11 +1529,7 @@ class CSNetHomeDeviceSensor(CoordinatorEntity, SensorEntity):
         """Update sensor with latest data from coordinator."""
         # Update sensor_data reference
         self._sensor_data = next(
-            (
-                x
-                for x in self._coordinator.get_sensors_data()
-                if x.get("device_id") == self._device_id
-            ),
+            (x for x in self._coordinator.get_sensors_data() if x.get("device_id") == self._device_id),
             None,
         )
 
@@ -1704,28 +1698,16 @@ class CSNetHomeAlarmStatisticsSensor(CoordinatorEntity, SensorEntity):
         if self._statistic_type == "total_alarm_count":
             # Count all sensors that have ever had an alarm (alarm_code != 0)
             # This is the current active alarm count
-            return sum(
-                1
-                for sensor in sensors
-                if sensor.get("alarm_code") and sensor.get("alarm_code") != 0
-            )
+            return sum(1 for sensor in sensors if sensor.get("alarm_code") and sensor.get("alarm_code") != 0)
 
         if self._statistic_type == "active_alarm_count":
             # Count currently active alarms
-            return sum(
-                1
-                for sensor in sensors
-                if sensor.get("alarm_code") and sensor.get("alarm_code") != 0
-            )
+            return sum(1 for sensor in sensors if sensor.get("alarm_code") and sensor.get("alarm_code") != 0)
 
         if self._statistic_type == "alarm_by_origin":
             # Count alarms by origin
             origins = [
-                sensor.get("alarm_origin")
-                for sensor in sensors
-                if sensor.get("alarm_code")
-                and sensor.get("alarm_code") != 0
-                and sensor.get("alarm_origin")
+                sensor.get("alarm_origin") for sensor in sensors if sensor.get("alarm_code") and sensor.get("alarm_code") != 0 and sensor.get("alarm_origin")
             ]
             if not origins:
                 return 0
@@ -1739,11 +1721,7 @@ class CSNetHomeAlarmStatisticsSensor(CoordinatorEntity, SensorEntity):
     def extra_state_attributes(self):
         """Return detailed statistics as attributes."""
         sensors = self._coordinator.get_sensors_data()
-        active_alarms = [
-            sensor
-            for sensor in sensors
-            if sensor.get("alarm_code") and sensor.get("alarm_code") != 0
-        ]
+        active_alarms = [sensor for sensor in sensors if sensor.get("alarm_code") and sensor.get("alarm_code") != 0]
 
         if self._statistic_type == "total_alarm_count":
             return {
@@ -1759,23 +1737,14 @@ class CSNetHomeAlarmStatisticsSensor(CoordinatorEntity, SensorEntity):
             }
 
         if self._statistic_type == "active_alarm_count":
-            return {
-                "devices_with_alarms": [
-                    f"{sensor.get('device_name')} - {sensor.get('room_name')}"
-                    for sensor in active_alarms
-                ]
-            }
+            return {"devices_with_alarms": [f"{sensor.get('device_name')} - {sensor.get('room_name')}" for sensor in active_alarms]}
 
         if self._statistic_type == "alarm_by_origin":
-            origins = [
-                sensor.get("alarm_origin") for sensor in active_alarms if sensor.get("alarm_origin")
-            ]
+            origins = [sensor.get("alarm_origin") for sensor in active_alarms if sensor.get("alarm_origin")]
             origin_counts = Counter(origins)
             return {
                 "origin_distribution": dict(origin_counts),
-                "most_common_origin": (
-                    origin_counts.most_common(1)[0][0] if origin_counts else None
-                ),
+                "most_common_origin": (origin_counts.most_common(1)[0][0] if origin_counts else None),
             }
 
         return {}
