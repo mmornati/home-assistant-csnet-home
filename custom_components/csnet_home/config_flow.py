@@ -7,10 +7,14 @@ from homeassistant import config_entries
 from homeassistant.const import CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_USERNAME
 
 from .const import (
+    CONF_ENABLE_ALARM_NOTIFICATIONS,
     CONF_FAN_COIL_MODEL,
+    CONF_FILTERED_ALARM_CODES,
     CONF_LANGUAGE,
     CONF_MAX_TEMP_OVERRIDE,
+    DEFAULT_ENABLE_ALARM_NOTIFICATIONS,
     DEFAULT_FAN_COIL_MODEL,
+    DEFAULT_FILTERED_ALARM_CODES,
     DEFAULT_LANGUAGE,
     DOMAIN,
     FAN_COIL_MODEL_LEGACY,
@@ -48,8 +52,9 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_SCAN_INTERVAL: user_input[CONF_SCAN_INTERVAL],
                         CONF_LANGUAGE: user_input.get(CONF_LANGUAGE, DEFAULT_LANGUAGE),
                         CONF_MAX_TEMP_OVERRIDE: user_input.get(CONF_MAX_TEMP_OVERRIDE),
-                        # Store the Fan coil control type
                         CONF_FAN_COIL_MODEL: user_input.get(CONF_FAN_COIL_MODEL, DEFAULT_FAN_COIL_MODEL),
+                        CONF_ENABLE_ALARM_NOTIFICATIONS: user_input.get(CONF_ENABLE_ALARM_NOTIFICATIONS, DEFAULT_ENABLE_ALARM_NOTIFICATIONS),
+                        CONF_FILTERED_ALARM_CODES: user_input.get(CONF_FILTERED_ALARM_CODES, DEFAULT_FILTERED_ALARM_CODES),
                     },
                 )
 
@@ -62,12 +67,14 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): int,
                     vol.Optional(CONF_LANGUAGE, default=DEFAULT_LANGUAGE): vol.In(["en", "fr", "es"]),
                     vol.Optional(CONF_MAX_TEMP_OVERRIDE): vol.All(vol.Coerce(int), vol.Range(min=8, max=80)),
-                    # Selection of Fan coil control type
                     vol.Optional(CONF_FAN_COIL_MODEL, default=DEFAULT_FAN_COIL_MODEL): vol.In([FAN_COIL_MODEL_STANDARD, FAN_COIL_MODEL_LEGACY]),
+                    vol.Optional(CONF_ENABLE_ALARM_NOTIFICATIONS, default=DEFAULT_ENABLE_ALARM_NOTIFICATIONS): bool,
+                    vol.Optional(CONF_FILTERED_ALARM_CODES, default=DEFAULT_FILTERED_ALARM_CODES): str,
                 }
             ),
             description_placeholders={
-                "max_temp_override_desc": "Optional: Override maximum temperature limit (8-80°C). Leave empty to use device defaults (35°C for air circuits, 80°C for water circuits/heaters)."
+                "max_temp_override_desc": "Optional: Override maximum temperature limit (8-80°C). Leave empty to use device defaults (35°C for air circuits, 80°C for water circuits/heaters).",
+                "filtered_alarm_codes_desc": "Comma-separated list of alarm codes to suppress from notifications (default: -1 for communication errors). Leave empty to show all notifications.",
             },
             errors=errors,
         )
@@ -122,6 +129,8 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_LANGUAGE: user_input.get(CONF_LANGUAGE, DEFAULT_LANGUAGE),
                         CONF_MAX_TEMP_OVERRIDE: user_input.get(CONF_MAX_TEMP_OVERRIDE),
                         CONF_FAN_COIL_MODEL: user_input.get(CONF_FAN_COIL_MODEL, DEFAULT_FAN_COIL_MODEL),
+                        CONF_ENABLE_ALARM_NOTIFICATIONS: user_input.get(CONF_ENABLE_ALARM_NOTIFICATIONS, DEFAULT_ENABLE_ALARM_NOTIFICATIONS),
+                        CONF_FILTERED_ALARM_CODES: user_input.get(CONF_FILTERED_ALARM_CODES, DEFAULT_FILTERED_ALARM_CODES),
                     },
                 )
 
@@ -148,9 +157,20 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_FAN_COIL_MODEL,
                         default=reconfigure_entry.data.get(CONF_FAN_COIL_MODEL, DEFAULT_FAN_COIL_MODEL),
                     ): vol.In([FAN_COIL_MODEL_STANDARD, FAN_COIL_MODEL_LEGACY]),
+                    vol.Optional(
+                        CONF_ENABLE_ALARM_NOTIFICATIONS,
+                        default=reconfigure_entry.data.get(CONF_ENABLE_ALARM_NOTIFICATIONS, DEFAULT_ENABLE_ALARM_NOTIFICATIONS),
+                    ): bool,
+                    vol.Optional(
+                        CONF_FILTERED_ALARM_CODES,
+                        default=reconfigure_entry.data.get(CONF_FILTERED_ALARM_CODES, DEFAULT_FILTERED_ALARM_CODES),
+                    ): str,
                 }
             ),
-            description_placeholders={"max_temp_override_desc": "Optional: Override maximum temperature limit (8-80°C). Leave empty to use device defaults."},
+            description_placeholders={
+                "max_temp_override_desc": "Optional: Override maximum temperature limit (8-80°C). Leave empty to use device defaults.",
+                "filtered_alarm_codes_desc": "Comma-separated list of alarm codes to suppress from notifications.",
+            },
             errors=errors,
         )
 

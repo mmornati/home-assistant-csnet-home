@@ -384,3 +384,219 @@ async def test_coordinator_get_sensor_data_by_id(hass: HomeAssistant):
     assert coordinator.get_sensor_data_by_id(1, 10, 1) == sensor_1
     assert coordinator.get_sensor_data_by_id(2, 20, 2) == sensor_2
     assert coordinator.get_sensor_data_by_id(3, 30, 3) is None
+
+
+@pytest.mark.asyncio
+async def test_coordinator_filtered_alarm_code_skipped(hass: HomeAssistant):
+    """Test that filtered alarm codes (default: -1) are skipped from notifications."""
+    mock_api = MagicMock()
+    mock_api.load_translations = AsyncMock()
+    mock_api.async_get_elements_data = AsyncMock(
+        return_value={
+            "common_data": {"name": "Test Home"},
+            "sensors": [
+                {
+                    "device_id": 123,
+                    "room_id": 456,
+                    "zone_id": 789,
+                    "device_name": "Test Device",
+                    "room_name": "Test Room",
+                    "alarm_code": -1,
+                    "alarm_message": "System/Communication Error",
+                    "unit_type": "standard",
+                }
+            ],
+        }
+    )
+    mock_api.async_get_installation_devices_data = AsyncMock(return_value=None)
+    mock_api.async_get_installation_alarms = AsyncMock(return_value=None)
+
+    hass.data["csnet_home"] = {"test": {"api": mock_api}}
+
+    # Default: filtered_alarm_codes = "-1" which should filter out alarm_code -1
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test")
+
+    with patch("homeassistant.core.ServiceRegistry.async_call", new_callable=AsyncMock) as mock_async_call:
+        await coordinator._async_update_data()
+
+        # Verify alarm code was stored (tracking still happens)
+        assert coordinator._last_alarm_codes["123-456-789"] == -1
+
+        # Verify NO notification was sent (filtered)
+        mock_async_call.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_coordinator_filtered_alarm_codes_custom(hass: HomeAssistant):
+    """Test that custom filtered alarm codes are respected."""
+    mock_api = MagicMock()
+    mock_api.load_translations = AsyncMock()
+    mock_api.async_get_elements_data = AsyncMock(
+        return_value={
+            "common_data": {"name": "Test Home"},
+            "sensors": [
+                {
+                    "device_id": 123,
+                    "room_id": 456,
+                    "zone_id": 789,
+                    "device_name": "Test Device",
+                    "room_name": "Test Room",
+                    "alarm_code": -5,
+                    "alarm_message": "Communication Error",
+                    "unit_type": "standard",
+                }
+            ],
+        }
+    )
+    mock_api.async_get_installation_devices_data = AsyncMock(return_value=None)
+    mock_api.async_get_installation_alarms = AsyncMock(return_value=None)
+
+    hass.data["csnet_home"] = {"test": {"api": mock_api}}
+
+    # Custom filtered codes: -5 should be filtered
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test", filtered_alarm_codes="-5,-10")
+
+    with patch("homeassistant.core.ServiceRegistry.async_call", new_callable=AsyncMock) as mock_async_call:
+        await coordinator._async_update_data()
+
+        # Verify NO notification was sent (filtered)
+        mock_async_call.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_coordinator_disabled_alarm_notifications(hass: HomeAssistant):
+    """Test that disabled alarm notifications suppress all notifications."""
+    mock_api = MagicMock()
+    mock_api.load_translations = AsyncMock()
+    mock_api.async_get_elements_data = AsyncMock(
+        return_value={
+            "common_data": {"name": "Test Home"},
+            "sensors": [
+                {
+                    "device_id": 123,
+                    "room_id": 456,
+                    "zone_id": 789,
+                    "device_name": "Test Device",
+                    "room_name": "Test Room",
+                    "alarm_code": 42,
+                    "alarm_code_formatted": "E42",
+                    "alarm_message": "Real Alarm",
+                    "unit_type": "standard",
+                }
+            ],
+        }
+    )
+    mock_api.async_get_installation_devices_data = AsyncMock(return_value=None)
+    mock_api.async_get_installation_alarms = AsyncMock(return_value=None)
+
+    hass.data["csnet_home"] = {"test": {"api": mock_api}}
+
+    # Disable all alarm notifications
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test", enable_alarm_notifications=False)
+
+    with patch("homeassistant.core.ServiceRegistry.async_call", new_callable=AsyncMock) as mock_async_call:
+        await coordinator._async_update_data()
+
+        # Verify NO notification was sent (disabled)
+        mock_async_call.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_coordinator_parse_filtered_alarm_codes(hass: HomeAssistant):
+    """Test parsing of comma-separated alarm codes."""
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test", filtered_alarm_codes="-1,-2,10,20")
+
+    assert coordinator._filtered_alarm_codes == {-1, -2, 10, 20}
+
+
+@pytest.mark.asyncio
+async def test_coordinator_parse_filtered_alarm_codes_empty(hass: HomeAssistant):
+    """Test parsing empty alarm codes string."""
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test", filtered_alarm_codes="")
+
+    assert coordinator._filtered_alarm_codes == set()
+
+
+@pytest.mark.asyncio
+async def test_coordinator_parse_filtered_alarm_codes_invalid(hass: HomeAssistant):
+    """Test parsing invalid alarm codes string."""
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test", filtered_alarm_codes="abc,def")
+
+    assert coordinator._filtered_alarm_codes == set()
+
+
+@pytest.mark.asyncio
+async def test_coordinator_installation_alarm_filtered(hass: HomeAssistant):
+    """Test that installation alarms with filtered codes are suppressed."""
+    mock_api = MagicMock()
+    mock_api.load_translations = AsyncMock()
+    mock_api.async_get_elements_data = AsyncMock(
+        return_value={
+            "common_data": {"name": "Test Home"},
+            "sensors": [],
+        }
+    )
+    mock_api.async_get_installation_devices_data = AsyncMock(return_value=None)
+    mock_api.async_get_installation_alarms = AsyncMock(
+        return_value={
+            "data": [
+                {
+                    "id": 123,
+                    "code": -1,
+                    "unitId": 456,
+                    "recoveredAtString": "1980-01-01 00:00:00",
+                }
+            ]
+        }
+    )
+
+    hass.data["csnet_home"] = {"test": {"api": mock_api}}
+
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test")
+
+    with patch("homeassistant.core.ServiceRegistry.async_call", new_callable=AsyncMock) as mock_async_call:
+        await coordinator._async_update_data()
+
+        # Verify NO notification was sent (filtered)
+        mock_async_call.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_coordinator_installation_alarm_not_filtered(hass: HomeAssistant):
+    """Test that installation alarms not in filter list are sent."""
+    mock_api = MagicMock()
+    mock_api.load_translations = AsyncMock()
+    mock_api.async_get_elements_data = AsyncMock(
+        return_value={
+            "common_data": {"name": "Test Home"},
+            "sensors": [],
+        }
+    )
+    mock_api.async_get_installation_devices_data = AsyncMock(return_value=None)
+    mock_api.async_get_installation_alarms = AsyncMock(
+        return_value={
+            "data": [
+                {
+                    "id": 123,
+                    "code": 42,
+                    "unitId": 456,
+                    "recoveredAtString": "1980-01-01 00:00:00",
+                }
+            ]
+        }
+    )
+    mock_api.translate_alarm = MagicMock(return_value="Test Alarm")
+
+    hass.data["csnet_home"] = {"test": {"api": mock_api}}
+
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test")
+
+    with patch("homeassistant.core.ServiceRegistry.async_call", new_callable=AsyncMock) as mock_async_call:
+        await coordinator._async_update_data()
+
+        # Verify notification WAS sent (not filtered)
+        mock_async_call.assert_called_once()
+        args, kwargs = mock_async_call.call_args
+        assert args[0] == "persistent_notification"
+        assert args[1] == "create"
+        assert "123" in args[2]["notification_id"]

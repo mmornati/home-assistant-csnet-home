@@ -1255,6 +1255,12 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
         if isinstance(operation_status, str):
             return operation_status
         return OPERATION_STATUS_MAP.get(operation_status, "")
+    @property
+    def native_value(self):
+        """Calculate and return the state."""
+        heating_status = self._get_heating_status()
+        if not heating_status:
+            return 0
 
     def _get_thermal_power_values(self, heating_status):
         """Calculate thermal output using heating or cooling delta temperature."""

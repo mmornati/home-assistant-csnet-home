@@ -9,7 +9,15 @@ from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, OTC_COOLING_TYPE_FIX, OTC_HEATING_TYPE_FIX, WATER_CIRCUIT_MAX_HEAT, WATER_CIRCUIT_MIN_HEAT
+from .const import (
+    DOMAIN,
+    OTC_COOLING_TYPE_FIX,
+    OTC_HEATING_TYPE_FIX,
+    WATER_CIRCUIT_MAX_COOL,
+    WATER_CIRCUIT_MAX_HEAT,
+    WATER_CIRCUIT_MIN_COOL,
+    WATER_CIRCUIT_MIN_HEAT,
+)
 from .coordinator import CSNetHomeCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -150,8 +158,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
 class CSNetHomeFixedWaterTemperatureNumber(CoordinatorEntity, NumberEntity):
     """Representation of a fixed water temperature number entity."""
 
-    _attr_native_min_value = WATER_CIRCUIT_MIN_HEAT
-    _attr_native_max_value = WATER_CIRCUIT_MAX_HEAT
     _attr_native_step = 1.0
     _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
     _attr_mode = NumberMode.AUTO
@@ -173,6 +179,14 @@ class CSNetHomeFixedWaterTemperatureNumber(CoordinatorEntity, NumberEntity):
         self._circuit = circuit
         self._mode = mode  # 0 = cool, 1 = heat
         self.entry = entry
+
+        # Set temperature limits based on mode
+        if mode == 1:  # Heating
+            self._attr_native_min_value = WATER_CIRCUIT_MIN_HEAT
+            self._attr_native_max_value = WATER_CIRCUIT_MAX_HEAT
+        else:  # Cooling
+            self._attr_native_min_value = WATER_CIRCUIT_MIN_COOL
+            self._attr_native_max_value = WATER_CIRCUIT_MAX_COOL
 
         # Determine name based on mode
         mode_name = "Heating" if mode == 1 else "Cooling"

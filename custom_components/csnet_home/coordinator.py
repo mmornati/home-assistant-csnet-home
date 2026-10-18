@@ -15,7 +15,7 @@ _LOGGER = logging.getLogger(__name__)
 class CSNetHomeCoordinator(DataUpdateCoordinator):
     """Coordinator to fetch all sensor data from the cloud API."""
 
-    def __init__(self, hass: HomeAssistant, update_interval: int, entry_id: str):
+    def __init__(self, hass: HomeAssistant, update_interval: int, entry_id: str, enable_alarm_notifications: bool = True, filtered_alarm_codes: str = "-1"):
         """Initialize the coordinator."""
         _LOGGER.debug("Configuring CSNetHome Coordinator")
         self.hass = hass
@@ -25,6 +25,8 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         self._sensors_by_id = {}
         self._last_alarm_codes: dict[str, int] = {}
         self._notified_installation_alarm_ids: set[int] = set()
+        self._enable_alarm_notifications = enable_alarm_notifications
+        self._filtered_alarm_codes = self._parse_filtered_alarm_codes(filtered_alarm_codes)
         super().__init__(
             hass,
             _LOGGER,
@@ -32,6 +34,16 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
             update_method=self._async_update_data,
             update_interval=self.update_interval,
         )
+
+    def _parse_filtered_alarm_codes(self, codes_string: str) -> set[int]:
+        """Parse comma-separated alarm codes string into a set of integers."""
+        if not codes_string:
+            return set()
+        try:
+            return {int(code.strip()) for code in codes_string.split(",") if code.strip()}
+        except ValueError:
+            _LOGGER.warning("Invalid alarm codes format: %s, defaulting to empty set", codes_string)
+            return set()
 
     async def _async_update_data(self):
         """Fetch data for all sensors."""
@@ -173,6 +185,8 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
 
     async def _handle_alarm_notifications(self):
         """Raise notification if new alarm codes appear."""
+        if not self._enable_alarm_notifications:
+            return
         try:
             for sensor in self._device_data.get("sensors", []):
                 key = f"{sensor.get('device_id')}-{sensor.get('room_id')}-{sensor.get('zone_id')}"
@@ -180,6 +194,12 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
                 if alarm_code is None or alarm_code == 0:
                     # clear last stored to allow future notifications
                     self._last_alarm_codes.pop(key, None)
+                    continue
+
+                if alarm_code in self._filtered_alarm_codes:
+                    _LOGGER.debug("Skipping notification for filtered alarm code: %s", alarm_code)
+                    # Still track the alarm code to avoid repeated processing on next poll
+                    self._last_alarm_codes[key] = alarm_code
                     continue
 
                 prev_code = self._last_alarm_codes.get(key)
@@ -231,6 +251,8 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
 
     async def _handle_installation_alarms(self, api):
         """Handle notifications for installation-level alarms."""
+        if not self._enable_alarm_notifications:
+            return
         installation_alarms_data = self.get_installation_alarms_data()
         alarms = installation_alarms_data.get("data", [])
         if not alarms:
@@ -249,6 +271,13 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
             if alarm_id is None:
                 continue
 
+            # Generate notification
+            code = alarm.get("code")
+
+            if code in self._filtered_alarm_codes:
+                _LOGGER.debug("Skipping notification for filtered installation alarm code: %s", code)
+                continue
+
             current_active_ids.add(alarm_id)
 
             if alarm_id in self._notified_installation_alarm_ids:
@@ -257,8 +286,6 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
             # New active alarm found
             self._notified_installation_alarm_ids.add(alarm_id)
 
-            # Generate notification
-            code = alarm.get("code")
             unit_id = alarm.get("unitId")
 
             description = api.translate_alarm(code) if code != -1 else "System/Communication Error"

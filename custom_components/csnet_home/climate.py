@@ -24,7 +24,9 @@ from .const import (
     OPERATION_STATUS_MAP,
     OTC_COOLING_TYPE_NAMES,
     OTC_HEATING_TYPE_NAMES,
+    WATER_CIRCUIT_MAX_COOL,
     WATER_CIRCUIT_MAX_HEAT,
+    WATER_CIRCUIT_MIN_COOL,
     WATER_CIRCUIT_MIN_HEAT,
 )
 from .helpers import extract_heating_status
@@ -572,8 +574,19 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
             return self._cached_limits
 
         zone_id = self._sensor_data.get("zone_id")
-        default_min = WATER_CIRCUIT_MIN_HEAT if zone_id in [5, 6] else HEATING_MIN_TEMPERATURE
-        default_max = WATER_CIRCUIT_MAX_HEAT if zone_id in [5, 6] else HEATING_MAX_TEMPERATURE
+        mode = self._sensor_data.get("mode", 1)
+        is_cooling = mode == 0
+
+        if zone_id in [5, 6]:
+            if is_cooling:
+                default_min = WATER_CIRCUIT_MIN_COOL
+                default_max = WATER_CIRCUIT_MAX_COOL
+            else:
+                default_min = WATER_CIRCUIT_MIN_HEAT
+                default_max = WATER_CIRCUIT_MAX_HEAT
+        else:
+            default_min = HEATING_MIN_TEMPERATURE
+            default_max = HEATING_MAX_TEMPERATURE
 
         min_limit = default_min
         max_limit = default_max
@@ -583,7 +596,6 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
 
         if installation_devices_data:
             cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
-            mode = self._sensor_data.get("mode", 1)
             raw_min, raw_max = cloud_api.get_temperature_limits(zone_id, mode, installation_devices_data)
 
             normalized_min = self._normalize_temperature_limit(raw_min)
