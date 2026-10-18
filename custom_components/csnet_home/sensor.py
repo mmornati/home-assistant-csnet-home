@@ -593,9 +593,7 @@ def _coerce_description(
     )
 
 
-def _apply_description_attrs(
-    entity: SensorEntity, description: SensorEntityDescription
-) -> None:
+def _apply_description_attrs(entity: SensorEntity, description: SensorEntityDescription) -> None:
     """Copy the relevant description fields onto the entity's ``_attr_*`` slots.
 
     :class:`homeassistant.components.sensor.SensorEntity` exposes its
@@ -632,9 +630,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     sensors = []
     common_data = coordinator.get_common_data()
     for sensor_data in coordinator.get_sensors_data():
-        device_common_data = common_data.get("device_status", {}).get(
-            sensor_data["device_id"], {}
-        )
+        device_common_data = common_data.get("device_status", {}).get(sensor_data["device_id"], {})
 
         for description in ZONE_SENSOR_DESCRIPTIONS:
             sensors.append(
@@ -706,9 +702,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
             )
 
     # Add alarm history sensor (shows recent alarms from installation alarms API)
-    sensors.append(
-        CSNetHomeAlarmHistorySensor(coordinator, coordinator.get_common_data())
-    )
+    sensors.append(CSNetHomeAlarmHistorySensor(coordinator, coordinator.get_common_data()))
 
     # Add alarm statistics sensors (total count, by origin, by device)
     sensors.append(
@@ -771,9 +765,7 @@ class CSNetHomeSensor(CoordinatorEntity, SensorEntity):
     ):
         """Initialize the sensor."""
         super().__init__(coordinator)
-        description = _coerce_description(
-            description_or_key, device_class=device_class, unit=unit
-        )
+        description = _coerce_description(description_or_key, device_class=device_class, unit=unit)
         _apply_description_attrs(self, description)
         self._coordinator = coordinator
         self._sensor_data = sensor_data
@@ -828,9 +820,7 @@ class CSNetHomeSensor(CoordinatorEntity, SensorEntity):
         # 2. Full common_data dict (after update): _common_data = {"device_status": {...}}
         if "device_status" in self._common_data:
             # After update: nested structure
-            device_status = self._common_data.get("device_status", {}).get(
-                device_id, {}
-            )
+            device_status = self._common_data.get("device_status", {}).get(device_id, {})
             device_name_from_status = device_status.get("name", "Unknown")
             firmware = device_status.get("firmware")
         else:
@@ -1059,9 +1049,7 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, SensorEntity):
             if otc_value is not None:
                 # Return the descriptive name for the OTC type
                 if "heating" in self._key:
-                    return OTC_HEATING_TYPE_NAMES.get(
-                        otc_value, f"Unknown ({otc_value})"
-                    )
+                    return OTC_HEATING_TYPE_NAMES.get(otc_value, f"Unknown ({otc_value})")
                 return OTC_COOLING_TYPE_NAMES.get(otc_value, f"Unknown ({otc_value})")
 
         return "Unknown"
@@ -1177,9 +1165,7 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
         p_low = heating_status.get("ouSuctionPress", 0)
 
         # Get temp using the module-level helper function
-        t_discharge = _convert_unsigned_to_signed_byte(
-            heating_status.get("ouDischargeTemperature")
-        )
+        t_discharge = _convert_unsigned_to_signed_byte(heating_status.get("ouDischargeTemperature"))
         if t_discharge is None:
             t_discharge = 0
 
@@ -1412,9 +1398,7 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
         power_consumption_w = self._calculate_complex_power(heating_status)
 
         # 2. Thermal Power Logic (With DHW Temp Switch)
-        heating_power_w, op_status, op_status_text = self._get_thermal_power_values(
-            heating_status
-        )
+        heating_power_w, op_status, op_status_text = self._get_thermal_power_values(heating_status)
 
         # Calculate incremental Energy (kWh) -> Watts * Hours / 1000
         energy_consumption_kwh = (power_consumption_w * time_diff) / 1000.0
@@ -1564,9 +1548,7 @@ class CSNetHomeDeviceSensor(CoordinatorEntity, SensorEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return device information."""
-        device_status = self._common_data.get("device_status", {}).get(
-            self._device_id, {}
-        )
+        device_status = self._common_data.get("device_status", {}).get(self._device_id, {})
         device_name = self._sensor_data["device_name"]
         room_name = self._sensor_data.get("room_name", "Unknown")
         controller_name = device_status.get("name", "Unknown")
@@ -1712,9 +1694,7 @@ class CSNetHomeAlarmStatisticsSensor(CoordinatorEntity, SensorEntity):
         # ``friendly_name`` is kept for backward compatibility with the legacy
         # 4-arg signature but the canonical name is derived from the
         # statistic type.
-        self._name = friendly_name or self._STATISTIC_FRIENDLY.get(
-            statistic_type, statistic_type
-        )
+        self._name = friendly_name or self._STATISTIC_FRIENDLY.get(statistic_type, statistic_type)
 
     @property
     def native_value(self):
@@ -1788,9 +1768,7 @@ class CSNetHomeAlarmStatisticsSensor(CoordinatorEntity, SensorEntity):
 
         if self._statistic_type == "alarm_by_origin":
             origins = [
-                sensor.get("alarm_origin")
-                for sensor in active_alarms
-                if sensor.get("alarm_origin")
+                sensor.get("alarm_origin") for sensor in active_alarms if sensor.get("alarm_origin")
             ]
             origin_counts = Counter(origins)
             return {
@@ -2062,9 +2040,7 @@ class CSNetHomeCompressorSensor(CoordinatorEntity, SensorEntity):
                 raw_value = heating_status.get("operationStatus")
                 return {
                     "raw_value": raw_value,
-                    "status_text": OPERATION_STATUS_MAP.get(
-                        raw_value, f"Unknown ({raw_value})"
-                    ),
+                    "status_text": OPERATION_STATUS_MAP.get(raw_value, f"Unknown ({raw_value})"),
                     "defrosting": bool(heating_status.get("defrosting", 0)),
                 }
 
