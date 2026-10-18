@@ -1255,6 +1255,7 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
         if isinstance(operation_status, str):
             return operation_status
         return OPERATION_STATUS_MAP.get(operation_status, "")
+
     @property
     def native_value(self):
         """Calculate and return the state."""
@@ -2118,4 +2119,3 @@ class CSNetHomeCompressorSensor(CoordinatorEntity, SensorEntity):
     def unique_id(self) -> str:
         """Return unique id."""
         return f"{DOMAIN}-compressor-{self._key}"
-        
