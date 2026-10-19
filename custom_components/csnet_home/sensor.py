@@ -146,6 +146,13 @@ INSTALLATION_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
     ),
     SensorEntityDescription(
+        key="heat_exchanger_water_outlet_temperature",
+        name="Heat Exchanger Water Outlet Temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    SensorEntityDescription(
         key="set_water_temperature",
         name="Set Water Temperature",
         device_class=SensorDeviceClass.TEMPERATURE,
@@ -478,9 +485,9 @@ DAILY_SENSOR_DESCRIPTIONS: dict[str, SensorEntityDescription] = {
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         state_class=SensorStateClass.TOTAL_INCREASING,
     ),
-    "daily_cop_heating": SensorEntityDescription(
-        key="daily_cop_heating",
-        name="Daily COP",
+    "daily_cop_hvac": SensorEntityDescription(
+        key="daily_cop_hvac",
+        name="Daily HVAC COP",
         state_class=SensorStateClass.MEASUREMENT,
     ),
     "daily_cop_dhw": SensorEntityDescription(
@@ -516,6 +523,24 @@ def _convert_unsigned_to_signed_byte(value):
         return value - 256
 
     return value
+
+
+def _get_heating_status_from_installation_data(installation_data):
+    """Get heatingStatus from installation devices data (first indoor)."""
+    if not isinstance(installation_data, dict):
+        return None
+
+    data_array = installation_data.get("data", [])
+    if isinstance(data_array, list) and len(data_array) > 0:
+        first_device = data_array[0]
+        if isinstance(first_device, dict):
+            indoors_array = first_device.get("indoors", [])
+            if isinstance(indoors_array, list) and len(indoors_array) > 0:
+                first_indoors = indoors_array[0]
+                if isinstance(first_indoors, dict):
+                    return first_indoors.get("heatingStatus", {})
+
+    return None
 
 
 def _name_for(zone_name: str, friendly_name: str) -> str:
@@ -739,10 +764,9 @@ class CSNetHomeSensor(CoordinatorEntity, SensorEntity):
         self._device_id = sensor_data.get("device_id")
         self._room_id = sensor_data.get("room_id")
         self._zone_id = sensor_data.get("zone_id")
-        self._name = _name_for(
-            f"{sensor_data.get('device_name', 'Unknown')} {sensor_data.get('room_name', 'Unknown')}",
-            self._key,
-        )
+        device_name = sensor_data.get("device_name", "Unknown")
+        room_name = sensor_data.get("room_name", "Unknown")
+        self._name = _name_for(f"{device_name} {room_name}", self._key)
         _LOGGER.debug("Configuring Sensor %s", self._name)
 
     @property
@@ -853,18 +877,7 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, SensorEntity):
     def _get_heating_status(self):
         """Get heatingStatus from installation devices data."""
         installation_data = self._coordinator.get_installation_devices_data()
-        if not isinstance(installation_data, dict):
-            return None
-        data_array = installation_data.get("data", [])
-        if isinstance(data_array, list) and len(data_array) > 0:
-            first_device = data_array[0]
-            if isinstance(first_device, dict):
-                indoors_array = first_device.get("indoors", [])
-                if isinstance(indoors_array, list) and len(indoors_array) > 0:
-                    first_indoors = indoors_array[0]
-                    if isinstance(first_indoors, dict):
-                        return first_indoors.get("heatingStatus", {})
-        return None
+        return _get_heating_status_from_installation_data(installation_data)
 
     def _get_raw_value(self):
         """Get raw value from installation data or heating status."""
@@ -1211,6 +1224,12 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
 
         return round(final_power)
 
+    def _get_operation_status_text(self, operation_status):
+        """Return a normalized operation status text."""
+        if isinstance(operation_status, str):
+            return operation_status
+        return OPERATION_STATUS_MAP.get(operation_status, "")
+
     @property
     def native_value(self):
         """Calculate and return the state."""
@@ -1218,13 +1237,42 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
         if not heating_status:
             return 0
 
-        # Extract raw values for other calculations
+    def _get_thermal_power_values(self, heating_status):
+        """Calculate thermal output using heating or cooling delta temperature."""
         raw_flow = heating_status.get("waterFlow", 0)
         flow_rate = raw_flow / 10.0 if raw_flow else 0
         temp_in = heating_status.get("waterInletTemp", 0)
-
-        # Operation Status needed for deciding temp_out
         op_status = heating_status.get("operationStatus")
+        op_status_text = self._get_operation_status_text(op_status).lower()
+
+        # Logic: If DHW (Status 8) use Exchanger Outlet, else use Normal Outlet
+        if op_status == 8:
+            temp_out = heating_status.get("waterOutletHPTemp", 0)
+        else:
+            temp_out = heating_status.get("waterOutletTemp", 0)
+
+        is_cooling = "cooling thermostat on" in op_status_text
+        is_heating = "heating thermostat on" in op_status_text or op_status in (6, 8)
+
+        if is_cooling:
+            delta_t = temp_in - temp_out
+        elif is_heating:
+            delta_t = temp_out - temp_in
+        else:
+            delta_t = 0
+
+        thermal_power = 0
+        if delta_t > 0 and flow_rate >= 0.01:
+            thermal_power = round(flow_rate * 1160 * delta_t, 2)
+
+        return thermal_power, op_status, op_status_text
+
+    @property
+    def native_value(self):
+        """Calculate and return the state."""
+        heating_status = self._get_heating_status()
+        if not heating_status:
+            return 0
 
         # 1. Instant Consumption (Watts) - complex model with guardrails
         instant_consumption = self._calculate_complex_power(heating_status)
@@ -1232,17 +1280,8 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
         if self._key == "instant_consumption":
             return instant_consumption
 
-        # 2. Heating Power (Watts)
-        # Logic: If DHW (Status 8) use Exchanger Outlet, else use Normal Outlet
-        if op_status == 8:
-            temp_out = heating_status.get("waterOutletHPTemp", 0)
-        else:
-            temp_out = heating_status.get("waterOutletTemp", 0)
-
-        delta_t = temp_out - temp_in
-        heating_power = 0
-        if delta_t > 0 and flow_rate >= 0.01:
-            heating_power = round(flow_rate * 1160 * delta_t, 2)
+        # 2. Heating / Thermal Power (Watts)
+        heating_power, _, _ = self._get_thermal_power_values(heating_status)
 
         if self._key == "heating_power":
             return heating_power
@@ -1260,7 +1299,7 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
     """Sensor for accumulated daily values (Energy, Daily COP) with reset.
 
     Introduced in PR #155 by davigar1391.
-    Accumulates daily_consumption, daily_heating, daily_cop_heating and
+    Accumulates daily_consumption, daily_heating, daily_cop_hvac and
     daily_cop_dhw. Resets at local midnight and restores state after HA
     restarts via SensorState restoration.
     """
@@ -1270,10 +1309,21 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
         coordinator: CSNetHomeCoordinator,
         device_data,
         common_data,
-        description: SensorEntityDescription,
+        description_or_key: SensorEntityDescription | str,
+        device_class=None,
+        unit=None,
+        friendly_name=None,
     ):
         """Initialize the daily sensor."""
-        super().__init__(coordinator, device_data, common_data, description)
+        super().__init__(
+            coordinator,
+            device_data,
+            common_data,
+            description_or_key,
+            device_class=device_class,
+            unit=unit,
+            friendly_name=friendly_name,
+        )
         self._state = 0.0
         # Dedicated accumulators for this instance
         self._energy_in = 0.0  # Input energy (Electricity)
@@ -1335,22 +1385,8 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
         # 1. Use the complex model for Consumption Power
         power_consumption_w = self._calculate_complex_power(heating_status)
 
-        # 2. Heating Power Logic (With DHW Temp Switch)
-        raw_flow = heating_status.get("waterFlow", 0)
-        flow_rate = raw_flow / 10.0 if raw_flow else 0
-        temp_in = heating_status.get("waterInletTemp", 0)
-        op_status = heating_status.get("operationStatus")
-
-        if op_status == 8:
-            temp_out = heating_status.get("waterOutletHPTemp", 0)
-        else:
-            temp_out = heating_status.get("waterOutletTemp", 0)
-
-        delta_t = temp_out - temp_in
-
-        heating_power_w = 0
-        if delta_t > 0 and flow_rate >= 0.01:
-            heating_power_w = flow_rate * 1160 * delta_t
+        # 2. Thermal Power Logic (With DHW Temp Switch)
+        heating_power_w, op_status, op_status_text = self._get_thermal_power_values(heating_status)
 
         # Calculate incremental Energy (kWh) -> Watts * Hours / 1000
         energy_consumption_kwh = (power_consumption_w * time_diff) / 1000.0
@@ -1363,16 +1399,20 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
             self._state += energy_heating_kwh
 
         # Daily COPs
-        elif self._key in ["daily_cop_heating", "daily_cop_dhw"]:
-            op_status = heating_status.get("operationStatus")
+        elif self._key in ["daily_cop_hvac", "daily_cop_dhw"]:
             defrost_active = heating_status.get("defrosting") == 1
 
             should_accumulate = False
 
-            if self._key == "daily_cop_heating":
-                # Accumulate if Heating (6)
+            if self._key == "daily_cop_hvac":
+                # Accumulate if Heating (6) or Cooling
                 # OR Defrosting is active (AND we are not explicitly in DHW mode)
-                if op_status == 6 or (defrost_active and op_status != 8):
+                if (
+                    op_status == 6
+                    or "heating thermostat on" in op_status_text
+                    or "cooling thermostat on" in op_status_text
+                    or (defrost_active and op_status != 8)
+                ):
                     should_accumulate = True
 
             elif self._key == "daily_cop_dhw":
@@ -1389,9 +1429,9 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
                     self._energy_in += energy_consumption_kwh
                     self._energy_out += energy_heating_kwh
 
-            # Calculate COP based on Accumulated totals
-            if self._energy_in > 0.01:
-                self._state = self._energy_out / self._energy_in
+                # Calculate COP based on Accumulated totals
+                if self._energy_in > 0.01:
+                    self._state = self._energy_out / self._energy_in
             # If no energy consumed yet, keep previous state or 0
 
         self.async_write_ha_state()
@@ -1492,15 +1532,20 @@ class CSNetHomeDeviceSensor(CoordinatorEntity, SensorEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return device information."""
+        device_status = self._common_data.get("device_status", {}).get(self._device_id, {})
+        device_name = self._sensor_data["device_name"]
+        room_name = self._sensor_data.get("room_name", "Unknown")
+        controller_name = device_status.get("name", "Unknown")
+
         return DeviceInfo(
-            name=f"{self._sensor_data['device_name']}-{self._sensor_data.get('room_name', 'Unknown')}",
+            name=f"{device_name}-{room_name}",
             manufacturer="Hitachi",
-            model=f"{self._common_data.get('device_status', {}).get(self._device_id, {}).get('name', 'Unknown')} Remote Controller",
-            sw_version=self._common_data.get("device_status", {}).get(self._device_id, {}).get("firmware"),
+            model=f"{controller_name} Remote Controller",
+            sw_version=device_status.get("firmware"),
             identifiers={
                 (
                     DOMAIN,
-                    f"{self._sensor_data['device_name']}-{self._sensor_data.get('room_name', 'Unknown')}",
+                    f"{device_name}-{room_name}",
                 )
             },
         )
@@ -1748,6 +1793,7 @@ class CSNetHomeCompressorSensor(CoordinatorEntity, SensorEntity):
         "suction_pressure_correction": {"key": "ouSuctionPressCorrection"},
         # Expansion Valve and Control
         "expansion_valve_opening": {"key": "evi"},
+        "ou_evo_1": {"key": "ouEvo1", "invalid": [255, -1]},
         "outdoor_fan_rpm": {"key": "fanRPM", "invalid": -1},
         # Outdoor Unit Information
         "operation_status": {
@@ -1857,18 +1903,7 @@ class CSNetHomeCompressorSensor(CoordinatorEntity, SensorEntity):
     def _get_heating_status(self):
         """Get heatingStatus from installation devices data."""
         installation_data = self._coordinator.get_installation_devices_data()
-        if not isinstance(installation_data, dict):
-            return None
-        data_array = installation_data.get("data", [])
-        if isinstance(data_array, list) and len(data_array) > 0:
-            first_device = data_array[0]
-            if isinstance(first_device, dict):
-                indoors_array = first_device.get("indoors", [])
-                if isinstance(indoors_array, list) and len(indoors_array) > 0:
-                    first_indoors = indoors_array[0]
-                    if isinstance(first_indoors, dict):
-                        return first_indoors.get("heatingStatus", {})
-        return None
+        return _get_heating_status_from_installation_data(installation_data)
 
     def _get_second_cycle(self):
         """Get secondCycle from installation devices data."""
