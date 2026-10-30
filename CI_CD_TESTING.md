@@ -191,7 +191,13 @@ upload and again before publishing), and @mentions are neutralised. The issue is
 by a plain shell step in another job. Claude never pushes code; fixes go through a
 normal PR.
 
-**Setup**: add the `ANTHROPIC_API_KEY` repository secret.
+**Setup**: add one repository secret:
+- `CLAUDE_CODE_OAUTH_TOKEN`: run `claude setup-token` locally (Claude Pro/Max subscription;
+  usage counts against the plan, no API credit needed). Used when present.
+- `ANTHROPIC_API_KEY`: an API key whose organization has prepaid credit. Used otherwise.
+
+If the review step fails, the `Show Claude error` step prints the API error (for example
+`Credit balance is too low` or an invalid token).
 
 ---
 
