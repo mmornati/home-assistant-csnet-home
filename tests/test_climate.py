@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock
 import pytest
 from homeassistant.components.climate import FAN_AUTO, FAN_ON, HVACAction, HVACMode
 from homeassistant.components.climate.const import ClimateEntityFeature
+from homeassistant.const import UnitOfTemperature
 
 from custom_components.csnet_home.climate import CSNetHomeClimate
 from custom_components.csnet_home.const import (
@@ -216,7 +217,18 @@ async def test_set_temperature_updates_state_on_success(hass):
     """Update target temperature locally on success."""
     entity = build_entity(hass, mode=1, on_off=1, setp=19.0)
     await entity.async_set_temperature(temperature=21.0)
-    assert entity.target_temperature == 21.0
+    assert entity.native_target_temperature == 21.0
+
+
+def test_temperatures_exposed_under_native_and_legacy_names(hass):
+    """Serve native_* to HA >= 2026.11 and the old names to older releases."""
+    entity = build_entity(hass, mode=1, on_off=1, cur=19.5, setp=20.0)
+    assert entity.native_current_temperature == 19.5
+    assert entity.native_target_temperature == 20.0
+    assert entity._attr_native_temperature_unit == UnitOfTemperature.CELSIUS
+    assert entity.current_temperature == 19.5
+    assert entity.target_temperature == 20.0
+    assert entity._attr_temperature_unit == UnitOfTemperature.CELSIUS
 
 
 def test_unique_id_contains_device_id(hass):
@@ -239,8 +251,8 @@ async def test_handle_coordinator_update_handles_missing_sensor_data(hass):
     entity._handle_coordinator_update()
 
     # Verify entity handles None sensor_data gracefully
-    assert entity.current_temperature is None
-    assert entity.target_temperature is None
+    assert entity.native_current_temperature is None
+    assert entity.native_target_temperature is None
     assert entity.hvac_mode == HVACMode.OFF
     assert entity.preset_mode == "comfort"
     assert not entity.extra_state_attributes
@@ -261,8 +273,8 @@ async def test_handle_coordinator_update_preserves_sensor_data_when_found(hass):
     entity._handle_coordinator_update()
 
     # Verify entity still has valid data
-    assert entity.current_temperature == 19.5
-    assert entity.target_temperature == 20.0
+    assert entity.native_current_temperature == 19.5
+    assert entity.native_target_temperature == 20.0
     assert entity.hvac_mode == HVACMode.HEAT
 
 
