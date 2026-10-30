@@ -230,8 +230,14 @@ it has write access.
 **Security model**: the issue was generated from third-party text, so the Claude job has
 `contents: read` only, tools confined to the two directories above plus read-only access
 to the Home Assistant package, no shell, no network and no git. Paths are resolved and
-checked, so `..` and symlinks cannot escape. Text posted to GitHub goes through
-`scripts/ci/sanitize_report.sh` (credential patterns, size, @mentions).
+checked, so `..` and symlinks cannot escape. Tests (which include code Claude wrote) run
+with a minimal environment: no API key, no GitHub tokens, no `$GITHUB_OUTPUT`. Only
+issues opened by `github-actions[bot]` are accepted, and Claude works on the issue text
+as it was when the label was added. `scripts/ci/check_patch_paths.sh` checks every
+changed path with rename detection off (both sides of a move) and refuses symlinks and
+submodules, in the fix job and again before the PR. Text posted to GitHub goes through
+`scripts/ci/sanitize_report.sh` (credential patterns, size, @mentions), and the test
+result line in the PR must match pytest's summary format.
 
 **Notes**: PRs opened with the workflow token do not start CI by themselves; close and
 reopen the PR to run it. A run costs a few dollars at most with Claude Opus 5.5 (the

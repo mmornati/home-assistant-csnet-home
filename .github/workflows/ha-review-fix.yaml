@@ -66,12 +66,33 @@ jobs:
           if ! gh issue view "$ISSUE" --json labels --jq '.labels[].name' | grep -qx ha-release-review; then
             echo "::error::#$ISSUE is not an HA release review issue"; exit 1
           fi
+          # Only issues opened by the review workflow itself, not look-alikes.
+          AUTHOR=$(gh api "repos/$GH_REPO/issues/$ISSUE" --jq .user.login)
+          if [ "$AUTHOR" != "github-actions[bot]" ]; then
+            echo "::error::#$ISSUE was opened by $AUTHOR, not by the review workflow"; exit 1
+          fi
           PERMISSION=$(gh api "repos/$GH_REPO/collaborators/$SENDER/permission" --jq .permission)
           case "$PERMISSION" in
             admin|maintain|write) echo "Approved by $SENDER ($PERMISSION)" ;;
             *) echo "::error::$SENDER has '$PERMISSION' access; write access is required"; exit 1 ;;
           esac
           echo "issue=$ISSUE" >> "$GITHUB_OUTPUT"
+
+          # Pin what was approved: for a label event, the issue as it was when
+          # the label was added (from the event payload), not a later edit.
+          if [ "$GITHUB_EVENT_NAME" = "issues" ]; then
+            jq '{number: .issue.number, title: .issue.title, body: .issue.body}' "$GITHUB_EVENT_PATH" > issue.json
+          else
+            gh issue view "$ISSUE" --json number,title,body > issue.json
+          fi
+          sha256sum issue.json
+
+      - name: Upload approved issue
+        uses: actions/upload-artifact@v7
+        with:
+          name: ha-fix-issue
+          path: issue.json
+          retention-days: 7
 
   fix:
     name: Claude fix - issue ${{ needs.gate.outputs.issue }}
@@ -80,7 +101,6 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: read
-      issues: read
     outputs:
       result: ${{ steps.result.outputs.result }}
       has_patch: ${{ steps.patch.outputs.has_patch }}
@@ -103,12 +123,11 @@ jobs:
       - name: Install Home Assistant ${{ steps.ha.outputs.latest }}
         run: scripts/ci/install_ha.sh "${{ steps.ha.outputs.latest }}" tests
 
-      - name: Fetch the review issue
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          ISSUE: ${{ needs.gate.outputs.issue }}
-        run: gh issue view "$ISSUE" --json number,title,body > "$RUNNER_TEMP/issue.json"
+      - name: Download approved issue
+        uses: actions/download-artifact@v8
+        with:
+          name: ha-fix-issue
+          path: ${{ runner.temp }}
 
       # Separate venv for the SDK; pytest runs in the Home Assistant env above.
       - name: Claude fix
@@ -137,28 +156,38 @@ jobs:
           "$RUNNER_TEMP/fix-venv/bin/black" --quiet custom_components/csnet_home tests
           "$RUNNER_TEMP/fix-venv/bin/isort" --quiet custom_components/csnet_home tests
 
-      # Re-run the tests here rather than trusting Claude's own run.
+      # Re-run the tests here rather than trusting Claude's own run. The tests
+      # include code Claude wrote: run them with a minimal environment so they
+      # cannot reach tokens or write $GITHUB_OUTPUT / $GITHUB_ENV, and take the
+      # result only from the exit code.
       - name: Verify tests
         id: verify
         run: |
-          if pytest tests/ -q --tb=short -p no:cacheprovider > "$RUNNER_TEMP/pytest.log" 2>&1; then
+          set +e
+          env -i PATH="$PATH" HOME="$HOME" LANG=C.UTF-8 \
+            python -m pytest tests/ -q --tb=short -p no:cacheprovider > "$RUNNER_TEMP/pytest.log" 2>&1
+          STATUS=$?
+          set -e
+          if [ "$STATUS" -eq 0 ]; then
             echo "tests=passed" >> "$GITHUB_OUTPUT"
           else
             echo "tests=failed" >> "$GITHUB_OUTPUT"
             echo "::warning::Tests fail with Claude's changes; the PR will say so"
           fi
           tail -3 "$RUNNER_TEMP/pytest.log"
+          # Only a line that looks like pytest's own summary goes into the PR.
+          LAST=$(tail -1 "$RUNNER_TEMP/pytest.log" | tr -d '=' | sed 's/^ *//;s/ *$//')
+          if [[ "$LAST" =~ ^[0-9]+\ (passed|failed|error)(,\ [0-9]+\ [a-z]+)*\ in\ [0-9.]+s$ ]]; then
+            echo "$LAST" > "$RUNNER_TEMP/pytest-summary.txt"
+          else
+            echo "see the workflow log" > "$RUNNER_TEMP/pytest-summary.txt"
+          fi
 
       - name: Build patch
         id: patch
         run: |
           git add -A
-          ALLOWED='^(custom_components/csnet_home/|tests/)'
-          OUTSIDE=$(git diff --cached --name-only | grep -Ev "$ALLOWED" || true)
-          MANIFEST=custom_components/csnet_home/manifest.json
-          if [ -n "$OUTSIDE" ] || git diff --cached --name-only | grep -qx "$MANIFEST"; then
-            echo "::error::Changes outside the allowed paths: ${OUTSIDE:-manifest.json}"; exit 1
-          fi
+          scripts/ci/check_patch_paths.sh
           git diff --cached --binary > "$RUNNER_TEMP/ha-fix.patch"
           if [ -s "$RUNNER_TEMP/ha-fix.patch" ]; then
             echo "has_patch=true" >> "$GITHUB_OUTPUT"
@@ -167,7 +196,6 @@ jobs:
             echo "has_patch=false" >> "$GITHUB_OUTPUT"
             echo "No changes."
           fi
-          tail -1 "$RUNNER_TEMP/pytest.log" > "$RUNNER_TEMP/pytest-summary.txt"
           cp "$RUNNER_TEMP/ha-fix.patch" "$RUNNER_TEMP/ha-fix-summary.md" "$RUNNER_TEMP/pytest-summary.txt" .
 
       - name: Upload fix
@@ -211,10 +239,7 @@ jobs:
         run: |
           git apply --index "$FIX_DIR/ha-fix.patch"
           # Same path check as the fix job, in case the artifact was altered.
-          if git diff --cached --name-only | grep -Ev '^(custom_components/csnet_home/|tests/)' \
-              || git diff --cached --name-only | grep -qx custom_components/csnet_home/manifest.json; then
-            echo "::error::Patch touches files outside the allowed paths"; exit 1
-          fi
+          scripts/ci/check_patch_paths.sh
 
           scripts/ci/sanitize_report.sh "$FIX_DIR/ha-fix-summary.md"
           BRANCH="claude/ha-fix-${ISSUE}-${GITHUB_RUN_ID}"

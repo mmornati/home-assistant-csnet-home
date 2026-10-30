@@ -38,6 +38,14 @@ WRITE_ROOTS = (INTEGRATION, TESTS)
 PROTECTED = {INTEGRATION / "manifest.json"}
 MAX_FILE_CHARS = 200_000
 MAX_TOOL_OUTPUT = 12_000
+# pytest runs code Claude wrote, so it gets a minimal environment: no API key,
+# no GitHub tokens, no $GITHUB_OUTPUT/$GITHUB_ENV to tamper with later steps.
+TEST_ENV_KEYS = ("PATH", "HOME", "LANG", "LC_ALL", "TMPDIR", "PYTHONHASHSEED", "pythonLocation", "LD_LIBRARY_PATH")
+
+
+def test_environment() -> dict[str, str]:
+    """Environment for running the test suite."""
+    return {key: os.environ[key] for key in TEST_ENV_KEYS if key in os.environ}
 
 SYSTEM = """You fix compatibility findings in csnet_home, a Home Assistant custom \
 integration (climate, water_heater, sensor and number platforms, a config flow and a \
@@ -207,6 +215,7 @@ class Workspace:
                 result = subprocess.run(  # nosec B603
                     [workspace.pytest_python, "-m", "pytest", "-q", "--tb=short", "-p", "no:cacheprovider", str(target)],
                     cwd=ROOT,
+                    env=test_environment(),
                     capture_output=True,
                     text=True,
                     timeout=900,
