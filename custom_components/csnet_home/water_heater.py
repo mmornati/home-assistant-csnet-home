@@ -7,7 +7,9 @@ from typing import Any
 
 from homeassistant.components.water_heater import WaterHeaterEntity, WaterHeaterEntityFeature
 from homeassistant.const import PRECISION_WHOLE, UnitOfTemperature
+from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
     CONF_MAX_TEMP_OVERRIDE,
@@ -49,16 +51,18 @@ async def async_setup_entry(hass, entry, async_add_entities):
     )
 
 
-class CSNetHomeWaterHeater(WaterHeaterEntity):
+class CSNetHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
     """Representation of a Water Heater entity."""
 
     def __init__(self, hass, entry, sensor_data, common_data):
         """Initialize the water heater entity."""
+        # Follow the coordinator: no polling of our own, and the entity becomes
+        # unavailable when a CSNet Manager poll fails
+        super().__init__(hass.data[DOMAIN][entry.entry_id]["coordinator"])
         self.hass = hass
         self.entry = entry
         self._sensor_data = sensor_data
         self._common_data = common_data
-        self._available = True
         self._is_swimming_pool = sensor_data.get("zone_id") == 4
 
         # Set appropriate name based on zone type
@@ -140,10 +144,15 @@ class CSNetHomeWaterHeater(WaterHeaterEntity):
         """Return current operation ie. eco, performance."""
         return self._attr_current_operation
 
-    async def async_update(self):
-        """Fetch new state data from the coordinator."""
-        coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
-        sensors_data = coordinator.get_sensors_data()
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Refresh the entity from the coordinator data and write the state."""
+        self._refresh_from_coordinator()
+        self.async_write_ha_state()
+
+    def _refresh_from_coordinator(self):
+        """Load this entity's latest sensor data from the coordinator."""
+        sensors_data = self.coordinator.get_sensors_data()
 
         expected_zone_id = 4 if self._is_swimming_pool else 3
         for sensor in sensors_data:

@@ -42,7 +42,7 @@ async def test_climate_entity_added_to_platform(hass):
 
 async def test_water_heater_entity_added_to_platform(hass):
     """Water heater entity registers and exposes capability attributes."""
-    entity = build_water_heater_entity(hass)
+    entity = _allow_listeners(build_water_heater_entity(hass))
     assert isinstance(entity.supported_features, WaterHeaterEntityFeature)
 
     platform = MockEntityPlatform(hass, domain="water_heater", platform_name=DOMAIN)
