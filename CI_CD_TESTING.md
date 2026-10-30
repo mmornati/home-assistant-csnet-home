@@ -203,6 +203,46 @@ override it with the `model` input.
 
 ---
 
+### HA Review Fix (Claude)
+
+**File**: `.github/workflows/ha-review-fix.yaml`
+
+**Triggers**: a maintainer adds the `ha-review:fix` label to an `ha-release-review` issue;
+manual dispatch with an issue number.
+
+**Who decides**: you. Review issues are only suggestions (they can be wrong); after
+checking one, adding the label is the approval. The workflow verifies that whoever added
+it has write access.
+
+**What it does**:
+1. `scripts/ci/ha_fix.py` runs Claude with a few tools (SDK Tool Runner, on
+   `ANTHROPIC_API_KEY`): list, read and search files, edit files, run pytest. Claude
+   verifies each finding against the code and the installed Home Assistant source,
+   fixes the confirmed ones, adds tests and runs them. Its summary starts with
+   `Result: FIXED`, `NO_CHANGE` or `NEEDS_HUMAN`.
+2. The workflow formats the code (black, isort) and re-runs the tests itself.
+3. A separate job without an LLM checks that only `custom_components/csnet_home/` and
+   `tests/` changed (never `manifest.json`), pushes `claude/ha-fix-<issue>-<run>` and
+   opens a PR with Claude's summary and the test result. Nothing is merged.
+4. Without changes, it comments the summary on the issue instead. Either way the
+   `ha-review:fix` label is removed, so it can be added again for another attempt.
+
+**Security model**: the issue was generated from third-party text, so the Claude job has
+`contents: read` only, tools confined to the two directories above plus read-only access
+to the Home Assistant package, no shell, no network and no git. Paths are resolved and
+checked, so `..` and symlinks cannot escape. Text posted to GitHub goes through
+`scripts/ci/sanitize_report.sh` (credential patterns, size, @mentions).
+
+**Notes**: PRs opened with the workflow token do not start CI by themselves; close and
+reopen the PR to run it. A run costs a few dollars at most with Claude Opus 5.5 (the
+conversation is prompt-cached); the log prints the token counts and estimate. The model
+follows `HA_REVIEW_MODEL`, like the review.
+
+Review issues also get the `ha-review:breaking` label when the report contains a
+BREAKING row.
+
+---
+
 ## What Gets Tested
 
 ### Unit Tests (pytest)

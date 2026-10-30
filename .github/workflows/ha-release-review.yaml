@@ -77,6 +77,8 @@ jobs:
         run: |
           gh label create ha-release-review --color 41BDF5 \
             --description "Automated review of a new Home Assistant release" 2>/dev/null || true
+          gh label create ha-review:fix --color 0E8A16 \
+            --description "Maintainer approved: let Claude open a PR for this review" 2>/dev/null || true
 
           # 2026.11.0b1 -> 2026.11
           release_of() { echo "$1" | cut -d. -f1,2; }
@@ -197,18 +199,7 @@ jobs:
       # Check before the artifact upload too: artifacts are readable by anyone
       # with read access to the repository. Fails closed if there is no report.
       - name: Check report for credentials
-        run: |
-          if [ ! -s ha-review.md ]; then
-            echo "::error::No review report was produced."
-            exit 1
-          fi
-          SECRET_RE='sk-ant-|gh[opsur]_[A-Za-z0-9]{20,}|github_pat_|AKIA[0-9A-Z]{16}'
-          SECRET_RE="${SECRET_RE}|-----BEGIN|[A-Za-z0-9+/=]{80,}"
-          if grep -Eq "$SECRET_RE" ha-review.md; then
-            echo "::error::Report contains credential-like content; discarded."
-            rm -f ha-review.md
-            exit 1
-          fi
+        run: scripts/ci/sanitize_report.sh ha-review.md || { rm -f ha-review.md; exit 1; }
 
       - name: Upload report
         uses: actions/upload-artifact@v7
@@ -225,6 +216,12 @@ jobs:
     permissions:
       issues: write
     steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/ci
+
       - name: Download report
         uses: actions/download-artifact@v8
         with:
@@ -238,29 +235,24 @@ jobs:
           VERSION: ${{ needs.detect.outputs.version }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          # The report was written by an LLM that read third-party text: refuse
-          # anything that looks like a credential, and neutralise @mentions.
-          if [ ! -s ha-review.md ]; then
-            echo "::error::Review report is missing or empty."
-            exit 1
-          fi
-          SECRET_RE='sk-ant-|gh[opsur]_[A-Za-z0-9]{20,}|github_pat_|AKIA[0-9A-Z]{16}'
-          SECRET_RE="${SECRET_RE}|-----BEGIN|[A-Za-z0-9+/=]{80,}"
-          if grep -Eq "$SECRET_RE" ha-review.md; then
-            echo "::error::Report contains credential-like content; not publishing."
-            exit 1
-          fi
-          if [ "$(wc -c < ha-review.md)" -gt 60000 ]; then
-            echo "::error::Report is larger than 60 KB; not publishing."
-            exit 1
-          fi
-          sed -i 's/@\([A-Za-z0-9]\)/@\xE2\x80\x8B\1/g' ha-review.md
+          # The report was written by an LLM that read third-party text.
+          scripts/ci/sanitize_report.sh ha-review.md
           {
             cat ha-review.md
             echo ""
             echo "---"
             echo "_Automated review of HA ${VERSION} by Claude (${HA_REVIEW_MODEL}) · [workflow run](${RUN_URL})._"
             echo "_Generated from third-party release notes: verify before acting._"
+            echo "_To have Claude open a pull request for the confirmed findings, add the \`ha-review:fix\` label._"
           } > body.md
-          gh issue create --label ha-release-review \
-            --title "Home Assistant ${RELEASE} compatibility review" --body-file body.md
+          URL=$(gh issue create --label ha-release-review \
+            --title "Home Assistant ${RELEASE} compatibility review" --body-file body.md)
+          echo "Created $URL"
+
+          # Flag urgent reviews without opening them: any BREAKING row in the table.
+          if grep -Eq '\|[[:space:]]*\**BREAKING\**[[:space:]]*\|' ha-review.md; then
+            gh label create ha-review:breaking --color B60205 \
+              --description "Review found a change that breaks the integration" 2>/dev/null || true
+            gh issue edit "$URL" --add-label ha-review:breaking
+            echo "::warning::Review found BREAKING changes: $URL"
+          fi
