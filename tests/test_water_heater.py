@@ -1,7 +1,7 @@
 """Test CSNet Home water heater entity."""
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from homeassistant.components.water_heater import WaterHeaterEntityFeature
@@ -70,6 +70,7 @@ def build_water_heater_entity(
         get_sensors_data=lambda: [sensor_data],
         get_common_data=lambda: {"device_status": {1234: common_data}},
         get_installation_devices_data=lambda: installation_devices_data,
+        last_update_success=True,
     )
 
     entity = CSNetHomeWaterHeater(hass, entry, sensor_data, common_data)
@@ -282,7 +283,7 @@ async def test_water_heater_update(hass):
     }
     coordinator.get_sensors_data = lambda: [updated_sensor]
 
-    await entity.async_update()
+    entity._refresh_from_coordinator()
 
     assert entity._sensor_data["current_temperature"] == 50.0
     assert entity._sensor_data["setting_temperature"] == 52
@@ -304,7 +305,7 @@ async def test_swimming_pool_update(hass):
     }
     coordinator.get_sensors_data = lambda: [updated_sensor]
 
-    await entity.async_update()
+    entity._refresh_from_coordinator()
 
     assert entity._sensor_data["current_temperature"] == 29.0
     assert entity._sensor_data["setting_temperature"] == 30
@@ -330,3 +331,31 @@ def test_swimming_pool_device_info(hass):
     assert device_info["manufacturer"] == "Hitachi"
     assert "Remote Controller" in device_info["model"]
     assert device_info["sw_version"] == "1.0.0"
+
+
+def test_water_heater_follows_coordinator(hass):
+    """The entity does not poll and is unavailable when the coordinator update failed."""
+    entity = build_water_heater_entity(hass, zone_id=3, room_name="DHW")
+    coordinator = hass.data[DOMAIN]["test-entry"]["coordinator"]
+
+    assert entity.coordinator is coordinator
+    assert entity.should_poll is False
+    assert entity.available is True
+
+    coordinator.last_update_success = False
+    assert entity.available is False
+
+
+def test_water_heater_coordinator_update_writes_state(hass):
+    """A coordinator update refreshes the attributes and writes the state."""
+    entity = build_water_heater_entity(hass, zone_id=3, room_name="DHW", cur=40.0)
+    coordinator = hass.data[DOMAIN]["test-entry"]["coordinator"]
+    coordinator.get_sensors_data = lambda: [
+        {"zone_id": 3, "room_name": "DHW", "on_off": 1, "doingBoost": False, "current_temperature": 47.0, "setting_temperature": 50}
+    ]
+    entity.async_write_ha_state = MagicMock()
+
+    entity._handle_coordinator_update()
+
+    assert entity.current_temperature == 47.0
+    entity.async_write_ha_state.assert_called_once()
