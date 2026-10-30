@@ -2,6 +2,7 @@
 
 from unittest.mock import patch
 
+import pytest
 from homeassistant import config_entries, data_entry_flow
 from homeassistant.const import CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_USERNAME
 from homeassistant.core import HomeAssistant
@@ -38,6 +39,13 @@ TEST_CONFIG = {
     CONF_ENABLE_ALARM_NOTIFICATIONS: TEST_ENABLE_ALARM_NOTIFICATIONS,
     CONF_FILTERED_ALARM_CODES: TEST_FILTERED_ALARM_CODES,
 }
+
+
+@pytest.fixture(autouse=True)
+def bypass_setup_entry():
+    """Skip real integration setup so flow tests never reach the CSNet cloud."""
+    with patch("custom_components.csnet_home.async_setup_entry", return_value=True):
+        yield
 
 
 async def test_config_flow_user_init(hass: HomeAssistant):

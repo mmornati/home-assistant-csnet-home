@@ -7,7 +7,6 @@ import time
 from dataclasses import dataclass
 
 import aiohttp
-import async_timeout
 from homeassistant.core import HomeAssistant
 
 from custom_components.csnet_home.const import (
@@ -281,7 +280,7 @@ class CSNetHomeAPI:
             "acceptedCookies": "yes",
         }
 
-        async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+        async with asyncio.timeout(DEFAULT_API_TIMEOUT):
             async with self.session.get(login_url, headers=headers, cookies=cookies, data={}) as response:
                 if response.status == 200:
                     _LOGGER.debug("Login page called...")
@@ -323,7 +322,7 @@ class CSNetHomeAPI:
         }
 
         try:
-            async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+            async with asyncio.timeout(DEFAULT_API_TIMEOUT):
                 async with self.session.post(login_url, headers=headers, cookies=cookies, data=form_data) as response:
                     if await self.check_logged_in(response):
                         _LOGGER.info("Login successful")
@@ -391,7 +390,7 @@ class CSNetHomeAPI:
         }
 
         try:
-            async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+            async with asyncio.timeout(DEFAULT_API_TIMEOUT):
                 # Use cookies from session if self.cookies is not set
                 # aiohttp will automatically use cookies from cookie_jar if cookies=None
                 request_cookies = self.cookies if self.cookies else None
@@ -485,7 +484,7 @@ class CSNetHomeAPI:
         }
 
         try:
-            async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+            async with asyncio.timeout(DEFAULT_API_TIMEOUT):
                 # Use cookies from session if self.cookies is not set
                 # aiohttp will automatically use cookies from cookie_jar if cookies=None
                 request_cookies = self.cookies if self.cookies else None
@@ -519,7 +518,7 @@ class CSNetHomeAPI:
         }
 
         try:
-            async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+            async with asyncio.timeout(DEFAULT_API_TIMEOUT):
                 # Use cookies from session if self.cookies is not set
                 # aiohttp will automatically use cookies from cookie_jar if cookies=None
                 request_cookies = self.cookies if self.cookies else None
@@ -558,7 +557,7 @@ class CSNetHomeAPI:
         }
 
         try:
-            async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+            async with asyncio.timeout(DEFAULT_API_TIMEOUT):
                 async with self.session.post(delete_url, headers=headers, cookies=cookies, data=data) as response:
                     response_text = await response.text()
                     _LOGGER.debug(
@@ -770,7 +769,7 @@ class CSNetHomeAPI:
         }
 
         try:
-            async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+            async with asyncio.timeout(DEFAULT_API_TIMEOUT):
                 async with self.session.post(settings_url, headers=headers, cookies=cookies, data=data) as response:
                     response.raise_for_status()
                     _LOGGER.debug("Temperature set to %s for %s", temperature, zone_id)
@@ -828,7 +827,7 @@ class CSNetHomeAPI:
         }
 
         try:
-            async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+            async with asyncio.timeout(DEFAULT_API_TIMEOUT):
                 async with self.session.post(settings_url, headers=headers, cookies=cookies, data=data) as response:
                     response.raise_for_status()
                     _LOGGER.debug(
@@ -866,7 +865,7 @@ class CSNetHomeAPI:
         }
 
         try:
-            async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+            async with asyncio.timeout(DEFAULT_API_TIMEOUT):
                 async with self.session.post(settings_url, headers=headers, cookies=cookies, data=data) as response:
                     response.raise_for_status()
                     _LOGGER.debug("Force water heater status to %s for %s", status, zone_id)
@@ -931,7 +930,7 @@ class CSNetHomeAPI:
         }
 
         try:
-            async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+            async with asyncio.timeout(DEFAULT_API_TIMEOUT):
                 async with self.session.post(settings_url, headers=headers, cookies=cookies, data=data) as response:
                     response_text = await response.text()
                     _LOGGER.debug(
@@ -1004,7 +1003,7 @@ class CSNetHomeAPI:
         }
 
         try:
-            async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+            async with asyncio.timeout(DEFAULT_API_TIMEOUT):
                 async with self.session.post(settings_url, headers=headers, cookies=cookies, data=data) as response:
                     response_text = await response.text()
                     _LOGGER.debug(
@@ -1076,7 +1075,7 @@ class CSNetHomeAPI:
         _LOGGER.debug("Sending data (%s): ", redact_data(data))
 
         try:
-            async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+            async with asyncio.timeout(DEFAULT_API_TIMEOUT):
                 async with self.session.post(settings_url, headers=headers, cookies=cookies, data=data) as response:
                     response.raise_for_status()
                     response_text = await response.text()  # Récupère la réponse en texte
@@ -1116,7 +1115,7 @@ class CSNetHomeAPI:
         }
 
         try:
-            async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+            async with asyncio.timeout(DEFAULT_API_TIMEOUT):
                 async with self.session.post(settings_url, headers=headers, cookies=cookies, data=data) as response:
                     response_text = await response.text()
                     _LOGGER.debug(
@@ -1174,7 +1173,7 @@ class CSNetHomeAPI:
         }
 
         try:
-            async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+            async with asyncio.timeout(DEFAULT_API_TIMEOUT):
                 async with self.session.post(settings_url, headers=headers, cookies=cookies, data=data) as response:
                     response_text = await response.text()
                     _LOGGER.debug(
@@ -1413,7 +1412,7 @@ class CSNetHomeAPI:
         for ep in endpoints:
             url = f"{self.base_url}/translations/{ep}"
             try:
-                async with async_timeout.timeout(DEFAULT_API_TIMEOUT):
+                async with asyncio.timeout(DEFAULT_API_TIMEOUT):
                     async with self.session.get(url, headers=headers) as response:
                         if response.status == 200:
                             data = await response.json()

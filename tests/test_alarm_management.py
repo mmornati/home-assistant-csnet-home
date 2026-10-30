@@ -75,7 +75,7 @@ async def test_alarm_history_sensor(hass, mock_api):
     """Test that the alarm history sensor correctly counts alarms from 'data' key."""
     # Setup coordinator
     setup_hass_services(hass)
-    coordinator = CSNetHomeCoordinator(hass, 60, "test_entry")
+    coordinator = CSNetHomeCoordinator(hass, 60, "test_entry", filtered_alarm_codes="")
     hass.data[DOMAIN] = {"test_entry": {"api": mock_api, "coordinator": coordinator}}
 
     # Trigger update
@@ -102,7 +102,7 @@ async def test_coordinator_alarm_notifications(hass, mock_api):
     """Test that coordinator triggers notifications for active alarms."""
     # Setup coordinator
     setup_hass_services(hass)
-    coordinator = CSNetHomeCoordinator(hass, 60, "test_entry")
+    coordinator = CSNetHomeCoordinator(hass, 60, "test_entry", filtered_alarm_codes="")
     hass.data[DOMAIN] = {"test_entry": {"api": mock_api, "coordinator": coordinator}}
 
     # Trigger update

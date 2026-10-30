@@ -45,11 +45,6 @@ try:
 except ImportError:
     sys.modules["aiohttp"] = MagicMock()
 
-try:
-    import async_timeout  # noqa: F401
-except ImportError:
-    sys.modules["async_timeout"] = MagicMock()
-
 
 @pytest.fixture
 def load_fixture():

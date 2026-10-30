@@ -102,7 +102,6 @@ def mock_deps():
             sys.modules["homeassistant.components"] = MagicMock()
             sys.modules["homeassistant.components.number"] = MagicMock()
             sys.modules["aiohttp"] = MagicMock()
-            sys.modules["async_timeout"] = MagicMock()
 
         # Update specific mocks for this test file
         sys.modules["homeassistant.helpers.update_coordinator"].CoordinatorEntity = MockCoordinatorEntity

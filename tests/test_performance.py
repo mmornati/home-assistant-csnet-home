@@ -78,11 +78,6 @@ except ImportError:
     except ImportError:
         sys.modules["aiohttp"] = MagicMock()
 
-    try:
-        import async_timeout  # noqa: F401
-    except ImportError:
-        sys.modules["async_timeout"] = MagicMock()
-
 
 # Now import coordinator
 from custom_components.csnet_home.coordinator import CSNetHomeCoordinator  # noqa: E402
