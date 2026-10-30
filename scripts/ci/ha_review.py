@@ -12,7 +12,8 @@ Inputs:
 - the integration's own source (``custom_components/csnet_home``)
 
 Writes the markdown report to ``--output`` and exits non-zero on any API
-error, refusal or empty answer. Needs ``ANTHROPIC_API_KEY``.
+error, refusal or empty answer. Needs ``ANTHROPIC_API_KEY``. The model comes
+from ``--model``, else ``HA_REVIEW_MODEL``, else ``DEFAULT_MODEL``.
 """
 
 import argparse
@@ -31,9 +32,18 @@ import anthropic
 ROOT = Path(__file__).resolve().parents[2]
 INTEGRATION = ROOT / "custom_components" / "csnet_home"
 BLOG_FEED = "https://contributors.home-assistant.io/blog/rss.xml"
-MODEL = "claude-opus-5-5"
-# USD per million tokens (input, output) for MODEL, used only for the log line.
-PRICE = (4.00, 20.00)
+DEFAULT_MODEL = "claude-opus-5-5"
+# USD per million tokens (input, output), used only for the cost log line.
+PRICES = {
+    "claude-fable-5-1": (10.00, 50.00),
+    "claude-opus-5-5": (4.00, 20.00),
+    "claude-opus-5": (5.00, 25.00),
+    "claude-sonnet-5-5": (2.00, 10.00),
+    "claude-sonnet-5": (2.00, 10.00),
+    "claude-haiku-5-5": (0.10, 0.50),  # (0.50, 2.50) above 100k input tokens
+}
+# Models that accept the server-side refusal fallback (`fallbacks: "default"`).
+FALLBACK_MODELS = {"claude-fable-5-1", "claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5"}
 
 INPUT_FILES = {
     "import_smoke.log": "Result of importing every integration module on the new HA version",
@@ -166,7 +176,13 @@ def main():
     parser.add_argument("--previous", required=True, help="previously supported HA version")
     parser.add_argument("--inputs", type=Path, default=Path("ha-review-input"))
     parser.add_argument("--output", type=Path, default=Path("ha-review.md"))
+    parser.add_argument(
+        "--model",
+        default=os.environ.get("HA_REVIEW_MODEL") or DEFAULT_MODEL,
+        help=f"Claude model id (default: $HA_REVIEW_MODEL or {DEFAULT_MODEL})",
+    )
     args = parser.parse_args()
+    print(f"Model: {args.model}")
 
     if not os.environ.get("ANTHROPIC_API_KEY"):
         print("::error::ANTHROPIC_API_KEY is not set; add it as a repository secret.")
@@ -184,19 +200,22 @@ def main():
 
     content = build_content(args.version, args.previous, args.inputs, posts, integration_source())
 
-    client = anthropic.Anthropic()
-    try:
+    request = {
+        "model": args.model,
+        "max_tokens": 32000,
+        "output_config": {"effort": "high"},
+        "system": SYSTEM,
+        "messages": [{"role": "user", "content": content}],
+    }
+    if args.model in FALLBACK_MODELS:
         # Server-side fallback re-runs the request on another model if this one
         # declines it, instead of failing the review.
-        with client.beta.messages.stream(
-            model=MODEL,
-            max_tokens=32000,
-            betas=["server-side-fallback-2026-07-01"],
-            fallbacks="default",
-            output_config={"effort": "high"},
-            system=SYSTEM,
-            messages=[{"role": "user", "content": content}],
-        ) as stream:
+        request["betas"] = ["server-side-fallback-2026-07-01"]
+        request["fallbacks"] = "default"
+
+    client = anthropic.Anthropic()
+    try:
+        with client.beta.messages.stream(**request) as stream:
             message = stream.get_final_message()
     except anthropic.APIStatusError as err:
         print(f"::error::Claude API error {err.status_code}: {err.message}")
@@ -206,11 +225,13 @@ def main():
         sys.exit(1)
 
     usage = message.usage
-    cost = (usage.input_tokens * PRICE[0] + usage.output_tokens * PRICE[1]) / 1_000_000
-    print(
-        f"Model {message.model}: {usage.input_tokens} input / {usage.output_tokens} output tokens"
-        f" (~${cost:.2f} at {MODEL} rates), stop_reason={message.stop_reason}"
-    )
+    cost_text = "cost unknown for this model"
+    if price := PRICES.get(args.model):
+        if args.model == "claude-haiku-5-5" and usage.input_tokens > 100_000:
+            price = (0.50, 2.50)
+        cost = (usage.input_tokens * price[0] + usage.output_tokens * price[1]) / 1_000_000
+        cost_text = f"~${cost:.2f} at {args.model} rates"
+    print(f"Model {message.model}: {usage.input_tokens} input / {usage.output_tokens} output tokens" f" ({cost_text}), stop_reason={message.stop_reason}")
 
     if message.stop_reason == "refusal":
         print("::error::Claude declined the request")

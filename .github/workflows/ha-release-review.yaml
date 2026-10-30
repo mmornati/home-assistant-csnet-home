@@ -26,9 +26,19 @@ name: HA Release Review (Claude)
         description: 'HA version to review (e.g. 2026.11.0 or 2026.11.0b1). Empty = auto-detect.'
         type: string
         default: ''
+      model:
+        description: 'Claude model for this run (e.g. claude-sonnet-5-5). Empty = HA_REVIEW_MODEL.'
+        type: string
+        default: ''
 
 permissions:
   contents: read
+
+# Model used for the review: the manual-run input, else the HA_REVIEW_MODEL
+# repository variable (Settings > Secrets and variables > Actions > Variables),
+# else the default below.
+env:
+  HA_REVIEW_MODEL: ${{ inputs.model || vars.HA_REVIEW_MODEL || 'claude-opus-5-5' }}
 
 concurrency:
   group: ha-release-review
@@ -175,6 +185,9 @@ jobs:
           VERSION: ${{ needs.detect.outputs.version }}
           PREVIOUS: ${{ needs.detect.outputs.previous }}
         run: |
+          if ! [[ "$HA_REVIEW_MODEL" =~ ^claude-[a-z0-9.-]+$ ]]; then
+            echo "::error::Invalid model id '$HA_REVIEW_MODEL'"; exit 1
+          fi
           python -m venv /tmp/review-venv
           /tmp/review-venv/bin/pip install --quiet "anthropic>=2.3,<3"
           /tmp/review-venv/bin/python scripts/ci/ha_review.py \
@@ -246,7 +259,7 @@ jobs:
             cat ha-review.md
             echo ""
             echo "---"
-            echo "_Automated review of HA ${VERSION} by Claude · [workflow run](${RUN_URL})._"
+            echo "_Automated review of HA ${VERSION} by Claude (${HA_REVIEW_MODEL}) · [workflow run](${RUN_URL})._"
             echo "_Generated from third-party release notes: verify before acting._"
           } > body.md
           gh issue create --label ha-release-review \
