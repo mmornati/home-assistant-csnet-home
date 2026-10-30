@@ -82,7 +82,7 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
             HVACMode.HEAT_COOL,
         ]
         self._attr_preset_modes = ["comfort", "eco"]
-        if self._sensor_data.get("ecocomfort") and self._sensor_data.get("ecocomfort") == 0:
+        if self._sensor_data.get("ecocomfort") == 0:
             self._attr_preset_mode = "eco"
         else:
             self._attr_preset_mode = "comfort"
@@ -128,6 +128,10 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
         # cache for dynamically computed limits
         self._cached_limits: tuple[float | None, float | None] | None = None
 
+    def _fan_circuit(self):
+        """Return the fan circuit: C1 for zone 1 and C1 water (5), C2 otherwise."""
+        return 1 if self._sensor_data.get("zone_id") in (1, 5) else 2
+
     def _get_fan_mode_from_data(self):
         """Read the fan mode from the raw API data."""
         if self._sensor_data is None:
@@ -135,8 +139,7 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
 
         if self._is_fan_coil:
             # Fan speed for fan coil
-            zone_id = self._sensor_data.get("zone_id")
-            circuit = 1 if zone_id == 1 else 2
+            circuit = self._fan_circuit()
 
             fan_speed_key = f"fan{circuit}_speed"
             fan_speed = self._sensor_data.get(fan_speed_key)
@@ -448,7 +451,8 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
             on_off=self._sensor_data.get("on_off"),
         )
         if response:
-            self._sensor_data["ecocomfort"] = 1 if preset_mode == "eco" else 0
+            # ecocomfort: 0 = Eco, 1 = Comfort
+            self._sensor_data["ecocomfort"] = 0 if preset_mode == "eco" else 1
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
         """Set new fan mode (fan speed for fan coil, silent mode otherwise)."""
@@ -462,10 +466,7 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
 
             fan_speed = self._fan_speed_map[fan_mode]
 
-            # Determine which circuit to use based on zone_id
-            zone_id = self._sensor_data.get("zone_id")
-            # Zone 1 uses C1, Zone 2 uses C2
-            circuit = 1 if zone_id == 1 else 2
+            circuit = self._fan_circuit()
 
             # Check if fan control is available for this circuit
             coordinator = self.coordinator

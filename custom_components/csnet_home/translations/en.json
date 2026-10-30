@@ -15,7 +15,7 @@
                 "data_description": {
                     "username": "Your CSNet Manager username",
                     "password": "Your CSNet Manager password",
-                    "scan_interval": "How often to poll for updates (default: 60 seconds)",
+                    "scan_interval": "How often to poll for updates (default and minimum: 60 seconds)",
                     "language": "Preferred language for device names and alarms",
                     "max_temp_override": "Override the maximum temperature limit (8-80°C). Leave empty for defaults.",
                     "fan_coil_model": "Select the fan coil control type (standard or legacy)"
@@ -35,7 +35,7 @@
                 "data_description": {
                     "username": "Your CSNet Manager username",
                     "password": "Your CSNet Manager password",
-                    "scan_interval": "How often to poll for updates",
+                    "scan_interval": "How often to poll for updates (minimum: 60 seconds)",
                     "language": "Preferred language for device names and alarms",
                     "max_temp_override": "Override the maximum temperature limit (8-80°C)",
                     "fan_coil_model": "Select the fan coil control type"

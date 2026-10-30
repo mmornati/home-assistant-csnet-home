@@ -16,14 +16,16 @@ from .const import (
     DEFAULT_FAN_COIL_MODEL,
     DEFAULT_FILTERED_ALARM_CODES,
     DEFAULT_LANGUAGE,
+    DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     FAN_COIL_MODEL_LEGACY,
     FAN_COIL_MODEL_STANDARD,
+    MIN_SCAN_INTERVAL,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
-DEFAULT_SCAN_INTERVAL = 60
+SCAN_INTERVAL_SCHEMA = vol.All(vol.Coerce(int), vol.Range(min=MIN_SCAN_INTERVAL))
 
 
 class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -64,7 +66,7 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 {
                     vol.Required(CONF_USERNAME): str,
                     vol.Required(CONF_PASSWORD): str,
-                    vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): int,
+                    vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): SCAN_INTERVAL_SCHEMA,
                     vol.Optional(CONF_LANGUAGE, default=DEFAULT_LANGUAGE): vol.In(["en", "fr", "es"]),
                     vol.Optional(CONF_MAX_TEMP_OVERRIDE): vol.All(vol.Coerce(int), vol.Range(min=8, max=80)),
                     vol.Optional(CONF_FAN_COIL_MODEL, default=DEFAULT_FAN_COIL_MODEL): vol.In([FAN_COIL_MODEL_STANDARD, FAN_COIL_MODEL_LEGACY]),
@@ -91,7 +93,7 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """
         from .api import CSNetHomeAPI
 
-        _LOGGER.info("Config flow: Validating credentials for user: %s", username)
+        _LOGGER.debug("Config flow: Validating credentials")
         try:
             # Validate credentials using the API
             is_valid = await CSNetHomeAPI.async_validate_credentials(self.hass, username, password)
@@ -143,12 +145,15 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Required(CONF_PASSWORD, default=reconfigure_entry.data.get(CONF_PASSWORD)): str,
                     vol.Optional(
                         CONF_SCAN_INTERVAL,
-                        default=reconfigure_entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
-                    ): int,
+                        default=max(
+                            reconfigure_entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
+                            MIN_SCAN_INTERVAL,
+                        ),
+                    ): SCAN_INTERVAL_SCHEMA,
                     vol.Optional(
                         CONF_LANGUAGE,
                         default=reconfigure_entry.data.get(CONF_LANGUAGE, DEFAULT_LANGUAGE),
-                    ): vol.In(["en", "fr"]),
+                    ): vol.In(["en", "fr", "es"]),
                     vol.Optional(
                         CONF_MAX_TEMP_OVERRIDE,
                         default=reconfigure_entry.data.get(CONF_MAX_TEMP_OVERRIDE),
@@ -176,8 +181,10 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_reauth(self, entry_data):
         """Handle reauthentication when credentials are invalid."""
-        # Store the entry for later use
-        self.context["entry_id"] = entry_data.get("entry_id")
+        # Home Assistant already puts the entry id in the flow context and passes
+        # the entry data here, which does not contain it: only fall back to it.
+        if not self.context.get("entry_id"):
+            self.context["entry_id"] = entry_data.get("entry_id")
         return await self.async_step_reauth_confirm()
 
     async def async_step_reauth_confirm(self, user_input=None):

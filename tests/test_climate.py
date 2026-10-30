@@ -1442,3 +1442,66 @@ def test_device_info_with_missing_sensor_data_keys(hass):
     # Should not raise KeyError, should use defaults
     assert device_info is not None
     assert device_info["name"] == "Unknown Device-Unknown Room"
+
+
+def test_initial_preset_mode_eco(hass):
+    """The cached preset is eco when ecocomfort is 0 (0 = Eco, 1 = Comfort)."""
+    assert build_entity(hass, ecocomfort=0)._attr_preset_mode == "eco"
+    assert build_entity(hass, ecocomfort=1)._attr_preset_mode == "comfort"
+
+
+@pytest.mark.asyncio
+async def test_set_preset_mode_optimistic_value(hass):
+    """After setting a preset, the optimistic ecocomfort matches the API encoding."""
+    entity = build_entity(hass, ecocomfort=1)
+    entity.hass = hass
+
+    await entity.async_set_preset_mode("eco")
+    assert entity._sensor_data["ecocomfort"] == 0
+    assert entity.preset_mode == "eco"
+
+    await entity.async_set_preset_mode("comfort")
+    assert entity._sensor_data["ecocomfort"] == 1
+    assert entity.preset_mode == "comfort"
+
+
+@pytest.mark.asyncio
+async def test_set_preset_mode_failure_keeps_value(hass):
+    """A failed preset write leaves the current value untouched."""
+    entity = build_entity(hass, ecocomfort=1)
+    entity.hass = hass
+    hass.data[DOMAIN][entity.entry.entry_id]["api"].set_preset_modes = AsyncMock(return_value=False)
+
+    await entity.async_set_preset_mode("eco")
+    assert entity._sensor_data["ecocomfort"] == 1
+
+
+def test_fan_mode_reading_for_c1_water_zone(hass):
+    """Zone 5 (C1 water) reads the C1 fan speed."""
+    entity = build_entity(hass, is_fan_coil=True, zone_id=5, fan1_speed=1, fan2_speed=2)
+    assert entity.fan_mode == "low"
+
+
+@pytest.mark.asyncio
+async def test_set_fan_mode_for_c1_water_zone_uses_circuit1(hass):
+    """Zone 5 (C1 water) sets the fan speed on circuit 1, not circuit 2."""
+    entity = build_entity(hass, is_fan_coil=True, zone_id=5, fan1_speed=3)
+    entity.hass = hass
+    api = hass.data[DOMAIN][entity.entry.entry_id]["api"]
+
+    await entity.async_set_fan_mode("low")
+
+    assert api.async_set_fan_speed.call_args[0][3] == 1
+    assert entity._sensor_data["fan1_speed"] == 1
+
+
+@pytest.mark.asyncio
+async def test_set_fan_mode_for_c2_water_zone_uses_circuit2(hass):
+    """Zone 6 (C2 water) keeps using circuit 2."""
+    entity = build_entity(hass, is_fan_coil=True, zone_id=6, fan2_speed=3)
+    entity.hass = hass
+    api = hass.data[DOMAIN][entity.entry.entry_id]["api"]
+
+    await entity.async_set_fan_mode("low")
+
+    assert api.async_set_fan_speed.call_args[0][3] == 2

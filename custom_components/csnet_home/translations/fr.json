@@ -15,7 +15,7 @@
                 "data_description": {
                     "username": "Votre nom d'utilisateur CSNet Manager",
                     "password": "Votre mot de passe CSNet Manager",
-                    "scan_interval": "Fréquence de mise à jour des données (par défaut : 60 secondes)",
+                    "scan_interval": "Fréquence de mise à jour des données (par défaut et minimum : 60 secondes)",
                     "language": "Langue préférée pour les noms d'appareils et les alarmes",
                     "max_temp_override": "Remplacer la limite de température maximale (8-80°C). Laisser vide pour les valeurs par défaut.",
                     "fan_coil_model": "Sélectionnez le type de contrôle du ventilo-convecteur (standard ou legacy)"
@@ -35,7 +35,7 @@
                 "data_description": {
                     "username": "Votre nom d'utilisateur CSNet Manager",
                     "password": "Votre mot de passe CSNet Manager",
-                    "scan_interval": "Fréquence de mise à jour des données",
+                    "scan_interval": "Fréquence de mise à jour des données (minimum : 60 secondes)",
                     "language": "Langue préférée pour les noms d'appareils et les alarmes",
                     "max_temp_override": "Remplacer la limite de température maximale (8-80°C)",
                     "fan_coil_model": "Sélectionnez le type de contrôle du ventilo-convecteur"

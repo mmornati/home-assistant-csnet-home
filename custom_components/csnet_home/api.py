@@ -21,7 +21,10 @@ from custom_components.csnet_home.const import (
     INSTALLATION_ALARMS_PATH,
     INSTALLATION_DEVICES_PATH,
     LANGUAGE_FILES,
+    LOGIN_BACKOFF_BASE,
+    LOGIN_BACKOFF_MAX,
     LOGIN_PATH,
+    MAX_AUTH_REJECTIONS,
     WATER_CIRCUIT_MAX_COOL,
     WATER_CIRCUIT_MAX_HEAT,
     WATER_CIRCUIT_MIN_COOL,
@@ -30,6 +33,9 @@ from custom_components.csnet_home.const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+# CSNet Manager serves its login page (status 200) when the session is not valid
+LOGIN_PAGE_MARKER = 'loadContent("login")'
 
 
 @dataclass
@@ -106,6 +112,7 @@ TO_REDACT = {
     "password",
     "password_unsanitized",
     "token",
+    "XSRF-TOKEN",
 }
 
 # Alarm Origin Map Constants
@@ -266,6 +273,23 @@ class CSNetHomeAPI:
         self.xsrf_token = None
         self.translations = {}
         self.installation_id = None
+        # Serialise logins so parallel reads/writes never sign in twice
+        self._login_lock = asyncio.Lock()
+        self._login_failures = 0
+        self._next_login_attempt = 0.0
+        # Consecutive logins where the server answered with the login page again
+        self.auth_rejections = 0
+        self._last_login_rejected = False
+
+    @property
+    def auth_failed(self) -> bool:
+        """Return True when the server rejected the credentials too many times in a row."""
+        return self.auth_rejections >= MAX_AUTH_REJECTIONS
+
+    @property
+    def login_backoff_remaining(self) -> float:
+        """Return the seconds left before another login attempt is allowed."""
+        return max(0.0, self._next_login_attempt - time.monotonic())
 
     async def get_xsrf_token(self):
         """Get the XSRF token from the cloud service."""
@@ -290,7 +314,50 @@ class CSNetHomeAPI:
                 return False
 
     async def async_login(self):
-        """Log in to the cloud service and return a session cookie."""
+        """Log in to the cloud service, at most once at a time and with backoff.
+
+        Concurrent callers wait for the login in progress and reuse its result.
+        After a failed login, further attempts are skipped (returning False
+        without any request) for a delay that doubles on each failure, so an
+        outage or a wrong password does not hammer CSNet Manager.
+        """
+        async with self._login_lock:
+            if self.logged_in:
+                return True
+
+            remaining = self.login_backoff_remaining
+            if remaining > 0:
+                _LOGGER.debug("Skipping CSNet login, backing off for another %.0f s", remaining)
+                return False
+
+            rejected = False
+            try:
+                success = await self._async_do_login()
+                rejected = not success and self._last_login_rejected
+            except Exception as e:
+                _LOGGER.error("Login exception: %s", e)
+                success = False
+
+            if success:
+                self._login_failures = 0
+                self._next_login_attempt = 0.0
+                self.auth_rejections = 0
+                return True
+
+            self._login_failures += 1
+            self.auth_rejections = self.auth_rejections + 1 if rejected else 0
+            delay = min(LOGIN_BACKOFF_BASE * 2 ** (self._login_failures - 1), LOGIN_BACKOFF_MAX)
+            self._next_login_attempt = time.monotonic() + delay
+            _LOGGER.warning(
+                "CSNet login failed (%s consecutive failure(s)), next attempt in %d s",
+                self._login_failures,
+                delay,
+            )
+            return False
+
+    async def _async_do_login(self):
+        """Perform the login requests: fetch the XSRF token, then post the login form."""
+        self._last_login_rejected = False
         if self.session is None or self.session.closed:
             self.session = aiohttp.ClientSession(cookie_jar=aiohttp.CookieJar())
 
@@ -325,8 +392,9 @@ class CSNetHomeAPI:
             async with asyncio.timeout(DEFAULT_API_TIMEOUT):
                 async with self.session.post(login_url, headers=headers, cookies=cookies, data=form_data) as response:
                     if await self.check_logged_in(response):
-                        _LOGGER.info("Login successful")
                         return True
+                    # A 200 that shows the login page again means the credentials were refused
+                    self._last_login_rejected = response.status == 200
                     _LOGGER.error("Login failed. Status code: %s", response.status)
                     return False
         except Exception as e:
@@ -350,7 +418,7 @@ class CSNetHomeAPI:
         Returns:
             bool: True if credentials are valid, False otherwise
         """
-        _LOGGER.info("Starting credential validation for user: %s", username)
+        _LOGGER.debug("Starting credential validation")
         # Create a temporary API instance for validation
         temp_api = CSNetHomeAPI(hass, username, password, base_url)
         # Pre-create the session so it is always available for cleanup
@@ -360,7 +428,7 @@ class CSNetHomeAPI:
             # Attempt to login with the provided credentials
             _LOGGER.debug("Attempting login for credential validation")
             login_success = await temp_api.async_login()
-            _LOGGER.info(
+            _LOGGER.debug(
                 "Credential validation result: %s",
                 "SUCCESS" if login_success else "FAILED",
             )
@@ -381,8 +449,9 @@ class CSNetHomeAPI:
         sensor_data_url = f"{self.base_url}{ELEMENTS_PATH}"
 
         if not self.session or not self.logged_in:
-            _LOGGER.warning("No active session found.")
-            await self.async_login()
+            _LOGGER.debug("No active session found, logging in.")
+            if not await self.async_login():
+                return None
 
         headers = COMMON_API_HEADERS | {
             "accept": "application/json, text/javascript, */*; q=0.01",
@@ -475,8 +544,9 @@ class CSNetHomeAPI:
         installation_devices_url = f"{self.base_url}{INSTALLATION_DEVICES_PATH}?installationId=-1"
 
         if not self.session or not self.logged_in:
-            _LOGGER.warning("No active session found.")
-            await self.async_login()
+            _LOGGER.debug("No active session found, logging in.")
+            if not await self.async_login():
+                return None
 
         headers = COMMON_API_HEADERS | {
             "accept": "application/json, text/javascript, */*; q=0.01",
@@ -509,8 +579,9 @@ class CSNetHomeAPI:
         installation_alarms_url = f"{self.base_url}{INSTALLATION_ALARMS_PATH}" f"?installationId={self.installation_id}&_csrf={self.xsrf_token}"
 
         if not self.session or not self.logged_in:
-            _LOGGER.warning("No active session found.")
-            await self.async_login()
+            _LOGGER.debug("No active session found, logging in.")
+            if not await self.async_login():
+                return None
 
         headers = COMMON_API_HEADERS | {
             "accept": "*/*",
@@ -728,11 +799,26 @@ class CSNetHomeAPI:
 
         return (min_temp, max_temp)
 
-    async def async_set_temperature(self, zone_id, parent_id, mode, **kwargs):
-        """Set the target temperature for a room."""
-        settings_url = f"{self.base_url}{HEAT_SETTINGS_PATH}"
+    def _is_session_expired(self, response, response_text) -> bool:
+        """Return True when a response means the CSNet session is no longer valid.
 
-        temperature = kwargs.get("temperature")
+        An expired session is redirected to the login page, which aiohttp
+        follows, so it usually arrives as a 200 carrying the login page.
+        """
+        if response.status in (401, 403):
+            return True
+        if isinstance(response_text, str) and LOGIN_PAGE_MARKER in response_text:
+            return True
+        return getattr(getattr(response, "url", None), "path", None) == LOGIN_PATH
+
+    async def _async_post_heat_setting(self, data, description) -> bool:
+        """Post a change to /data/indoor/heat_setting.
+
+        The HTTP status alone does not prove the change was accepted: an
+        expired session answers with the login page. In that case log in
+        again and retry once with the new CSRF token.
+        """
+        settings_url = f"{self.base_url}{HEAT_SETTINGS_PATH}"
 
         headers = COMMON_API_HEADERS | {
             "accept": "*/*",
@@ -741,10 +827,62 @@ class CSNetHomeAPI:
             "origin": self.base_url,
         }
 
+        for attempt in range(2):
+            data["_csrf"] = self.xsrf_token
+            cookies = {
+                "XSRF-TOKEN": self.xsrf_token,
+                "acceptedCookies": "yes",
+            }
+            try:
+                async with asyncio.timeout(DEFAULT_API_TIMEOUT):
+                    async with self.session.post(settings_url, headers=headers, cookies=cookies, data=data) as response:
+                        response_text = await response.text()
+                        _LOGGER.debug(
+                            "%s with payload=%s, status=%s, response=%s",
+                            description,
+                            redact_data(data),
+                            response.status,
+                            response_text,
+                        )
+                        if not self._is_session_expired(response, response_text):
+                            if response.status != 200:
+                                _LOGGER.warning("HTTP %s for %s: %s", response.status, description, response_text)
+                                return False
+                            return True
+            except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+                _LOGGER.error("Error during %s: %s", description, err)
+                return False
+
+            self.logged_in = False
+            if attempt == 0:
+                _LOGGER.info("CSNet session expired during %s, logging in again", description)
+                if not await self.async_login():
+                    _LOGGER.error("Could not %s: login failed", description)
+                    return False
+
+        _LOGGER.error("Could not %s: session still expired after logging in again", description)
+        return False
+
+    @staticmethod
+    def circuit_for_zone(zone_id):
+        """Return (circuit number, is water circuit) used in heat_setting keys.
+
+        Zones 5 and 6 are the C1 and C2 water circuits and use C1/C2 in
+        parameter names; zones 1 and 2 are the C1/C2 air (room) circuits.
+        """
+        if zone_id == 5:
+            return 1, True
+        if zone_id == 6:
+            return 2, True
+        return zone_id, False
+
+    async def async_set_temperature(self, zone_id, parent_id, mode, **kwargs):
+        """Set the target temperature for a room."""
+        temperature = kwargs.get("temperature")
+
         data = {
             "orderStatus": "PENDING",
             "indoorId": parent_id,
-            "_csrf": self.xsrf_token,
         }
         if zone_id == 3:
             data["settingTempDHW"] = str(int(temperature))
@@ -763,20 +901,7 @@ class CSNetHomeAPI:
         else:
             data[f"settingTempRoomZ{zone_id}"] = str(int(temperature * 10))
 
-        cookies = {
-            "XSRF-TOKEN": self.xsrf_token,
-            "acceptedCookies": "yes",
-        }
-
-        try:
-            async with asyncio.timeout(DEFAULT_API_TIMEOUT):
-                async with self.session.post(settings_url, headers=headers, cookies=cookies, data=data) as response:
-                    response.raise_for_status()
-                    _LOGGER.debug("Temperature set to %s for %s", temperature, zone_id)
-                    return True
-        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
-            _LOGGER.error("Error setting temperature for %s: %s", zone_id, err)
-            return False
+        return await self._async_post_heat_setting(data, f"set temperature={temperature} for zone {zone_id}")
 
     async def async_set_fixed_water_temperature(self, circuit: int, parent_id: int, mode: int, temperature: float):
         """Set fixed water temperature for a circuit.
@@ -794,19 +919,9 @@ class CSNetHomeAPI:
         Returns:
             bool: True if successful, False otherwise
         """
-        settings_url = f"{self.base_url}{HEAT_SETTINGS_PATH}"
-
-        headers = COMMON_API_HEADERS | {
-            "accept": "*/*",
-            "x-requested-with": "XMLHttpRequest",
-            "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
-            "origin": self.base_url,
-        }
-
         data = {
             "orderStatus": "PENDING",
             "indoorId": parent_id,
-            "_csrf": self.xsrf_token,
         }
 
         # Set the appropriate fixed temperature field based on circuit and mode
@@ -821,70 +936,20 @@ class CSNetHomeAPI:
             _LOGGER.warning("Invalid mode %s for fixed water temperature", mode)
             return False
 
-        cookies = {
-            "XSRF-TOKEN": self.xsrf_token,
-            "acceptedCookies": "yes",
-        }
-
-        try:
-            async with asyncio.timeout(DEFAULT_API_TIMEOUT):
-                async with self.session.post(settings_url, headers=headers, cookies=cookies, data=data) as response:
-                    response.raise_for_status()
-                    _LOGGER.debug(
-                        "Fixed water temperature set to %s for circuit %s (mode %s)",
-                        temperature,
-                        circuit,
-                        mode,
-                    )
-                    return True
-        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
-            _LOGGER.error("Error setting fixed water temperature for circuit %s: %s", circuit, err)
-            return False
+        return await self._async_post_heat_setting(data, f"set fixed water temperature={temperature} for circuit {circuit} (mode {mode})")
 
     async def set_water_heater_status(self, zone_id, parent_id, status):
         """Change the water heater forcing status."""
-        settings_url = f"{self.base_url}{HEAT_SETTINGS_PATH}"
-
-        headers = COMMON_API_HEADERS | {
-            "accept": "*/*",
-            "x-requested-with": "XMLHttpRequest",
-            "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
-            "origin": self.base_url,
-        }
-
         data = {
             "orderStatus": "PENDING",
             "indoorId": parent_id,
             "boostDHW": status,
-            "_csrf": self.xsrf_token,
         }
 
-        cookies = {
-            "XSRF-TOKEN": self.xsrf_token,
-            "acceptedCookies": "yes",
-        }
-
-        try:
-            async with asyncio.timeout(DEFAULT_API_TIMEOUT):
-                async with self.session.post(settings_url, headers=headers, cookies=cookies, data=data) as response:
-                    response.raise_for_status()
-                    _LOGGER.debug("Force water heater status to %s for %s", status, zone_id)
-                    return True
-        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
-            _LOGGER.error("Error forcing the water heater status for %s: %s", zone_id, err)
-            return False
+        return await self._async_post_heat_setting(data, f"set water heater boost={status} for zone {zone_id}")
 
     async def async_set_hvac_mode(self, zone_id, parent_id, hvac_mode: str):
         """Set HVAC mode: HEAT, COOL, or OFF."""
-        settings_url = f"{self.base_url}{HEAT_SETTINGS_PATH}"
-
-        headers = COMMON_API_HEADERS | {
-            "accept": "*/*",
-            "x-requested-with": "XMLHttpRequest",
-            "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
-            "origin": self.base_url,
-        }
-
         # Mapping from HA mode to CSNet parameters
         hvac_mode_lower = hvac_mode.lower()
         data = {
@@ -892,15 +957,9 @@ class CSNetHomeAPI:
             "updatedOn": str(int(time.time() * 1000)),  # current timestamp in ms
             "orderStatus": "PENDING",
             "indoorId": parent_id,
-            "_csrf": self.xsrf_token,
         }
 
-        # For zone_id 5 (fixed temp circuit), use C1 in parameter names
-        circuit_id = 1 if zone_id == 5 else zone_id
-
-        # Determine if this is a water circuit or air circuit
-        # Zone 5 is fixed temperature water circuit, zones 1,2,4 are typically air/room thermostats
-        is_water_circuit = zone_id == 5
+        circuit_id, is_water_circuit = self.circuit_for_zone(zone_id)
 
         # Determine the correct key for run/stop based on circuit type
         run_stop_key = f"runStopC{circuit_id}"
@@ -922,63 +981,20 @@ class CSNetHomeAPI:
             data[run_stop_key] = "0"
         else:
             _LOGGER.warning("Unsupported hvac_mode=%s ignored", hvac_mode)
-            return True
-
-        cookies = {
-            "XSRF-TOKEN": self.xsrf_token,
-            "acceptedCookies": "yes",
-        }
-
-        try:
-            async with asyncio.timeout(DEFAULT_API_TIMEOUT):
-                async with self.session.post(settings_url, headers=headers, cookies=cookies, data=data) as response:
-                    response_text = await response.text()
-                    _LOGGER.debug(
-                        "Set hvac_mode=%s with payload=%s, status=%s, response=%s",
-                        hvac_mode,
-                        redact_data(data),
-                        response.status,
-                        response_text,
-                    )
-                    if response.status != 200:
-                        _LOGGER.warning(
-                            "HTTP %s for hvac_mode=%s: %s",
-                            response.status,
-                            hvac_mode,
-                            response_text,
-                        )
-                        return False
-                    response.raise_for_status()
-                    return True
-        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
-            _LOGGER.error("Error setting hvac_mode=%s: %s", hvac_mode, err)
             return False
+
+        return await self._async_post_heat_setting(data, f"set hvac_mode={hvac_mode} for zone {zone_id}")
 
     async def set_preset_modes(self, zone_id, parent_id, preset_mode, current_mode=None, on_off=None):
         """Set the eco/comfort mode for a zone."""
-        settings_url = f"{self.base_url}{HEAT_SETTINGS_PATH}"
-
-        headers = COMMON_API_HEADERS | {
-            "accept": "*/*",
-            "x-requested-with": "XMLHttpRequest",
-            "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
-            "origin": self.base_url,
-        }
-
         data = {
             "id": f"{parent_id}{zone_id}",  # device id + zone id
             "updatedOn": str(int(time.time() * 1000)),  # current timestamp in ms
             "orderStatus": "PENDING",
             "indoorId": parent_id,
-            "_csrf": self.xsrf_token,
         }
 
-        # For zone_id 5 (fixed temp circuit), use C1 in parameter names
-        circuit_id = 1 if zone_id == 5 else zone_id
-
-        # Determine if this is a water circuit or air circuit
-        # Zone 5 is fixed temperature water circuit, zones 1,2,4 are typically air/room thermostats
-        is_water_circuit = zone_id == 5
+        circuit_id, is_water_circuit = self.circuit_for_zone(zone_id)
 
         # Include current HVAC mode and run/stop status if provided
         if current_mode is not None:
@@ -997,36 +1013,7 @@ class CSNetHomeAPI:
         else:
             data[f"ecoModeC{circuit_id}"] = "1"
 
-        cookies = {
-            "XSRF-TOKEN": self.xsrf_token,
-            "acceptedCookies": "yes",
-        }
-
-        try:
-            async with asyncio.timeout(DEFAULT_API_TIMEOUT):
-                async with self.session.post(settings_url, headers=headers, cookies=cookies, data=data) as response:
-                    response_text = await response.text()
-                    _LOGGER.debug(
-                        "Set preset_mode=%s for zone=%s with payload=%s, status=%s, response=%s",
-                        preset_mode,
-                        zone_id,
-                        redact_data(data),
-                        response.status,
-                        response_text,
-                    )
-                    if response.status != 200:
-                        _LOGGER.warning(
-                            "HTTP %s for preset_mode=%s: %s",
-                            response.status,
-                            preset_mode,
-                            response_text,
-                        )
-                        return False
-                    response.raise_for_status()
-                    return True
-        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
-            _LOGGER.error("Error setting preset_mode for %s: %s", zone_id, err)
-            return False
+        return await self._async_post_heat_setting(data, f"set preset_mode={preset_mode} for zone {zone_id}")
 
     async def set_water_heater_mode(self, zone_id, parent_id, preset_mode):
         """Set the off/eco/performance demand mode for water_heater and swimming pool.
@@ -1034,20 +1021,9 @@ class CSNetHomeAPI:
         For DHW (zone_id=3): supports eco/performance/off
         For SWP (zone_id=4): supports on/off only
         """
-        settings_url = f"{self.base_url}{HEAT_SETTINGS_PATH}"
-        _LOGGER.debug("URL %s et mode %s", settings_url, preset_mode)
-
-        headers = COMMON_API_HEADERS | {
-            "accept": "*/*",
-            "x-requested-with": "XMLHttpRequest",
-            "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
-            "origin": self.base_url,
-        }
-
         data = {
             "orderStatus": "PENDING",
             "indoorId": parent_id,
-            "_csrf": self.xsrf_token,
         }
 
         if zone_id == 3:  # DHW (water heater)
@@ -1067,38 +1043,11 @@ class CSNetHomeAPI:
             elif preset_mode == "off":
                 data["runStopSWP"] = 0
 
-        cookies = {
-            "XSRF-TOKEN": self.xsrf_token,
-            "acceptedCookies": "yes",
-        }
-
-        _LOGGER.debug("Sending data (%s): ", redact_data(data))
-
-        try:
-            async with asyncio.timeout(DEFAULT_API_TIMEOUT):
-                async with self.session.post(settings_url, headers=headers, cookies=cookies, data=data) as response:
-                    response.raise_for_status()
-                    response_text = await response.text()  # Récupère la réponse en texte
-                    _LOGGER.debug("Réponse API (%s): %s", response.status, response_text)
-                    _LOGGER.debug("Set preset_mode to %s for %s", preset_mode, zone_id)
-                    return True
-        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
-            _LOGGER.error("Error setting preset_mode for %s: %s", zone_id, err)
-            return False
+        return await self._async_post_heat_setting(data, f"set water heater mode={preset_mode} for zone {zone_id}")
 
     async def async_set_silent_mode(self, zone_id, parent_id, silent_mode: bool):
         """Set silent/quiet mode for a zone."""
-        settings_url = f"{self.base_url}{HEAT_SETTINGS_PATH}"
-
-        headers = COMMON_API_HEADERS | {
-            "accept": "*/*",
-            "x-requested-with": "XMLHttpRequest",
-            "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
-            "origin": self.base_url,
-        }
-
-        # For zone_id 5 (fixed temp circuit), use C1 in parameter names
-        circuit_id = 1 if zone_id == 5 else zone_id
+        circuit_id, _ = self.circuit_for_zone(zone_id)
 
         data = {
             "id": f"{parent_id}{zone_id}",  # device id + zone id
@@ -1106,39 +1055,9 @@ class CSNetHomeAPI:
             "orderStatus": "PENDING",
             "indoorId": parent_id,
             f"silentModeC{circuit_id}": "1" if silent_mode else "0",
-            "_csrf": self.xsrf_token,
         }
 
-        cookies = {
-            "XSRF-TOKEN": self.xsrf_token,
-            "acceptedCookies": "yes",
-        }
-
-        try:
-            async with asyncio.timeout(DEFAULT_API_TIMEOUT):
-                async with self.session.post(settings_url, headers=headers, cookies=cookies, data=data) as response:
-                    response_text = await response.text()
-                    _LOGGER.debug(
-                        "Set silent_mode=%s for zone=%s with payload=%s, status=%s, response=%s",
-                        silent_mode,
-                        zone_id,
-                        redact_data(data),
-                        response.status,
-                        response_text,
-                    )
-                    if response.status != 200:
-                        _LOGGER.warning(
-                            "HTTP %s for silent_mode=%s: %s",
-                            response.status,
-                            silent_mode,
-                            response_text,
-                        )
-                        return False
-                    response.raise_for_status()
-                    return True
-        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
-            _LOGGER.error("Error setting silent_mode for %s: %s", zone_id, err)
-            return False
+        return await self._async_post_heat_setting(data, f"set silent_mode={silent_mode} for zone {zone_id}")
 
     async def async_set_fan_speed(self, zone_id, parent_id, fan_speed: int, circuit: int = 1):
         """Set fan speed for a fan coil circuit.
@@ -1149,55 +1068,15 @@ class CSNetHomeAPI:
             fan_speed: Fan speed value (0=off, 1=low, 2=medium, 3=auto)
             circuit: Circuit number (1 for C1, 2 for C2)
         """
-        settings_url = f"{self.base_url}{HEAT_SETTINGS_PATH}"
-
-        headers = COMMON_API_HEADERS | {
-            "accept": "*/*",
-            "x-requested-with": "XMLHttpRequest",
-            "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
-            "origin": self.base_url,
-        }
-
         data = {
             "id": f"{parent_id}{zone_id}",  # device id + zone id
             "updatedOn": str(int(time.time() * 1000)),  # current timestamp in ms
             "orderStatus": "PENDING",
             "indoorId": parent_id,
             f"fan{circuit}Speed": str(fan_speed),
-            "_csrf": self.xsrf_token,
         }
 
-        cookies = {
-            "XSRF-TOKEN": self.xsrf_token,
-            "acceptedCookies": "yes",
-        }
-
-        try:
-            async with asyncio.timeout(DEFAULT_API_TIMEOUT):
-                async with self.session.post(settings_url, headers=headers, cookies=cookies, data=data) as response:
-                    response_text = await response.text()
-                    _LOGGER.debug(
-                        "Set fan_speed=%s for zone=%s circuit=%s with payload=%s, status=%s, response=%s",
-                        fan_speed,
-                        zone_id,
-                        circuit,
-                        redact_data(data),
-                        response.status,
-                        response_text,
-                    )
-                    if response.status != 200:
-                        _LOGGER.warning(
-                            "HTTP %s for fan_speed=%s: %s",
-                            response.status,
-                            fan_speed,
-                            response_text,
-                        )
-                        return False
-                    response.raise_for_status()
-                    return True
-        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
-            _LOGGER.error("Error setting fan_speed for %s circuit %s: %s", zone_id, circuit, err)
-            return False
+        return await self._async_post_heat_setting(data, f"set fan_speed={fan_speed} for zone {zone_id} circuit {circuit}")
 
     def is_fan_coil_compatible(self, installation_devices_data):
         """Check if the system supports fan coil control.
@@ -1347,8 +1226,8 @@ class CSNetHomeAPI:
             bool: True if the login was successful, False otherwise.
         """
         page_content = await response.text()
-        if response.status == 200 and 'loadContent("login")' not in page_content:
-            _LOGGER.info("Login successful")
+        if response.status == 200 and LOGIN_PAGE_MARKER not in page_content:
+            _LOGGER.info("CSNet login successful")
             self.logged_in = True
             return True
 
