@@ -72,35 +72,19 @@ The CSNet Home integration uses a multi-layered testing approach to ensure compa
 
 **File**: `.github/workflows/validate.yaml`
 
-**Triggers**:
-- Push to main branch
-- Pull requests
-- Manual dispatch
+**Triggers**: push to main, pull requests
 
 **What it does**:
-1. **Hassfest Validation** - Official Home Assistant integration validation
-2. **HACS Validation** - HACS integration standards compliance
-3. **Code Style** - Black formatting check
-4. **Linting** - Pylint code quality analysis
-5. **Unit Tests** - pytest with coverage across multiple HA versions
-6. **Security Scan** - Bandit security vulnerability detection
-
-**Matrix Testing**:
-```yaml
-Python versions: [3.11, 3.12, 3.13]
-HA versions: [2025.6.0, 2025.8.0, 2025.10.0]
-Total combinations: 9
-```
-
-**Example Output**:
-```
-✓ Hassfest: Passed
-✓ HACS: Passed  
-✓ Black: Code formatted correctly
-✓ Pylint: No issues found
-✓ Tests (Python 3.12 + HA 2025.10.0): 45 passed, coverage 87%
-✓ Security: No vulnerabilities detected
-```
+1. **Hassfest** and **HACS** validation
+2. **Code style** - Black and isort
+3. **Lint** - Pylint (informational)
+4. **Unit tests** - the full pytest suite against the **latest stable HA**, resolved
+   from PyPI on every run (`scripts/ci/ha_versions.py`). HA is installed with
+   `scripts/ci/install_ha.sh`, which pins the exact version, installs the matching
+   `pytest-homeassistant-custom-component`, and fails if pip ends up with a different
+   HA version. If the test harness for a brand-new HA release is not published yet,
+   the job warns and skips pytest instead of testing the wrong version.
+5. **Security scan** - Bandit (informational)
 
 ---
 
@@ -108,36 +92,14 @@ Total combinations: 9
 
 **File**: `.github/workflows/smoke-test.yaml`
 
-**Triggers**:
-- Push to main
-- Pull requests
-- Manual dispatch
+**Triggers**: push to main, pull requests, manual dispatch
 
-**Purpose**: Fast validation that integration loads without errors
+**Purpose**: fast check that every module imports on recent HA releases.
 
-**What it tests**:
-1. Module imports work correctly
-2. Manifest.json is valid
-3. Home Assistant API compatibility
-4. No import errors or syntax issues
-
-**Speed**: ~2-3 minutes per version
-
-**Matrix Testing**:
-```yaml
-Python versions: [3.11, 3.12, 3.13]
-HA versions: [2025.4.0, 2025.6.0, 2025.8.0, 2025.10.0]
-Total combinations: 12
-```
-
-**Example Output**:
-```
-Testing HA 2025.10.0 with Python 3.13:
-✓ All modules imported successfully
-✓ Manifest valid
-✓ HA APIs compatible
-✓ No syntax or import errors
-```
+**Matrix**: the newest patch of each of the last 3 monthly HA releases, each with the
+Python version that release requires. Resolved from PyPI on every run, so no manual
+version bumps are needed. `scripts/ci/import_smoke.py` imports every module and fails
+the job on any error (no `continue-on-error`).
 
 ---
 
@@ -184,55 +146,50 @@ HA versions: [2025.9.0, 2025.10.0, latest]
 
 **File**: `.github/workflows/nightly-compatibility.yaml`
 
-**Triggers**:
-- Scheduled: Every night at 2 AM UTC
-- Manual dispatch
-
-**Purpose**: Proactively detect compatibility issues with upcoming HA versions
-
-**🔥 NEW: Dynamic Latest Version Testing**
-- Automatically detects and tests the **absolute latest** HA version
-- Checks both PyPI and GitHub for newest release
-- **Zero maintenance** - no manual version updates needed
-- Works with any future HA version (2025, 2026, 2027...)
+**Triggers**: every night at 2 AM UTC, manual dispatch
 
 **What it does**:
-1. **Test Latest Stable**: Full test suite against **dynamically detected** latest HA release 🔥
-   - Fetches from PyPI (usually most current)
-   - Falls back to GitHub Releases
-   - No manual updates needed!
-2. **Test Dev Branch**: Tests against upcoming HA version (preview)
-3. **Multi-Version Smoke**: Quick checks across 5 fixed + 1 dynamic version
-   - Fixed: 2025.4.0, 2025.6.0, 2025.8.0, 2025.9.0, 2025.10.0
-   - Dynamic: Whatever is latest on PyPI (changes automatically!)
-4. **Generate Report**: Compatibility status report with version details
-5. **Auto-Alert**: Creates GitHub issue if tests fail
+1. **Unit tests on latest stable** - full pytest suite on the newest HA release.
+2. **Import smoke on recent releases** - last 4 monthly releases.
+3. **Import smoke on the next beta** - when PyPI has a pre-release newer than the latest
+   stable (usually about a week before each monthly release). New HA deprecation
+   warnings are surfaced as workflow annotations.
+4. **Report + issue** - writes a summary table, and on failure opens (or comments on)
+   an issue labelled `compatibility`, `automated`, `needs-investigation`. It comments
+   again when the check is green.
 
-**Notification Behavior**:
-- Creates issue on first failure
-- Updates existing issue on subsequent failures
-- Comments when tests pass again after failure
-- Issues labeled: `compatibility`, `automated`, `needs-investigation`
+No step uses `continue-on-error`: a failing test fails the run and opens the issue.
+(Before October 2026 every test step had `continue-on-error: true`, so the nightly
+stayed green while 12 tests were failing.)
 
-**Example Report**:
-**Example Report**:
-```markdown
-# 🔍 Nightly Compatibility Check Report
+---
 
-**Date**: 2025-10-25 02:00:00 UTC
+### HA Release Review (Claude)
 
-## Test Results
+**File**: `.github/workflows/ha-release-review.yaml`
 
-✅ **Latest Stable HA**: Tests Passed (2025.10.2)
-⚠️ **HA Dev Branch**: Tests Failed (may indicate upcoming breaking changes)
-✅ **Multi-Version Smoke Tests**: Passed
+**Triggers**: every 6 hours (polls PyPI), manual dispatch with an optional version
 
-## Recommendations
+**Purpose**: catch breaking changes and deprecations that tests do not cover, as soon as a
+new HA release (or its first beta) appears.
 
-- 🔧 Review upcoming Home Assistant changes
-- 📝 Check HA dev branch changelog for breaking changes
-- 🛠️ Consider updating integration code proactively
-```
+**What it does**, once per monthly release (`YYYY.M`, the issue title is the dedupe key):
+1. Installs the new HA version and runs the import smoke test and unit tests.
+2. Diffs the HA base modules this integration inherits from (climate, water_heater,
+   sensor, number, entity, entity_platform, update_coordinator, config_entries, ...)
+   against the previous release.
+3. Runs Claude (`anthropics/claude-code-action`, pinned to a commit SHA) with those
+   results, the HA release notes and the developer blog, and has it write a report.
+4. A separate job opens one issue `Home Assistant YYYY.M compatibility review`
+   (label `ha-release-review`) from that report.
+
+**Security model**: release notes and blog posts are third-party text, so the job that
+runs Claude has `contents: read` only, no Bash, web access limited to
+`developers.home-assistant.io`, and can write only `ha-review.md`. The issue is created
+by a plain shell step in another job. Claude never pushes code; fixes go through a
+normal PR.
+
+**Setup**: add the `ANTHROPIC_API_KEY` repository secret.
 
 ---
 
