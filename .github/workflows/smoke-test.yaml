@@ -12,245 +12,51 @@ permissions:
   contents: read
 
 jobs:
-  get-test-versions:
-    name: Get HA Versions for Testing
+  versions:
+    name: Resolve HA Versions
     runs-on: ubuntu-latest
     outputs:
-      versions_matrix: ${{ steps.fetch-versions.outputs.versions_matrix }}
-    steps:
-      - name: Fetch Test Versions
-        id: fetch-versions
-        run: |
-          echo "Fetching recent stable HA versions for smoke testing..."
-
-          # Get current year and month
-          CURRENT_YEAR=$(date +%Y)
-          CURRENT_MONTH=$(date +%-m)  # Remove leading zero
-
-          echo "Current date: $CURRENT_YEAR.$CURRENT_MONTH"
-          echo "Will test last 3 months of releases"
-
-          # Get all stable versions for current year (and previous if needed)
-          ALL_VERSIONS=$(curl -s https://pypi.org/pypi/homeassistant/json | \
-            jq -r '.releases | keys | .[]' | \
-            grep -E '^20[0-9]{2}\.[0-9]+\.[0-9]+$' | \
-            grep -v 'b' | \
-            sort -V)
-
-          # Group by month and get the latest patch version from each of the last 3 months
-          VERSIONS=""
-          for month in $(seq $((CURRENT_MONTH)) -1 $((CURRENT_MONTH - 2))); do
-            if [ "$month" -lt 1 ]; then
-              # Handle year boundary (e.g., Jan 2026 looking back to Dec 2025)
-              PREV_YEAR=$((CURRENT_YEAR - 1))
-              month=$((month + 12))
-              LATEST=$(echo "$ALL_VERSIONS" | grep "^${PREV_YEAR}\.${month}\." | tail -1)
-            else
-              LATEST=$(echo "$ALL_VERSIONS" | grep "^${CURRENT_YEAR}\.${month}\." | tail -1)
-            fi
-
-            if [ -n "$LATEST" ]; then
-              echo "  Month $month: $LATEST"
-              VERSIONS="${VERSIONS}${LATEST}"$'\n'
-            fi
-          done
-
-          # Remove trailing newline and sort
-          VERSIONS=$(echo "$VERSIONS" | grep -v '^$' | sort -V)
-
-          echo ""
-          echo "Selected versions for testing:"
-          echo "$VERSIONS"
-
-          # Create JSON array
-          VERSIONS_JSON=$(echo "$VERSIONS" | jq -R -s -c 'split("\n") | map(select(length > 0))')
-          echo "versions_matrix=$VERSIONS_JSON" >> "$GITHUB_OUTPUT"
-
-  smoke-test:
-    name: Smoke Test - HA ${{ matrix.ha-version }}
-    runs-on: ubuntu-latest
-    needs: get-test-versions
-    strategy:
-      fail-fast: false
-      matrix:
-        ha-version: ${{ fromJson(needs.get-test-versions.outputs.versions_matrix) }}
-
+      matrix: ${{ steps.resolve.outputs.matrix }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Determine Python Version
-        id: python-version
-        run: |
-          VERSION="${{ matrix.ha-version }}"
+      - name: Resolve versions from PyPI
+        id: resolve
+        run: python3 scripts/ci/ha_versions.py --months 3
 
-          # Get Python requirement for this HA version
-          PY_REQ=$(curl -s https://pypi.org/pypi/homeassistant/$VERSION/json \
-            | jq -r '.info.requires_python // ">=3.12.0"')
-          echo "HA $VERSION requires: $PY_REQ"
+  smoke-test:
+    name: Smoke Test - HA ${{ matrix.ha }}
+    runs-on: ubuntu-latest
+    needs: versions
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.versions.outputs.matrix) }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
 
-          # Determine Python version
-          # HA 2026.3+ requires Python 3.14.2+
-          # HA 2025.6-2026.2 requires Python 3.13.2+
-          # HA 2024.12-2025.5 requires Python 3.12+
-          if [[ "$PY_REQ" == *"3.14"* ]]; then
-            PYTHON_VERSION="3.14"
-          elif [[ "$PY_REQ" == *"3.13"* ]]; then
-            PYTHON_VERSION="3.13"
-          else
-            PYTHON_VERSION="3.12"
-          fi
-
-          echo "Using Python: $PYTHON_VERSION"
-          echo "python_version=$PYTHON_VERSION" >> "$GITHUB_OUTPUT"
-
-      - name: Set up Python ${{ steps.python-version.outputs.python_version }}
+      - name: Set up Python ${{ matrix.python }}
         uses: actions/setup-python@v7
         with:
-          python-version: ${{ steps.python-version.outputs.python_version }}
+          python-version: ${{ matrix.python }}
           cache: 'pip'
 
-      - name: Install Home Assistant ${{ matrix.ha-version }}
+      - name: Install Home Assistant ${{ matrix.ha }}
+        run: scripts/ci/install_ha.sh "${{ matrix.ha }}" runtime
+
+      - name: Verify manifest
         run: |
-          python -m pip install --upgrade pip
-          pip install homeassistant==${{ matrix.ha-version }}
+          python - <<'EOF'
+          import json, sys
+          manifest = json.load(open("custom_components/csnet_home/manifest.json"))
+          required = ("domain", "name", "version", "requirements", "config_flow", "iot_class")
+          missing = [f for f in required if f not in manifest]
+          if missing:
+              sys.exit(f"manifest.json missing: {missing}")
+          print("manifest.json OK")
+          EOF
 
-      - name: Install integration dependencies
-        run: |
-          pip install -r custom_components/csnet_home/requirements.txt
-
-      - name: Smoke Test - Import Integration
-        id: import-test
-        continue-on-error: true
-        run: |
-          python -c "
-          import sys
-          import importlib.util
-
-          # Test that all modules can be imported
-          modules = [
-              'custom_components.csnet_home',
-              'custom_components.csnet_home.api',
-              'custom_components.csnet_home.climate',
-              'custom_components.csnet_home.config_flow',
-              'custom_components.csnet_home.coordinator',
-              'custom_components.csnet_home.sensor',
-              'custom_components.csnet_home.water_heater',
-          ]
-
-          print('Testing module imports...')
-          failed = []
-          for module in modules:
-              try:
-                  # Try importing directly - simpler and clearer
-                  __import__(module)
-                  print(f'✓ {module}')
-              except Exception as e:
-                  print(f'⚠️  {module}: {e}')
-                  failed.append(module)
-
-          if failed:
-              ha_ver = \"${{ matrix.ha-version }}\"
-              print(f'\\n⚠️  Some imports failed (may be dependency conflicts with HA {ha_ver})')
-              print(f'Note: Docker integration tests provide the real compatibility validation')
-          else:
-              print('\\n✓ All modules imported successfully')
-          "
-        env:
-          PYTHONPATH: ${{ github.workspace }}
-
-      - name: Smoke Test - Verify Manifest
-        run: |
-          python -c "
-          import json
-          import sys
-
-          print('Checking manifest.json...')
-          with open('custom_components/csnet_home/manifest.json') as f:
-              manifest = json.load(f)
-
-          required_fields = ['domain', 'name', 'version', 'requirements', 'config_flow', 'iot_class']
-
-          for field in required_fields:
-              if field not in manifest:
-                  print(f'✗ Missing required field: {field}')
-                  sys.exit(1)
-              print(f'✓ {field}: {manifest[field]}')
-
-          print(f'\\n✓ Manifest valid for HA ${{ matrix.ha-version }}')
-          "
-
-      - name: Smoke Test - Check HA API Compatibility
-        id: ha-api-test
-        continue-on-error: true
-        run: |
-          python -c "
-          import sys
-          sys.path.insert(0, '${{ github.workspace }}')
-
-          print('Testing Home Assistant API compatibility...')
-
-          # Import HA core components
-          try:
-              from homeassistant import core
-              from homeassistant.config_entries import ConfigEntry
-              from homeassistant.helpers.entity import Entity
-              from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
-              from homeassistant.components.climate import ClimateEntity
-              from homeassistant.components.sensor import SensorEntity
-              from homeassistant.components.water_heater import WaterHeaterEntity
-              print('✓ Home Assistant core imports successful')
-          except (ImportError, AttributeError) as e:
-              error_msg = str(e)
-              # Check if this is the known pycares/aiodns Python 3.13 compatibility issue
-              if 'pycares' in error_msg or 'ares_query_a_result' in error_msg:
-                  print(f'⚠️  Dependency compatibility issue (Python 3.13 + pycares): {e}')
-                  print('  This is a known environment issue, not a code problem.')
-                  print('  Integration tests provide real compatibility validation.')
-                  sys.exit(0)  # Exit successfully for this known issue
-              else:
-                  print(f'✗ Failed to import HA core: {e}')
-                  sys.exit(1)
-
-          # Verify our integration can access HA APIs
-          try:
-              from custom_components.csnet_home.const import DOMAIN
-              print(f'✓ Integration domain: {DOMAIN}')
-          except ImportError as e:
-              print(f'✗ Failed to import integration: {e}')
-              sys.exit(1)
-
-          print('\\n✓ All HA APIs compatible with ${{ matrix.ha-version }}')
-          "
-        env:
-          PYTHONPATH: ${{ github.workspace }}
-
-      - name: Summary
-        if: always()
-        run: |
-          {
-            echo "### Smoke Test Results"
-            echo ""
-            echo "- **Home Assistant Version**: ${{ matrix.ha-version }}"
-            echo "- **Python Version**: ${{ steps.python-version.outputs.python_version }}"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          if [ "${{ steps.import-test.outcome }}" == "failure" ]; then
-            {
-              echo "- **Import Test**: ⚠️ Some dependency conflicts"
-              echo "  (see Docker integration test for real validation)"
-            } >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "- **Import Test**: ✓ Passed" >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-          if [ "${{ steps.ha-api-test.outcome }}" == "failure" ]; then
-            {
-              echo "- **HA API Test**: ⚠️ Dependency compatibility issue (Python 3.13)"
-              echo "  (see Docker integration test for real validation)"
-            } >> "$GITHUB_STEP_SUMMARY"
-          elif [ "${{ steps.ha-api-test.outcome }}" == "success" ]; then
-            echo "- **HA API Test**: ✓ Passed" >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-          echo "- **Overall Status**: ${{ job.status }}" >> "$GITHUB_STEP_SUMMARY"
+      - name: Import smoke test
+        run: python scripts/ci/import_smoke.py

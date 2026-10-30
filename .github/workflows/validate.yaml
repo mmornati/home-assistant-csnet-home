@@ -80,8 +80,32 @@ jobs:
         run: pylint custom_components/csnet_home
         continue-on-error: true
 
-  # Note: pytest removed due to josepy dependency conflicts in isolated pip installs
-  # Docker integration tests provide comprehensive validation in real HA environment
+  tests:
+    name: Unit Tests (latest HA)
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: Checkout
+        uses: "actions/checkout@v7"
+
+      - name: Resolve latest Home Assistant
+        id: ha
+        run: python3 scripts/ci/ha_versions.py --months 1
+
+      - name: Setup Python
+        uses: "actions/setup-python@v7"
+        with:
+          python-version: ${{ steps.ha.outputs.latest_python }}
+          cache: 'pip'
+
+      # Pinning HA and letting pip pick the matching test harness avoids the
+      # dependency conflicts that made pytest unreliable here before.
+      - name: Install Home Assistant ${{ steps.ha.outputs.latest }}
+        id: install
+        run: scripts/ci/install_ha.sh "${{ steps.ha.outputs.latest }}" tests
+
+      - name: Run pytest
+        if: steps.install.outputs.harness == 'ready'
+        run: pytest tests/ -q --cov=custom_components/csnet_home --cov-report=term-missing
 
   security:
     name: Security Scan
