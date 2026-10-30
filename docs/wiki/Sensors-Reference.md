@@ -6,14 +6,21 @@ Complete reference of all sensors provided by the Hitachi CSNet Home integration
 
 The integration creates numerous sensors to monitor your Hitachi heat pump system. Sensors are organized into several categories:
 
-- **🌡️ Zone Sensors** - Per-zone temperature and status
-- **💧 Water System Sensors** - Hydraulic system monitoring
-- **🌤️ Environmental Sensors** - Outdoor and weather data
-- **⚙️ System Status Sensors** - Equipment operation status
-- **📡 Device Sensors** - WiFi and connectivity
-- **🔔 Alarm Sensors** - Alarm monitoring and history
-- **⚙️ Configuration Sensors** - System configuration details
-- **🔧 Diagnostic Sensors** - Technical system information
+- **Zone Sensors** - Per-zone temperature and status
+- **Device Sensors** - WiFi and connectivity
+- **Water System Sensors** - Hydraulic system and DHW tank monitoring
+- **Environmental Sensors** - Outdoor and weather data
+- **System Status Sensors** - Equipment operation status
+- **Configuration Sensors** - System configuration details
+- **OTC Sensors** - Outdoor Temperature Compensation settings
+- **Energy and Performance Sensors** - Estimated power, energy and COP
+- **Compressor / Outdoor Unit Sensors** - Refrigerant cycle telemetry (see [Compressor Sensors](../COMPRESSOR_SENSORS.md))
+- **Alarm Sensors** - Alarm monitoring and history
+
+!!! note "Entity IDs"
+    Home Assistant builds entity IDs from the entity name, which comes from your CSNet Manager device and room names. The IDs on this page are patterns: `{device}` is the CSNet device name (often `Remote`) and `{zone}` is the room/zone name. Examples such as `sensor.remote_living_room_current_temperature` are placeholders. If you renamed an entity, or it was created by an older version, your ID may differ — check **Settings → Devices & Services → Entities**.
+
+The integration also creates **number** entities for the fixed water temperature of water circuits; they are described in [Climate Control](Climate-Control.md#number-entities-for-fixed-water-temperature).
 
 ---
 
@@ -69,9 +76,9 @@ action:
 **Description**: Whether the zone is powered on or off
 
 ### Doing Boost
-**Entity**: `sensor.{device}_{zone}_doingBoost`  
+**Entity**: `sensor.{device}_{zone}_doingboost`  
 **Values**: `on`, `off`  
-**Device Class**: `binary`  
+**Device Class**: `enum`  
 **Description**: Indicates if boost mode is active
 
 **Note**: Primarily used for DHW water heater
@@ -89,8 +96,8 @@ action:
 ### Alarm Active
 **Entity**: `sensor.{device}_{zone}_alarm_active`  
 **Values**: `on`, `off`  
-**Device Class**: `binary`  
-**Description**: Boolean indicator if any alarm is active
+**Device Class**: `enum`  
+**Description**: `on` when the zone's alarm code is non-zero
 
 **Usage**:
 ```yaml
@@ -114,34 +121,35 @@ action:
 **Entity**: `sensor.{device}_{zone}_alarm_code_formatted`  
 **Values**: Formatted code string  
 **Device Class**: `enum`  
-**Description**: Alarm code formatted for display (hex or decimal)
+**Description**: Alarm code formatted for display. Codes that carry a letter (BCD-encoded) are shown in hexadecimal, others in decimal; `0` means no alarm.
 
 ### Alarm Origin
 **Entity**: `sensor.{device}_{zone}_alarm_origin`  
 **Values**: Origin description  
 **Device Class**: `enum`  
-**Description**: Where the alarm originated (for Yutaki systems)
-
-**Possible Origins**:
-- Indoor Unit
-- Outdoor Unit
-- Compressor
-- Inverter
-- Refrigerant Cycle
-- Communication
-- etc.
+**Description**: Component the alarm comes from, translated into the configured language (for example indoor unit, outdoor unit, compressor, inverter, refrigerant cycle, communication). Only filled for `yutaki` and `water_heater` unit types; empty otherwise.
 
 ### Unit Type
 **Entity**: `sensor.{device}_{zone}_unit_type`  
 **Values**: System type identifier  
 **Device Class**: `enum`  
-**Description**: Type of unit (standard, yutaki, water_heater, fan_coil)
+**Description**: Type of unit derived from the zone type:
+
+| Value | Zone |
+|-------|------|
+| `water_heater` | DHW (zone 3) |
+| `swimming_pool` | Swimming pool (zone 4) |
+| `yutaki` | C1 water circuit (zone 5) |
+| `standard` | Everything else |
 
 ---
 
 ## Device Sensors
 
-Monitor WiFi and connectivity for each device.
+Monitor WiFi and connectivity for each device. These sensors are named after the CSNet device only (not the zone).
+
+!!! note
+    Device sensors are created once per zone, so a device with several zones gets several identical sensors, which Home Assistant suffixes `_2`, `_3`, and so on. You can disable the duplicates.
 
 ### WiFi Signal
 **Entity**: `sensor.{device}_wifi_signal`  
@@ -155,19 +163,19 @@ Monitor WiFi and connectivity for each device.
 - `-60 to -70 dBm` - Fair
 - `-70+ dBm` - Poor
 
-**Example**: `sensor.remote_living_room_wifi_signal`
+**Example**: `sensor.remote_wifi_signal`
 
 ### Connectivity
 **Entity**: `sensor.{device}_connectivity`  
 **Values**: `on` (online), `off` (offline)  
-**Device Class**: `binary`  
-**Description**: Device online status (based on last communication < 10 minutes)
+**Device Class**: `enum`  
+**Description**: `on` if the device's last communication with CSNet Manager is at most 10 minutes old
 
 **Usage**:
 ```yaml
 trigger:
   - platform: state
-    entity_id: sensor.remote_living_room_connectivity
+    entity_id: sensor.remote_connectivity
     to: "off"
     for: "00:05:00"
 action:
@@ -179,15 +187,13 @@ action:
 ### Last Communication
 **Entity**: `sensor.{device}_last_communication`  
 **Device Class**: `timestamp`  
-**Description**: ISO 8601 timestamp of last successful communication
-
-**Example Value**: `2025-01-24T15:30:45+00:00`
+**Description**: Timestamp (UTC) of the device's last communication with CSNet Manager
 
 ---
 
 ## Water System Sensors
 
-Monitor hydraulic system operation (installation-wide).
+Monitor hydraulic system operation (installation-wide). These sensors belong to the **System-Controller** device and are named `System Controller …`.
 
 ### Pump Speed
 **Entity**: `sensor.system_controller_pump_speed`  
@@ -215,6 +221,21 @@ Monitor hydraulic system operation (installation-wide).
 **Device Class**: `temperature`  
 **Description**: Water outlet temperature (supply to heating circuits)
 
+### External Tank Temperature
+**Entity**: `sensor.system_controller_external_tank_temperature`  
+**Unit**: °C  
+**Device Class**: `temperature`  
+**Description**: Temperature reported by the third water outlet probe (`waterOutlet3Temp`, TWO3), typically an external tank
+
+### Heat Exchanger Water Outlet Temperature
+**Entity**: `sensor.system_controller_heat_exchanger_water_outlet_temperature`  
+**Unit**: °C  
+**Device Class**: `temperature`  
+**Description**: Water temperature at the heat pump's heat exchanger outlet (`waterOutletHPTemp`). This is the dedicated DHW tank supply reading: while the unit is producing DHW, the [Output Power](#output-power) calculation uses it instead of the normal outlet temperature.
+
+!!! note
+    The DHW tank's own temperature is the `current_temperature` of the water heater entity (read from `tempDHW`). See [Water Heater Control](Water-Heater-Control.md).
+
 ### Set Water Temperature
 **Entity**: `sensor.system_controller_set_water_temperature`  
 **Unit**: °C  
@@ -237,7 +258,7 @@ trigger:
 **Description**: System water pressure
 
 **Normal Range**: 1.0 - 2.5 bar  
-**Note**: Value is automatically divided by 50 from API response
+**Note**: The raw API value is divided by 50
 
 ### Gas Temperature
 **Entity**: `sensor.system_controller_gas_temperature`  
@@ -269,9 +290,7 @@ Monitor outdoor conditions and weather.
 **Entity**: `sensor.system_controller_outdoor_average_temperature`  
 **Unit**: °C  
 **Device Class**: `temperature`  
-**Description**: Rolling average of outdoor temperature
-
-**Note**: Used for OTC (Outdoor Temperature Compensation) calculations
+**Description**: Average outdoor temperature as reported by the unit (`outdoorAmbientAverageTemp`)
 
 ### Weather Temperature
 **Entity**: `sensor.system_controller_weather_temperature`  
@@ -300,7 +319,7 @@ Monitor equipment operation.
 ### Defrost
 **Entity**: `sensor.system_controller_defrost`  
 **Values**: `on`, `off`  
-**Device Class**: `binary`  
+**Device Class**: `enum`  
 **Description**: Indicates if defrost cycle is active
 
 **Note**: Heat pump enters defrost periodically in heating mode when outdoor coil ices up
@@ -308,7 +327,6 @@ Monitor equipment operation.
 ### Mix Valve Position
 **Entity**: `sensor.system_controller_mix_valve_position`  
 **Unit**: % (0-100)  
-**Device Class**: `percentage`  
 **Description**: Mixing valve opening percentage
 
 **Purpose**: Mixes return water with supply to achieve target temperature
@@ -316,12 +334,12 @@ Monitor equipment operation.
 ### Central Control Enabled
 **Entity**: `sensor.system_controller_central_control_enabled`  
 **Values**: `on`, `off`  
-**Device Class**: `binary`  
+**Device Class**: `enum`  
 **Description**: Indicates if central control is properly configured
 
 **Requirements for "On"**:
 - Central config ≥ 3 (Total Control), OR
-- LCD software version ≥ 0x0222 (for non-S80 models)
+- LCD software version ≥ 0x0222, or not yet set (0), for non-S80 models
 
 ### Unit Model
 **Entity**: `sensor.system_controller_unit_model`  
@@ -342,7 +360,7 @@ Monitor equipment operation.
 **Values**: Version in hex format  
 **Description**: LCD controller software version
 
-**Example Value**: `0x0222` (version 2.34)
+**Example Value**: `0x0222`
 
 ### Central Config
 **Entity**: `sensor.system_controller_central_config`  
@@ -368,7 +386,7 @@ System configuration details.
 ### Fan Coil Compatible
 **Entity**: `sensor.system_controller_fan_coil_compatible`  
 **Values**: `on`, `off`  
-**Device Class**: `binary`  
+**Device Class**: `enum`  
 **Description**: Indicates if system supports fan coil control
 
 **Determined by**: `systemConfigBits & 0x2000`
@@ -376,7 +394,7 @@ System configuration details.
 ### C1 Thermostat Present
 **Entity**: `sensor.system_controller_c1_thermostat_present`  
 **Values**: `on`, `off`  
-**Device Class**: `binary`  
+**Device Class**: `enum`  
 **Description**: Indicates if C1 circuit thermostat is installed
 
 **Determined by**: `systemConfigBits & 0x40`
@@ -384,7 +402,7 @@ System configuration details.
 ### C2 Thermostat Present
 **Entity**: `sensor.system_controller_c2_thermostat_present`  
 **Values**: `on`, `off`  
-**Device Class**: `binary`  
+**Device Class**: `enum`  
 **Description**: Indicates if C2 circuit thermostat is installed
 
 **Determined by**: `systemConfigBits & 0x80`
@@ -392,7 +410,7 @@ System configuration details.
 ### Cascade Slave Mode
 **Entity**: `sensor.system_controller_cascade_slave_mode`  
 **Values**: `on`, `off`  
-**Device Class**: `binary`  
+**Device Class**: `enum`  
 **Description**: Indicates if system is in cascade slave configuration
 
 **Determined by**: `systemConfigBits & 0x1000`
@@ -428,6 +446,8 @@ Outdoor Temperature Compensation configuration.
 - `Points` (1) - Point-based curve
 - `Fixed` (2) - Fixed temperature
 
+When a circuit's OTC type is `Fixed`, a fixed water temperature number entity is created for it. See [Fixed Water Temperature Control](Climate-Control.md#fixed-water-temperature-control-water-circuits-only).
+
 ### OTC Heating Type C2
 **Entity**: `sensor.system_controller_otc_heating_type_c2`  
 **Values**: OTC type name  
@@ -445,25 +465,84 @@ Outdoor Temperature Compensation automatically adjusts water temperature based o
 
 ---
 
+## Energy and Performance Sensors
+
+Installation-wide sensors on the **System-Controller** device. The CSNet API does not report power or energy, so these values are **estimates calculated by the integration** from the unit's telemetry on every poll. Treat them as indicative, not as metered values.
+
+| Sensor | Entity (pattern) | Unit | What it is |
+|--------|------------------|------|------------|
+| Instant Consumption | `sensor.system_controller_instant_consumption` | W | Estimated electrical input |
+| Output Power | `sensor.system_controller_output_power` | W | Thermal output (heating **or** cooling) |
+| Instant COP | `sensor.system_controller_instant_cop` | – | Output Power ÷ Instant Consumption |
+| Daily Consumption | `sensor.system_controller_daily_consumption` | kWh | Estimated electrical energy today |
+| Daily Output Energy | `sensor.system_controller_daily_output_energy` | kWh | Thermal energy today (heating and cooling) |
+| Daily HVAC COP | `sensor.system_controller_daily_hvac_cop` | – | Today's COP for space heating/cooling |
+| DHW Daily COP | `sensor.system_controller_dhw_daily_cop` | – | Today's COP for DHW production |
+
+### Instant Consumption
+
+Estimated from compressor frequency, discharge and suction pressures and discharge temperature, then clamped to the range given by the reported compressor current (current × 230 V up to (current + 0.99) × 230 V). It is `0` when the compressor runs at 0 Hz.
+
+### Output Power
+
+Thermal power = water flow (m³/h) × 1160 × ΔT, in watts.
+
+| Operation status | ΔT used | Outlet temperature used |
+|------------------|---------|-------------------------|
+| Heating Thermostat On (6) | outlet − inlet | Out Water Temperature |
+| Domestic Hot Water On (8) | outlet − inlet | Heat Exchanger Water Outlet Temperature |
+| Cooling Thermostat On (3) | inlet − outlet | Out Water Temperature |
+| Anything else | – | Output is 0 |
+
+Output is also 0 when ΔT is not positive or the flow is below 0.01 m³/h.
+
+### Instant COP
+
+Output Power divided by Instant Consumption, rounded to 2 decimals. It reports `0` while consumption is below 50 W.
+
+### Daily Sensors
+
+- Integrated from the instant values on each update, reset at local midnight, and restored after a Home Assistant restart.
+- **Daily Consumption** and **Daily Output Energy** use state class `total_increasing`, so they can be added to the Energy dashboard (remember they are estimates).
+- **Daily HVAC COP** accumulates while the unit is heating or cooling, or defrosting outside DHW production.
+- **DHW Daily COP** accumulates while the unit is producing DHW, or defrosting outside space heating.
+
+!!! note "Renamed sensor"
+    The daily space-heating COP sensor was renamed from **Daily COP** to **Daily HVAC COP** when cooling support was added. It now has a new unique ID, so Home Assistant creates a new entity; the old one is left orphaned and can be deleted.
+
+---
+
+## Compressor / Outdoor Unit Sensors
+
+Refrigerant cycle telemetry (compressor frequency and current, discharge/evaporator temperatures, pressures, expansion valves, outdoor fan, secondary cycle) is grouped under a separate **Compressor Outdoor Unit** device, with entity IDs such as `sensor.compressor_outdoor_unit_compressor_frequency`.
+
+See the full list in [Compressor Sensors](../COMPRESSOR_SENSORS.md).
+
+---
+
 ## Alarm Sensors
 
 Monitor system alarms and history.
 
 ### Alarm History
 **Entity**: `sensor.alarm_history`  
-**State**: Number of alarms in history  
-**Description**: Count and details of recent alarms
+**State**: Number of alarms returned by the CSNet installation alarms API  
+**Description**: Count and details of recent alarms (up to 10 in attributes)
 
 **Attributes**:
 ```yaml
 recent_alarms:
-  - code: 42
+  - id: 138670          # use with the csnet_home.delete_alarm service
+    code: 42
     description: "Alarm description"
-    timestamp: "2025-01-24T10:30:00"
-    device: "Remote"
+    timestamp: "<createdAtString from CSNet>"
+    recovered: "<recoveredAtString from CSNet>"
+    device: 12345        # unitId
 total_alarms: 5
-last_updated: "2025-01-24T15:00:00"
+last_updated: "<timestamp from CSNet>"
 ```
+
+An alarm whose `recovered` value is `1980-01-01 00:00:00` is still active. Code `-1` is reported as "System/Communication Error".
 
 **Usage**:
 ```yaml
@@ -479,9 +558,9 @@ action:
 ```
 
 ### Total Alarms
-**Entity**: `sensor.total_alarm_count`  
-**State**: Count of currently active alarms  
-**Description**: Total number of active alarm conditions
+**Entity**: `sensor.total_alarms`  
+**State**: Number of zones with a non-zero alarm code  
+**Description**: Count of zones currently in alarm
 
 **Attributes**:
 ```yaml
@@ -493,9 +572,9 @@ active_devices:
 ```
 
 ### Active Alarms
-**Entity**: `sensor.active_alarm_count`  
-**State**: Number of active alarms  
-**Description**: Count of currently active alarms
+**Entity**: `sensor.active_alarms`  
+**State**: Number of zones with a non-zero alarm code (same value as Total Alarms)  
+**Description**: Count of zones currently in alarm, listed by name in the attributes
 
 **Attributes**:
 ```yaml
@@ -505,8 +584,8 @@ devices_with_alarms:
 ```
 
 ### Alarms by Origin
-**Entity**: `sensor.alarm_by_origin`  
-**State**: Count of most common alarm origin  
+**Entity**: `sensor.alarms_by_origin`  
+**State**: Number of active alarms sharing the most common origin  
 **Description**: Alarms grouped by origin component
 
 **Attributes**:
@@ -545,11 +624,11 @@ group:
   system_health:
     name: System Health
     entities:
-      - sensor.remote_living_room_connectivity
-      - sensor.remote_living_room_wifi_signal
+      - sensor.remote_connectivity
+      - sensor.remote_wifi_signal
       - sensor.system_controller_water_pressure
-      - sensor.total_alarm_count
-      - sensor.active_alarm_count
+      - sensor.total_alarms
+      - sensor.active_alarms
 ```
 
 ### Water System Group
@@ -615,13 +694,13 @@ automation:
   - alias: "Alert on Weak WiFi"
     trigger:
       - platform: numeric_state
-        entity_id: sensor.remote_living_room_wifi_signal
+        entity_id: sensor.remote_wifi_signal
         below: -75
         for: "00:10:00"
     action:
       - service: notify.mobile_app
         data:
-          message: "Device WiFi signal weak: {{ states('sensor.remote_living_room_wifi_signal') }} dBm"
+          message: "Device WiFi signal weak: {{ states('sensor.remote_wifi_signal') }} dBm"
 ```
 
 ---
@@ -750,14 +829,14 @@ sensor:
 **Solutions**:
 - Check last_communication timestamp
 - Verify connectivity sensor
-- Reduce scan interval if needed
 - Check Home Assistant logs
+- Keep the scan interval at 60 seconds or more (see [Configuration Guide](Configuration-Guide.md#scan-interval))
 
 ---
 
 ## Best Practices
 
-### ✅ DO
+### Do
 
 - **Group related sensors** for easier dashboard organization
 - **Use template sensors** to derive useful metrics
@@ -766,7 +845,7 @@ sensor:
 - **Create notifications** for critical sensor values
 - **Use statistics sensors** for trend analysis
 
-### ❌ DON'T
+### Don't
 
 - **Don't poll individual sensors** separately (use integration update)
 - **Don't create duplicate sensors** (use existing ones)

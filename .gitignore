@@ -167,3 +167,11 @@ actionlint
 .nexus_config.json
 .nexus/*
 !.nexus/lessons/
+
+# Local tooling
+/.claude/
+/.impeccable/review/
+/.impeccable/mocks/
+/.impeccable/build/
+/.impeccable/questions/
+/.impeccable/hook.cache.json

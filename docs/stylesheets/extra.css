@@ -1,0 +1,110 @@
+/* Documentation pages: the Thermogram world in reading mode. */
+
+:root {
+  --tx-ink-0: #0b0712;
+  --tx-ink-1: #140c22;
+  --tx-plum: #8b2185;
+  --tx-magenta: #c5376f;
+  --tx-ember: #ea5a3a;
+  --tx-amber: #ffd24a;
+  --tx-hot: #fff6d6;
+  --tx-ice: #2e9bd6;
+  --tx-display: "Big Shoulders Display", "Arial Narrow", sans-serif;
+  --tx-ironbow: linear-gradient(90deg, #07040f 0%, #1d0a3a 14%, #470f76 30%, #8b2185 45%, #c5376f 58%, #ea5a3a 70%, #f7922a 81%, #ffd24a 91%, #fff8e6 100%);
+}
+
+[data-md-color-primary="custom"] {
+  --md-primary-fg-color: #140c22;
+  --md-primary-fg-color--light: #2a1745;
+  --md-primary-fg-color--dark: #0b0712;
+  --md-primary-bg-color: #fff6d6;
+  --md-primary-bg-color--light: rgba(255, 246, 214, 0.72);
+}
+
+[data-md-color-scheme="default"][data-md-color-accent="custom"] {
+  --md-accent-fg-color: #c5376f;
+  --md-accent-fg-color--transparent: rgba(197, 55, 111, 0.1);
+}
+[data-md-color-scheme="default"] {
+  --md-default-bg-color: #fffcf4;
+  --md-code-bg-color: #f6f0e4;
+  --md-typeset-a-color: #9a2563;
+  --md-default-fg-color: rgba(20, 12, 34, 0.9);
+  --md-default-fg-color--light: rgba(20, 12, 34, 0.62);
+}
+
+[data-md-color-scheme="slate"] {
+  --md-hue: 275;
+  --md-default-bg-color: #120a1e;
+  --md-default-bg-color--light: rgba(18, 10, 30, 0.7);
+  --md-code-bg-color: #1b1029;
+  --md-footer-bg-color: #0b0712;
+  --md-footer-bg-color--dark: #07040f;
+  --md-typeset-a-color: #ffb35c;
+  --md-default-fg-color: rgba(255, 246, 214, 0.88);
+  --md-default-fg-color--light: rgba(255, 238, 214, 0.64);
+}
+[data-md-color-scheme="slate"][data-md-color-accent="custom"] {
+  --md-accent-fg-color: #ffd24a;
+  --md-accent-fg-color--transparent: rgba(255, 210, 74, 0.12);
+}
+
+/* The thermal scale runs under the header, as on the camera. */
+.md-header { box-shadow: none; }
+.md-header::after {
+  content: "";
+  position: absolute; left: 0; right: 0; bottom: -3px; height: 3px;
+  background: var(--tx-ironbow);
+}
+.md-tabs { background: var(--tx-ink-0); }
+.md-header__topic:first-child { font-family: var(--tx-display); font-weight: 800; text-transform: uppercase; letter-spacing: 0.02em; font-size: 1.05rem; }
+.md-header__button.md-logo img { height: 1.6rem; }
+
+.md-typeset h1 {
+  font-family: var(--tx-display);
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0;
+  line-height: 0.98;
+  font-size: 2.6em;
+  color: var(--md-default-fg-color);
+  text-wrap: balance;
+}
+.md-typeset h2 {
+  font-family: var(--tx-display);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  font-size: 1.75em;
+  line-height: 1.05;
+  margin-top: 2.4em;
+}
+.md-typeset h3 { font-weight: 700; margin-top: 2em; }
+
+.md-typeset table:not([class]) { font-size: 0.74rem; }
+.md-typeset table:not([class]) th { font-weight: 600; }
+.md-typeset table:not([class]) td, .md-typeset table:not([class]) th { font-variant-numeric: tabular-nums; }
+
+.md-typeset ::selection, ::selection { background: #ffd24a; color: #0b0712; }
+
+/* Footer disclaimer line */
+.tx-docs-disclaimer {
+  margin: 0; padding: 0.8rem 0; font-size: 0.62rem;
+  color: var(--md-footer-fg-color--light);
+}
+
+/* "Unofficial" notice used at the top of key pages */
+.md-typeset .admonition.unofficial,
+.md-typeset details.unofficial {
+  border-color: #c5376f;
+}
+.md-typeset .unofficial > .admonition-title,
+.md-typeset .unofficial > summary {
+  background-color: rgba(197, 55, 111, 0.1);
+}
+.md-typeset .unofficial > .admonition-title::before,
+.md-typeset .unofficial > summary::before {
+  background-color: #c5376f;
+  -webkit-mask-image: var(--md-admonition-icon--warning);
+  mask-image: var(--md-admonition-icon--warning);
+}

@@ -6,8 +6,9 @@ Solutions to common issues with the Hitachi CSNet Home integration.
 
 Start here to identify your issue:
 
-| Symptom | Likely Category | Jump To |
-|---------|----------------|---------|
+| Symptom | Jump To |
+|---------|---------|
+| Everything worked yesterday, nothing today | [Integration Stopped Working Overnight](#integration-stopped-working-overnight) |
 | Can't find integration when adding | [Installation Issues](#installation-issues) |
 | Authentication fails | [Configuration Issues](#configuration-issues) |
 | No entities created | [Configuration Issues](#configuration-issues) |
@@ -15,6 +16,25 @@ Start here to identify your issue:
 | Controls don't respond | [Control Issues](#control-issues) |
 | Wrong temperature readings | [Sensor Issues](#sensor-issues) |
 | Alarms appearing | [Alarm Issues](#alarm-issues) |
+
+---
+
+## Integration Stopped Working Overnight
+
+**Symptoms**: The integration worked, then suddenly fails to log in, stops updating, or entities lose their values — without any change on your side.
+
+**Why it happens**: The integration has no official API to use. It talks to the CSNet Manager **web** API, the one behind the csnetmanager.com website, which Hitachi can change at any time without notice. A change to the login page, a request format or a response field can break the integration until it is updated.
+
+**What to do**:
+
+1. Check that you can still log in at [csnetmanager.com](https://www.csnetmanager.com) and that your unit shows up there. If the website itself is down or broken, wait.
+2. Look at the Home Assistant log for `csnet_home` errors.
+3. Check [GitHub Issues](https://github.com/mmornati/home-assistant-csnet-home/issues) — if Hitachi changed something, others will be reporting it too. Add your debug log there rather than opening a duplicate.
+4. Update the integration when a fix is released.
+
+Don't lower the scan interval to "retry faster": it adds load without helping.
+
+See [How It Works](How-It-Works.md) for how the integration talks to CSNet Manager.
 
 ---
 
@@ -68,20 +88,17 @@ Start here to identify your issue:
 **Symptoms**: Errors in logs about missing dependencies or import failures
 
 **Causes**:
-- Missing Python dependencies
-- Incompatible Home Assistant version
-- Corrupted files
+- Incompatible (old) Home Assistant version
+- Corrupted or partially copied files
 
 **Solutions**:
 
 1. **Check Home Assistant Version**:
-   - Requires HA 2023.1.0 or newer
+   - Use a current Home Assistant release
    - Update if needed
 
-2. **Reinstall Dependencies**:
-   ```bash
-   pip install -r custom_components/csnet_home/requirements.txt
-   ```
+2. **No extra dependencies**:
+   - The integration declares no Python requirements in its manifest; there is nothing to `pip install`
 
 3. **Reinstall Integration**:
    - Delete `custom_components/csnet_home/`
@@ -247,9 +264,8 @@ Start here to identify your issue:
    - If site is down, wait for service restoration
 
 6. **Re-authenticate**:
-   - Delete integration
-   - Re-add with credentials
-   - May need to refresh authentication
+   - Settings → Devices & Services → Hitachi CSNet Home → ⋮ → **Reconfigure**
+   - Re-enter your credentials; they are validated before saving and the integration reloads
 
 ### Intermittent Unavailability
 
@@ -270,7 +286,7 @@ Start here to identify your issue:
 
 2. **Increase Scan Interval**:
    - Current default: 60 seconds
-   - Try increasing to 120 or 180 seconds
+   - Try increasing to 120 or 180 seconds (via **Reconfigure**)
    - Reduces API call frequency
 
 3. **Monitor Connection**:
@@ -279,7 +295,7 @@ Start here to identify your issue:
      - alias: "Log Connection Issues"
        trigger:
          - platform: state
-           entity_id: sensor.remote_living_room_connectivity
+           entity_id: sensor.remote_connectivity
            to: "off"
        action:
          - service: logbook.log
@@ -378,8 +394,8 @@ Start here to identify your issue:
    - Should show `[comfort, eco]`
 
 2. **Verify ecocomfort Value**:
-   - Check integration logs for `ecocomfort` field
-   - Should be 0 (eco) or 1 (comfort), not -1
+   - Check debug logs for the `ecocomfort` field
+   - Should be 0 (eco) or 1 (comfort); `-1` means the unit reports no eco/comfort mode for that zone, and the preset always shows Comfort
 
 3. **Try Temperature Change Instead**:
    - Manually adjust temperature
@@ -497,7 +513,7 @@ Start here to identify your issue:
 
 3. **Consult Manual**:
    - Look up alarm code in system manual
-   - Check [Alarm Code Reference]
+   - Use `sensor.{device}_{zone}_alarm_code_formatted`, which matches the code shown on the unit
 
 4. **Basic Checks**:
    - Is system powered on?
@@ -520,13 +536,18 @@ Start here to identify your issue:
 **Symptoms**: Getting alarm notifications but no real issue
 
 **Causes**:
-- Transient conditions trigger alarms
-- Notification automation too sensitive
-- Alarm history sensor updates
+- Transient conditions trigger alarms (code `-1`, communication errors, is the usual one)
+- Your own notification automation is too sensitive
 
 **Solutions**:
 
-1. **Add Delay to Automation**:
+1. **Filter the code in the integration**:
+   - Settings → Devices & Services → Hitachi CSNet Home → ⋮ → **Reconfigure**
+   - Add the code to **Filtered Alarm Codes** (comma-separated, e.g. `-1,42`), or turn off **Enable Alarm Notifications**
+   - Every entry must be an integer, otherwise the whole list is ignored
+   - See [Built-in Alarm Notifications](Advanced-Features.md#built-in-alarm-notifications)
+
+2. **For your own automations, add a delay**:
    ```yaml
    trigger:
      - platform: state
@@ -535,16 +556,17 @@ Start here to identify your issue:
        for: "00:05:00"  # Wait 5 minutes
    ```
 
-2. **Filter by Alarm Code**:
+3. **Filter by Alarm Code**:
    ```yaml
    condition:
      - condition: template
        value_template: "{{ states('sensor.remote_living_room_alarm_code') | int > 10 }}"
    ```
 
-3. **Check Alarm History**:
+4. **Check Alarm History**:
    - Review `sensor.alarm_history` attributes
    - See if alarms are clearing quickly
+   - Delete stale installation alarms with the `csnet_home.delete_alarm` service
 
 ---
 
@@ -737,7 +759,7 @@ Found a bug? Know how to fix it?
 
 ## Prevention Tips
 
-### ✅ DO
+### Do
 
 - Keep Home Assistant updated
 - Keep integration updated
@@ -747,9 +769,9 @@ Found a bug? Know how to fix it?
 - Enable logging when troubleshooting
 - Report bugs to help community
 
-### ❌ DON'T
+### Don't
 
-- Set scan_interval < 30 seconds
+- Set scan_interval below 60 seconds
 - Make rapid repeated changes
 - Ignore alarm notifications
 - Disable without investigating

@@ -17,9 +17,10 @@ Any Hitachi heat pump equipped with the **ATW-IOT-01 module** that works with th
 - Yutampo models  
 - Systems with single or multiple zones
 - Systems with or without DHW (hot water)
+- Systems with a swimming pool circuit
 - Fan coil compatible systems
 
-See [Supported Devices](../SUPPORTED_DEVICES) for detailed compatibility.
+See [Supported Devices](../SUPPORTED_DEVICES.md) for detailed compatibility.
 
 ### Do I need a CSNet Manager account?
 
@@ -28,14 +29,14 @@ Yes. You need an active CSNet Manager account with your system registered. This 
 ### Is this cloud-based or local control?
 
 **Cloud-based**. The integration communicates with Hitachi's CSNet Manager cloud service. It does NOT communicate directly with your heat pump locally. This means:
-- ✅ Works from anywhere with internet
-- ✅ Uses official Hitachi API
-- ❌ Requires internet connection
-- ❌ Some latency in commands (5-10 seconds)
+- Works wherever Home Assistant has internet access
+- Uses the same (unofficial) web API as the CSNet Manager website
+- Requires an internet connection
+- Some latency in commands (5-10 seconds)
 
 ### Is this official from Hitachi?
 
-No, this is a **community-developed integration**. It was created by reverse-engineering the CSNet Manager web interface since Hitachi doesn't provide an official API. However, it uses the same methods as the official CSNet Manager app.
+No, this is a **community-developed integration**. It was created by reverse-engineering the CSNet Manager web interface since Hitachi doesn't provide an official API. Hitachi can change that interface at any time, which can break the integration until it is updated.
 
 ---
 
@@ -64,7 +65,7 @@ Yes! The integration works with all Home Assistant installation types:
 
 ### What Home Assistant version do I need?
 
-Home Assistant 2023.1.0 or newer recommended. Older versions may work but aren't tested.
+Use a current Home Assistant release. The integration is only tested against recent versions.
 
 ### How do I update the integration?
 
@@ -87,23 +88,20 @@ Use your **CSNet Manager** credentials - the same username and password you use 
 How often Home Assistant checks for updates from CSNet Manager. Default is 60 seconds.
 
 **Recommendations**:
-- **60 seconds** - Good balance (default)
-- **30-45 seconds** - More responsive (don't go lower)
-- **120-180 seconds** - Less API load, slower updates
+- **60 seconds** - Default, and the lowest value we recommend
+- **120-180 seconds** - Less load on CSNet Manager, slower updates
+
+Each poll makes 3 requests to csnetmanager.com and there is no backoff, so please don't go below 60 seconds. See [Configuration Guide](Configuration-Guide.md#scan-interval).
 
 ### Can I change settings after setup?
 
-Yes. Go to Settings → Devices & Services → CSNet Home → Configure.
+Yes. Go to Settings → Devices & Services → Hitachi CSNet Home → ⋮ → **Reconfigure**.
 
-You can change:
-- Scan interval
-- Language preference
-
-To change credentials, you need to delete and re-add the integration.
+You can change every setting from the initial setup: credentials, scan interval, language, maximum temperature override, fan coil control model and alarm notification options. The integration reloads automatically after saving.
 
 ### Why does it need my CSNet password?
 
-The integration must log in to CSNet Manager on your behalf to retrieve data and send commands. Your credentials are stored securely in Home Assistant (encrypted with your instance key).
+The integration must log in to CSNet Manager on your behalf to retrieve data and send commands. Your credentials are stored in the integration's config entry in Home Assistant's `.storage` folder, like other integrations' credentials, so protect your Home Assistant backups and configuration directory.
 
 ---
 
@@ -123,6 +121,13 @@ The integration must log in to CSNet Manager on your behalf to retrieve data and
 - Set temperature
 - Change mode (Off/Eco/Performance)
 
+**Swimming Pool** (if present):
+- Turn on/off
+- Set temperature (24-33°C)
+
+**Fixed water temperature** (water circuits whose OTC type is Fixed):
+- Set heating/cooling water temperature through number entities
+
 ### What can I monitor?
 
 **Zone Sensors**:
@@ -138,6 +143,8 @@ The integration must log in to CSNet Manager on your behalf to retrieve data and
 - Pump speed
 - Defrost status
 - OTC settings
+- Estimated power, energy and COP
+- Compressor and outdoor unit telemetry
 - And many more!
 
 See complete list: [Sensors Reference](Sensors-Reference.md)
@@ -178,7 +185,7 @@ No. Both can be used simultaneously. Changes made in either place will sync (aft
 ### What happens if my internet goes down?
 
 - Home Assistant loses connection to CSNet Manager
-- Entities show "Unavailable"
+- Entities stop updating
 - You can't control via Home Assistant
 - **BUT** your heat pump continues operating with its last settings
 - Physical controls still work
@@ -208,6 +215,7 @@ Depends on your system configuration:
 - **Single zone**: 1 thermostat, 1 climate entity
 - **Dual zone**: 2 thermostats, 2 climate entities
 - **With DHW**: Plus 1 water heater entity
+- **With swimming pool**: Plus 1 more water heater entity
 
 ### What's Zone 3? Zone 5?
 
@@ -215,7 +223,7 @@ Depends on your system configuration:
 - Zone 1 = C1 Air circuit (room thermostat 1)
 - Zone 2 = C2 Air circuit (room thermostat 2)
 - Zone 3 = DHW (water heater)
-- Zone 4 = (varies by system)
+- Zone 4 = Swimming pool (SWP)
 - Zone 5 = C1 Water circuit (floor heating/radiators)
 - Zone 6 = C2 Water circuit
 
@@ -237,8 +245,8 @@ Only if your system has DHW configured in CSNet Manager. If you have DHW but no 
 
 ### What's the difference between Eco and Performance mode?
 
-- **Eco**: Normal efficient heating to target temperature
-- **Performance** (Boost): Aggressive fast heating, prioritizes DHW over space heating
+- **Eco**: DHW on, boost off
+- **Performance** (Boost): DHW on with the unit's DHW boost requested; what boost does depends on the unit's configuration
 
 Use Performance before baths or when you need hot water quickly.
 
@@ -255,22 +263,19 @@ Use Performance before baths or when you need hot water quickly.
 ### What's the difference between mode and preset?
 
 **HVAC Mode**: What type of conditioning
-- Heat, Cool, Auto, Off
+- Heat, Cool, Heat/Cool (Auto), Off
 
-**Preset Mode**: Energy/comfort level
-- Comfort = normal temperature
-- Eco = reduced temperature for energy savings
+**Preset Mode**: The circuit's eco/comfort setting on the unit
+- Comfort = normal operation
+- Eco = the unit's eco mode
 
 ### Why don't I see "Auto" mode?
 
-Some systems show it as "Heat/Cool" instead. This is the same as Auto mode - system automatically heats or cools as needed.
+Home Assistant calls it "Heat/Cool". It is the unit's Auto mode - the system heats or cools as needed.
 
 ### What does Eco mode actually do?
 
-Eco mode typically:
-- Reduces target temperature by 2-3°C in heating
-- Increases target temperature by 2-3°C in cooling
-- Saves energy while maintaining basic comfort
+The integration switches the circuit's eco mode on the unit. The setpoint change applied in eco mode is configured on the unit (or in CSNet Manager), not in Home Assistant.
 
 ### Can I create custom presets?
 
@@ -312,22 +317,25 @@ If signal is poor, consider WiFi extender or repositioning.
 
 ### What is Silent Mode?
 
-Silent mode reduces outdoor unit noise by limiting compressor and fan speed. Use at night or when noise is a concern.
+Silent mode switches the unit's silent setting to reduce outdoor unit noise. Use at night or when noise is a concern.
 
-**Note**: Not available on fan coil systems (they have fan speed control instead).
+**Note**: Not available on climate entities in fan coil mode (they have fan speed control instead).
 
 ### What is fan speed control?
 
 On fan coil compatible systems, you can control indoor fan speed:
-- Off, Low, Medium, Auto
+- `standard` model (default): Off, Low, Medium, Auto
+- `legacy` model: Low, Medium, High, Auto
 
-Replaces silent mode functionality.
+Replaces silent mode functionality. The model is chosen in the setup or reconfigure form; see [Fan Coil Control Model](Advanced-Features.md#fan-coil-control-model).
 
 ### How do I know if I have fan coil?
 
 Check `sensor.system_controller_fan_coil_compatible`:
 - **On**: You have fan speed control
 - **Off**: You have silent mode instead
+
+If you selected the `legacy` fan coil model, every climate entity uses fan speed control regardless of this sensor.
 
 ### What is OTC?
 
@@ -338,7 +346,7 @@ OTC sensors show your configuration:
 - Separate for heating and cooling
 - Separate for C1 and C2 circuits
 
-This is informational - configured in CSNet Manager, not controllable via HA.
+The OTC type is configured in CSNet Manager, not via HA. When the type is Fixed, you can set the fixed water temperature from HA through number entities; see [Fixed Water Temperature Control](Climate-Control.md#fixed-water-temperature-control-water-circuits-only).
 
 ---
 
@@ -364,7 +372,15 @@ See your system manual or contact support for specific codes.
 
 ### Can I silence alarm notifications?
 
-You can modify or disable the alarm notification automation. However, we recommend keeping them - alarms indicate real issues that need attention.
+Yes. The notifications are created by the integration itself. In **Reconfigure** you can:
+- Turn off **Enable Alarm Notifications** entirely, or
+- List codes to ignore in **Filtered Alarm Codes** (comma-separated, default `-1` for communication errors)
+
+Filtered alarms still show up in the alarm sensors. We recommend keeping notifications for real fault codes. See [Built-in Alarm Notifications](Advanced-Features.md#built-in-alarm-notifications).
+
+### Can I delete an alarm from CSNet Manager?
+
+Yes, with the `csnet_home.delete_alarm` service. See [Deleting Alarms](Advanced-Features.md#deleting-alarms).
 
 ---
 
@@ -408,10 +424,9 @@ This is normal for cloud-based control.
 
 ### Does this use a lot of internet data?
 
-No, very minimal:
-- API calls are small JSON responses
-- Default 60-second interval = ~1 call/minute
-- Total data usage: < 1 MB/day typically
+No, very little:
+- API calls return JSON responses
+- Default 60-second interval = 3 requests/minute
 
 ### Will this slow down my Home Assistant?
 
@@ -422,7 +437,7 @@ No, the integration is lightweight:
 
 ### Can I reduce API calls?
 
-Yes, increase `scan_interval`:
+Yes, increase `scan_interval` (via **Reconfigure**):
 - 120 seconds = half as many calls
 - 180 seconds = one-third as many calls
 

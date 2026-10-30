@@ -1,8 +1,12 @@
-# Hitachi CSNet Home Integration
+---
+template: home.html
+title: Hitachi heat pumps in Home Assistant
+description: Control Hitachi Yutaki and Yutampo heat pumps (ATW-IOT-01 / CSNet Manager) from Home Assistant. Zones, hot water, pool, compressor and energy sensors, alarms. Free and open source.
+hide:
+  - navigation
+  - toc
+---
 
-Welcome to the Hitachi CSNet Home Integration documentation!
+# Hitachi CSNet Home for Home Assistant
 
-This page will automatically redirect you to the [documentation home page](wiki/Home.md).
-
-If you are not redirected automatically, please click the link above or use the navigation menu.
-
+Control Hitachi heat pumps fitted with the ATW-IOT-01 module from Home Assistant, through the CSNet Manager cloud.
