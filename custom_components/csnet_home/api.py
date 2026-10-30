@@ -607,40 +607,12 @@ class CSNetHomeAPI:
 
     async def async_delete_alarm(self, installation_id, alarm_id):
         """Delete an installation alarm."""
-        delete_url = f"{self.base_url}{DELETESPECIFICALARM_PATH}"
-
         data = {
             "installationId": installation_id,
             "alarmId": alarm_id,
-            "_csrf": self.xsrf_token,
         }
 
-        headers = COMMON_API_HEADERS | {
-            "accept": "*/*",
-            "x-requested-with": "XMLHttpRequest",
-            "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
-            "origin": self.base_url,
-        }
-
-        cookies = {
-            "XSRF-TOKEN": self.xsrf_token,
-            "acceptedCookies": "yes",
-        }
-
-        try:
-            async with asyncio.timeout(DEFAULT_API_TIMEOUT):
-                async with self.session.post(delete_url, headers=headers, cookies=cookies, data=data) as response:
-                    response_text = await response.text()
-                    _LOGGER.debug(
-                        "Delete alarm response: %s (status %s)",
-                        response_text,
-                        response.status,
-                    )
-                    response.raise_for_status()
-                    return True
-        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
-            _LOGGER.error("Error deleting alarm %s: %s", alarm_id, err)
-            return False
+        return await self._async_post_form(data, f"delete alarm {alarm_id}", DELETESPECIFICALARM_PATH)
 
     def get_current_temperature(self, element):
         """Return target/setting temperature normalized per element type.
@@ -811,14 +783,14 @@ class CSNetHomeAPI:
             return True
         return getattr(getattr(response, "url", None), "path", None) == LOGIN_PATH
 
-    async def _async_post_heat_setting(self, data, description) -> bool:
-        """Post a change to /data/indoor/heat_setting.
+    async def _async_post_form(self, data, description, path=HEAT_SETTINGS_PATH) -> bool:
+        """Post a form to CSNet Manager (/data/indoor/heat_setting by default).
 
         The HTTP status alone does not prove the change was accepted: an
         expired session answers with the login page. In that case log in
         again and retry once with the new CSRF token.
         """
-        settings_url = f"{self.base_url}{HEAT_SETTINGS_PATH}"
+        url = f"{self.base_url}{path}"
 
         headers = COMMON_API_HEADERS | {
             "accept": "*/*",
@@ -835,7 +807,7 @@ class CSNetHomeAPI:
             }
             try:
                 async with asyncio.timeout(DEFAULT_API_TIMEOUT):
-                    async with self.session.post(settings_url, headers=headers, cookies=cookies, data=data) as response:
+                    async with self.session.post(url, headers=headers, cookies=cookies, data=data) as response:
                         response_text = await response.text()
                         _LOGGER.debug(
                             "%s with payload=%s, status=%s, response=%s",
@@ -901,7 +873,7 @@ class CSNetHomeAPI:
         else:
             data[f"settingTempRoomZ{zone_id}"] = str(int(temperature * 10))
 
-        return await self._async_post_heat_setting(data, f"set temperature={temperature} for zone {zone_id}")
+        return await self._async_post_form(data, f"set temperature={temperature} for zone {zone_id}")
 
     async def async_set_fixed_water_temperature(self, circuit: int, parent_id: int, mode: int, temperature: float):
         """Set fixed water temperature for a circuit.
@@ -936,7 +908,7 @@ class CSNetHomeAPI:
             _LOGGER.warning("Invalid mode %s for fixed water temperature", mode)
             return False
 
-        return await self._async_post_heat_setting(data, f"set fixed water temperature={temperature} for circuit {circuit} (mode {mode})")
+        return await self._async_post_form(data, f"set fixed water temperature={temperature} for circuit {circuit} (mode {mode})")
 
     async def set_water_heater_status(self, zone_id, parent_id, status):
         """Change the water heater forcing status."""
@@ -946,7 +918,7 @@ class CSNetHomeAPI:
             "boostDHW": status,
         }
 
-        return await self._async_post_heat_setting(data, f"set water heater boost={status} for zone {zone_id}")
+        return await self._async_post_form(data, f"set water heater boost={status} for zone {zone_id}")
 
     async def async_set_hvac_mode(self, zone_id, parent_id, hvac_mode: str):
         """Set HVAC mode: HEAT, COOL, or OFF."""
@@ -983,7 +955,7 @@ class CSNetHomeAPI:
             _LOGGER.warning("Unsupported hvac_mode=%s ignored", hvac_mode)
             return False
 
-        return await self._async_post_heat_setting(data, f"set hvac_mode={hvac_mode} for zone {zone_id}")
+        return await self._async_post_form(data, f"set hvac_mode={hvac_mode} for zone {zone_id}")
 
     async def set_preset_modes(self, zone_id, parent_id, preset_mode, current_mode=None, on_off=None):
         """Set the eco/comfort mode for a zone."""
@@ -1013,7 +985,7 @@ class CSNetHomeAPI:
         else:
             data[f"ecoModeC{circuit_id}"] = "1"
 
-        return await self._async_post_heat_setting(data, f"set preset_mode={preset_mode} for zone {zone_id}")
+        return await self._async_post_form(data, f"set preset_mode={preset_mode} for zone {zone_id}")
 
     async def set_water_heater_mode(self, zone_id, parent_id, preset_mode):
         """Set the off/eco/performance demand mode for water_heater and swimming pool.
@@ -1043,7 +1015,7 @@ class CSNetHomeAPI:
             elif preset_mode == "off":
                 data["runStopSWP"] = 0
 
-        return await self._async_post_heat_setting(data, f"set water heater mode={preset_mode} for zone {zone_id}")
+        return await self._async_post_form(data, f"set water heater mode={preset_mode} for zone {zone_id}")
 
     async def async_set_silent_mode(self, zone_id, parent_id, silent_mode: bool):
         """Set silent/quiet mode for a zone."""
@@ -1057,7 +1029,7 @@ class CSNetHomeAPI:
             f"silentModeC{circuit_id}": "1" if silent_mode else "0",
         }
 
-        return await self._async_post_heat_setting(data, f"set silent_mode={silent_mode} for zone {zone_id}")
+        return await self._async_post_form(data, f"set silent_mode={silent_mode} for zone {zone_id}")
 
     async def async_set_fan_speed(self, zone_id, parent_id, fan_speed: int, circuit: int = 1):
         """Set fan speed for a fan coil circuit.
@@ -1076,7 +1048,7 @@ class CSNetHomeAPI:
             f"fan{circuit}Speed": str(fan_speed),
         }
 
-        return await self._async_post_heat_setting(data, f"set fan_speed={fan_speed} for zone {zone_id} circuit {circuit}")
+        return await self._async_post_form(data, f"set fan_speed={fan_speed} for zone {zone_id} circuit {circuit}")
 
     def is_fan_coil_compatible(self, installation_devices_data):
         """Check if the system supports fan coil control.

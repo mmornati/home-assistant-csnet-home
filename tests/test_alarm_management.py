@@ -169,3 +169,56 @@ async def test_api_delete_alarm(hass):
         assert kwargs["data"]["installationId"] == 12345
         assert kwargs["data"]["alarmId"] == 67890
         assert kwargs["data"]["_csrf"] == "token"
+
+
+def _response_cm(status=200, text="success"):
+    """Build an async context manager yielding a mocked aiohttp response."""
+    response = MagicMock()
+    response.status = status
+    response.text = AsyncMock(return_value=text)
+    cm = MagicMock()
+    cm.__aenter__ = AsyncMock(return_value=response)
+    cm.__aexit__ = AsyncMock(return_value=False)
+    return cm
+
+
+@pytest.mark.asyncio
+async def test_api_delete_alarm_relogs_in_when_session_expired(hass):
+    """An expired session on delete logs in again and retries once with the new token."""
+    from custom_components.csnet_home.const import DELETESPECIFICALARM_PATH
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.session = MagicMock()
+    api.session.post = MagicMock(side_effect=[_response_cm(200, 'loadContent("login")'), _response_cm(200, "success")])
+    api.logged_in = True
+    api.xsrf_token = "old-token"
+
+    async def relogin():
+        api.logged_in = True
+        api.xsrf_token = "new-token"
+        return True
+
+    with patch.object(api, "async_login", AsyncMock(side_effect=relogin)) as login:
+        result = await api.async_delete_alarm(12345, 67890)
+
+    assert result is True
+    login.assert_awaited_once()
+    assert api.session.post.call_count == 2
+    args, kwargs = api.session.post.call_args
+    assert args[0].endswith(DELETESPECIFICALARM_PATH)
+    assert kwargs["data"]["_csrf"] == "new-token"
+    assert kwargs["data"]["alarmId"] == 67890
+
+
+@pytest.mark.asyncio
+async def test_api_delete_alarm_http_error_returns_false(hass):
+    """A server error on delete fails without logging in again."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.session = MagicMock()
+    api.session.post = MagicMock(side_effect=[_response_cm(500, "boom")])
+    api.logged_in = True
+    api.xsrf_token = "token"
+
+    with patch.object(api, "async_login", AsyncMock(return_value=True)) as login:
+        assert await api.async_delete_alarm(12345, 67890) is False
+    login.assert_not_awaited()
