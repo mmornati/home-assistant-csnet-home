@@ -166,8 +166,8 @@ jobs:
           done
           wc -l ha-review-input/ha-api.diff
 
-      # No Bash, no GitHub write token, web access limited to the HA developer
-      # docs, and Write limited to the report file.
+      # No Bash, no GitHub write token, reads limited to the checkout, web access
+      # limited to the HA developer docs, and Write limited to the report file.
       - name: Claude compatibility review
         uses: anthropics/claude-code-action@6d5ae526d25ce88daa2200be073e1a373167f064  # v1.0.265
         with:
@@ -176,7 +176,8 @@ jobs:
           claude_args: >-
             --model claude-sonnet-5-5
             --max-turns 40
-            --allowedTools "Read,Glob,Grep,Write(ha-review.md),WebFetch(domain:developers.home-assistant.io)"
+            --allowedTools "Read(./**),Glob,Grep,Write(ha-review.md),WebFetch(domain:developers.home-assistant.io)"
+            --disallowedTools "Bash,Read(//proc/**),Read(//etc/**),Read(//home/**),Read(//tmp/**),Read(~/**)"
           prompt: |
             You are reviewing Home Assistant ${{ needs.detect.outputs.version }} for
             compatibility with this custom integration (custom_components/csnet_home,
@@ -207,9 +208,22 @@ jobs:
                severity, deadline version, suggested fix), then the smoke/test results.
                Keep it short when nothing is affected.
 
+      # Check before the artifact upload too: artifacts are readable by anyone
+      # with read access to the repository.
+      - name: Check report for credentials
+        run: |
+          SECRET_RE='sk-ant-|gh[opsur]_[A-Za-z0-9]{20,}|github_pat_|AKIA[0-9A-Z]{16}'
+          SECRET_RE="${SECRET_RE}|-----BEGIN|[A-Za-z0-9+/=]{80,}"
+          if grep -Eq "$SECRET_RE" ha-review.md; then
+            echo "::error::Report contains credential-like content; discarded."
+            rm -f ha-review.md
+            exit 1
+          fi
+
       - name: Upload report
         uses: actions/upload-artifact@v7
         with:
+          retention-days: 7
           name: ha-review
           path: ha-review.md
           if-no-files-found: error
@@ -234,6 +248,19 @@ jobs:
           VERSION: ${{ needs.detect.outputs.version }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
+          # The report was written by an LLM that read third-party text: refuse
+          # anything that looks like a credential, and neutralise @mentions.
+          SECRET_RE='sk-ant-|gh[opsur]_[A-Za-z0-9]{20,}|github_pat_|AKIA[0-9A-Z]{16}'
+          SECRET_RE="${SECRET_RE}|-----BEGIN|[A-Za-z0-9+/=]{80,}"
+          if grep -Eq "$SECRET_RE" ha-review.md; then
+            echo "::error::Report contains credential-like content; not publishing."
+            exit 1
+          fi
+          if [ "$(wc -c < ha-review.md)" -gt 60000 ]; then
+            echo "::error::Report is larger than 60 KB; not publishing."
+            exit 1
+          fi
+          sed -i 's/@\([A-Za-z0-9]\)/@\xE2\x80\x8B\1/g' ha-review.md
           {
             cat ha-review.md
             echo ""

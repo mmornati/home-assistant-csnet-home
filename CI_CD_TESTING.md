@@ -184,8 +184,10 @@ new HA release (or its first beta) appears.
    (label `ha-release-review`) from that report.
 
 **Security model**: release notes and blog posts are third-party text, so the job that
-runs Claude has `contents: read` only, no Bash, web access limited to
-`developers.home-assistant.io`, and can write only `ha-review.md`. The issue is created
+runs Claude has `contents: read` only, no Bash, file reads limited to the checkout, web
+access limited to `developers.home-assistant.io`, and can write only `ha-review.md`. The
+report is rejected if it contains anything credential-like (checked before the artifact
+upload and again before publishing), and @mentions are neutralised. The issue is created
 by a plain shell step in another job. Claude never pushes code; fixes go through a
 normal PR.
 
