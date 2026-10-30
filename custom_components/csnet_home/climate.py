@@ -60,6 +60,11 @@ async def async_setup_entry(hass, entry, async_add_entities):
 class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
     """Representation of a thermostat (climate) entity."""
 
+    _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
+    # Home Assistant < 2026.11 only reads the non-native name; providing both
+    # names keeps newer releases from reporting the deprecated one.
+    _attr_temperature_unit = UnitOfTemperature.CELSIUS
+
     def __init__(self, coordinator, entry, sensor_data, common_data):
         """Initialize the thermostat entity."""
         super().__init__(coordinator)
@@ -69,7 +74,6 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
         self._attr_name = self._sensor_data.get("room_name", "Unknown")
         self.entry = entry
         # Temperature limits will be computed dynamically based on mode
-        self._attr_temperature_unit = UnitOfTemperature.CELSIUS
         # Expose all modes supported by the API
         self._attr_hvac_modes = [
             HVACMode.OFF,
@@ -149,7 +153,7 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
         return FAN_AUTO
 
     @property
-    def current_temperature(self):
+    def native_current_temperature(self):
         """Return the current temperature."""
         if self._sensor_data is None:
             return None
@@ -191,7 +195,7 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
         return self._assumed_fan_mode
 
     @property
-    def target_temperature(self):
+    def native_target_temperature(self):
         """Return the target temperature set by the user."""
         if self._sensor_data is None:
             return None
@@ -218,6 +222,10 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
                     return None
 
         return self._sensor_data["setting_temperature"]
+
+    # Home Assistant < 2026.11 only reads the non-native names
+    current_temperature = native_current_temperature
+    target_temperature = native_target_temperature
 
     @property
     def min_temp(self):
