@@ -180,8 +180,8 @@ new HA release (or its first beta) appears.
    against the previous release.
 3. `scripts/ci/ha_review.py` sends those results, the HA release notes, the developer-blog
    posts published since the previous monthly release (full text, from
-   `contributors.home-assistant.io`) and the integration's source to Claude Opus 5.5 in a
-   single Messages API call, and writes the report to `ha-review.md`.
+   `contributors.home-assistant.io`) and the integration's source to Claude in a single
+   Messages API call, and writes the report to `ha-review.md`.
 4. A separate job opens one issue `Home Assistant YYYY.M compatibility review`
    (label `ha-release-review`) from that report.
 
@@ -192,8 +192,14 @@ credential-like (checked before the artifact upload and again before publishing)
 @mentions are neutralised. The issue is created by a plain shell step in another job.
 
 **Setup**: the `ANTHROPIC_API_KEY` repository secret, from an organization with API credit.
-A run sends roughly 100k input tokens and costs about $0.50; the script logs the token
-counts. API errors (invalid key, no credit) are printed as workflow errors.
+A run sends roughly 200k input tokens; with Claude Opus 5.5 that is about $1.20. The script
+logs the token counts and estimated cost. API errors (invalid key, no credit) are printed
+as workflow errors.
+
+**Model**: `claude-opus-5-5` by default. To change it without editing code, set the
+`HA_REVIEW_MODEL` repository variable (Settings → Secrets and variables → Actions →
+Variables), e.g. `claude-sonnet-5-5` to roughly halve the cost. A manual run can also
+override it with the `model` input.
 
 ---
 
