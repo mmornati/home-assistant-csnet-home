@@ -54,6 +54,11 @@ async def async_setup_entry(hass, entry, async_add_entities):
 class CSNetHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
     """Representation of a Water Heater entity."""
 
+    _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
+    # Home Assistant < 2026.11 only reads the non-native name; providing both
+    # names keeps newer releases from reporting the deprecated one.
+    _attr_temperature_unit = UnitOfTemperature.CELSIUS
+
     def __init__(self, hass, entry, sensor_data, common_data):
         """Initialize the water heater entity."""
         # Follow the coordinator: no polling of our own, and the entity becomes
@@ -72,7 +77,6 @@ class CSNetHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
             self._attr_name = sensor_data.get("room_name", "Unknown Water Heater")
 
         # Temperature limits will be computed dynamically from API data
-        self._attr_temperature_unit = UnitOfTemperature.CELSIUS
         self._attr_supported_features = WaterHeaterEntityFeature.TARGET_TEMPERATURE | WaterHeaterEntityFeature.OPERATION_MODE
 
         # Swimming pools only support on/off, not eco/performance modes
@@ -119,9 +123,6 @@ class CSNetHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
 
     def _update_attributes(self):
         """Update the entity attributes from sensor data."""
-        self._attr_current_temperature = self._sensor_data.get("current_temperature")
-        self._attr_target_temperature = self._sensor_data.get("setting_temperature")
-
         _LOGGER.debug("_attr_current_operation: %s", self._sensor_data.get("on_off"))
 
         if self._is_swimming_pool:
@@ -138,6 +139,20 @@ class CSNetHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
                 self._attr_current_operation = "eco"
             if self._sensor_data.get("on_off") == 0:
                 self._attr_current_operation = "off"
+
+    @property
+    def native_current_temperature(self) -> float | None:
+        """Return the current water temperature."""
+        return self._sensor_data.get("current_temperature")
+
+    @property
+    def native_target_temperature(self) -> float | None:
+        """Return the target water temperature."""
+        return self._sensor_data.get("setting_temperature")
+
+    # Home Assistant < 2026.11 only reads the non-native names
+    current_temperature = native_current_temperature
+    target_temperature = native_target_temperature
 
     @property
     def current_operation(self) -> str | None:
@@ -234,7 +249,6 @@ class CSNetHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
         )
         if response:
             self._sensor_data["setting_temperature"] = temperature
-            self._attr_target_temperature = temperature
             _LOGGER.info("Set water heater target temperature to %s°C", temperature)
         else:
             _LOGGER.error("Failed to set water heater temperature.")
