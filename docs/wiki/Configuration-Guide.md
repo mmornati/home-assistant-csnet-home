@@ -53,12 +53,11 @@ You'll see a configuration dialog with the following fields:
 { #scan-interval }
 
 - How often the integration polls CSNet Manager (in seconds)
-- **Default**: 60 seconds
-- The form does not enforce a minimum or maximum
+- **Default and minimum**: 60 seconds. The form refuses lower values, and an entry saved earlier with a lower value is polled every 60 seconds
 - Each poll makes 3 requests to csnetmanager.com (elements, installation devices, installation alarms)
 
-!!! warning "Keep the scan interval at 60 seconds or more"
-    The integration has no backoff: it polls at the configured rate even when requests fail. CSNet Manager is a service Hitachi provides for its own app, without any official API, and every Home Assistant instance polling it adds load. Lower values put that service at risk for everyone.
+!!! note "Why there is a 60-second floor"
+    CSNet Manager is a service Hitachi provides for its own app, without any official API, and every Home Assistant instance polling it adds load. Faster polling makes no difference to a heating system that changes over minutes. When sign-in fails, the integration also waits longer and longer between attempts (see [Known limitations](How-It-Works.md#known-limitations)).
 
 **Language** (Optional)
 - Language of the CSNet Manager translations used for alarm messages and alarm origins
@@ -318,7 +317,7 @@ All settings, including credentials, are changed through the **reconfigure** flo
 **Scan interval recommendations**:
 - **Normal use**: 60-120 seconds
 - **Low priority**: 180-300 seconds
-- Do not go below 60 seconds (see [Scan Interval](#scan-interval))
+- 60 seconds is the minimum (see [Scan Interval](#scan-interval))
 
 ### Enabling Debug Logging
 

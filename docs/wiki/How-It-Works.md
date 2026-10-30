@@ -34,21 +34,22 @@ The integration never talks to your heat pump directly and needs nothing on your
 | | |
 |---|---|
 | **Host** | `https://www.csnetmanager.com` only. There is no telemetry, analytics or third-party service in the code. |
-| **Polling interval** | 60 seconds by default, set during setup or reconfiguration. |
+| **Polling interval** | 60 seconds by default and at minimum, set during setup or reconfiguration. |
 | **Requests per poll** | 3 HTTPS requests: `GET /data/elements`, `GET /data/installationdevices`, `GET /data/installationalarms`. |
 | **On start-up** | Sign-in (`GET` then `POST /login`) and three alarm translation files (`/translations/*.json`). |
 | **When you change something** | One `POST /data/indoor/heat_setting` per change (temperature, mode, preset, hot water, pool, silent mode, fan speed, fixed water temperature). Clearing an alarm calls `POST /data/deletemyspecificalarm`. |
 | **Timeout** | 10 seconds per request. |
-| **Session** | Signs in like the web app: fetches a CSRF token from the login page, posts the login form, then reuses the session cookie. If a read fails, it signs in again on the next read. |
+| **Session** | Signs in like the web app: fetches a CSRF token from the login page, posts the login form, then reuses the session cookie. Only one sign-in runs at a time. If a read fails, it signs in again on the next poll; if a change comes back with the login page, it signs in again and resends the change once. |
+| **When sign-in fails** | Waits before trying again: 1 minute, then 2, 4, 8… up to 30 minutes between attempts, with no other requests in between. A successful sign-in resets the delay. |
 
-### Please be gentle with the polling interval
+### Why the polling interval has a floor
 
-The integration has no automatic backoff. A lower interval multiplies the load on a service that Hitachi runs for its own app and has never opened to third parties. **Keep the interval at 60 seconds or more.** Faster polling makes no difference to a heating system that changes over minutes, and an unusual traffic pattern is the easiest way to get unofficial clients noticed and blocked.
+A lower interval multiplies the load on a service that Hitachi runs for its own app and has never opened to third parties, so the integration does not poll faster than **every 60 seconds**. Faster polling makes no difference to a heating system that changes over minutes, and an unusual traffic pattern is the easiest way to get unofficial clients noticed and blocked. Raising the interval is always fine.
 
 ## Your credentials and data
 
 - Your CSNet Manager **username and password are stored in the Home Assistant config entry** (in `.storage/core.config_entries`, like most cloud integrations) and are sent only to `www.csnetmanager.com`.
-- Debug logging redacts the password, username, CSRF token, installation IDs and coordinates from the request payloads it prints. Debug logs can still contain raw API responses, so **read a log before you share it publicly**.
+- Debug logging redacts the password, username, CSRF token and `XSRF-TOKEN` cookie, installation IDs and coordinates from the request payloads it prints. The username is not written to the log at the default level. Debug logs can still contain raw API responses, so **read a log before you share it publicly**.
 - The data the integration reads (zone names, temperatures, firmware, Wi-Fi signal, alarms, and the installation's location as stored by CSNet Manager) stays in your Home Assistant instance.
 - Only one CSNet Manager account can be configured per Home Assistant instance.
 
@@ -56,9 +57,9 @@ The integration has no automatic backoff. A lower interval multiplies the load o
 
 These come from how the integration works today. They are tracked on GitHub and may change in later releases.
 
-- **Failed sign-in is not reported as a re-authentication prompt.** If you change your CSNet Manager password, entities stop updating; use *Reconfigure* on the integration to enter the new one.
-- **No backoff on errors.** When CSNet Manager is unreachable, the integration simply tries again on the next poll.
-- **Commands are confirmed by the next poll.** A change is sent immediately and Home Assistant updates the entity optimistically; the following poll shows what the unit actually accepted.
+- **A changed password takes a few minutes to be noticed.** Home Assistant asks you to re-authenticate (a prompt on the integration in **Settings → Devices & services**) only after CSNet Manager has refused the credentials three sign-ins in a row, so that one odd answer from the website does not log you out. Until then, and while CSNet Manager is unreachable, entities show as **unavailable** instead of keeping old values.
+- **Sign-in errors are retried slowly.** After a failed sign-in the integration waits 1 minute, then 2, 4, 8… up to 30 minutes before trying again. Recovery after an outage can therefore lag by up to that delay; reloading the integration retries immediately.
+- **Commands are confirmed by the next poll.** A change is sent immediately and Home Assistant updates the entity optimistically. The integration checks that the website did not answer with its login page (an expired session) and, if it did, signs in again and resends the change once. It cannot tell whether the unit itself accepted the value: the following poll shows what the unit actually did.
 - **Cloud only.** There is no local control path. CSNet Manager must be reachable for anything to work.
 
 ## Responsible use

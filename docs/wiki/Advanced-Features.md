@@ -726,7 +726,7 @@ The scan interval is set in the setup or reconfigure form (default 60 seconds). 
 - **Vacation**: 300+ seconds
 
 !!! warning
-    Keep it at 60 seconds or more; see [Scan Interval](Configuration-Guide.md#scan-interval). There is no service to change the scan interval at runtime.
+    60 seconds is the minimum; see [Scan Interval](Configuration-Guide.md#scan-interval). There is no service to change the scan interval at runtime.
 
 ---
 

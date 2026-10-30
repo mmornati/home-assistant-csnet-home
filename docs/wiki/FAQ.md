@@ -88,10 +88,10 @@ Use your **CSNet Manager** credentials - the same username and password you use 
 How often Home Assistant checks for updates from CSNet Manager. Default is 60 seconds.
 
 **Recommendations**:
-- **60 seconds** - Default, and the lowest value we recommend
+- **60 seconds** - Default, and the lowest value the integration accepts
 - **120-180 seconds** - Less load on CSNet Manager, slower updates
 
-Each poll makes 3 requests to csnetmanager.com and there is no backoff, so please don't go below 60 seconds. See [Configuration Guide](Configuration-Guide.md#scan-interval).
+Each poll makes 3 requests to csnetmanager.com, so the integration does not accept values below 60 seconds. See [Configuration Guide](Configuration-Guide.md#scan-interval).
 
 ### Can I change settings after setup?
 
