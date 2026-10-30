@@ -236,6 +236,8 @@ def main():
     parser.add_argument("--ha-src", type=Path, help="installed homeassistant package directory")
     parser.add_argument("--pytest-python", default=sys.executable, help="Python of the Home Assistant env")
     parser.add_argument("--summary-out", type=Path, default=Path("ha-fix-summary.md"))
+    parser.add_argument("--source-version", default="", help="HA version of --ha-src")
+    parser.add_argument("--tests-version", default="", help="HA version run_tests uses")
     parser.add_argument("--max-iterations", type=int, default=40)
     parser.add_argument("--model", default=os.environ.get("HA_REVIEW_MODEL") or DEFAULT_MODEL)
     args = parser.parse_args()
@@ -261,7 +263,11 @@ def main():
             {
                 "role": "user",
                 "content": f"<issue number=\"{issue['number']}\" title=\"{issue['title']}\">\n"
-                f"{issue['body']}\n</issue>\n\nFix the confirmed findings of this issue.",
+                f"{issue['body']}\n</issue>\n\n"
+                f"The Home Assistant source under homeassistant/ is version {args.source_version or 'unknown'}, "
+                f"the version this review is about. run_tests runs on Home Assistant "
+                f"{args.tests_version or 'unknown'}; changes must keep working there too.\n\n"
+                "Fix the confirmed findings of this issue.",
             }
         ],
     }
