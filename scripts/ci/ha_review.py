@@ -17,6 +17,7 @@ error, refusal or empty answer. Needs ``ANTHROPIC_API_KEY``.
 
 import argparse
 import json
+import os
 import sys
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -166,6 +167,10 @@ def main():
     parser.add_argument("--inputs", type=Path, default=Path("ha-review-input"))
     parser.add_argument("--output", type=Path, default=Path("ha-review.md"))
     args = parser.parse_args()
+
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        print("::error::ANTHROPIC_API_KEY is not set; add it as a repository secret.")
+        sys.exit(1)
 
     # Blog posts from the start of the previous monthly release onwards.
     previous_monthly = ".".join(args.previous.split(".")[:2]) + ".0"
