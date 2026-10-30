@@ -178,26 +178,22 @@ new HA release (or its first beta) appears.
 2. Diffs the HA base modules this integration inherits from (climate, water_heater,
    sensor, number, entity, entity_platform, update_coordinator, config_entries, ...)
    against the previous release.
-3. Runs Claude (`anthropics/claude-code-action`, pinned to a commit SHA) with those
-   results, the HA release notes and the developer blog, and has it write a report.
+3. `scripts/ci/ha_review.py` sends those results, the HA release notes, the developer-blog
+   posts published since the previous monthly release (full text, from
+   `contributors.home-assistant.io`) and the integration's source to Claude Opus 5.5 in a
+   single Messages API call, and writes the report to `ha-review.md`.
 4. A separate job opens one issue `Home Assistant YYYY.M compatibility review`
    (label `ha-release-review`) from that report.
 
-**Security model**: release notes and blog posts are third-party text, so the job that
-runs Claude has `contents: read` only, no Bash, file reads limited to the checkout, web
-access limited to `developers.home-assistant.io`, and can write only `ha-review.md`. The
-report is rejected if it contains anything credential-like (checked before the artifact
-upload and again before publishing), and @mentions are neutralised. The issue is created
-by a plain shell step in another job. Claude never pushes code; fixes go through a
-normal PR.
+**Security model**: Claude gets no tools at all, so text planted in release notes or blog
+posts can only change the wording of the report. The job that calls Claude has
+`contents: read` only. The report must exist, and is rejected if it contains anything
+credential-like (checked before the artifact upload and again before publishing);
+@mentions are neutralised. The issue is created by a plain shell step in another job.
 
-**Setup**: add one repository secret:
-- `CLAUDE_CODE_OAUTH_TOKEN`: run `claude setup-token` locally (Claude Pro/Max subscription;
-  usage counts against the plan, no API credit needed). Used when present.
-- `ANTHROPIC_API_KEY`: an API key whose organization has prepaid credit. Used otherwise.
-
-If the review step fails, the `Show Claude error` step prints the API error (for example
-`Credit balance is too low` or an invalid token).
+**Setup**: the `ANTHROPIC_API_KEY` repository secret, from an organization with API credit.
+A run sends roughly 100k input tokens and costs about $0.50; the script logs the token
+counts. API errors (invalid key, no credit) are printed as workflow errors.
 
 ---
 
