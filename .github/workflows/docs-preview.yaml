@@ -6,8 +6,8 @@ name: Documentation Preview
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
-      - 'docs/wiki/**'
-      - 'docs/images/**'
+      - 'docs/**'
+      - 'overrides/**'
       - 'mkdocs.yml'
       - 'docs/requirements.txt'
       - '.github/workflows/docs-preview.yaml'

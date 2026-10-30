@@ -7,14 +7,14 @@ name: Deploy Documentation to GitHub Pages
     branches:
       - main
     paths:
-      - 'docs/wiki/**'
-      - 'docs/SUPPORTED_DEVICES.md'
+      - 'docs/**'
+      - 'overrides/**'
       - 'mkdocs.yml'
       - '.github/workflows/deploy-docs.yaml'
   pull_request:
     paths:
-      - 'docs/wiki/**'
-      - 'docs/SUPPORTED_DEVICES.md'
+      - 'docs/**'
+      - 'overrides/**'
       - 'mkdocs.yml'
   workflow_dispatch:
 
@@ -51,9 +51,7 @@ jobs:
 
       - name: Install MkDocs and dependencies
         run: |
-          pip install mkdocs-material
-          pip install mkdocs-minify-plugin
-          pip install mkdocs-redirects
+          pip install -r docs/requirements.txt
 
       - name: Build documentation
         run: mkdocs build --strict

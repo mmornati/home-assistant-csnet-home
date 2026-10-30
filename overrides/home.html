@@ -1,0 +1,305 @@
+{% extends "main.html" %}
+
+{% set hacs = "https://my.home-assistant.io/redirect/hacs_repository/?owner=mmornati&repository=home-assistant-csnet-home&category=integration" %}
+{% set add_integration = "https://my.home-assistant.io/redirect/config_flow_start/?domain=csnet_home" %}
+{% set gh = config.repo_url %}
+
+{% block extrahead %}
+  {{ super() }}
+  <link rel="stylesheet" href="{{ 'stylesheets/home.css' | url }}">
+{% endblock %}
+
+{% block tabs %}{% endblock %}
+{% block site_nav %}{% endblock %}
+
+{% block container %}
+<div class="tx">
+
+  <header class="tx-bar" aria-label="Site">
+    <a class="tx-brand" href="{{ '.' | url }}">
+      <img src="{{ 'images/mark.svg' | url }}" alt="" width="28" height="28">
+      <span>CSNet Home</span>
+    </a>
+    <nav class="tx-nav" aria-label="Sections">
+      <a href="#readings">Entities</a>
+      <a href="#how">How it works</a>
+      <a href="#install">Install</a>
+      <a href="{{ 'wiki/Home/' | url }}">Docs</a>
+      <a class="tx-nav__gh" href="{{ gh }}" aria-label="GitHub repository">
+        {% include ".icons/fontawesome/brands/github.svg" %}
+        <span data-gh-stars>GitHub</span>
+      </a>
+    </nav>
+  </header>
+
+  <section class="tx-hero" data-thermo data-hvac="heat" aria-labelledby="tx-title">
+    <canvas class="tx-hero__field" aria-hidden="true"></canvas>
+    <div class="tx-hero__stage" data-stage aria-hidden="true">
+      <div class="tx-meter" data-meter>
+        <svg class="tx-meter__reticle" viewBox="0 0 44 44" aria-hidden="true">
+          <circle cx="22" cy="22" r="9" fill="none"/>
+          <path d="M22 2v12M22 30v12M2 22h12M30 22h12"/>
+        </svg>
+        <div class="tx-meter__card">
+          <span class="tx-meter__zone" data-meter-zone>Ground floor · circuit C1</span>
+          <span class="tx-meter__temp" data-meter-temp>31.0 °C</span>
+          <span class="tx-meter__entity" data-meter-entity>climate.yutaki_ground_floor</span>
+          <span class="tx-meter__state" data-meter-state>underfloor · hvac_action: heating</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="tx-frame" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+
+    <div class="tx-hero__copy">
+      <h1 id="tx-title" class="tx-display">Your Hitachi heat pump inside Home Assistant.</h1>
+      <p class="tx-lede">Every zone, the hot water tank, the pool and the compressor itself, read from CSNet Manager and turned into Home Assistant entities. For Yutaki and Yutampo systems with the ATW-IOT-01 module. Free and open source.</p>
+      <div class="tx-actions">
+        <a class="tx-btn tx-btn--hot" href="{{ hacs }}">Install with HACS</a>
+        <a class="tx-btn" href="{{ 'wiki/Home/' | url }}">Read the docs</a>
+      </div>
+      <div class="tx-mode" role="group" aria-label="Preview hvac_mode">
+        <span class="tx-mode__label">hvac_mode</span>
+        <button type="button" data-mode="heat" aria-pressed="true">Heat</button>
+        <button type="button" data-mode="cool" aria-pressed="false">Cool</button>
+      </div>
+      <p class="tx-caption">Illustration with sample values. Point anywhere on the house to take a reading.</p>
+    </div>
+
+    <div class="tx-scale" aria-hidden="true">
+      <span class="tx-scale__end">55</span>
+      <div class="tx-scale__bar">
+        <span class="tx-scale__mark" data-scale-mark><b data-scale-value>31.0</b></span>
+      </div>
+      <span class="tx-scale__end">-5</span>
+      <span class="tx-scale__unit">°C</span>
+    </div>
+
+    <div class="tx-hud-meta" aria-hidden="true">
+      <span>CSNETMANAGER.COM</span>
+      <span>POLL 60 S</span>
+    </div>
+
+    <a class="tx-hero__honest" href="#how">Unofficial, not affiliated with Hitachi. Here is why.</a>
+  </section>
+
+  <section class="tx-band tx-readings" id="readings" aria-labelledby="readings-title">
+    <div class="tx-wrap tx-split">
+      <div class="tx-split__lead">
+        <h2 id="readings-title" class="tx-h2">One reading for everything your system does.</h2>
+        <p>Sign in once with your CSNet Manager account. The integration discovers the installation and creates entities for whatever your unit reports. Nothing to map by hand, nothing to flash.</p>
+        <a class="tx-link" href="{{ 'wiki/Sensors-Reference/' | url }}">Full sensor reference</a>
+      </div>
+      <table class="tx-report">
+        <caption class="tx-visually-hidden">Entities created by the integration</caption>
+        <thead>
+          <tr><th scope="col">Spot</th><th scope="col">Platform</th><th scope="col">What you get</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="tx-report__sp" style="--t:.62">Sp1</td>
+            <td><code>climate</code></td>
+            <td><strong>A thermostat per zone.</strong> C1 and C2, air or water circuits. Off, heat, cool and heat/cool, comfort and eco presets, silent mode, fan speed on fan-coil systems.</td>
+          </tr>
+          <tr>
+            <td class="tx-report__sp" style="--t:.86">Sp2</td>
+            <td><code>water_heater</code></td>
+            <td><strong>Domestic hot water.</strong> Off, eco and performance (boost), with the tank temperature as its own sensor.</td>
+          </tr>
+          <tr>
+            <td class="tx-report__sp" style="--t:.5">Sp3</td>
+            <td><code>water_heater</code></td>
+            <td><strong>Swimming pool.</strong> On or off, target between 24 and 33 °C.</td>
+          </tr>
+          <tr>
+            <td class="tx-report__sp" style="--t:.7">Sp4</td>
+            <td><code>sensor</code></td>
+            <td><strong>The water loop.</strong> Water in and out, flow, pressure, pump speed, mixing valve, outdoor and mean outdoor temperature.</td>
+          </tr>
+          <tr>
+            <td class="tx-report__sp" style="--t:.95">Sp5</td>
+            <td><code>sensor</code></td>
+            <td><strong>Inside the outdoor unit.</strong> Compressor frequency and current, discharge and suction pressure, expansion valve, fan speed, defrost. The secondary cycle too, on units that report it.</td>
+          </tr>
+          <tr>
+            <td class="tx-report__sp" style="--t:.78">Sp6</td>
+            <td><code>sensor</code></td>
+            <td><strong>Energy and efficiency.</strong> Instant consumption, heating and cooling thermal power, instant COP, daily consumption and daily COP for space heating and hot water.</td>
+          </tr>
+          <tr>
+            <td class="tx-report__sp" style="--t:.4">Sp7</td>
+            <td><code>number</code></td>
+            <td><strong>Fixed water temperature.</strong> Heating and cooling setpoints per water circuit, when it runs without outdoor compensation.</td>
+          </tr>
+          <tr>
+            <td class="tx-report__sp" style="--t:1">Sp8</td>
+            <td><code>sensor</code></td>
+            <td><strong>Alarms you actually see.</strong> Code, origin and description, a persistent notification when one fires, a filter for codes you choose to ignore, and a service to clear them.</td>
+          </tr>
+          <tr class="is-ghost">
+            <td class="tx-report__sp">Sp9</td>
+            <td><code>sensor</code></td>
+            <td><strong>Link health.</strong> Wi-Fi signal of the ATW-IOT-01, connectivity and last communication, so you know when the cloud is the problem.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="tx-band tx-dash" id="dashboard" aria-labelledby="dash-title">
+    <div class="tx-wrap">
+      <h2 id="dash-title" class="tx-h2 tx-h2--narrow">Looks like it was always there.</h2>
+      <p class="tx-dash__lede">These are standard Home Assistant entities. Thermostat cards, automations, voice assistants, the energy dashboard and HomeKit bridges work with them as they are.</p>
+      <div class="tx-shots">
+        <figure class="tx-shot tx-shot--tall">
+          <div class="tx-shot__frame"><img src="{{ 'images/HVAC_mode_selector.png' | url }}" alt="Home Assistant thermostat dialog for a zone: current temperature 18 °C, target 19 °C, heating, with the mode menu open on Heat/Cool, Heat, Cool and Off." width="960" height="1026" loading="lazy"></div>
+          <figcaption>Thermostat dialog for one zone, mode menu open.</figcaption>
+        </figure>
+        <figure class="tx-shot">
+          <div class="tx-shot__frame"><img src="{{ 'images/climate_card_controls.png' | url }}" alt="Home Assistant tile card for the Salon zone: heat at 20 °C, fan mode Auto, preset Comfort, target 19.0 °C." width="484" height="654" loading="lazy"></div>
+          <figcaption>Tile card with fan, preset and target.</figcaption>
+        </figure>
+        <figure class="tx-shot tx-shot--wide">
+          <div class="tx-shot__frame"><img src="{{ 'images/basic_thermostat_card.png' | url }}" alt="Compact Home Assistant thermostat card." width="388" height="144" loading="lazy"></div>
+          <figcaption>Compact card for a dashboard row.</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <section class="tx-band tx-systems" id="systems" aria-labelledby="systems-title">
+    <div class="tx-wrap">
+      <h2 id="systems-title" class="tx-h2 tx-h2--narrow">Made for the installs people actually have.</h2>
+      <ul class="tx-models" aria-label="Unit models">
+        <li>Yutaki S</li><li>Yutaki SC</li><li>Yutaki S80</li><li>Yutaki M</li><li>Yutaki SC Lite</li><li>Yutampo</li>
+      </ul>
+      <dl class="tx-circuits">
+        <div><dt>C1 · C2 air</dt><dd>Room thermostats</dd></div>
+        <div><dt>C1 · C2 water</dt><dd>Underfloor, radiators</dd></div>
+        <div><dt>DHW</dt><dd>Hot water tank</dd></div>
+        <div><dt>SWP</dt><dd>Swimming pool</dd></div>
+        <div><dt>Fan coils</dt><dd>Speed control</dd></div>
+        <div><dt>OTC</dt><dd>Outdoor compensation</dd></div>
+      </dl>
+      <p class="tx-systems__note">Every installation is a little different. The <a href="{{ 'SUPPORTED_DEVICES/' | url }}">compatibility matrix</a> lists what owners have tested. Running it on a unit that is not there yet? Add a line.</p>
+    </div>
+  </section>
+
+  <section class="tx-band tx-how" id="how" aria-labelledby="how-title">
+    <div class="tx-wrap">
+      <h2 id="how-title" class="tx-h2 tx-h2--narrow">Unofficial, by necessity.</h2>
+      <div class="tx-how__grid">
+        <div class="tx-how__text">
+          <p>Hitachi publishes no API for the ATW-IOT-01 and offers no Home Assistant integration. The author contacted Hitachi several times asking for one, or at least for documentation. None of those messages got an answer.</p>
+          <p>So the integration does what your browser does. It signs in to CSNet Manager with your account and reads the same data the web app shows, then sends your changes back the same way the web app does.</p>
+          <p class="tx-how__warn">It is not affiliated with, endorsed or supported by Hitachi. When Hitachi changes its website, the integration can stop working until it is updated.</p>
+          <a class="tx-link" href="{{ 'wiki/How-It-Works/' | url }}">How it works, in detail</a>
+        </div>
+        <ol class="tx-path" aria-label="Data path">
+          <li><b>Home Assistant</b><span>csnet_home integration</span></li>
+          <li class="tx-path__hop"><span>HTTPS · every 60 s</span></li>
+          <li><b>www.csnetmanager.com</b><span>Hitachi CSNet Manager cloud</span></li>
+          <li class="tx-path__hop"><span>Your internet link</span></li>
+          <li><b>ATW-IOT-01</b><span>Module on your unit</span></li>
+          <li class="tx-path__hop"><span>H-LINK</span></li>
+          <li><b>Heat pump</b><span>Yutaki · Yutampo</span></li>
+        </ol>
+      </div>
+      <dl class="tx-facts">
+        <div><dt>Polling</dt><dd>Every 60 seconds by default. Configurable, but please keep it at 60 s or more.</dd></div>
+        <div><dt>Traffic</dt><dd>3 HTTPS requests per poll. Sign-in and alarm translations on start-up.</dd></div>
+        <div><dt>Destination</dt><dd><code>www.csnetmanager.com</code> only. No telemetry, no analytics, no third-party service.</dd></div>
+        <div><dt>Credentials</dt><dd>Stored in your Home Assistant config entry. Sent only to CSNet Manager.</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <section class="tx-band tx-install" id="install" aria-labelledby="install-title">
+    <div class="tx-wrap">
+      <h2 id="install-title" class="tx-h2 tx-h2--narrow">Running in three steps.</h2>
+      <ol class="tx-steps">
+        <li>
+          <h3>Install from HACS</h3>
+          <p>Open the repository in HACS and download it. Or search for <em>Hitachi CSNet Home</em> in HACS.</p>
+          <a class="tx-btn tx-btn--hot" href="{{ hacs }}">Open in HACS</a>
+        </li>
+        <li>
+          <h3>Restart Home Assistant</h3>
+          <p>Settings, System, Restart. Home Assistant only loads new integrations at start-up.</p>
+        </li>
+        <li>
+          <h3>Add the integration</h3>
+          <p>Sign in with the username and password you use on csnetmanager.com. Zones appear a few seconds later.</p>
+          <a class="tx-btn" href="{{ add_integration }}">Add integration</a>
+        </li>
+      </ol>
+      <p class="tx-install__req">You need an ATW-IOT-01 module on the unit, a working CSNet Manager account, and Home Assistant with HACS. No HACS? <a href="{{ 'wiki/Installation-Guide/' | url }}#manual-installation">Install manually</a>.</p>
+    </div>
+  </section>
+
+  <section class="tx-band tx-manual" id="docs" aria-labelledby="docs-title">
+    <div class="tx-wrap tx-split">
+      <div class="tx-split__lead">
+        <h2 id="docs-title" class="tx-h2">The manual.</h2>
+        <p>From the first sign-in to reading compressor pressures. Read it in order, or jump to the reading you need.</p>
+      </div>
+      <ol class="tx-index">
+        <li><a href="{{ 'wiki/Installation-Guide/' | url }}"><span class="tx-index__n">01</span><b>Installation</b><span>HACS, release zip or git</span></a></li>
+        <li><a href="{{ 'wiki/Configuration-Guide/' | url }}"><span class="tx-index__n">02</span><b>Configuration</b><span>Account, polling, options</span></a></li>
+        <li><a href="{{ 'wiki/Climate-Control/' | url }}"><span class="tx-index__n">03</span><b>Climate control</b><span>Modes, presets, limits</span></a></li>
+        <li><a href="{{ 'wiki/Multi-Zone-Configuration/' | url }}"><span class="tx-index__n">04</span><b>Multi-zone</b><span>C1 and C2 circuits</span></a></li>
+        <li><a href="{{ 'wiki/Water-Heater-Control/' | url }}"><span class="tx-index__n">05</span><b>Hot water</b><span>DHW modes and boost</span></a></li>
+        <li><a href="{{ 'wiki/Sensors-Reference/' | url }}"><span class="tx-index__n">06</span><b>Sensors</b><span>Every reading, explained</span></a></li>
+        <li><a href="{{ 'COMPRESSOR_SENSORS/' | url }}"><span class="tx-index__n">07</span><b>Compressor</b><span>Outdoor unit internals</span></a></li>
+        <li><a href="{{ 'wiki/Advanced-Features/' | url }}"><span class="tx-index__n">08</span><b>Advanced</b><span>Silent mode, fans, OTC, alarms</span></a></li>
+        <li><a href="{{ 'wiki/How-It-Works/' | url }}"><span class="tx-index__n">09</span><b>How it works</b><span>The API, privacy, disclaimer</span></a></li>
+        <li><a href="{{ 'wiki/Troubleshooting/' | url }}"><span class="tx-index__n">10</span><b>Troubleshooting</b><span>When a reading goes missing</span></a></li>
+        <li><a href="{{ 'wiki/FAQ/' | url }}"><span class="tx-index__n">11</span><b>FAQ</b><span>Short answers</span></a></li>
+        <li><a href="{{ 'SUPPORTED_DEVICES/' | url }}"><span class="tx-index__n">12</span><b>Supported devices</b><span>Tested by owners</span></a></li>
+      </ol>
+    </div>
+  </section>
+
+</div>
+{% endblock %}
+
+{% block footer %}
+<footer class="tx-foot">
+  <div class="tx-wrap tx-foot__grid">
+    <div class="tx-foot__id">
+      <img src="{{ 'images/mark.svg' | url }}" alt="" width="36" height="36">
+      <p><b>Hitachi CSNet Home</b> for Home Assistant.<br>Built by <a href="https://github.com/mmornati">Marco Mornati</a> and contributors. Apache License 2.0.</p>
+    </div>
+    <nav class="tx-foot__links" aria-label="Project">
+      <a href="{{ gh }}">Source code</a>
+      <a href="{{ gh }}/releases">Releases <span data-gh-release></span></a>
+      <a href="{{ gh }}/issues">Report a bug</a>
+      <a href="{{ gh }}/discussions">Discussions</a>
+    </nav>
+    <p class="tx-foot__legal">Independent community project. Not affiliated with, endorsed by or supported by Hitachi. Hitachi, Yutaki, Yutampo and CSNet Manager are trademarks of their respective owners and are used here only to describe compatibility. Use at your own risk.</p>
+  </div>
+</footer>
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script src="{{ 'javascripts/thermogram.js' | url }}" defer></script>
+  <script>
+    (function () {
+      var repo = "mmornati/home-assistant-csnet-home";
+      function fmt(n) { return n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "k" : String(n); }
+      fetch("https://api.github.com/repos/" + repo)
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) {
+          if (!d || typeof d.stargazers_count !== "number") return;
+          document.querySelectorAll("[data-gh-stars]").forEach(function (el) { el.textContent = fmt(d.stargazers_count) + " stars"; });
+        }).catch(function () {});
+      fetch("https://api.github.com/repos/" + repo + "/releases/latest")
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) {
+          if (!d || !d.tag_name) return;
+          document.querySelectorAll("[data-gh-release]").forEach(function (el) { el.textContent = d.tag_name; });
+        }).catch(function () {});
+    })();
+  </script>
+{% endblock %}

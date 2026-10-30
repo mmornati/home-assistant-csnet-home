@@ -1,4 +1,4 @@
-![logo](./docs/images/logo.png)
+<img src="./docs/images/mark.svg" alt="" width="72" height="72">
 
 # Hitachi CSNet Home Integration for Home Assistant
 
@@ -10,6 +10,11 @@
 [![License](https://img.shields.io/github/license/mmornati/home-assistant-csnet-home.svg?style=for-the-badge)](LICENSE)
 
 A custom Home Assistant integration to control Hitachi heat pumps and air conditioning systems using the ATW-IOT-01 module through the CSNet Manager cloud service.
+
+**Website and documentation: [mmornati.github.io/home-assistant-csnet-home](https://mmornati.github.io/home-assistant-csnet-home)**
+
+> [!WARNING]
+> **Unofficial integration.** This project is not affiliated with, endorsed by or supported by Hitachi. Hitachi provides no public API for the ATW-IOT-01 module; the author contacted Hitachi several times about an official API or Home Assistant integration and never received an answer. The integration therefore works the way the CSNet Manager web application does, and it can stop working whenever Hitachi changes its website. Hitachi, Yutaki, Yutampo and CSNet Manager are trademarks of their respective owners. See [How it works & disclaimer](https://mmornati.github.io/home-assistant-csnet-home/wiki/How-It-Works/).
 
 ---
 

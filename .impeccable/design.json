@@ -1,0 +1,563 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-30T09:34:21+00:00",
+  "title": "Design System: Hitachi CSNet Home",
+  "extensions": {
+    "colorMeta": {
+      "ink-0": {
+        "role": "neutral",
+        "displayName": "Viewfinder Black",
+        "canonical": "#0b0712",
+        "tonalRamp": [
+          "oklch(15% 0.025 301)",
+          "oklch(26% 0.025 301)",
+          "oklch(38% 0.025 301)",
+          "oklch(49% 0.025 301)",
+          "oklch(61% 0.025 301)",
+          "oklch(72% 0.025 301)",
+          "oklch(84% 0.025 301)",
+          "oklch(95% 0.025 301)"
+        ]
+      },
+      "ink-1": {
+        "role": "neutral",
+        "displayName": "Night Violet",
+        "canonical": "#140c22",
+        "tonalRamp": [
+          "oklch(15% 0.045 299)",
+          "oklch(26% 0.045 299)",
+          "oklch(38% 0.045 299)",
+          "oklch(49% 0.045 299)",
+          "oklch(61% 0.045 299)",
+          "oklch(72% 0.045 299)",
+          "oklch(84% 0.045 299)",
+          "oklch(95% 0.045 299)"
+        ]
+      },
+      "ink-2": {
+        "role": "neutral",
+        "displayName": "Deep Indigo",
+        "canonical": "#1d0a3a",
+        "tonalRamp": [
+          "oklch(15% 0.087 296)",
+          "oklch(26% 0.087 296)",
+          "oklch(38% 0.087 296)",
+          "oklch(49% 0.087 296)",
+          "oklch(61% 0.087 296)",
+          "oklch(72% 0.087 296)",
+          "oklch(84% 0.087 296)",
+          "oklch(95% 0.087 296)"
+        ]
+      },
+      "ironbow-black": {
+        "role": "neutral",
+        "displayName": "Ironbow Cold End",
+        "canonical": "#07040f",
+        "tonalRamp": [
+          "oklch(15% 0.028 298)",
+          "oklch(26% 0.028 298)",
+          "oklch(38% 0.028 298)",
+          "oklch(49% 0.028 298)",
+          "oklch(61% 0.028 298)",
+          "oklch(72% 0.028 298)",
+          "oklch(84% 0.028 298)",
+          "oklch(95% 0.028 298)"
+        ]
+      },
+      "ironbow-indigo": {
+        "role": "secondary",
+        "displayName": "Ironbow Indigo",
+        "canonical": "#470f76",
+        "tonalRamp": [
+          "oklch(15% 0.157 303)",
+          "oklch(26% 0.157 303)",
+          "oklch(38% 0.157 303)",
+          "oklch(49% 0.157 303)",
+          "oklch(61% 0.157 303)",
+          "oklch(72% 0.157 303)",
+          "oklch(84% 0.157 303)",
+          "oklch(95% 0.157 303)"
+        ]
+      },
+      "plum": {
+        "role": "secondary",
+        "displayName": "Plum",
+        "canonical": "#8b2185",
+        "tonalRamp": [
+          "oklch(15% 0.179 331)",
+          "oklch(26% 0.179 331)",
+          "oklch(38% 0.179 331)",
+          "oklch(49% 0.179 331)",
+          "oklch(61% 0.179 331)",
+          "oklch(72% 0.179 331)",
+          "oklch(84% 0.179 331)",
+          "oklch(95% 0.179 331)"
+        ]
+      },
+      "magenta": {
+        "role": "secondary",
+        "displayName": "Thermal Magenta",
+        "canonical": "#c5376f",
+        "tonalRamp": [
+          "oklch(15% 0.183 1)",
+          "oklch(26% 0.183 1)",
+          "oklch(38% 0.183 1)",
+          "oklch(49% 0.183 1)",
+          "oklch(61% 0.183 1)",
+          "oklch(72% 0.183 1)",
+          "oklch(84% 0.183 1)",
+          "oklch(95% 0.183 1)"
+        ]
+      },
+      "ember": {
+        "role": "primary",
+        "displayName": "Ember",
+        "canonical": "#ea5a3a",
+        "tonalRamp": [
+          "oklch(15% 0.185 34)",
+          "oklch(26% 0.185 34)",
+          "oklch(38% 0.185 34)",
+          "oklch(49% 0.185 34)",
+          "oklch(61% 0.185 34)",
+          "oklch(72% 0.185 34)",
+          "oklch(84% 0.185 34)",
+          "oklch(95% 0.185 34)"
+        ]
+      },
+      "orange": {
+        "role": "secondary",
+        "displayName": "Furnace Orange",
+        "canonical": "#f7922a",
+        "tonalRamp": [
+          "oklch(15% 0.162 60)",
+          "oklch(26% 0.162 60)",
+          "oklch(38% 0.162 60)",
+          "oklch(49% 0.162 60)",
+          "oklch(61% 0.162 60)",
+          "oklch(72% 0.162 60)",
+          "oklch(84% 0.162 60)",
+          "oklch(95% 0.162 60)"
+        ]
+      },
+      "amber": {
+        "role": "primary",
+        "displayName": "Ironbow Amber",
+        "canonical": "#ffd24a",
+        "tonalRamp": [
+          "oklch(15% 0.155 90)",
+          "oklch(26% 0.155 90)",
+          "oklch(38% 0.155 90)",
+          "oklch(49% 0.155 90)",
+          "oklch(61% 0.155 90)",
+          "oklch(72% 0.155 90)",
+          "oklch(84% 0.155 90)",
+          "oklch(95% 0.155 90)"
+        ]
+      },
+      "hot": {
+        "role": "neutral",
+        "displayName": "White-Hot Cream",
+        "canonical": "#fff6d6",
+        "tonalRamp": [
+          "oklch(15% 0.043 94)",
+          "oklch(26% 0.043 94)",
+          "oklch(38% 0.043 94)",
+          "oklch(49% 0.043 94)",
+          "oklch(61% 0.043 94)",
+          "oklch(72% 0.043 94)",
+          "oklch(84% 0.043 94)",
+          "oklch(95% 0.043 94)"
+        ]
+      },
+      "white-hot": {
+        "role": "neutral",
+        "displayName": "Ironbow Hot End",
+        "canonical": "#fff8e6",
+        "tonalRamp": [
+          "oklch(15% 0.025 89)",
+          "oklch(26% 0.025 89)",
+          "oklch(38% 0.025 89)",
+          "oklch(49% 0.025 89)",
+          "oklch(61% 0.025 89)",
+          "oklch(72% 0.025 89)",
+          "oklch(84% 0.025 89)",
+          "oklch(95% 0.025 89)"
+        ]
+      },
+      "ice-hi": {
+        "role": "tertiary",
+        "displayName": "Ice Highlight",
+        "canonical": "#9ee3ff",
+        "tonalRamp": [
+          "oklch(15% 0.079 225)",
+          "oklch(26% 0.079 225)",
+          "oklch(38% 0.079 225)",
+          "oklch(49% 0.079 225)",
+          "oklch(61% 0.079 225)",
+          "oklch(72% 0.079 225)",
+          "oklch(84% 0.079 225)",
+          "oklch(95% 0.079 225)"
+        ]
+      },
+      "docs-paper": {
+        "role": "neutral",
+        "displayName": "Docs Paper",
+        "canonical": "#fffcf4",
+        "tonalRamp": [
+          "oklch(15% 0.011 90)",
+          "oklch(26% 0.011 90)",
+          "oklch(38% 0.011 90)",
+          "oklch(49% 0.011 90)",
+          "oklch(61% 0.011 90)",
+          "oklch(72% 0.011 90)",
+          "oklch(84% 0.011 90)",
+          "oklch(95% 0.011 90)"
+        ]
+      },
+      "docs-code-paper": {
+        "role": "neutral",
+        "displayName": "Code Paper",
+        "canonical": "#f6f0e4",
+        "tonalRamp": [
+          "oklch(15% 0.017 85)",
+          "oklch(26% 0.017 85)",
+          "oklch(38% 0.017 85)",
+          "oklch(49% 0.017 85)",
+          "oklch(61% 0.017 85)",
+          "oklch(72% 0.017 85)",
+          "oklch(84% 0.017 85)",
+          "oklch(95% 0.017 85)"
+        ]
+      },
+      "docs-link-light": {
+        "role": "secondary",
+        "displayName": "Docs Wine Link",
+        "canonical": "#9a2563",
+        "tonalRamp": [
+          "oklch(15% 0.162 353)",
+          "oklch(26% 0.162 353)",
+          "oklch(38% 0.162 353)",
+          "oklch(49% 0.162 353)",
+          "oklch(61% 0.162 353)",
+          "oklch(72% 0.162 353)",
+          "oklch(84% 0.162 353)",
+          "oklch(95% 0.162 353)"
+        ]
+      },
+      "docs-night": {
+        "role": "neutral",
+        "displayName": "Docs Night",
+        "canonical": "#120a1e",
+        "tonalRamp": [
+          "oklch(15% 0.042 300)",
+          "oklch(26% 0.042 300)",
+          "oklch(38% 0.042 300)",
+          "oklch(49% 0.042 300)",
+          "oklch(61% 0.042 300)",
+          "oklch(72% 0.042 300)",
+          "oklch(84% 0.042 300)",
+          "oklch(95% 0.042 300)"
+        ]
+      },
+      "docs-code-night": {
+        "role": "neutral",
+        "displayName": "Code Night",
+        "canonical": "#1b1029",
+        "tonalRamp": [
+          "oklch(15% 0.050 302)",
+          "oklch(26% 0.050 302)",
+          "oklch(38% 0.050 302)",
+          "oklch(49% 0.050 302)",
+          "oklch(61% 0.050 302)",
+          "oklch(72% 0.050 302)",
+          "oklch(84% 0.050 302)",
+          "oklch(95% 0.050 302)"
+        ]
+      },
+      "docs-link-dark": {
+        "role": "secondary",
+        "displayName": "Docs Night Link",
+        "canonical": "#ffb35c",
+        "tonalRamp": [
+          "oklch(15% 0.136 68)",
+          "oklch(26% 0.136 68)",
+          "oklch(38% 0.136 68)",
+          "oklch(49% 0.136 68)",
+          "oklch(61% 0.136 68)",
+          "oklch(72% 0.136 68)",
+          "oklch(84% 0.136 68)",
+          "oklch(95% 0.136 68)"
+        ]
+      },
+      "docs-header-light": {
+        "role": "neutral",
+        "displayName": "Header Violet Light",
+        "canonical": "#2a1745",
+        "tonalRamp": [
+          "oklch(15% 0.083 300)",
+          "oklch(26% 0.083 300)",
+          "oklch(38% 0.083 300)",
+          "oklch(49% 0.083 300)",
+          "oklch(61% 0.083 300)",
+          "oklch(72% 0.083 300)",
+          "oklch(84% 0.083 300)",
+          "oklch(95% 0.083 300)"
+        ]
+      },
+      "text-2": {
+        "role": "neutral",
+        "displayName": "Warm Ash",
+        "canonical": "rgba(255, 238, 214, 0.74)"
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "rgba(255, 246, 214, 0.16)"
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Hero headline only; uppercase, balanced."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Band titles; docs H1/H2 use the same face at 900/800."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Step titles and docs H3."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Running text, 33-36rem measure."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Buttons, nav, footer and text links; uppercase."
+      },
+      "readout": {
+        "displayName": "Readout",
+        "purpose": "Live spot-meter temperature; tabular figures."
+      },
+      "instrument": {
+        "displayName": "Instrument",
+        "purpose": "Scale, HUD meta, toggle, column heads, addresses, entity ids, inline code."
+      }
+    },
+    "gradients": [
+      {
+        "name": "ironbow",
+        "value": "linear-gradient(90deg, #07040f 0%, #1d0a3a 14%, #470f76 30%, #8b2185 45%, #c5376f 58%, #ea5a3a 70%, #f7922a 81%, #ffd24a 91%, #fff8e6 100%)",
+        "purpose": "The temperature scale: canvas LUT, scale bar, index rail, spot dots, docs header strip."
+      }
+    ],
+    "shadows": [
+      {
+        "name": "meter-lift",
+        "value": "0 6px 14px rgba(11, 7, 18, 0.5)",
+        "purpose": "Spot-meter card over the thermogram."
+      },
+      {
+        "name": "shot-lift",
+        "value": "0 14px 30px rgba(11, 7, 18, 0.3)",
+        "purpose": "Screenshot frames on the hot band."
+      },
+      {
+        "name": "reticle-legibility",
+        "value": "drop-shadow(0 1px 2px rgba(11, 7, 18, 0.7))",
+        "purpose": "Filter keeping the crosshair readable over any field value."
+      }
+    ],
+    "focus": [
+      {
+        "name": "focus-amber",
+        "value": "outline: 2px solid #ffd24a; outline-offset: 3px",
+        "purpose": "All interactive elements on the landing."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out-expo",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Button, toggle and index-row transitions (0.25-0.35s)."
+      },
+      {
+        "name": "flow",
+        "value": "tx-flow 1.2s linear infinite",
+        "purpose": "Dashed ice-hi line along the data path."
+      },
+      {
+        "name": "scale-mark",
+        "value": "top 0.2s linear",
+        "purpose": "Scale tick following the meter."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "animations off, transitions 0.01ms, canvas renders one still frame",
+        "purpose": "prefers-reduced-motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "index-collapse",
+        "value": "40em"
+      },
+      {
+        "name": "wrap-wide",
+        "value": "48em"
+      },
+      {
+        "name": "shots-two-col",
+        "value": "52em"
+      },
+      {
+        "name": "steps-three-col",
+        "value": "56em"
+      },
+      {
+        "name": "split",
+        "value": "60em"
+      },
+      {
+        "name": "portrait-hero",
+        "value": "max-aspect-ratio: 21/20"
+      }
+    ],
+    "thermogram": {
+      "lut": "same nine ironbow stops, 256 entries",
+      "span": {
+        "heat": [
+          -5,
+          55
+        ],
+        "cool": [
+          12,
+          46
+        ]
+      },
+      "autoRange": "ends interpolate during the heat/cool switch"
+    }
+  },
+  "components": [
+    {
+      "name": "Primary Button (hot)",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one hot call to action: Install with HACS / Open in HACS.",
+      "html": "<div class=\"ds-canvas\"><a class=\"ds-btn ds-btn--hot\" href=\"#\">Install with HACS</a></div>",
+      "css": ":host{--tx-ink-0:#0b0712;--tx-ink-1:#140c22;--tx-hot:#fff6d6;--tx-amber:#ffd24a;--tx-ember:#ea5a3a;--tx-ice-hi:#9ee3ff;--tx-text-2:rgba(255,238,214,.74);--tx-line:rgba(255,246,214,.16);--tx-ease:cubic-bezier(0.16,1,0.3,1);--tx-display:'Big Shoulders Display','Arial Narrow',sans-serif;--tx-mono:'Martian Mono',ui-monospace,monospace;--tx-body:'Hanken Grotesk',system-ui,sans-serif;--tx-ironbow:linear-gradient(90deg,#07040f 0%,#1d0a3a 14%,#470f76 30%,#8b2185 45%,#c5376f 58%,#ea5a3a 70%,#f7922a 81%,#ffd24a 91%,#fff8e6 100%);} .ds-canvas{background:var(--tx-ink-0);padding:2rem}.ds-btn{display:inline-flex;align-items:center;justify-content:center;min-height:3rem;padding:0 1.35rem;font-family:var(--tx-body);font-size:.86rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;text-decoration:none;color:var(--tx-hot);border:1.5px solid rgba(255,246,214,.5);border-radius:2px;background:rgba(11,7,18,.35);transition:background-color .25s var(--tx-ease),color .25s var(--tx-ease),border-color .25s var(--tx-ease),transform .25s var(--tx-ease);cursor:pointer}.ds-btn:hover{border-color:var(--tx-hot);background:rgba(255,246,214,.1)}.ds-btn:active{transform:translateY(1px)}.ds-btn:focus-visible{outline:2px solid var(--tx-amber);outline-offset:3px}.ds-btn--hot{background:var(--tx-amber);border-color:var(--tx-amber);color:var(--tx-ink-0)}.ds-btn--hot:hover{background:var(--tx-hot);border-color:var(--tx-hot);color:var(--tx-ink-0)}"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Secondary action beside the hot button: Read the docs, Add integration.",
+      "html": "<div class=\"ds-canvas\"><a class=\"ds-btn\" href=\"#\">Read the docs</a></div>",
+      "css": ":host{--tx-ink-0:#0b0712;--tx-ink-1:#140c22;--tx-hot:#fff6d6;--tx-amber:#ffd24a;--tx-ember:#ea5a3a;--tx-ice-hi:#9ee3ff;--tx-text-2:rgba(255,238,214,.74);--tx-line:rgba(255,246,214,.16);--tx-ease:cubic-bezier(0.16,1,0.3,1);--tx-display:'Big Shoulders Display','Arial Narrow',sans-serif;--tx-mono:'Martian Mono',ui-monospace,monospace;--tx-body:'Hanken Grotesk',system-ui,sans-serif;--tx-ironbow:linear-gradient(90deg,#07040f 0%,#1d0a3a 14%,#470f76 30%,#8b2185 45%,#c5376f 58%,#ea5a3a 70%,#f7922a 81%,#ffd24a 91%,#fff8e6 100%);} .ds-canvas{background:var(--tx-ink-0);padding:2rem}.ds-btn{display:inline-flex;align-items:center;justify-content:center;min-height:3rem;padding:0 1.35rem;font-family:var(--tx-body);font-size:.86rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;text-decoration:none;color:var(--tx-hot);border:1.5px solid rgba(255,246,214,.5);border-radius:2px;background:rgba(11,7,18,.35);transition:background-color .25s var(--tx-ease),color .25s var(--tx-ease),border-color .25s var(--tx-ease),transform .25s var(--tx-ease);cursor:pointer}.ds-btn:hover{border-color:var(--tx-hot);background:rgba(255,246,214,.1)}.ds-btn:active{transform:translateY(1px)}.ds-btn:focus-visible{outline:2px solid var(--tx-amber);outline-offset:3px}"
+    },
+    {
+      "name": "hvac_mode Toggle",
+      "kind": "chip",
+      "refersTo": "mode-toggle-heat-on",
+      "description": "Segmented instrument control that re-renders the field in heat or cool.",
+      "html": "<div class=\"ds-canvas\"><div class=\"ds-mode\" role=\"group\" aria-label=\"Preview hvac_mode\"><span class=\"ds-mode__label\">hvac_mode</span><button type=\"button\" data-mode=\"heat\" aria-pressed=\"true\">Heat</button><button type=\"button\" data-mode=\"cool\" aria-pressed=\"false\">Cool</button></div></div>",
+      "css": ":host{--tx-ink-0:#0b0712;--tx-ink-1:#140c22;--tx-hot:#fff6d6;--tx-amber:#ffd24a;--tx-ember:#ea5a3a;--tx-ice-hi:#9ee3ff;--tx-text-2:rgba(255,238,214,.74);--tx-line:rgba(255,246,214,.16);--tx-ease:cubic-bezier(0.16,1,0.3,1);--tx-display:'Big Shoulders Display','Arial Narrow',sans-serif;--tx-mono:'Martian Mono',ui-monospace,monospace;--tx-body:'Hanken Grotesk',system-ui,sans-serif;--tx-ironbow:linear-gradient(90deg,#07040f 0%,#1d0a3a 14%,#470f76 30%,#8b2185 45%,#c5376f 58%,#ea5a3a 70%,#f7922a 81%,#ffd24a 91%,#fff8e6 100%);} .ds-canvas{background:var(--tx-ink-0);padding:2rem}.ds-mode{display:inline-flex;align-items:stretch;border:1px solid var(--tx-line);border-radius:2px;background:rgba(11,7,18,.55);font-family:var(--tx-mono);font-size:.72rem;text-transform:uppercase;letter-spacing:.05em}.ds-mode__label{padding:.65rem .8rem;color:var(--tx-text-2);border-right:1px solid var(--tx-line);text-transform:none}.ds-mode button{font:inherit;letter-spacing:inherit;text-transform:inherit;padding:.65rem 1rem;min-width:4.5rem;cursor:pointer;color:var(--tx-text-2);background:transparent;border:0;transition:background-color .3s var(--tx-ease),color .3s var(--tx-ease)}.ds-mode button:hover{color:var(--tx-hot)}.ds-mode button:focus-visible{outline:2px solid var(--tx-amber);outline-offset:3px}.ds-mode button[data-mode=heat][aria-pressed=true]{background:var(--tx-ember);color:var(--tx-ink-0)}.ds-mode button[data-mode=cool][aria-pressed=true]{background:var(--tx-ice-hi);color:var(--tx-ink-0)}"
+    },
+    {
+      "name": "Spot Meter",
+      "kind": "custom",
+      "refersTo": "spot-meter-card",
+      "description": "Crosshair reticle plus reading card naming zone, temperature and entity.",
+      "html": "<div class=\"ds-canvas\"><svg class=\"ds-reticle\" viewBox=\"0 0 44 44\" aria-hidden=\"true\"><circle cx=\"22\" cy=\"22\" r=\"9\" fill=\"none\"/><path d=\"M22 2v12M22 30v12M2 22h12M30 22h12\"/></svg><div class=\"ds-meter\"><span class=\"ds-meter__zone\">Ground floor · circuit C1</span><span class=\"ds-meter__temp\">31.0 °C</span><span class=\"ds-meter__entity\">climate.yutaki_ground_floor</span><span>underfloor · hvac_action: heating</span></div></div>",
+      "css": ":host{--tx-ink-0:#0b0712;--tx-ink-1:#140c22;--tx-hot:#fff6d6;--tx-amber:#ffd24a;--tx-ember:#ea5a3a;--tx-ice-hi:#9ee3ff;--tx-text-2:rgba(255,238,214,.74);--tx-line:rgba(255,246,214,.16);--tx-ease:cubic-bezier(0.16,1,0.3,1);--tx-display:'Big Shoulders Display','Arial Narrow',sans-serif;--tx-mono:'Martian Mono',ui-monospace,monospace;--tx-body:'Hanken Grotesk',system-ui,sans-serif;--tx-ironbow:linear-gradient(90deg,#07040f 0%,#1d0a3a 14%,#470f76 30%,#8b2185 45%,#c5376f 58%,#ea5a3a 70%,#f7922a 81%,#ffd24a 91%,#fff8e6 100%);} .ds-canvas{background:radial-gradient(60% 80% at 20% 40%,#c5376f,#3b0f70 60%,#0b0712);padding:2rem;display:flex;gap:.5rem;align-items:flex-start}.ds-reticle{width:44px;height:44px;flex:none;stroke:var(--tx-hot);stroke-width:1.5;filter:drop-shadow(0 1px 2px rgba(11,7,18,.7))}.ds-meter{display:grid;gap:.15rem;min-width:15.5rem;padding:.65rem .8rem .7rem;background:rgba(11,7,18,.82);border:1px solid rgba(255,246,214,.28);border-radius:2px;box-shadow:0 6px 14px rgba(11,7,18,.5);font-family:var(--tx-mono);font-size:.72rem;color:var(--tx-text-2);white-space:nowrap}.ds-meter__zone{color:var(--tx-hot);font-family:var(--tx-body);font-size:.82rem;font-weight:600}.ds-meter__temp{font-size:1.6rem;line-height:1.15;color:var(--tx-amber);font-variant-numeric:tabular-nums}.ds-meter__entity{color:var(--tx-hot)}"
+    },
+    {
+      "name": "Scale Bar",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Vertical ironbow temperature scale with auto-ranged ends and a live mark.",
+      "html": "<div class=\"ds-canvas\"><div class=\"ds-scale\"><span class=\"ds-plate\">55</span><div class=\"ds-scale__bar\"><span class=\"ds-scale__mark\"><b class=\"ds-plate\">31.0</b></span></div><span class=\"ds-plate\">-5</span><span class=\"ds-plate\">°C</span></div></div>",
+      "css": ":host{--tx-ink-0:#0b0712;--tx-ink-1:#140c22;--tx-hot:#fff6d6;--tx-amber:#ffd24a;--tx-ember:#ea5a3a;--tx-ice-hi:#9ee3ff;--tx-text-2:rgba(255,238,214,.74);--tx-line:rgba(255,246,214,.16);--tx-ease:cubic-bezier(0.16,1,0.3,1);--tx-display:'Big Shoulders Display','Arial Narrow',sans-serif;--tx-mono:'Martian Mono',ui-monospace,monospace;--tx-body:'Hanken Grotesk',system-ui,sans-serif;--tx-ironbow:linear-gradient(90deg,#07040f 0%,#1d0a3a 14%,#470f76 30%,#8b2185 45%,#c5376f 58%,#ea5a3a 70%,#f7922a 81%,#ffd24a 91%,#fff8e6 100%);} .ds-canvas{background:var(--tx-ink-0);padding:2rem 2rem 2rem 6rem}.ds-scale{display:inline-grid;justify-items:center;gap:.5rem;font-family:var(--tx-mono);font-size:.7rem;color:var(--tx-text-2)}.ds-plate{background:rgba(11,7,18,.72);padding:.15rem .35rem;border-radius:2px}.ds-scale__bar{position:relative;width:10px;height:14rem;background:linear-gradient(0deg,#07040f 0%,#1d0a3a 14%,#470f76 30%,#8b2185 45%,#c5376f 58%,#ea5a3a 70%,#f7922a 81%,#ffd24a 91%,#fff8e6 100%);border:1px solid rgba(255,246,214,.35)}.ds-scale__mark{position:absolute;right:100%;top:40%;width:.75rem;height:1.5px;background:var(--tx-hot)}.ds-scale__mark b{position:absolute;right:calc(100% + .35rem);top:50%;transform:translateY(-50%);font-weight:500;color:var(--tx-hot);font-variant-numeric:tabular-nums}"
+    },
+    {
+      "name": "Manual Index",
+      "kind": "nav",
+      "refersTo": null,
+      "description": "Numbered docs index on an ironbow rail, addressed like a scale.",
+      "html": "<div class=\"ds-canvas\"><ol class=\"ds-index\"><li><a href=\"#\"><span class=\"ds-index__n\">01</span><b>Installation</b><span>HACS, release zip or git</span></a></li><li><a href=\"#\"><span class=\"ds-index__n\">02</span><b>Configuration</b><span>Account, polling, options</span></a></li><li><a href=\"#\"><span class=\"ds-index__n\">03</span><b>Climate control</b><span>Modes, presets, limits</span></a></li></ol></div>",
+      "css": ":host{--tx-ink-0:#0b0712;--tx-ink-1:#140c22;--tx-hot:#fff6d6;--tx-amber:#ffd24a;--tx-ember:#ea5a3a;--tx-ice-hi:#9ee3ff;--tx-text-2:rgba(255,238,214,.74);--tx-line:rgba(255,246,214,.16);--tx-ease:cubic-bezier(0.16,1,0.3,1);--tx-display:'Big Shoulders Display','Arial Narrow',sans-serif;--tx-mono:'Martian Mono',ui-monospace,monospace;--tx-body:'Hanken Grotesk',system-ui,sans-serif;--tx-ironbow:linear-gradient(90deg,#07040f 0%,#1d0a3a 14%,#470f76 30%,#8b2185 45%,#c5376f 58%,#ea5a3a 70%,#f7922a 81%,#ffd24a 91%,#fff8e6 100%);} .ds-canvas{background:var(--tx-ink-1);padding:2rem;color:var(--tx-hot);font-family:var(--tx-body)}.ds-index{list-style:none;margin:0;padding:0;position:relative}.ds-index::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:linear-gradient(180deg,#fff8e6 0%,#ffd24a 9%,#f7922a 19%,#ea5a3a 30%,#c5376f 42%,#8b2185 55%,#470f76 70%,#1d0a3a 86%,#07040f 100%)}.ds-index a{display:grid;grid-template-columns:3rem minmax(0,1fr) auto;align-items:baseline;gap:0 1rem;padding:.95rem 0 .95rem 1.4rem;border-bottom:1px solid var(--tx-line);text-decoration:none;color:inherit;transition:background-color .25s var(--tx-ease)}.ds-index a>*{transition:transform .35s var(--tx-ease)}.ds-index a:hover{background:rgba(255,246,214,.05)}.ds-index a:hover>:not(:last-child){transform:translateX(.4rem)}.ds-index a:focus-visible{outline:2px solid var(--tx-amber);outline-offset:3px}.ds-index__n{font-family:var(--tx-mono);font-size:.72rem;color:var(--tx-text-2)}.ds-index b{font-family:var(--tx-display);font-weight:800;font-size:1.6rem;text-transform:uppercase;color:var(--tx-hot)}.ds-index a>span:last-child{color:var(--tx-text-2);font-size:.92rem;text-align:right}"
+    },
+    {
+      "name": "Reading Table Row",
+      "kind": "card",
+      "refersTo": null,
+      "description": "Thermography report: spot dot placed on the ironbow by its reading; ghost row hollow.",
+      "html": "<div class=\"ds-canvas\"><table class=\"ds-report\"><thead><tr><th>Spot</th><th>Platform</th><th>What you get</th></tr></thead><tbody><tr><td class=\"ds-sp\" style=\"--t:.86\">Sp2</td><td><code>water_heater</code></td><td><strong>Domestic hot water.</strong> Off, eco and performance.</td></tr><tr class=\"is-ghost\"><td class=\"ds-sp\">Sp9</td><td><code>sensor</code></td><td><strong>Link health.</strong> Wi-Fi signal and last communication.</td></tr></tbody></table></div>",
+      "css": ":host{--tx-ink-0:#0b0712;--tx-ink-1:#140c22;--tx-hot:#fff6d6;--tx-amber:#ffd24a;--tx-ember:#ea5a3a;--tx-ice-hi:#9ee3ff;--tx-text-2:rgba(255,238,214,.74);--tx-line:rgba(255,246,214,.16);--tx-ease:cubic-bezier(0.16,1,0.3,1);--tx-display:'Big Shoulders Display','Arial Narrow',sans-serif;--tx-mono:'Martian Mono',ui-monospace,monospace;--tx-body:'Hanken Grotesk',system-ui,sans-serif;--tx-ironbow:linear-gradient(90deg,#07040f 0%,#1d0a3a 14%,#470f76 30%,#8b2185 45%,#c5376f 58%,#ea5a3a 70%,#f7922a 81%,#ffd24a 91%,#fff8e6 100%);} .ds-canvas{background:var(--tx-ink-0);padding:2rem;font-family:var(--tx-body);color:var(--tx-text-2)}.ds-report{width:100%;border-collapse:collapse}.ds-report th{text-align:left;font-family:var(--tx-mono);font-weight:400;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;padding:0 1rem .8rem 0;border-bottom:1px solid rgba(255,246,214,.4)}.ds-report td{padding:1.15rem 1rem 1.15rem 0;border-bottom:1px solid var(--tx-line);vertical-align:top}.ds-report strong{color:var(--tx-hot);font-weight:600}.ds-report code{font-family:var(--tx-mono);font-size:.82em;background:rgba(255,246,214,.08);border-radius:3px;padding:.1em .35em;color:var(--tx-hot)}.ds-sp{font-family:var(--tx-mono);font-size:.74rem;color:var(--tx-hot);white-space:nowrap;padding-left:1.4rem!important;position:relative}.ds-sp::before{content:'';position:absolute;left:0;top:1.3rem;width:.7rem;height:.7rem;border-radius:50%;background-image:var(--tx-ironbow);background-size:5000% 100%;background-position:calc(var(--t,.5)*100%) 0;box-shadow:0 0 0 1px rgba(255,246,214,.35)}.is-ghost .ds-sp::before{background:transparent;box-shadow:inset 0 0 0 1px rgba(255,246,214,.5)}"
+    },
+    {
+      "name": "Viewfinder Frame",
+      "kind": "card",
+      "refersTo": "shot-frame",
+      "description": "Screenshot frame with amber corner brackets, used on the hot band.",
+      "html": "<div class=\"ds-canvas\"><figure class=\"ds-shot\"><div class=\"ds-shot__frame\"><div class=\"ds-shot__img\"></div></div><figcaption>Tile card with fan, preset and target.</figcaption></figure></div>",
+      "css": ":host{--tx-ink-0:#0b0712;--tx-ink-1:#140c22;--tx-hot:#fff6d6;--tx-amber:#ffd24a;--tx-ember:#ea5a3a;--tx-ice-hi:#9ee3ff;--tx-text-2:rgba(255,238,214,.74);--tx-line:rgba(255,246,214,.16);--tx-ease:cubic-bezier(0.16,1,0.3,1);--tx-display:'Big Shoulders Display','Arial Narrow',sans-serif;--tx-mono:'Martian Mono',ui-monospace,monospace;--tx-body:'Hanken Grotesk',system-ui,sans-serif;--tx-ironbow:linear-gradient(90deg,#07040f 0%,#1d0a3a 14%,#470f76 30%,#8b2185 45%,#c5376f 58%,#ea5a3a 70%,#f7922a 81%,#ffd24a 91%,#fff8e6 100%);} .ds-canvas{padding:2rem;background:radial-gradient(120% 90% at 85% 10%,#ffd24a 0%,rgba(255,210,74,0) 55%),radial-gradient(90% 80% at 10% 100%,#8b2185 0%,rgba(139,33,133,0) 60%),#ea5a3a;font-family:var(--tx-body)}.ds-shot{margin:0;max-width:20rem}.ds-shot__frame{position:relative;padding:.9rem;background:rgba(11,7,18,.88);border-radius:3px;box-shadow:0 14px 30px rgba(11,7,18,.3)}.ds-shot__frame::before,.ds-shot__frame::after{content:'';position:absolute;width:1rem;height:1rem;border:0 solid var(--tx-amber)}.ds-shot__frame::before{top:.3rem;left:.3rem;border-top-width:1.5px;border-left-width:1.5px}.ds-shot__frame::after{bottom:.3rem;right:.3rem;border-bottom-width:1.5px;border-right-width:1.5px}.ds-shot__img{height:9rem;border-radius:2px;background:#fff}.ds-shot figcaption{margin-top:.7rem;font-size:.9rem;font-weight:500;color:rgba(11,7,18,.8)}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Thermal Viewfinder",
+    "overview": "The project is shown the way an installer sees a heat pump through a thermal camera. Whole regions of the page are owned by the ironbow palette, from violet-black through magenta and ember to white-hot, and the chrome on top of them is an instrument HUD: thin corner brackets, a crosshair spot meter, a vertical temperature scale, tabular readouts. Nothing is decorated for its own sake; every device on the page reads as part of the camera or part of the report it produces.\n\nDensity is low and confident on the landing (very large condensed uppercase display, generous bands), and quiet in the docs, which keep MkDocs Material's reading layout and carry the world through the display face, a 3px ironbow strip under the header, and the custom palette. Temperature is the organising idea: sections run from cold ink to the hot amber band and back to the cold \"honest\" band, and cold, idle and unavailable states are drawn as deliberately as heat (ghost readings, hollow spot markers, italics for \"not exposed as an entity\").\n\nThe world refuses the stock HACS landing: no logo-plus-tagline hero, no feature-card grid, no screenshot as the hero. No Hitachi logos, ever (PRODUCT.md brand commitment).",
+    "keyCharacteristics": [
+      "Ironbow gradient as the one ordered palette; colors are positions on a temperature scale, not arbitrary accents.",
+      "Viewfinder HUD chrome: 1.5px corner brackets, crosshair reticle, scale bar with a live mark.",
+      "Condensed uppercase display (Big Shoulders Display) against a calm grotesque body (Hanken Grotesk).",
+      "Martian Mono as the instrument voice: readings, addresses, identifiers, column labels.",
+      "Near-square corners (2px) everywhere on the HUD; flat surfaces separated by hairlines.",
+      "Cold register (ice-hi) reserved for the \"how it works / honesty\" band and the COOL mode."
+    ],
+    "rules": [
+      {
+        "name": "The Scale Order Rule",
+        "body": "Every gradient that represents temperature uses the same nine stops in the same order: #07040f 0, #1d0a3a 14%, #470f76 30%, #8b2185 45%, #c5376f 58%, #ea5a3a 70%, #f7922a 81%, #ffd24a 91%, #fff8e6 100%. The canvas LUT, the scale bar, the manual index rail, the spot-dot swatches and the docs header strip all share it. Hot is always toward amber/white, cold toward violet-black; never reverse the meaning.",
+        "section": "colors"
+      },
+      {
+        "name": "The Cold Is Honest Rule",
+        "body": "Ice-hi marks the cold register only: COOL mode and the disclosure band (how it works, polling, traffic, credentials). It never decorates heat content.",
+        "section": "colors"
+      },
+      {
+        "name": "The Instrument Voice Rule",
+        "body": "Martian Mono is the camera's voice: measurements, addresses (Sp1..Sp9, 01..12), hostnames, entity ids, and data labels. Prose, headings and calls to action never use it.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tabular Reading Rule",
+        "body": "Every number that changes or is compared (meter, scale mark, docs tables) uses tabular figures.",
+        "section": "typography"
+      },
+      {
+        "name": "The Readable Over Heat Rule",
+        "body": "Any HUD text drawn over the canvas sits on a translucent ink plate (rgba(11, 7, 18, 0.72-0.82), 2px radius) rather than relying on a text shadow.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** pick colors by temperature position on the nine-stop ironbow scale; hot content warmer, absent or idle content colder.",
+      "**Do** draw cold, idle and unavailable states on purpose: ghost text in ash, hollow markers, italic \"not exposed\" lines.",
+      "**Do** put HUD text over imagery on a translucent ink plate with a 2px radius.",
+      "**Do** use Martian Mono with tabular figures for every measurement, address and identifier.",
+      "**Do** keep corners at 2px (3px for image frames) and separate regions with hairlines (rgba(255, 246, 214, 0.16)).",
+      "**Do** keep the unofficial disclaimer visible in the first viewport and in the footer.",
+      "**Do** respect reduced motion: stop the flow line and canvas animation, render one still frame."
+    ],
+    "donts": [
+      "**Don't** build a logo-tagline-feature-card-grid landing or use a screenshot as the hero.",
+      "**Don't** use Hitachi logos or anything implying endorsement.",
+      "**Don't** reorder or recolor the ironbow stops, or use ice-hi on heat content.",
+      "**Don't** set prose, headings or call-to-action buttons in Martian Mono.",
+      "**Don't** add large radii, pill shapes or stacked shadowed cards; depth comes from band temperature and the canvas."
+    ]
+  }
+}

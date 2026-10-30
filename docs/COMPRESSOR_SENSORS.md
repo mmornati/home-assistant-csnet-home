@@ -2,94 +2,107 @@
 
 ## Overview
 
-The CSNet Home integration now provides comprehensive monitoring of your heat pump's compressor and outdoor unit through a dedicated device with 30+ sensors. This allows you to track the real-time performance, efficiency, and health of your system.
+The CSNet Home integration monitors your heat pump's compressor and outdoor unit through a dedicated device with 28 sensors (17 for the primary cycle, 11 for the secondary cycle). They let you track the real-time performance and health of the refrigerant cycle.
+
+The sensors are created when the CSNet installation devices data is available, and read the `heatingStatus` (primary cycle) and `secondCycle` (secondary cycle) blocks of the first indoor unit.
 
 ## Device Structure
 
 All compressor-related sensors are grouped under a dedicated device:
+
 - **Device Name**: `Compressor Outdoor Unit`
 - **Manufacturer**: Hitachi
-- **Model**: Automatically detected (Yutaki, RAS-1, RAS-2, RAD)
+- **Model**: `{type} Outdoor Unit`, where the type comes from the outdoor unit code (`RAS-1`, `RAS-2`, `Yutaki`, `RAD`, or `Unknown`)
+- **Software version**: outdoor unit PCB software, shown in hex
+
+Entity IDs follow the pattern `sensor.compressor_outdoor_unit_{sensor_name}`, for example `sensor.compressor_outdoor_unit_compressor_frequency`.
 
 ## Primary Compressor Sensors
 
 ### Operational Metrics
 
-| Sensor | Description | Unit | Usage |
-|--------|-------------|------|-------|
-| **Compressor Frequency** | Current operating frequency of the compressor | Hz | Monitor compressor speed (0-120 Hz typical) |
-| **Compressor Current** | Electrical current draw | A | Track power consumption |
-| **Compressor Capacity** | Current capacity setting | - | System capacity indicator |
-| **Operation Status** | Current operational state | - | Standby, Heating, Cooling, DHW, Idle, Defrost, Stop |
+| Sensor | Description | Unit |
+|--------|-------------|------|
+| **Compressor Frequency** | Current operating frequency of the compressor (`ouHz`) | Hz |
+| **Compressor Current** | Electrical current draw (`ouCurrent`) | A |
+| **Compressor Capacity** | Unit capacity value (`unitCapacity`) | - |
+| **Operation Status** | Current operational state, as text | - |
+
+**Operation Status** values: `Off`, `Cooling Demand Off`, `Cooling Thermostat Off`, `Cooling Thermostat On`, `Heating Demand Off`, `Heating Thermostat Off`, `Heating Thermostat On`, `Domestic Hot Water Off`, `Domestic Hot Water On`, `Swimming Pool Off`, `Swimming Pool On`, `Alarm` (unknown codes show as `Unknown (n)`). Its attributes are `raw_value`, `status_text` and `defrosting`.
 
 ### Temperature Sensors
 
-| Sensor | Description | Unit | Importance |
-|--------|-------------|------|------------|
-| **Discharge Temperature** | Temperature of refrigerant leaving compressor | °C | **Critical** - High values may indicate issues |
-| **Evaporator Temperature** | Temperature at the evaporator | °C | Monitor heat exchange efficiency |
-| **Outdoor Ambient Temperature** | Outside air temperature at the unit | °C | Context for system performance |
+| Sensor | Description | Unit |
+|--------|-------------|------|
+| **Discharge Temperature** | Temperature of refrigerant leaving the compressor | °C |
+| **Evaporator Temperature** | Temperature at the evaporator | °C |
+| **Outdoor Ambient Temperature** | Outside air temperature measured at the outdoor unit | °C |
+
+These three values are sent by the API as unsigned bytes; the integration converts them so that sub-zero temperatures are shown correctly.
 
 ### Pressure Sensors
 
-| Sensor | Description | Unit | Usage |
-|--------|-------------|------|-------|
-| **Discharge Pressure** | High-side refrigerant pressure | bar | Monitor compression performance |
-| **Suction Pressure** | Low-side refrigerant pressure | bar | Monitor evaporation performance |
-| **Suction Pressure Correction** | Correction factor applied | - | Diagnostic information |
+| Sensor | Description | Unit |
+|--------|-------------|------|
+| **Discharge Pressure** | High-side refrigerant pressure | bar |
+| **Suction Pressure** | Low-side refrigerant pressure | bar |
+| **Suction Pressure Correction** | Correction value reported by the unit | - |
 
 ### Control & Valve Sensors
 
-| Sensor | Description | Unit | Usage |
-|--------|-------------|------|-------|
-| **Expansion Valve Opening (EVI)** | Electronic expansion valve position | % | Monitor refrigerant flow control (0-100%) |
-| **Outdoor Fan RPM** | Speed of outdoor unit fan | RPM | Track cooling/ventilation |
+| Sensor | Description | Unit |
+|--------|-------------|------|
+| **Expansion Valve Opening (EVI)** | Electronic expansion valve position (`evi`) | % |
+| **Expansion Valve Opening (EVO)** | Outdoor expansion valve position (`ouEvo1`) | % |
+| **Outdoor Fan RPM** | Speed of the outdoor unit fan | RPM |
 
 ### System Information
 
 | Sensor | Description | Values |
 |--------|-------------|--------|
-| **System Status Flags** | Bitfield of system configuration | Hex value with decoded attributes |
-| **Outdoor Unit Code** | Type of outdoor unit | Yutaki, RAS-1, RAS-2, RAD |
+| **System Status Flags** | Bitfield of system status (`systemStatus2Flags`) | Hex string, with decoded attributes |
+| **Outdoor Unit Code** | Type of outdoor unit | `Unknown`, `RAS-1`, `RAS-2`, `Yutaki`, `RAD`, or `Code n` |
 | **Outdoor Unit Capacity Code** | Capacity identifier | Numeric code |
-| **Outdoor Unit PCB Software** | Software version of outdoor unit | Hex version |
+| **Outdoor Unit PCB Software** | Software version of the outdoor unit PCB | Numeric value (the device info shows it in hex) |
 
 ## Secondary Cycle Sensors
 
-For systems with dual-cycle configuration (e.g., cascade systems, advanced Yutaki models), additional sensors are available:
-
-### Secondary Compressor Metrics
+For systems with a second refrigerant cycle, additional sensors read the `secondCycle` data:
 
 | Sensor | Description | Unit |
 |--------|-------------|------|
-| **Secondary Discharge Temperature** | Secondary cycle discharge temp | °C |
-| **Secondary Suction Temperature** | Secondary cycle suction temp | °C |
+| **Secondary Discharge Temperature** | Secondary cycle discharge temperature | °C |
+| **Secondary Suction Temperature** | Secondary cycle suction temperature | °C |
 | **Secondary Discharge Pressure** | Secondary cycle high pressure | bar |
 | **Secondary Suction Pressure** | Secondary cycle low pressure | bar |
 | **Secondary Compressor Frequency** | Secondary compressor speed | Hz |
 | **Secondary Compressor Current** | Secondary compressor current draw | A |
 | **Secondary Current** | Additional current measurement | A |
-| **Secondary Expansion Valve** | Secondary EV position | - |
-| **Secondary Superheat** | Superheat measurement | - |
-| **Secondary Stop Code** | Secondary cycle stop reason | Code |
-| **Secondary Retry Code** | Secondary cycle retry status | Code |
+| **Secondary Expansion Valve** | Secondary expansion valve position | - |
+| **Secondary Superheat** | Superheat value (`teSH`) | - |
+| **Secondary Stop Code** | Secondary cycle stop reason (`Running` when 0) | Code |
+| **Secondary Retry Code** | Secondary cycle retry status (`Normal` when 0) | Code |
 
 ## Using the Sensors
 
 ### Performance Monitoring
 
-Monitor your heat pump's efficiency by tracking:
-- **Compressor Frequency** vs **Outdoor Temperature** - Lower frequency at moderate temps = good efficiency
-- **Discharge Temperature** - Should stay within safe operating range (typically 40-80°C)
-- **Current Draw** - Lower current = more efficient operation
+Monitor your heat pump by tracking:
+
+- **Compressor Frequency** vs **Outdoor Ambient Temperature** - how hard the compressor works for the conditions
+- **Discharge Temperature** - should stay within the manufacturer's operating range
+- **Compressor Current** - electrical load of the compressor
+
+For estimated power, energy and COP, use the calculated sensors described in [Energy and Performance Sensors](wiki/Sensors-Reference.md#energy-and-performance-sensors). Instant Consumption is derived from these compressor readings.
 
 ### Diagnostic Use
 
-Detect potential issues early:
-- **High Discharge Temperature** (>85°C) may indicate low refrigerant or blockage
-- **Abnormal Pressures** - Discharge and suction pressures should be within normal ranges
+Signs worth investigating:
+
+- **High Discharge Temperature** for long periods
+- **Abnormal Pressures** compared with the manufacturer's specifications
 - **Operation Status** stuck in unusual states
-- **Frequent Defrost Cycles** may indicate sensor or airflow issues
+- **Frequent defrost** (see the `defrosting` attribute of Operation Status)
 
 ### Home Automation Examples
 
@@ -108,7 +121,7 @@ automation:
         data:
           message: "Heat pump discharge temperature is high: {{ states('sensor.compressor_outdoor_unit_discharge_temperature') }}°C"
 
-# Track compressor runtime
+# Track compressor starts
 automation:
   - alias: "Log Compressor Runtime"
     trigger:
@@ -120,105 +133,64 @@ automation:
         data:
           name: "Compressor Started"
           message: "Compressor frequency: {{ states('sensor.compressor_outdoor_unit_compressor_frequency') }} Hz"
-
-# Efficiency monitoring
-template:
-  - sensor:
-      - name: "Heat Pump Efficiency"
-        unit_of_measurement: "Hz/°C"
-        state: >
-          {% set freq = states('sensor.compressor_outdoor_unit_compressor_frequency') | float(0) %}
-          {% set outdoor = states('sensor.compressor_outdoor_unit_outdoor_ambient_temperature') | float(0) %}
-          {% set indoor = states('sensor.system_controller_outdoor_temperature') | float(0) %}
-          {% set delta = indoor - outdoor %}
-          {% if delta > 0 and freq > 0 %}
-            {{ (freq / delta) | round(2) }}
-          {% else %}
-            0
-          {% endif %}
 ```
-
-## Energy Dashboard Integration
-
-Use compressor sensors to track energy consumption patterns:
-- **Compressor Frequency** correlates directly with power usage
-- **Compressor Current** provides instantaneous power draw
-- Track operation patterns to optimize scheduling
 
 ## System Status Flags Decoder
 
 The **System Status Flags** sensor provides decoded attributes:
-- `cascade_slave`: System is in cascade slave mode
-- `fan_coil_mode`: Fan coil control is active
-- `c1_thermostat`: Circuit 1 has thermostat
-- `c2_thermostat`: Circuit 2 has thermostat
-- `raw_value`: Decimal value of flags
-- `hex_value`: Hexadecimal representation
+
+- `cascade_slave`: bit `0x1000`
+- `fan_coil_mode`: bit `0x2000`
+- `c1_thermostat`: bit `0x40`
+- `c2_thermostat`: bit `0x80`
+- `raw_value`: decimal value of the flags
+- `hex_value`: hexadecimal representation
 
 ## Data Availability
 
-### Always Available (Primary Cycle)
-- Compressor frequency, current, capacity
-- Discharge and evaporator temperatures
-- Pressures and expansion valve data
-- Operation status and outdoor unit information
+### Primary Cycle
 
-### Conditionally Available (Secondary Cycle)
-- Secondary cycle sensors only populate when:
-  - System has dual-cycle configuration
-  - Secondary cycle is active
-  - Data is being reported by the hardware
+Primary cycle sensors are populated from `heatingStatus`. Some values only change while the compressor is running.
 
-**Note**: If secondary sensors show `None` or `Unknown`, your system likely doesn't have a secondary cycle, or it's currently inactive.
+### Secondary Cycle
+
+Secondary cycle sensors only show values when the unit reports a `secondCycle` block. If they show `Unknown`, your system most likely has no secondary cycle, or it is inactive.
 
 ## Technical Notes
 
 ### Pressure Units
-Pressure values are reported in **bar**. To convert:
+
+Pressure values are shown in **bar**. To convert:
+
 - **bar to PSI**: multiply by 14.5038
 - **bar to kPa**: multiply by 100
 
-### Frequency Range
-- **0 Hz**: Compressor is off or idle
-- **10-30 Hz**: Low speed operation (mild conditions)
-- **40-80 Hz**: Normal operation
-- **80-120 Hz**: High demand operation (extreme conditions)
-
 ### Invalid Values
-The integration automatically filters invalid values:
-- `-1` typically means "not available" or "not configured"
-- `255` or `127` may indicate uninitialized or invalid readings
-- These are returned as `None` in Home Assistant
+
+Some sensors treat specific raw values as "not available" and report no value instead:
+
+| Sensor | Ignored values |
+|--------|----------------|
+| Expansion Valve Opening (EVO) | `255`, `-1` |
+| Outdoor Fan RPM | `-1` |
+| Outdoor Unit PCB Software | `-1` |
+| Secondary Discharge / Suction Pressure | `127` |
+| Secondary Expansion Valve | `255` |
 
 ## Troubleshooting
 
 ### Sensors Show "Unknown" or "Unavailable"
-- Ensure your system has been running for at least one full refresh cycle
-- Check that the CSNet API is responding (check System Controller sensors)
-- Some sensors only populate when the system is actively heating/cooling
+
+- Wait for at least one full refresh cycle
+- Check that the System Controller sensors are reporting (same data source)
+- Some sensors only change when the system is actively heating/cooling
 
 ### Secondary Cycle Sensors Not Populating
-- This is normal if your system doesn't have a dual-cycle configuration
-- Only advanced Yutaki models typically have secondary cycles
-- These sensors can be hidden in Home Assistant if not applicable
+
+- This is normal if your system doesn't have a second refrigerant cycle
+- You can disable these sensors in Home Assistant if not applicable
 
 ### Pressure Values Seem Wrong
-- Verify the pressure unit conversion is correct for your region
-- Compare with manufacturer specifications for your model
-- Pressure sensors may report raw values that need calibration
 
-## Future Enhancements
-
-Potential future additions:
-- Historical trending graphs
-- Efficiency calculations and COP estimates
-- Predictive maintenance alerts
-- Cascade system specific metrics
-- Power consumption estimates based on frequency/current
-
----
-
-**Last Updated**: October 2025
-**Integration Version**: Compatible with CSNet Home v2.0+
-
-
+- Compare with the values shown by the unit's own service menu or the manufacturer's specifications for your model
+- Report a mismatch on [GitHub Issues](https://github.com/mmornati/home-assistant-csnet-home/issues) with a debug log

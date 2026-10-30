@@ -4,30 +4,30 @@ Learn how to control your Hitachi heat pump zones through Home Assistant climate
 
 ## Overview
 
-Each zone or thermostat in your Hitachi system appears as a **climate entity** in Home Assistant. These entities provide full control over:
+Each air zone (C1/C2 room thermostat) and each water circuit (C1/C2 water) in your Hitachi system appears as a **climate entity** in Home Assistant. DHW and the swimming pool are exposed as water heater entities instead (see [Water Heater Control](Water-Heater-Control.md)). Climate entities provide control over:
 
-- 🌡️ **Temperature** - Set target temperature
-- 🔥 **HVAC Mode** - Heat, Cool, Auto, or Off
-- 💚 **Preset Mode** - Comfort or Eco
-- 🔇 **Fan Mode** - Silent mode or fan speed (system dependent)
-- 📊 **Status** - Current temperature, operation status, alarms
+- **Temperature** - Set target temperature
+- **HVAC Mode** - Heat, Cool, Heat/Cool (Auto), or Off
+- **Preset Mode** - Comfort or Eco
+- **Fan Mode** - Silent mode or fan speed (system dependent)
+- **Status** - Current temperature, operation status, alarms
 
 ---
 
 ## Entity Naming
 
-Climate entities are named based on your system configuration:
+Climate entities are named after the zone/room name configured in CSNet Manager:
 
-**Format**: `climate.{device_name}_{zone_name}`
+**Format**: `climate.{zone_name}`
 
 **Examples**:
-- `climate.remote_living_room`
-- `climate.remote_first_floor`
-- `climate.remote_zone_1`
+- `climate.living_room`
+- `climate.first_floor`
 
-The name combines:
-- **Device name**: From CSNet Manager (usually "Remote")
-- **Zone name**: Your configured zone/room name
+The entity belongs to a device named `{Device Name}-{Zone Name}` (for example `Remote-Living Room`).
+
+!!! note
+    The examples on this page use `climate.remote_living_room` as a placeholder. Replace it with the entity ID shown in **Settings → Devices & Services → Entities**.
 
 ---
 
@@ -65,21 +65,26 @@ automation:
 ```
 
 **Temperature Range**:
-- **Heating**: Typically 8°C to 55°C
-- **Cooling**: Typically 18°C to 30°C
-- **DHW**: Typically 30°C to 55°C
-- Exact ranges vary by system configuration
+
+The integration reads the limits reported by your unit. When the unit does not report them, these defaults apply:
+
+| Zone | Heating | Cooling |
+|------|---------|---------|
+| Air circuits (C1/C2 air) | 11-35°C | 11-35°C |
+| Water circuits (C1/C2 water) | 20-80°C | 5-22°C |
+
+If [Maximum Temperature Override](Configuration-Guide.md#field-details) is set, it replaces the maximum for every climate entity in every mode. See [Dynamic Temperature Limits](Advanced-Features.md#dynamic-temperature-limits).
 
 ### Changing HVAC Mode
 
-Available modes depend on your system:
+Every climate entity lists all four modes; whether your unit accepts Cool or Heat/Cool depends on its configuration.
 
-| Mode | Description | When to Use |
-|------|-------------|-------------|
-| **Off** | System off, no heating or cooling | When you don't need climate control |
-| **Heat** | Heating mode only | Cold weather, winter |
-| **Cool** | Cooling mode only | Hot weather, summer (if supported) |
-| **Heat/Cool (Auto)** | Automatic heating/cooling | Transitional seasons, maintains comfort automatically |
+| Mode | CSNet mode | Description |
+|------|-----------|-------------|
+| **Off** | run/stop = 0 | Zone stopped; the last mode is kept on the unit |
+| **Heat** | 1 | Heating |
+| **Cool** | 0 | Cooling (if your system supports it) |
+| **Heat/Cool** | 2 | Automatic heating/cooling ("Auto" on the unit) |
 
 **Via UI**:
 1. Click on climate entity
@@ -128,16 +133,18 @@ target:
   entity_id: climate.remote_living_room
 ```
 
-**Note**: `turn_on` will restore the last active mode (Heat, Cool, or Auto).
+**Note**: `turn_on` restores the last mode reported by the unit (Heat, Cool, or Heat/Cool), or Heat if none is known.
 
 ### Using Preset Modes
 
-Preset modes adjust the target temperature for energy savings:
+Preset modes switch the circuit's eco/comfort setting on the unit (`ecoModeC{n}`):
 
-| Preset | Description | Temperature Adjustment |
-|--------|-------------|----------------------|
-| **Comfort** | Normal comfort temperature | Full target temperature |
-| **Eco** | Energy-saving mode | Reduced temperature (~2-3°C lower in heating) |
+| Preset | Description |
+|--------|-------------|
+| **Comfort** | Normal operation |
+| **Eco** | The unit's eco mode; how much the setpoint changes is configured on the unit, not in Home Assistant |
+
+If the unit reports no eco/comfort state for a zone, the preset shows as Comfort.
 
 **Via UI**:
 1. Open climate entity
@@ -187,7 +194,7 @@ automation:
 
 Fan mode behavior depends on your system type:
 
-#### Non-Fan Coil Systems (Standard)
+#### Non-Fan Coil Systems
 
 **Silent Mode** - Reduces outdoor unit noise:
 - **Auto** = Normal operation
@@ -203,11 +210,12 @@ data:
 
 #### Fan Coil Systems
 
-**Fan Speed Control**:
-- **Off** = Fan off
-- **Low** = Low speed
-- **Medium** = Medium speed
-- **Auto** = Automatic speed
+**Fan Speed Control** - the available speeds depend on the **Fan Coil Control Model** option ([Configuration Guide](Configuration-Guide.md#field-details)):
+
+| Model | Fan modes (API value 0, 1, 2, 3) |
+|-------|----------------------------------|
+| `standard` (default) | `off`, `low`, `medium`, `auto` |
+| `legacy` | `low`, `medium`, `high`, `auto` |
 
 ```yaml
 service: climate.set_fan_mode
@@ -222,9 +230,13 @@ data:
 Look at the climate entity attributes:
 ```yaml
 is_fan_coil_compatible: true  # or false
-fan_modes: ["off", "low", "medium", "auto"]  # Fan coil
-fan_modes: ["auto", "on"]  # Standard (silent mode)
+fan_coil_model: standard      # or legacy
+fan_modes: ["off", "low", "medium", "auto"]  # Fan coil, standard model
+fan_modes: ["low", "medium", "high", "auto"] # Fan coil, legacy model
+fan_modes: ["auto", "on"]                    # No fan coil (silent mode)
 ```
+
+With the `standard` model, fan coil support is detected from the unit; with `legacy`, every climate entity is treated as a fan coil.
 
 ### Fixed Water Temperature Control (Water Circuits Only)
 
@@ -241,16 +253,13 @@ Your Hitachi system can operate in different **OTC (Outdoor Temperature Compensa
 
 #### Checking Your OTC Mode
 
-Check your climate entity attributes to see your current OTC mode:
+Check the climate entity attributes (each entity shows the OTC type of its own circuit), or the `sensor.system_controller_otc_*` sensors:
 
 ```yaml
-# For C1 circuit
 otc_heating_type: 3  # 3 = Fixed mode
 otc_heating_type_name: "Fixed"
-
-# For C2 circuit
-otc_heating_type_c2: 3
-otc_heating_type_name_c2: "Fixed"
+otc_cooling_type: 2  # 2 = Fixed mode
+otc_cooling_type_name: "Fixed"
 ```
 
 **OTC Type Values**:
@@ -259,7 +268,7 @@ otc_heating_type_name_c2: "Fixed"
 
 #### Number Entities for Fixed Water Temperature
 
-When your system is in **Fixed mode (OTC = FIX)**, number entities automatically appear for controlling the fixed water temperature:
+These are the integration's only **number** entities. One is created per circuit and mode whose OTC type is **Fixed** when the integration loads:
 
 **Entity Names**:
 - `number.{zone_name}_fixed_water_temperature_heating_c1` - C1 heating mode
@@ -271,7 +280,9 @@ When your system is in **Fixed mode (OTC = FIX)**, number entities automatically
 - `number.salon_fixed_water_temperature_heating_c1`
 - `number.bibliotheque_fixed_water_temperature_cooling_c2`
 
-**Note**: These entities are **circuit-level** settings that affect both air zones (1,2) and water zones (5,6) of the same circuit. The fixed water temperature controls the water supply temperature for the entire circuit.
+**Note**: These entities are **circuit-level** settings (`fixTempHeatC1`, `fixTempCoolC1`, `fixTempHeatC2`, `fixTempCoolC2`) that affect both the air zone and the water zone of the same circuit. The entity is attached to the circuit's air zone device when one exists, otherwise to the water zone device, and `{zone_name}` is that zone's name.
+
+The entity is unavailable whenever the circuit's OTC type for that mode is not Fixed.
 
 #### Using Fixed Water Temperature Control
 
@@ -333,23 +344,22 @@ For **water zones** (zone_id 5 = C1 Water, zone_id 6 = C2 Water):
 
 #### Temperature Range
 
-Fixed water temperature typically ranges from:
-- **Heating**: 20°C to 80°C (varies by system)
-- **Cooling**: 10°C to 30°C (varies by system)
+The number entities use fixed ranges, in 1°C steps:
+- **Heating**: 20°C to 80°C
+- **Cooling**: 5°C to 22°C
 
-Check the number entity's `min` and `max` attributes for your system's exact range.
+The unit may apply narrower limits of its own.
 
 #### Why Don't I See the Number Entity?
 
 If you don't see the fixed water temperature number entity, it's because:
 
-1. **Your OTC type is NOT FIX** - The entity only appears when OTC type is FIX
-2. **System not in Fixed mode** - Check your climate entity attributes to see your current OTC type
-3. **Entity not created yet** - The entity appears automatically when conditions are met
+1. **Your OTC type is NOT FIX** - The entity is only created for circuits/modes whose OTC type is Fixed
+2. **The OTC type changed after the integration loaded** - Number entities are created only at setup
 
 **To enable fixed temperature control**:
-- Change your OTC type to FIX in the CSNet Manager app or website
-- The number entity will appear automatically after the next integration update
+- Change your OTC type to FIX in the CSNet Manager app or website (or on the unit)
+- Reload the integration (**Settings → Devices & Services → Hitachi CSNet Home → ⋮ → Reload**) so the number entity is created
 
 #### Example: Seasonal Temperature Adjustment
 
@@ -396,7 +406,7 @@ automation:
 
 **Want to Use Fixed Mode**:
 - Change OTC type to FIX in CSNet Manager app/website
-- The number entity will appear automatically
+- Reload the integration so the number entity is created
 - You can then set fixed water temperature via Home Assistant
 
 ---
@@ -421,12 +431,13 @@ The desired temperature setpoint:
 
 ### HVAC Action
 
-What the system is currently doing:
+Derived by the integration from the zone state, not from the compressor:
 
-- **heating** - Actively heating
-- **cooling** - Actively cooling
-- **idle** - On but not actively heating/cooling
-- **off** - System is off
+- **heating** - Zone on, mode Heat, and target temperature above current temperature
+- **cooling** - Zone on, mode Cool, and target temperature below current temperature
+- **idle** - Anything else, including when the zone is off
+
+For the real operating state, use the `operation_status_text` attribute.
 
 ```yaml
 {{ state_attr('climate.remote_living_room', 'hvac_action') }}
@@ -470,8 +481,10 @@ operation_status_text: "Heating Thermostat On"  # Human-readable
 - `4` - Heating Demand Off
 - `5` - Heating Thermostat Off
 - `6` - Heating Thermostat On
-- `7` - DHW Off
-- `8` - DHW On
+- `7` - Domestic Hot Water Off
+- `8` - Domestic Hot Water On
+- `9` - Swimming Pool Off
+- `10` - Swimming Pool On
 - `11` - Alarm
 
 ### Real Mode
@@ -504,8 +517,10 @@ doingBoost: false
 Current alarm status:
 
 ```yaml
-alarm_code: 0  # 0 = No alarm, >0 = Alarm code
+alarm_code: 0  # 0 = No alarm, otherwise the alarm code
 ```
+
+Formatted code, origin and message are available as separate sensors (see [Sensors Reference](Sensors-Reference.md#zone-sensors)).
 
 ### Silent Mode Status
 
@@ -525,6 +540,10 @@ fan2_speed: 2  # C2 fan speed (0-3)
 fan1_control_available: true
 fan2_control_available: true
 ```
+
+`fanXControlledOnLCD` on the unit decides availability: fan speed can be set in heating, cooling, or both, depending on that setting. With the `legacy` fan coil model the check is skipped when setting the speed.
+
+All climate entities also expose `fan_coil_model` (`standard` or `legacy`).
 
 ### OTC Information
 
@@ -558,8 +577,8 @@ climate.remote_living_room:
       - heat
       - cool
       - heat_cool
-    min_temp: 8
-    max_temp: 55
+    min_temp: 11
+    max_temp: 35
     preset_modes:
       - comfort
       - eco
@@ -578,7 +597,10 @@ climate.remote_living_room:
     c2_demand: false
     doingBoost: false
     silent_mode: 0
+    fan_coil_model: standard
     is_fan_coil_compatible: false
+    otc_heating_type: 1
+    otc_heating_type_name: "Points"
 ```
 
 ---
@@ -606,7 +628,7 @@ cards:
     entities:
       - entity: sensor.remote_living_room_current_temperature
         name: Current Temperature
-      - entity: sensor.remote_living_room_target_temperature
+      - entity: sensor.remote_living_room_setting_temperature
         name: Target Temperature
       - entity: climate.remote_living_room
         type: attribute
@@ -913,7 +935,7 @@ automation:
 
 ## Tips & Best Practices
 
-### ✅ DO
+### Do
 
 - **Use Eco mode** when sleeping or away for energy savings
 - **Set realistic temperatures** (20-22°C for comfort in winter)
@@ -922,15 +944,15 @@ automation:
 - **Check operation_status_text** to understand system state
 - **Use silent mode at night** to reduce noise
 
-### ❌ DON'T
+### Don't
 
 - **Don't change temperature too frequently** (< every 5 minutes)
 - **Don't set extreme temperatures** (system won't heat/cool faster)
 - **Don't turn on/off repeatedly** (causes wear)
 - **Don't ignore alarms** (check alarm messages promptly)
-- **Don't set scan_interval < 30 seconds** (may hit rate limits)
+- **Don't set scan_interval below 60 seconds** (see [Configuration Guide](Configuration-Guide.md#scan-interval))
 
-### 💡 Pro Tips
+### Pro Tips
 
 1. **Use presets instead of temperature changes** for energy savings
 2. **Monitor hvac_action** to see when actually heating/cooling

@@ -29,15 +29,17 @@ Before configuring, ensure:
 
 You'll see a configuration dialog with the following fields:
 
-| Field | Description | Example |
+| Field | Description | Default |
 |-------|-------------|---------|
-| **Username** | Your CSNet Manager username | `user@example.com` |
-| **Password** | Your CSNet Manager password | `••••••••` |
-| **Scan Interval** | Update frequency in seconds (default: 60) | `60` |
-| **Language** | Alarm message language | `en` or `fr` |
-| **Max Temp Override** | Optional maximum temperature override (8-80°C) | `45` (leave empty for auto) |
+| **Username** | Your CSNet Manager username | – |
+| **Password** | Your CSNet Manager password | – |
+| **Scan Interval** | Update frequency in seconds | `60` |
+| **Language** | Language for device names and alarm messages | `en` |
+| **Maximum Temperature Override** | Optional maximum temperature (8-80°C) | empty (device limits) |
+| **Fan Coil Control Model** | `standard` or `legacy` fan speed mapping | `standard` |
+| **Enable Alarm Notifications** | Create persistent notifications for new alarms | enabled |
+| **Filtered Alarm Codes** | Comma-separated alarm codes that never create a notification | `-1` |
 
-**[PLACEHOLDER: Screenshot of configuration dialog]**
 
 #### Field Details
 
@@ -45,35 +47,53 @@ You'll see a configuration dialog with the following fields:
 - Use the **same credentials** you use for:
   - CSNet Manager mobile app
   - CSNet Manager website (www.csnetmanager.com)
-- Credentials are stored securely in Home Assistant
+- Credentials are stored in the Home Assistant config entry (in the `.storage` folder of your configuration directory)
 
 **Scan Interval** (Optional)
-- How often Home Assistant checks for updates (in seconds)
-- **Default**: 60 seconds (recommended)
-- **Minimum**: 30 seconds (don't set lower to avoid rate limits)
-- **Maximum**: 300 seconds (5 minutes)
-- Lower values = more responsive, but more API calls
-- Higher values = less responsive, but lower load
+{ #scan-interval }
+
+- How often the integration polls CSNet Manager (in seconds)
+- **Default**: 60 seconds
+- The form does not enforce a minimum or maximum
+- Each poll makes 3 requests to csnetmanager.com (elements, installation devices, installation alarms)
+
+!!! warning "Keep the scan interval at 60 seconds or more"
+    The integration has no backoff: it polls at the configured rate even when requests fail. CSNet Manager is a service Hitachi provides for its own app, without any official API, and every Home Assistant instance polling it adds load. Lower values put that service at risk for everyone.
 
 **Language** (Optional)
-- Choose the language for alarm messages
-- **Options**: `en` (English) or `fr` (French)
+- Language of the CSNet Manager translations used for alarm messages and alarm origins
+- **Options**: `en` (English), `fr` (French), `es` (Spanish)
 - **Default**: `en`
-- Can be changed later by reconfiguring
+- The reconfigure form currently offers only `en` and `fr`
 
-**Max Temp Override** (Optional, Advanced)
-- Allows you to override the maximum temperature limit for all climate entities
+**Maximum Temperature Override** (Optional, Advanced)
+- Replaces the maximum temperature of **every climate entity** (all zones, all modes, including cooling) and of the **DHW water heater**
+- Does not apply to the swimming pool (fixed 24-33°C) or to the fixed water temperature number entities
 - **Range**: 8-80°C
-- **Default behavior** (when empty):
-  - Air circuits (standard heat pumps): 35°C maximum
-  - Water circuits (Yutaki/Hydro systems): 80°C maximum  
-  - Water heaters (DHW): 80°C maximum
-- **Use cases**:
-  - Special hardware configurations
-  - Testing purposes
-  - Custom installations requiring non-standard limits
-- ⚠️ **Warning**: Setting this above manufacturer specifications may prevent your system from reaching the target temperature
-- 💡 **Recommendation**: Leave empty unless you have a specific reason to override
+- **Default behavior** (when empty): limits reported by the unit, with these fallbacks:
+  - Air circuits (zones 1/2): 35°C
+  - Water circuits (zones 5/6): 80°C heating, 22°C cooling
+  - Water heater (DHW): `dhwMax` reported by the unit, else 80°C
+- Setting this above the manufacturer's specification does not make the unit accept higher setpoints
+- Leave empty unless you have a specific reason to override
+
+**Fan Coil Control Model** (Optional)
+- `standard` (default): fan coil support is detected from the unit (`systemConfigBits`), fan modes are `off`, `low`, `medium`, `auto`
+- `legacy`: forces fan coil mode on every climate entity, with fan modes `low`, `medium`, `high`, `auto`, and skips the per-circuit fan availability check
+- Choose `legacy` only if fan speeds are mislabelled or missing with `standard`. See [Fan Speed Control](Advanced-Features.md#fan-speed-control-fan-coil-systems)
+
+**Enable Alarm Notifications** (Optional)
+- When enabled (default), the integration creates a Home Assistant persistent notification when a zone reports a new alarm code, and for each active installation alarm
+- When disabled, no notifications are created; alarm sensors keep working
+
+**Filtered Alarm Codes** (Optional)
+- Comma-separated list of integer alarm codes that never create a notification, for example `-1,42`
+- **Default**: `-1` (communication errors, which tend to appear and clear on their own)
+- Leave empty to be notified of every alarm
+- If any entry is not an integer, the whole list is ignored (a warning is logged) and every alarm is notified
+- Filtering only affects notifications: the alarm still appears in the alarm sensors
+
+See [Alarm Notifications](Advanced-Features.md#built-in-alarm-notifications) for details.
 
 ### Step 3: Submit Configuration
 
@@ -99,7 +119,6 @@ If successful, you'll see:
 - New devices in **Settings** → **Devices & Services**
 - Entities created for your zones and sensors
 
-**[PLACEHOLDER: Screenshot of successful configuration]**
 
 ---
 
@@ -107,52 +126,38 @@ If successful, you'll see:
 
 After configuration, the integration automatically creates entities based on your system.
 
+!!! note "Entity IDs are patterns"
+    Home Assistant derives entity IDs from entity names, which come from the device and room names in CSNet Manager. `{device}` below is the CSNet device name (often `Remote`), `{zone}` the zone/room name. Examples elsewhere in this documentation, such as `climate.remote_living_room` or `water_heater.remote_dhw`, are placeholders for your own IDs.
+
 ### Devices
 
-One device is created for **each zone/thermostat** in your system:
+One device is created for **each zone** reported by CSNet Manager (air zones, water circuits, DHW, swimming pool):
 
 **Device Name Format**: `{Device Name}-{Zone Name}`
 
 Example: `Remote-Living Room`
 
-Each device includes:
-- Climate entity
-- Multiple sensors
-- Device information (model, firmware, etc.)
+Additional devices group installation-wide entities: **System-Controller**, **Compressor Outdoor Unit**, **Installation Alarms** and **Alarm Statistics**.
 
 ### Entities Per Zone
 
-For **each zone** (C1, C2, etc.), you get:
+| Zone type (CSNet zone id) | Main entity | Entity ID pattern |
+|---------------------------|-------------|-------------------|
+| C1/C2 air circuit (1, 2) | Climate | `climate.{zone}` |
+| C1/C2 water circuit (5, 6) | Climate | `climate.{zone}` |
+| DHW (3) | Water heater | `water_heater.{zone}` |
+| Swimming pool (4) | Water heater | `water_heater.{zone}` |
 
-#### Climate Entity
-- **Entity ID**: `climate.{device_name}_{zone_name}`
-- **Example**: `climate.remote_living_room`
-- Controls temperature, mode, and presets
+Every zone, whatever its type, also gets these sensors:
 
-#### Temperature Sensors
-- **Current Temperature**: `sensor.{device}_current_temperature`
-- **Target Temperature**: `sensor.{device}_setting_temperature`
+- **Current / Setting Temperature**: `sensor.{device}_{zone}_current_temperature`, `sensor.{device}_{zone}_setting_temperature`
+- **Status**: `sensor.{device}_{zone}_mode`, `_on_off`, `_doingboost`, `_unit_type`
+- **Alarms**: `sensor.{device}_{zone}_alarm_code`, `_alarm_active`, `_alarm_message`, `_alarm_code_formatted`, `_alarm_origin`
+- **Device sensors**: `sensor.{device}_wifi_signal`, `sensor.{device}_connectivity`, `sensor.{device}_last_communication` (one set per zone, so duplicates get `_2`, `_3` suffixes)
 
-#### Status Sensors
-- **Mode**: `sensor.{device}_mode` (Heat, Cool, Auto)
-- **On/Off**: `sensor.{device}_on_off`
-- **Alarm Code**: `sensor.{device}_alarm_code`
-- **Alarm Active**: `sensor.{device}_alarm_active`
-- **Alarm Message**: `sensor.{device}_alarm_message`
-- **Doing Boost**: `sensor.{device}_doingBoost`
+### Number Entities (If applicable)
 
-#### Device Sensors
-- **WiFi Signal**: `sensor.{device}_wifi_signal`
-- **Connectivity**: `sensor.{device}_connectivity`
-- **Last Communication**: `sensor.{device}_last_communication`
-
-### Water Heater Entity (If applicable)
-
-If your system has DHW (Domestic Hot Water):
-
-- **Entity ID**: `water_heater.{device_name}_dhw`
-- **Example**: `water_heater.remote_dhw`
-- Controls water heater temperature and operation mode
+When a circuit's OTC type is **Fixed**, a number entity is created to set its fixed water temperature, for example `number.{zone}_fixed_water_temperature_heating_c1`. See [Fixed Water Temperature Control](Climate-Control.md#fixed-water-temperature-control-water-circuits-only).
 
 ### System-Wide Sensors
 
@@ -163,6 +168,8 @@ Additional sensors for overall system monitoring:
 - `sensor.system_controller_water_flow`
 - `sensor.system_controller_in_water_temperature`
 - `sensor.system_controller_out_water_temperature`
+- `sensor.system_controller_external_tank_temperature`
+- `sensor.system_controller_heat_exchanger_water_outlet_temperature`
 - `sensor.system_controller_set_water_temperature`
 - `sensor.system_controller_water_pressure`
 - `sensor.system_controller_gas_temperature`
@@ -179,6 +186,7 @@ Additional sensors for overall system monitoring:
 - `sensor.system_controller_central_control_enabled`
 - `sensor.system_controller_unit_model`
 - `sensor.system_controller_lcd_software_version`
+- `sensor.system_controller_central_config`
 
 #### Configuration Sensors
 - `sensor.system_controller_fan_coil_compatible`
@@ -192,11 +200,25 @@ Additional sensors for overall system monitoring:
 - `sensor.system_controller_otc_heating_type_c2`
 - `sensor.system_controller_otc_cooling_type_c2`
 
+#### Energy and Performance Sensors (estimated)
+- `sensor.system_controller_instant_consumption`
+- `sensor.system_controller_output_power`
+- `sensor.system_controller_instant_cop`
+- `sensor.system_controller_daily_consumption`
+- `sensor.system_controller_daily_output_energy`
+- `sensor.system_controller_daily_hvac_cop`
+- `sensor.system_controller_dhw_daily_cop`
+
+#### Compressor / Outdoor Unit Sensors
+- 28 sensors such as `sensor.compressor_outdoor_unit_compressor_frequency`; see [Compressor Sensors](../COMPRESSOR_SENSORS.md)
+
 #### Alarm Sensors
 - `sensor.alarm_history` - Recent alarm history
-- `sensor.total_alarms` - Total alarm count
-- `sensor.active_alarms` - Currently active alarms
+- `sensor.total_alarms` - Number of zones in alarm
+- `sensor.active_alarms` - Zones in alarm, listed in attributes
 - `sensor.alarms_by_origin` - Alarms grouped by origin
+
+See [Sensors Reference](Sensors-Reference.md) for details on every sensor.
 
 ---
 
@@ -207,10 +229,10 @@ Additional sensors for overall system monitoring:
 **System**: Yutaki S with 1 zone and water heater
 
 **Created Entities**:
-- `climate.remote_zone_1` - Main zone climate control
-- `water_heater.remote_dhw` - Water heater
+- `climate.zone_1` - Main zone climate control
+- `water_heater.dhw` - Water heater (named after the DHW zone in CSNet Manager)
 - `sensor.remote_zone_1_current_temperature`
-- `sensor.remote_zone_1_target_temperature`
+- `sensor.remote_zone_1_setting_temperature`
 - Plus all system-wide sensors
 
 ### Example 2: Two Zones (C1 and C2)
@@ -218,8 +240,8 @@ Additional sensors for overall system monitoring:
 **System**: Yutaki S with floor heating on 2 floors
 
 **Created Entities**:
-- `climate.remote_first_floor` - C1 circuit
-- `climate.remote_second_floor` - C2 circuit
+- `climate.first_floor` - C1 circuit
+- `climate.second_floor` - C2 circuit
 - Sensors for each zone
 - System-wide sensors
 
@@ -228,9 +250,9 @@ Additional sensors for overall system monitoring:
 **System**: Yutaki SC with 2 thermostats + DHW
 
 **Created Entities**:
-- `climate.remote_living_room` - C1 thermostat
-- `climate.remote_bedrooms` - C2 thermostat
-- `water_heater.remote_dhw` - Water heater
+- `climate.living_room` - C1 thermostat
+- `climate.bedrooms` - C2 thermostat
+- `water_heater.dhw` - Water heater
 - All zone sensors
 - All system sensors
 
@@ -239,9 +261,9 @@ Additional sensors for overall system monitoring:
 **System**: Fan coil compatible with 2 zones
 
 **Created Entities**:
-- `climate.remote_zone_1` - With fan speed control
-- `climate.remote_zone_2` - With fan speed control
-- Additional fan speed attributes and sensors
+- `climate.zone_1` - With fan speed control
+- `climate.zone_2` - With fan speed control
+- Additional fan speed attributes (`fan1_speed`, `fan2_speed`, `fan1_control_available`, `fan2_control_available`)
 
 ---
 
@@ -282,38 +304,21 @@ group:
     entities:
       - climate.remote_first_floor
       - sensor.remote_first_floor_current_temperature
-      - sensor.remote_first_floor_target_temperature
+      - sensor.remote_first_floor_setting_temperature
 ```
 
 ---
 
 ## Advanced Configuration Options
 
-### Adjusting Scan Interval
+### Adjusting Scan Interval, Language and Other Options
 
-To change the scan interval after initial setup:
+All settings, including credentials, are changed through the **reconfigure** flow (there is no separate options dialog). See [Reconfiguring](#reconfiguring).
 
-1. Go to **Settings** → **Devices & Services**
-2. Find **Hitachi CSNet Home**
-3. Click **Configure**
-4. Adjust **Scan Interval**
-5. Click **Submit**
-
-**Recommendations**:
+**Scan interval recommendations**:
 - **Normal use**: 60-120 seconds
-- **Active monitoring**: 30-60 seconds
 - **Low priority**: 180-300 seconds
-
-### Changing Language
-
-To change the alarm message language:
-
-1. Go to **Settings** → **Devices & Services**
-2. Find **Hitachi CSNet Home**
-3. Click **Configure**
-4. Change **Language**
-5. Click **Submit**
-6. Restart Home Assistant to apply changes
+- Do not go below 60 seconds (see [Scan Interval](#scan-interval))
 
 ### Enabling Debug Logging
 
@@ -373,8 +378,7 @@ After adding, restart Home Assistant and check logs:
 **Solutions**:
 1. **Check internet**: Verify Home Assistant can reach internet
 2. **Check firewall**: Ensure CSNet Manager domain is accessible
-3. **Increase timeout**: May need to wait longer for slow connections
-4. **Retry**: Sometimes CSNet Manager servers are slow
+3. **Retry**: Each request times out after 10 seconds; CSNet Manager is sometimes slow
 
 ### Duplicate Entities
 
@@ -396,9 +400,13 @@ To change configuration:
 
 1. Go to **Settings** → **Devices & Services**
 2. Find **Hitachi CSNet Home**
-3. Click **Configure**
-4. Update settings
+3. Click **⋮** (three dots) → **Reconfigure**
+4. Update settings (the form is pre-filled with the current values)
 5. Click **Submit**
+
+The credentials are validated against CSNet Manager before saving, and the integration reloads automatically — no restart needed. The reconfigure form contains the same fields as the initial setup.
+
+Only one CSNet Home entry can be configured per Home Assistant instance.
 
 ### Option 2: Remove and Re-add (Fresh Start)
 

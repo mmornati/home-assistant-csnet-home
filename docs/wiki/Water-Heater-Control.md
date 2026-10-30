@@ -7,27 +7,39 @@ Learn how to control your Domestic Hot Water (DHW) system through Home Assistant
 If your Hitachi system includes a DHW (Domestic Hot Water) heater, it appears as a **water_heater entity** in Home Assistant. This provides full control over your hot water production.
 
 **Available Controls**:
-- 🌡️ **Temperature** - Set target water temperature
-- ⚙️ **Operation Mode** - Off, Eco, Performance (Boost)
-- 📊 **Status** - Current water temperature monitoring
+- **Temperature** - Set target water temperature (whole degrees)
+- **Operation Mode** - Off, Eco, Performance (Boost)
+- **Status** - Current water temperature monitoring
+
+!!! note "Swimming pool"
+    A swimming pool circuit is also exposed as a water_heater entity, with only `off`/`on` modes and a 24-33°C range. See [Swimming Pool](Advanced-Features.md#swimming-pool).
 
 ---
 
 ## Entity Naming
 
-Water heater entities follow this naming convention:
+The water heater entity is named after the DHW zone name reported by CSNet Manager:
 
-**Format**: `water_heater.{device_name}_dhw`
+**Format**: `water_heater.{zone_name}`
 
-**Examples**:
-- `water_heater.remote_dhw`
-- `water_heater.hitachi_dhw`
+Its device is named `{Device Name}-{Zone Name}`.
+
+!!! note
+    The examples on this page use `water_heater.remote_dhw` as a placeholder. Replace it with the entity ID shown in **Settings → Devices & Services → Entities**.
 
 ---
 
 ## Operation Modes
 
-The water heater supports three operation modes:
+The water heater supports three operation modes. They map to the unit's DHW run/stop (`runStopDHW`) and DHW boost (`boostDHW`) settings:
+
+| Mode | runStopDHW | boostDHW |
+|------|-----------|----------|
+| `off` | 0 | unchanged |
+| `eco` | 1 | 0 |
+| `performance` | 1 | 1 |
+
+The current mode is read back from the unit: `off` when DHW is stopped, `performance` while the unit reports a boost in progress (`doingBoost`), `eco` otherwise.
 
 ### Off Mode
 
@@ -74,7 +86,7 @@ data:
 
 ### Performance Mode (Boost)
 
-**Description**: Rapid heating for high hot water demand
+**Description**: Requests the unit's DHW boost, for high hot water demand. What the boost does exactly is defined by the unit's configuration.
 
 **When to use**:
 - Filling a bath
@@ -84,10 +96,9 @@ data:
 
 **Energy use**: High/intensive
 
-**Behavior**:
-- Aggressive heating cycle
-- Prioritizes DHW over space heating
-- Reaches target temperature quickly
+**Behavior** (depends on the unit's configuration):
+- Starts a DHW boost on the unit
+- Typically heats the tank faster, at a higher energy cost
 
 ```yaml
 service: water_heater.set_operation_mode
@@ -97,7 +108,6 @@ data:
   operation_mode: "performance"
 ```
 
-**[PLACEHOLDER: Screenshot showing water heater modes in UI]**
 
 ---
 
@@ -107,10 +117,15 @@ data:
 
 The water heater allows you to set your desired hot water temperature.
 
-**Temperature Range**: Typically 30°C to 55°C
-- **Minimum**: 30°C (sufficient for most uses)
-- **Maximum**: 55°C (prevents legionella, maximum efficiency)
+**Temperature Range**:
+- **Minimum**: 30°C (fixed)
+- **Maximum**, in order of priority:
+  1. [Maximum Temperature Override](Configuration-Guide.md#field-details), if set
+  2. The DHW maximum reported by the unit (`dhwMax`)
+  3. 80°C
 - **Recommended**: 50-55°C for domestic use
+
+Setpoints are sent as whole degrees.
 
 **Via UI**:
 1. Open the water heater entity
@@ -143,7 +158,7 @@ automation:
 
 ### Current Temperature
 
-Monitor the actual water temperature:
+Monitor the actual water temperature. It is read from the unit's DHW tank temperature (`tempDHW`):
 
 ```yaml
 {{ state_attr('water_heater.remote_dhw', 'current_temperature') }}
@@ -170,14 +185,25 @@ water_heater.remote_dhw:
     current_temperature: 48
     temperature: 50
     min_temp: 30
-    max_temp: 55
+    max_temp: 55      # dhwMax from your unit, or the override
     operation_list:
       - "off"
       - eco
       - performance
     operation_mode: eco
-    supported_features: 3
+    supported_features: 3   # target temperature + operation mode
 ```
+
+### Related Sensors
+
+| Sensor | Entity (pattern) | What it shows |
+|--------|------------------|---------------|
+| DHW zone sensors | `sensor.{device}_{zone}_current_temperature`, `_setting_temperature`, `_on_off`, `_doingboost` | Same values as the water heater entity |
+| Heat Exchanger Water Outlet Temperature | `sensor.system_controller_heat_exchanger_water_outlet_temperature` | Water leaving the heat pump's exchanger; used for output power while producing DHW |
+| External Tank Temperature | `sensor.system_controller_external_tank_temperature` | Third outlet probe (TWO3), if fitted |
+| DHW Daily COP | `sensor.system_controller_dhw_daily_cop` | Estimated COP of DHW production today |
+
+See [Sensors Reference](Sensors-Reference.md) for details.
 
 ---
 
@@ -190,7 +216,6 @@ type: thermostat
 entity: water_heater.remote_dhw
 ```
 
-**[PLACEHOLDER: Screenshot of water heater thermostat card]**
 
 ### Detailed Water Heater Card
 
@@ -601,7 +626,7 @@ automation:
 
 ## Tips & Best Practices
 
-### ✅ DO
+### Do
 
 - **Use Eco mode** for normal daily operation
 - **Use Performance mode** for high-demand periods (baths, multiple showers)
@@ -610,7 +635,7 @@ automation:
 - **Turn off when away** for extended periods to save energy
 - **Monitor temperature regularly** to ensure adequate supply
 
-### ❌ DON'T
+### Don't
 
 - **Don't set temperature below 50°C long-term** (legionella risk)
 - **Don't exceed 55°C** (unnecessary energy use, scaling risk)
@@ -618,7 +643,7 @@ automation:
 - **Don't turn off/on frequently** (causes wear)
 - **Don't ignore low temperature** alerts (may indicate system issues)
 
-### 💡 Pro Tips
+### Pro Tips
 
 1. **Coordinate with heating schedule** - DHW heating reduces space heating capacity
 2. **Use off-peak electricity** - Schedule boost during cheap rate periods
