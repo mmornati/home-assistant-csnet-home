@@ -273,7 +273,11 @@ def main():
     tokens = {"input": 0, "cache_read": 0, "cache_write": 0, "output": 0}
     message = None
     try:
-        for message in client.beta.messages.tool_runner(**request):
+        # Streaming: the SDK refuses non-streaming requests whose max_tokens could
+        # take more than 10 minutes. Each turn yields a stream; reading its final
+        # message completes the turn, then the runner calls the tools.
+        for stream in client.beta.messages.tool_runner(**request, stream=True):
+            message = stream.get_final_message()
             usage = message.usage
             tokens["input"] += usage.input_tokens
             tokens["cache_read"] += usage.cache_read_input_tokens or 0
