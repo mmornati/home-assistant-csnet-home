@@ -14,7 +14,8 @@
 # is one, otherwise at the stable release; the issue title is the dedupe key.
 # Patch releases are covered by the deterministic nightly workflow.
 #
-# Requires the ANTHROPIC_API_KEY repository secret.
+# Requires one repository secret: CLAUDE_CODE_OAUTH_TOKEN (from `claude setup-token`,
+# uses a Claude Pro/Max subscription) or ANTHROPIC_API_KEY (prepaid API credit).
 name: HA Release Review (Claude)
 
 'on':
@@ -172,7 +173,10 @@ jobs:
         id: claude
         uses: anthropics/claude-code-action@6d5ae526d25ce88daa2200be073e1a373167f064  # v1.0.265
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Prefer a Claude Pro/Max subscription token (`claude setup-token`);
+          # fall back to an Anthropic API key with prepaid credit.
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          anthropic_api_key: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN == '' && secrets.ANTHROPIC_API_KEY || '' }}
           github_token: ${{ github.token }}
           claude_args: >-
             --model claude-sonnet-5-5
