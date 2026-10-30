@@ -15,7 +15,7 @@
                 "data_description": {
                     "username": "Su nombre de usuario de CSNet Manager",
                     "password": "Su contraseña de CSNet Manager",
-                    "scan_interval": "Con qué frecuencia buscar actualizaciones (predeterminado: 60 segundos)",
+                    "scan_interval": "Con qué frecuencia buscar actualizaciones (predeterminado y mínimo: 60 segundos)",
                     "language": "Idioma preferido para los nombres de los dispositivos y las alarmas",
                     "max_temp_override": "Anule el límite máximo de temperatura (8-80°C). Déjelo vacío para los valores predeterminados.",
                     "fan_coil_model": "Seleccione el tipo de control del fan coil (estándar o heredado)"
@@ -35,7 +35,7 @@
                 "data_description": {
                     "username": "Su nombre de usuario de CSNet Manager",
                     "password": "Su contraseña de CSNet Manager",
-                    "scan_interval": "Con qué frecuencia buscar actualizaciones",
+                    "scan_interval": "Con qué frecuencia buscar actualizaciones (mínimo: 60 segundos)",
                     "language": "Idioma preferido para los nombres de los dispositivos y las alarmas",
                     "max_temp_override": "Anule el límite máximo de temperatura (8-80°C)",
                     "fan_coil_model": "Seleccione el tipo de control del fan coil"

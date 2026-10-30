@@ -1,12 +1,14 @@
 """Test API module to check contracts."""
 
 import asyncio
-from unittest.mock import ANY, AsyncMock, patch
+import logging
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
 from aiohttp import CookieJar
 
-from custom_components.csnet_home.api import CSNetHomeAPI
+from custom_components.csnet_home.api import TO_REDACT, CSNetHomeAPI, redact_data
+from custom_components.csnet_home.const import LOGIN_BACKOFF_BASE, LOGIN_BACKOFF_MAX, MAX_AUTH_REJECTIONS
 
 
 @pytest.fixture
@@ -1989,6 +1991,7 @@ async def test_api_get_elements_data_with_fan_speeds(mock_aiohttp_client, hass):
 
     api = CSNetHomeAPI(hass, "user", "pass")
     api.session = mock_client_instance
+    api.logged_in = True
 
     data = await api.async_get_elements_data()
 
@@ -2512,3 +2515,293 @@ def test_get_heating_setting_via_helper(hass):
     api = CSNetHomeAPI(hass, "user", "pass")
     data = {"heatingSetting": {"setting": 20}}
     assert api.get_heating_setting_from_installation_devices(data) == {"setting": 20}
+
+
+# Login lock, backoff and session-expiry handling
+
+
+def _response_cm(status=200, text='{"status":"success"}'):
+    """Build an async context manager yielding a mocked aiohttp response."""
+    response = MagicMock()
+    response.status = status
+    response.text = AsyncMock(return_value=text)
+    cm = MagicMock()
+    cm.__aenter__ = AsyncMock(return_value=response)
+    cm.__aexit__ = AsyncMock(return_value=False)
+    return cm
+
+
+def _logged_in_api(hass, post_responses):
+    """Return an API with a mocked session whose posts return the given responses."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.session = MagicMock()
+    api.session.post = MagicMock(side_effect=post_responses)
+    api.logged_in = True
+    api.xsrf_token = "old-token"
+    return api
+
+
+@pytest.mark.asyncio
+async def test_login_lock_serialises_concurrent_logins(hass):
+    """Concurrent callers share one login instead of each signing in."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+    calls = 0
+
+    async def fake_login():
+        nonlocal calls
+        calls += 1
+        await asyncio.sleep(0)
+        api.logged_in = True
+        return True
+
+    with patch.object(api, "_async_do_login", side_effect=fake_login):
+        results = await asyncio.gather(*(api.async_login() for _ in range(5)))
+
+    assert results == [True] * 5
+    assert calls == 1
+
+
+@pytest.mark.asyncio
+async def test_login_backoff_skips_attempts_and_doubles(hass):
+    """After a failure no request is made until the backoff delay has passed."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+    now = 1000.0
+
+    with (
+        patch("custom_components.csnet_home.api.time.monotonic", side_effect=lambda: now),
+        patch.object(api, "_async_do_login", AsyncMock(return_value=False)) as do_login,
+    ):
+        assert await api.async_login() is False
+        assert do_login.call_count == 1
+        assert api.login_backoff_remaining == LOGIN_BACKOFF_BASE
+
+        # Within the backoff window: no new login request
+        now += LOGIN_BACKOFF_BASE - 1
+        assert await api.async_login() is False
+        assert do_login.call_count == 1
+
+        # Window elapsed: one new attempt, and the delay doubles
+        now += 1
+        assert await api.async_login() is False
+        assert do_login.call_count == 2
+        assert api.login_backoff_remaining == LOGIN_BACKOFF_BASE * 2
+
+        # The delay is capped
+        for _ in range(20):
+            now += LOGIN_BACKOFF_MAX
+            await api.async_login()
+        assert api.login_backoff_remaining == LOGIN_BACKOFF_MAX
+
+
+@pytest.mark.asyncio
+async def test_login_success_resets_backoff(hass):
+    """A successful login clears the failure counters."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+    now = 1000.0
+
+    async def ok():
+        api.logged_in = True
+        return True
+
+    with patch("custom_components.csnet_home.api.time.monotonic", side_effect=lambda: now), patch.object(api, "_async_do_login", AsyncMock(return_value=False)):
+        await api.async_login()
+
+    now += LOGIN_BACKOFF_BASE
+    with patch("custom_components.csnet_home.api.time.monotonic", side_effect=lambda: now), patch.object(api, "_async_do_login", side_effect=ok):
+        assert await api.async_login() is True
+    assert api.login_backoff_remaining == 0
+    assert api.auth_rejections == 0
+
+
+@pytest.mark.asyncio
+async def test_login_exception_counts_as_failure(hass):
+    """A network exception during login fails without raising and backs off."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+    with patch.object(api, "_async_do_login", AsyncMock(side_effect=asyncio.TimeoutError())):
+        assert await api.async_login() is False
+    assert api.login_backoff_remaining > 0
+    assert api.auth_failed is False
+
+
+@pytest.mark.asyncio
+async def test_rejected_credentials_set_auth_failed_after_threshold(mock_aiohttp_client, hass):
+    """Login pages returned for the login post count as credential rejections."""
+    mock_client_instance = mock_aiohttp_client.return_value
+    mock_client_instance.get.return_value.__aenter__.return_value.status = 200
+    login_response = mock_client_instance.post.return_value.__aenter__.return_value
+    login_response.status = 200
+    login_response.text = AsyncMock(return_value='xxx loadContent("login") xxx')
+
+    api = CSNetHomeAPI(hass, "user", "wrong")
+    api.session = mock_client_instance
+
+    for attempt in range(1, MAX_AUTH_REJECTIONS + 1):
+        api._next_login_attempt = 0.0
+        assert await api.async_login() is False
+        assert api.auth_rejections == attempt
+        assert api.auth_failed is (attempt >= MAX_AUTH_REJECTIONS)
+
+
+@pytest.mark.asyncio
+async def test_server_error_on_login_is_not_a_credential_rejection(mock_aiohttp_client, hass):
+    """A 5xx on the login post backs off but never asks for reauth."""
+    mock_client_instance = mock_aiohttp_client.return_value
+    mock_client_instance.get.return_value.__aenter__.return_value.status = 200
+    login_response = mock_client_instance.post.return_value.__aenter__.return_value
+    login_response.status = 503
+    login_response.text = AsyncMock(return_value="Service Unavailable")
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.session = mock_client_instance
+    api.auth_rejections = MAX_AUTH_REJECTIONS - 1
+
+    assert await api.async_login() is False
+    assert api.auth_rejections == 0
+    assert api.auth_failed is False
+
+
+@pytest.mark.asyncio
+async def test_read_skipped_when_login_fails(hass):
+    """Reads make no request when login is refused or backing off."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.session = MagicMock()
+    with patch.object(api, "async_login", AsyncMock(return_value=False)):
+        assert await api.async_get_elements_data() is None
+        assert await api.async_get_installation_devices_data() is None
+    api.session.get.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_write_relogs_in_and_retries_when_session_expired(hass):
+    """A 200 carrying the login page means the session expired: log in and retry once."""
+    api = _logged_in_api(
+        hass,
+        [
+            _response_cm(200, '<html>loadContent("login")</html>'),
+            _response_cm(200, '{"status":"success"}'),
+        ],
+    )
+
+    async def relogin():
+        api.logged_in = True
+        api.xsrf_token = "new-token"
+        return True
+
+    with patch.object(api, "async_login", AsyncMock(side_effect=relogin)) as login:
+        result = await api.async_set_temperature(1, 1234, 1, temperature=21)
+
+    assert result is True
+    login.assert_awaited_once()
+    assert api.session.post.call_count == 2
+    retry_kwargs = api.session.post.call_args_list[1][1]
+    assert retry_kwargs["data"]["_csrf"] == "new-token"
+    assert retry_kwargs["cookies"]["XSRF-TOKEN"] == "new-token"
+
+
+@pytest.mark.asyncio
+async def test_write_retries_on_forbidden(hass):
+    """A 403 (stale CSRF token) is treated like an expired session."""
+    api = _logged_in_api(hass, [_response_cm(403, "Forbidden"), _response_cm(200, "")])
+
+    with patch.object(api, "async_login", AsyncMock(return_value=True)) as login:
+        assert await api.async_set_silent_mode(1, 1234, True) is True
+    login.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_write_fails_when_session_stays_expired(hass):
+    """Only one retry: a second login page makes the write fail."""
+    api = _logged_in_api(
+        hass,
+        [
+            _response_cm(200, 'loadContent("login")'),
+            _response_cm(200, 'loadContent("login")'),
+        ],
+    )
+
+    with patch.object(api, "async_login", AsyncMock(return_value=True)) as login:
+        assert await api.async_set_hvac_mode(1, 1234, "heat") is False
+    login.assert_awaited_once()
+    assert api.session.post.call_count == 2
+    assert api.logged_in is False
+
+
+@pytest.mark.asyncio
+async def test_write_fails_without_retry_when_relogin_fails(hass):
+    """If logging in again fails, the write is not retried."""
+    api = _logged_in_api(hass, [_response_cm(200, 'loadContent("login")')])
+
+    with patch.object(api, "async_login", AsyncMock(return_value=False)):
+        assert await api.set_preset_modes(1, 1234, "eco") is False
+    assert api.session.post.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_write_http_error_returns_false(hass):
+    """A non-200 status that is not a session problem fails without re-login."""
+    api = _logged_in_api(hass, [_response_cm(500, "boom")])
+
+    with patch.object(api, "async_login", AsyncMock(return_value=True)) as login:
+        assert await api.set_water_heater_mode(3, 1234, "eco") is False
+    login.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_unsupported_hvac_mode_returns_false(hass):
+    """An unsupported HVAC mode is rejected without any request."""
+    api = _logged_in_api(hass, [])
+    assert await api.async_set_hvac_mode(1, 1234, "dry") is False
+    api.session.post.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_hvac_mode_zone6_uses_c2_water_circuit(hass):
+    """Zone 6 (C2 water) uses runStopC2, not runStopC6Air."""
+    api = _logged_in_api(hass, [_response_cm()])
+    assert await api.async_set_hvac_mode(6, 1234, "heat") is True
+    data = api.session.post.call_args[1]["data"]
+    assert data["runStopC2"] == "1"
+    assert "runStopC2Air" not in data
+    assert "runStopC6Air" not in data
+
+
+@pytest.mark.asyncio
+async def test_preset_mode_zone6_uses_c2_water_circuit(hass):
+    """Zone 6 (C2 water) uses ecoModeC2 and runStopC2."""
+    api = _logged_in_api(hass, [_response_cm()])
+    assert await api.set_preset_modes(6, 1234, "eco", current_mode=1, on_off=1) is True
+    data = api.session.post.call_args[1]["data"]
+    assert data["ecoModeC2"] == "0"
+    assert data["runStopC2"] == "1"
+    assert not any(key.endswith("C6") or "C6" in key for key in data)
+
+
+@pytest.mark.asyncio
+async def test_silent_mode_zone6_uses_c2(hass):
+    """Zone 6 (C2 water) uses silentModeC2."""
+    api = _logged_in_api(hass, [_response_cm()])
+    assert await api.async_set_silent_mode(6, 1234, True) is True
+    assert api.session.post.call_args[1]["data"]["silentModeC2"] == "1"
+
+
+def test_circuit_for_zone():
+    """Map zones to heat_setting circuit numbers."""
+    assert CSNetHomeAPI.circuit_for_zone(1) == (1, False)
+    assert CSNetHomeAPI.circuit_for_zone(2) == (2, False)
+    assert CSNetHomeAPI.circuit_for_zone(5) == (1, True)
+    assert CSNetHomeAPI.circuit_for_zone(6) == (2, True)
+
+
+def test_xsrf_cookie_is_redacted():
+    """The XSRF cookie value never appears in redacted data."""
+    assert "XSRF-TOKEN" in TO_REDACT
+    assert redact_data({"XSRF-TOKEN": "secret"}) == {"XSRF-TOKEN": "**REDACTED**"}
+
+
+@pytest.mark.asyncio
+async def test_validate_credentials_does_not_log_username_at_info(hass, caplog):
+    """Credential validation never writes the username to INFO logs."""
+    caplog.set_level(logging.INFO, logger="custom_components.csnet_home")
+    with patch.object(CSNetHomeAPI, "async_login", AsyncMock(return_value=True)), patch("aiohttp.ClientSession"):
+        await CSNetHomeAPI.async_validate_credentials(hass, "someone@example.com", "pass")
+    assert "someone@example.com" not in caplog.text

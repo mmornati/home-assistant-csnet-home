@@ -1,10 +1,14 @@
 """Test Coordinator configuration."""
 
+from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers.update_coordinator import UpdateFailed
 
+from custom_components.csnet_home.const import MIN_SCAN_INTERVAL
 from custom_components.csnet_home.coordinator import CSNetHomeCoordinator
 
 
@@ -100,9 +104,81 @@ async def test_coordinator_update_no_api(hass: HomeAssistant):
     hass.data["csnet_home"] = {"test": {"api": None}}
 
     coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test")
-    result = await coordinator._async_update_data()
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
 
-    assert result is None
+
+def _failing_api(logged_in=True, login_result=True, auth_failed=False):
+    """Build a mock API whose elements call returns None."""
+    mock_api = MagicMock()
+    mock_api.logged_in = logged_in
+    mock_api.auth_failed = auth_failed
+    mock_api.async_login = AsyncMock(return_value=login_result)
+    mock_api.load_translations = AsyncMock()
+    mock_api.async_get_elements_data = AsyncMock(return_value=None)
+    mock_api.async_get_installation_devices_data = AsyncMock(return_value=None)
+    mock_api.async_get_installation_alarms = AsyncMock(return_value=None)
+    return mock_api
+
+
+@pytest.mark.asyncio
+async def test_coordinator_update_no_data_raises_update_failed(hass: HomeAssistant):
+    """No elements data must mark the update failed, not publish empty data."""
+    mock_api = _failing_api()
+    hass.data["csnet_home"] = {"test": {"api": mock_api}}
+
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=60, entry_id="test")
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
+
+
+@pytest.mark.asyncio
+async def test_coordinator_login_failure_raises_update_failed(hass: HomeAssistant):
+    """A transient login failure raises UpdateFailed and skips all reads."""
+    mock_api = _failing_api(logged_in=False, login_result=False, auth_failed=False)
+    hass.data["csnet_home"] = {"test": {"api": mock_api}}
+
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=60, entry_id="test")
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
+    mock_api.async_get_elements_data.assert_not_called()
+    mock_api.async_get_installation_devices_data.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_coordinator_rejected_credentials_raise_auth_failed(hass: HomeAssistant):
+    """Rejected credentials raise ConfigEntryAuthFailed so HA starts reauth."""
+    mock_api = _failing_api(logged_in=False, login_result=False, auth_failed=True)
+    hass.data["csnet_home"] = {"test": {"api": mock_api}}
+
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=60, entry_id="test")
+    with pytest.raises(ConfigEntryAuthFailed):
+        await coordinator._async_update_data()
+
+
+@pytest.mark.asyncio
+async def test_coordinator_session_lost_during_fetch_with_rejected_credentials(hass: HomeAssistant):
+    """A fetch that re-logs in and is rejected also triggers reauth."""
+    mock_api = _failing_api(logged_in=True, auth_failed=True)
+
+    async def lose_session():
+        mock_api.logged_in = False
+
+    mock_api.load_translations = AsyncMock(side_effect=lose_session)
+    hass.data["csnet_home"] = {"test": {"api": mock_api}}
+
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=60, entry_id="test")
+    with pytest.raises(ConfigEntryAuthFailed):
+        await coordinator._async_update_data()
+
+
+def test_coordinator_scan_interval_floor(hass: HomeAssistant):
+    """Intervals below the minimum are raised to MIN_SCAN_INTERVAL."""
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=10, entry_id="test")
+    assert coordinator.update_interval == timedelta(seconds=MIN_SCAN_INTERVAL)
+
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=120, entry_id="test")
+    assert coordinator.update_interval == timedelta(seconds=120)
 
 
 @pytest.mark.asyncio

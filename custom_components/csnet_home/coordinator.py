@@ -5,9 +5,10 @@ import logging
 from datetime import timedelta
 
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import DOMAIN
+from .const import DOMAIN, MIN_SCAN_INTERVAL
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -20,6 +21,14 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         _LOGGER.debug("Configuring CSNetHome Coordinator")
         self.hass = hass
         self.entry_id = entry_id
+        if update_interval < MIN_SCAN_INTERVAL:
+            _LOGGER.warning(
+                "Scan interval of %s s is below the %s s minimum, using %s s",
+                update_interval,
+                MIN_SCAN_INTERVAL,
+                MIN_SCAN_INTERVAL,
+            )
+            update_interval = MIN_SCAN_INTERVAL
         self.update_interval = timedelta(seconds=update_interval)
         self._device_data = {"sensors": [], "common_data": {}}
         self._sensors_by_id = {}
@@ -53,13 +62,12 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         # Retrieve the CloudServiceAPI object from hass data
         cloud_api = self.hass.data[DOMAIN][self.entry_id]["api"]
         if not cloud_api:
-            _LOGGER.error("No CloudServiceAPI instance found!")
-            return
+            raise UpdateFailed("No CSNet API instance found")
 
         # Ensure login is valid before launching parallel tasks to avoid race conditions
         # with multiple concurrent login attempts.
-        if not cloud_api.logged_in:
-            await cloud_api.async_login()
+        if not cloud_api.logged_in and not await cloud_api.async_login():
+            self._raise_login_failure(cloud_api)
 
         async def fetch_elements_chain():
             # ensure translations are loaded before elements to enrich alarm messages
@@ -80,6 +88,13 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         elements_data, installation_alarms_data = results[0]
         installation_devices_data = results[1]
 
+        if elements_data is None:
+            # Keep the last known data and mark entities unavailable instead of
+            # showing stale values as if they were current
+            if not cloud_api.logged_in:
+                self._raise_login_failure(cloud_api)
+            raise UpdateFailed("CSNet Manager returned no data")
+
         # Update internal data
         self._update_internal_data(elements_data, installation_devices_data, installation_alarms_data)
 
@@ -93,6 +108,13 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         await self._handle_installation_alarms(cloud_api)
 
         return self._device_data
+
+    @staticmethod
+    def _raise_login_failure(cloud_api):
+        """Raise the exception matching why the CSNet login failed."""
+        if getattr(cloud_api, "auth_failed", False) is True:
+            raise ConfigEntryAuthFailed("CSNet Manager rejected the credentials")
+        raise UpdateFailed("Could not log in to CSNet Manager")
 
     async def _fetch_data(self, cloud_api):
         """Fetch all data from the API."""

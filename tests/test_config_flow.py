@@ -3,6 +3,7 @@
 from unittest.mock import patch
 
 import pytest
+import voluptuous as vol
 from homeassistant import config_entries, data_entry_flow
 from homeassistant.const import CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_USERNAME
 from homeassistant.core import HomeAssistant
@@ -17,6 +18,7 @@ from custom_components.csnet_home.const import (
     DEFAULT_ENABLE_ALARM_NOTIFICATIONS,
     DEFAULT_FILTERED_ALARM_CODES,
     DOMAIN,
+    MIN_SCAN_INTERVAL,
 )
 
 # Define test constants
@@ -365,3 +367,86 @@ async def test_reconfigure_flow_updates_alarm_notification_options(hass: HomeAss
         updated_entry = hass.config_entries.async_get_entry(entry.entry_id)
         assert updated_entry.data[CONF_ENABLE_ALARM_NOTIFICATIONS] is False
         assert updated_entry.data[CONF_FILTERED_ALARM_CODES] == "-5,-10"
+
+
+async def test_user_flow_rejects_scan_interval_below_minimum(hass: HomeAssistant):
+    """The user step refuses polling faster than MIN_SCAN_INTERVAL."""
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+
+    with pytest.raises(vol.Invalid):
+        await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            user_input={**TEST_CONFIG, CONF_SCAN_INTERVAL: MIN_SCAN_INTERVAL - 1},
+        )
+
+
+async def _start_reconfigure(hass: HomeAssistant, data=None):
+    entry = MockConfigEntry(domain=DOMAIN, data=data or TEST_CONFIG, entry_id="test_entry_id")
+    entry.add_to_hass(hass)
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_RECONFIGURE, "entry_id": entry.entry_id},
+    )
+    return entry, result
+
+
+async def test_reconfigure_flow_rejects_scan_interval_below_minimum(hass: HomeAssistant):
+    """The reconfigure step refuses polling faster than MIN_SCAN_INTERVAL."""
+    _, result = await _start_reconfigure(hass)
+
+    with pytest.raises(vol.Invalid):
+        await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            user_input={**TEST_CONFIG, CONF_SCAN_INTERVAL: 30},
+        )
+
+
+async def test_reconfigure_flow_raises_low_stored_interval_default(hass: HomeAssistant):
+    """An entry saved with a low interval is offered the minimum as default."""
+    _, result = await _start_reconfigure(hass, {**TEST_CONFIG, CONF_SCAN_INTERVAL: 15})
+
+    schema = result["data_schema"].schema
+    key = next(k for k in schema if k == CONF_SCAN_INTERVAL)
+    assert key.default() == MIN_SCAN_INTERVAL
+
+
+async def test_reconfigure_flow_accepts_spanish(hass: HomeAssistant):
+    """Spanish is offered in reconfigure like in the user step."""
+    entry, result = await _start_reconfigure(hass)
+
+    with patch(
+        "custom_components.csnet_home.api.CSNetHomeAPI.async_validate_credentials",
+        return_value=True,
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            user_input={**TEST_CONFIG, CONF_LANGUAGE: "es"},
+        )
+
+    assert result["reason"] == "reconfigure_successful"
+    assert hass.config_entries.async_get_entry(entry.entry_id).data[CONF_LANGUAGE] == "es"
+
+
+async def test_reauth_started_by_home_assistant(hass: HomeAssistant):
+    """Reauth started by ConfigEntryAuthFailed receives entry data without entry_id."""
+    entry = MockConfigEntry(domain=DOMAIN, data=TEST_CONFIG, entry_id="test_entry_id")
+    entry.add_to_hass(hass)
+
+    with patch(
+        "custom_components.csnet_home.api.CSNetHomeAPI.async_validate_credentials",
+        return_value=True,
+    ):
+        entry.async_start_reauth(hass)
+        await hass.async_block_till_done()
+
+        flows = hass.config_entries.flow.async_progress()
+        assert len(flows) == 1
+        assert flows[0]["step_id"] == "reauth_confirm"
+
+        result = await hass.config_entries.flow.async_configure(
+            flows[0]["flow_id"],
+            user_input={CONF_USERNAME: TEST_USERNAME, CONF_PASSWORD: "new_password"},
+        )
+
+    assert result["reason"] == "reauth_successful"
+    assert hass.config_entries.async_get_entry(entry.entry_id).data[CONF_PASSWORD] == "new_password"

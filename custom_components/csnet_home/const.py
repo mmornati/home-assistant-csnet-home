@@ -27,6 +27,14 @@ COMMON_API_HEADERS = {
     "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
 }
 DEFAULT_API_TIMEOUT = 10
+# Polling floor: CSNet Manager is an unofficial API, keep the load low
+MIN_SCAN_INTERVAL = 60
+DEFAULT_SCAN_INTERVAL = 60
+# Login backoff: doubles after each failed login, from base up to max (seconds)
+LOGIN_BACKOFF_BASE = 60
+LOGIN_BACKOFF_MAX = 1800
+# Consecutive rejected logins before asking the user to re-authenticate
+MAX_AUTH_REJECTIONS = 3
 
 WATER_HEATER_MAX_TEMPERATURE = 80
 WATER_HEATER_MIN_TEMPERATURE = 30
