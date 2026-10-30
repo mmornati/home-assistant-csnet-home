@@ -169,6 +169,7 @@ jobs:
       # No Bash, no GitHub write token, reads limited to the checkout, web access
       # limited to the HA developer docs, and Write limited to the report file.
       - name: Claude compatibility review
+        id: claude
         uses: anthropics/claude-code-action@6d5ae526d25ce88daa2200be073e1a373167f064  # v1.0.265
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -207,6 +208,19 @@ jobs:
                starting with "Verdict:", then a markdown table (change, our file:line,
                severity, deadline version, suggested fix), then the smoke/test results.
                Keep it short when nothing is affected.
+
+      # The action hides Claude's output, including API errors (bad key, model
+      # not available, no credit). Print only the final error text on failure.
+      - name: Show Claude error
+        if: failure() && steps.claude.outputs.execution_file != ''
+        env:
+          EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
+        run: |
+          jq -r '[.[] | select(.type == "result")] | last | .result // "no result text"' \
+            "$EXECUTION_FILE" | head -c 1000
+          echo
+          jq -r '[.[] | select(.type == "assistant")] | last | .message.content[]?.text // empty' \
+            "$EXECUTION_FILE" | head -c 1000
 
       # Check before the artifact upload too: artifacts are readable by anyone
       # with read access to the repository.
