@@ -51,6 +51,7 @@ jobs:
       issues: read
     outputs:
       issue: ${{ steps.check.outputs.issue }}
+      target: ${{ steps.check.outputs.target }}
     steps:
       - name: Check issue and who approved it
         id: check
@@ -86,6 +87,13 @@ jobs:
             gh issue view "$ISSUE" --json number,title,body > issue.json
           fi
           sha256sum issue.json
+
+          # The HA version the review was about, from the issue footer
+          # ("Automated review of HA 2026.11.0b1 by Claude ...").
+          TARGET=$(jq -r .body issue.json | grep -oE 'review of HA 20[0-9]{2}\.[0-9]+\.[0-9]+(b[0-9]+)?' \
+            | head -1 | sed 's/^review of HA //' || true)
+          echo "Reviewed HA version: ${TARGET:-unknown}"
+          echo "target=$TARGET" >> "$GITHUB_OUTPUT"
 
       - name: Upload approved issue
         uses: actions/upload-artifact@v7
@@ -129,20 +137,42 @@ jobs:
           name: ha-fix-issue
           path: ${{ runner.temp }}
 
+      # Claude reads the source of the HA version the review was about (often a
+      # beta); tests run on the latest stable, the newest the harness supports.
+      - name: Download reviewed Home Assistant source
+        id: source
+        env:
+          TARGET: ${{ needs.gate.outputs.target }}
+        run: |
+          if [ -n "$TARGET" ] && python -m pip download --no-deps --quiet \
+              -d "$RUNNER_TEMP/ha-target" "homeassistant==$TARGET"; then
+            (cd "$RUNNER_TEMP/ha-target" && python -m zipfile -e ./*.whl src)
+            echo "ha_src=$RUNNER_TEMP/ha-target/src/homeassistant" >> "$GITHUB_OUTPUT"
+            echo "version=$TARGET" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Reviewed HA version unknown or unavailable; using the installed one"
+            python -c 'import homeassistant, os; print("ha_src=" + os.path.dirname(homeassistant.__file__))' \
+              >> "$GITHUB_OUTPUT"
+            echo "version=${{ steps.ha.outputs.latest }}" >> "$GITHUB_OUTPUT"
+          fi
+
       # Separate venv for the SDK; pytest runs in the Home Assistant env above.
       - name: Claude fix
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          HA_SRC: ${{ steps.source.outputs.ha_src }}
+          SOURCE_VERSION: ${{ steps.source.outputs.version }}
+          TESTS_VERSION: ${{ steps.ha.outputs.latest }}
         run: |
           if ! [[ "$HA_REVIEW_MODEL" =~ ^claude-[a-z0-9.-]+$ ]]; then
             echo "::error::Invalid model id '$HA_REVIEW_MODEL'"; exit 1
           fi
-          HA_SRC=$(python -c 'import homeassistant, os; print(os.path.dirname(homeassistant.__file__))')
           PYTEST_PYTHON=$(command -v python)
           python -m venv "$RUNNER_TEMP/fix-venv"
           "$RUNNER_TEMP/fix-venv/bin/pip" install --quiet "anthropic>=2.3,<3" black==25.12.0 isort==5.13.2
           "$RUNNER_TEMP/fix-venv/bin/python" scripts/ci/ha_fix.py \
             --issue "$RUNNER_TEMP/issue.json" --ha-src "$HA_SRC" --pytest-python "$PYTEST_PYTHON" \
+            --source-version "$SOURCE_VERSION" --tests-version "$TESTS_VERSION" \
             --summary-out "$RUNNER_TEMP/ha-fix-summary.md"
 
       - name: Read result
@@ -298,8 +328,12 @@ jobs:
         run: |
           if [ "$FIX_RESULT" = "success" ]; then
             scripts/ci/sanitize_report.sh "$SUMMARY"
+            case "$(head -1 "$SUMMARY")" in
+              "Result: NEEDS_HUMAN") HEADLINE="Claude made no changes: some findings need a maintainer's decision." ;;
+              *) HEADLINE="Claude found nothing to change for this review." ;;
+            esac
             {
-              echo "Claude found nothing to change for this review."
+              echo "$HEADLINE"
               echo ""
               cat "$SUMMARY"
               echo ""
