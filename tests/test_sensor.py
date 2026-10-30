@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from homeassistant.components.climate.const import HVACMode
-from homeassistant.components.sensor import SensorDeviceClass, SensorEntityDescription, SensorStateClass
+from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.const import STATE_OFF, STATE_ON, UnitOfEnergy, UnitOfPower, UnitOfTemperature
 from homeassistant.util import dt as dt_util
 
@@ -3023,7 +3023,7 @@ def test_issue_199_heating_power_state_class_for_energy_tab():
 def test_issue_199_daily_cop_sensors_use_measurement_state_class():
     """The COP sensors (no energy meaning) use ``state_class=measurement``."""
     coordinator = _build_installation_coordinator()
-    for key in ("daily_cop_heating", "daily_cop_dhw"):
+    for key in ("daily_cop_hvac", "daily_cop_dhw"):
         description = DAILY_SENSOR_DESCRIPTIONS[key]
         s = CSNetHomeDailySensor(coordinator, _global_device_data(), {}, description)
         assert s.state_class == SensorStateClass.MEASUREMENT
@@ -3213,8 +3213,8 @@ def test_daily_sensor_resets_at_midnight():
     assert s._energy_out == 0.0
 
 
-def test_daily_sensor_daily_cop_heating_accumulates_only_during_heating():
-    """daily_cop_heating should accumulate only when operationStatus == 6."""
+def test_daily_sensor_daily_cop_hvac_accumulates_only_during_heating():
+    """daily_cop_hvac should accumulate only when operationStatus == 6."""
     initial_state = {
         "ouHz": 50,
         "ouDischargePress": 20,
@@ -3228,7 +3228,7 @@ def test_daily_sensor_daily_cop_heating_accumulates_only_during_heating():
         "defrosting": 0,
     }
     coordinator = _build_installation_coordinator(initial_state)
-    description = DAILY_SENSOR_DESCRIPTIONS["daily_cop_heating"]
+    description = DAILY_SENSOR_DESCRIPTIONS["daily_cop_hvac"]
     s = _attach_hass(CSNetHomeDailySensor(coordinator, _global_device_data(), {}, description))
 
     s._last_update_time = dt_util.utcnow() - timedelta(hours=1)
@@ -3239,8 +3239,8 @@ def test_daily_sensor_daily_cop_heating_accumulates_only_during_heating():
     assert s.state == 0.0
 
 
-def test_daily_sensor_daily_cop_heating_accumulates_during_heating():
-    """daily_cop_heating should accumulate when operationStatus == 6."""
+def test_daily_sensor_daily_cop_hvac_accumulates_during_heating():
+    """daily_cop_hvac should accumulate when operationStatus == 6."""
     initial_state = {
         "ouHz": 50,
         "ouDischargePress": 20,
@@ -3254,7 +3254,7 @@ def test_daily_sensor_daily_cop_heating_accumulates_during_heating():
         "defrosting": 0,
     }
     coordinator = _build_installation_coordinator(initial_state)
-    description = DAILY_SENSOR_DESCRIPTIONS["daily_cop_heating"]
+    description = DAILY_SENSOR_DESCRIPTIONS["daily_cop_hvac"]
     s = _attach_hass(CSNetHomeDailySensor(coordinator, _global_device_data(), {}, description))
 
     s._last_update_time = dt_util.utcnow() - timedelta(hours=1)
@@ -3320,12 +3320,11 @@ def test_calculated_sensor_inherits_sensor_entity_for_energy_tab():
 
 def test_daily_sensor_state_class_from_description():
     """``state_class`` is sourced from the description (no property override needed)."""
-    coordinator = _build_installation_coordinator()
     # Energy sensors
     energy_desc = DAILY_SENSOR_DESCRIPTIONS["daily_consumption"]
     assert energy_desc.state_class == SensorStateClass.TOTAL_INCREASING
     # COP sensors
-    cop_desc = DAILY_SENSOR_DESCRIPTIONS["daily_cop_heating"]
+    cop_desc = DAILY_SENSOR_DESCRIPTIONS["daily_cop_hvac"]
     assert cop_desc.state_class == SensorStateClass.MEASUREMENT
 
 
