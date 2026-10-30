@@ -199,17 +199,16 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if validation_error:
                 errors = validation_error
             else:
-                # Update credentials and reload
-                self.hass.config_entries.async_update_entry(
+                # Update credentials and reload (no update listener: the flow
+                # owns the reload, as Home Assistant requires from 2026.12)
+                return self.async_update_reload_and_abort(
                     reauth_entry,
-                    data={
-                        **reauth_entry.data,
+                    data_updates={
                         CONF_USERNAME: user_input[CONF_USERNAME],
                         CONF_PASSWORD: user_input[CONF_PASSWORD],
                     },
+                    reason="reauth_successful",
                 )
-                await self.hass.config_entries.async_reload(reauth_entry.entry_id)
-                return self.async_abort(reason="reauth_successful")
 
         # Show form with current username pre-filled
         return self.async_show_form(

@@ -61,13 +61,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         entry.data.get(CONF_FILTERED_ALARM_CODES, DEFAULT_FILTERED_ALARM_CODES),
     )
 
-    # Initialise a listener for config flow options changes.
-    # See config_flow for defining an options setting that shows up as configure on the integration.
-    cancel_update_listener = entry.add_update_listener(_async_update_listener)
-
     hass.data[DOMAIN][entry.entry_id] = {
         "coordinator": coordinator,
-        "cancel_update_listener": cancel_update_listener,
         "api": api,
     }
 
@@ -118,12 +113,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     return True
 
 
-async def _async_update_listener(hass: HomeAssistant, config_entry):
-    """Handle config options update."""
-    # Reload the integration when the options change.
-    await hass.config_entries.async_reload(config_entry.entry_id)
-
-
 async def async_remove_config_entry_device(hass: HomeAssistant, config_entry: ConfigEntry, device_entry: DeviceEntry) -> bool:
     """Delete device if selected from UI."""
     # Adding this function shows the delete device option in the UI.
@@ -136,9 +125,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     # This is called when you remove your integration or shutdown HA.
     # If you have created any custom services, they need to be removed here too.
-
-    # Remove the config options update listener
-    hass.data[DOMAIN][entry.entry_id]["cancel_update_listener"]()
 
     # Unload platforms
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)

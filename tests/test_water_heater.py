@@ -81,6 +81,7 @@ def test_water_heater_initialization(hass):
     entity = build_water_heater_entity(hass, zone_id=3, room_name="DHW")
     assert entity._attr_name == "DHW"
     assert not entity._is_swimming_pool
+    assert entity._attr_native_temperature_unit == UnitOfTemperature.CELSIUS
     assert entity._attr_temperature_unit == UnitOfTemperature.CELSIUS
     assert entity._attr_supported_features == (WaterHeaterEntityFeature.TARGET_TEMPERATURE | WaterHeaterEntityFeature.OPERATION_MODE)
     assert entity._attr_operation_list == ["off", "eco", "performance"]
@@ -91,6 +92,7 @@ def test_swimming_pool_initialization(hass):
     entity = build_water_heater_entity(hass, zone_id=4, room_name="Pool")
     assert entity._attr_name == "Pool"
     assert entity._is_swimming_pool
+    assert entity._attr_native_temperature_unit == UnitOfTemperature.CELSIUS
     assert entity._attr_temperature_unit == UnitOfTemperature.CELSIUS
     assert entity._attr_supported_features == (WaterHeaterEntityFeature.TARGET_TEMPERATURE | WaterHeaterEntityFeature.OPERATION_MODE)
     assert entity._attr_operation_list == ["off", "on"]
@@ -154,15 +156,15 @@ def test_water_heater_precision(hass):
 def test_water_heater_current_temperature(hass):
     """Test water heater current temperature reading."""
     entity = build_water_heater_entity(hass, zone_id=3, cur=43.0, setp=45)
-    assert entity._attr_current_temperature == 43.0
-    assert entity._attr_target_temperature == 45
+    assert entity.native_current_temperature == 43.0
+    assert entity.native_target_temperature == 45
 
 
 def test_swimming_pool_current_temperature(hass):
     """Test swimming pool current temperature reading."""
     entity = build_water_heater_entity(hass, zone_id=4, cur=27.0, setp=28)
-    assert entity._attr_current_temperature == 27.0
-    assert entity._attr_target_temperature == 28
+    assert entity.native_current_temperature == 27.0
+    assert entity.native_target_temperature == 28
 
 
 def test_water_heater_unique_id(hass):
@@ -186,7 +188,7 @@ async def test_water_heater_set_temperature(hass):
     api = hass.data[DOMAIN]["test-entry"]["api"]
     api.async_set_temperature.assert_called_once()
     assert entity._sensor_data["setting_temperature"] == 50
-    assert entity._attr_target_temperature == 50
+    assert entity.native_target_temperature == 50
 
 
 @pytest.mark.asyncio
@@ -198,7 +200,7 @@ async def test_swimming_pool_set_temperature(hass):
     api = hass.data[DOMAIN]["test-entry"]["api"]
     api.async_set_temperature.assert_called_once()
     assert entity._sensor_data["setting_temperature"] == 30
-    assert entity._attr_target_temperature == 30
+    assert entity.native_target_temperature == 30
 
 
 @pytest.mark.asyncio
