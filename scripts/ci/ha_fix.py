@@ -47,6 +47,7 @@ def test_environment() -> dict[str, str]:
     """Environment for running the test suite."""
     return {key: os.environ[key] for key in TEST_ENV_KEYS if key in os.environ}
 
+
 SYSTEM = """You fix compatibility findings in csnet_home, a Home Assistant custom \
 integration (climate, water_heater, sensor and number platforms, a config flow and a \
 DataUpdateCoordinator).
