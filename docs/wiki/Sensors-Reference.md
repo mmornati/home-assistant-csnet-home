@@ -522,6 +522,12 @@ Output Power divided by Instant Consumption, rounded to 2 decimals. It reports `
 
 Refrigerant cycle telemetry (compressor frequency and current, discharge/evaporator temperatures, pressures, expansion valves, outdoor fan, secondary cycle) is grouped under a separate **Compressor Outdoor Unit** device, with entity IDs such as `sensor.compressor_outdoor_unit_compressor_frequency`.
 
+!!! note "Sensors your unit does not have"
+    Outdoor units report placeholders for hardware they lack instead of leaving the field out. The integration does not create those sensors, and removes the entities older versions created for them:
+
+    - **Suction Pressure** and **Suction Pressure Correction** when the unit reports a constant `128` (no suction pressure sensor).
+    - All **Secondary …** sensors (second refrigerant cycle) unless the unit is a Yutaki S80 or reports a real second-cycle pressure (anything but `127`). Only the S80 has a second (R134a) cycle; on other models those fields hold meaningless values.
+
 See the full list in [Compressor Sensors](../COMPRESSOR_SENSORS.md).
 
 ---
