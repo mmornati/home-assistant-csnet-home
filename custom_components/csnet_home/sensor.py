@@ -20,6 +20,7 @@ from homeassistant.const import (
     UnitOfVolumeFlowRate,
 )
 from homeassistant.core import callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -551,6 +552,50 @@ def _get_heating_status_from_installation_data(installation_data):
     return None
 
 
+# Raw values the outdoor unit reports for sensors it does not have
+SUCTION_PRESSURE_ABSENT = 128  # 0x80, constant on units without the sensor
+SECOND_CYCLE_PRESSURE_ABSENT = 127
+YUTAKI_S80_UNIT_MODEL = 2  # Only the S80 has a second (R134a) refrigerant cycle
+SUCTION_PRESSURE_KEYS = ("suction_pressure", "suction_pressure_correction")
+
+
+def _get_second_cycle_from_installation_data(installation_data):
+    """Get secondCycle from installation devices data (first indoor)."""
+    if not isinstance(installation_data, dict):
+        return None
+    data_array = installation_data.get("data", [])
+    if isinstance(data_array, list) and data_array and isinstance(data_array[0], dict):
+        indoors_array = data_array[0].get("indoors", [])
+        if isinstance(indoors_array, list) and indoors_array and isinstance(indoors_array[0], dict):
+            return indoors_array[0].get("secondCycle")
+    return None
+
+
+def unsupported_compressor_sensor_keys(installation_data) -> set[str]:
+    """Return compressor sensor keys the installed unit has no hardware for.
+
+    Units report placeholders for missing sensors instead of omitting them:
+    a constant 128 for the suction pressure, 127 for the second cycle
+    pressures, and drifting meaningless temperatures for a second cycle that
+    only the Yutaki S80 has. Those sensors are not created.
+    """
+    heating_status = _get_heating_status_from_installation_data(installation_data) or {}
+    second_cycle = _get_second_cycle_from_installation_data(installation_data) or {}
+    unsupported: set[str] = set()
+
+    if heating_status.get("ouSuctionPress") in (None, SUCTION_PRESSURE_ABSENT):
+        unsupported.update(SUCTION_PRESSURE_KEYS)
+
+    has_second_cycle = heating_status.get("unitModel") == YUTAKI_S80_UNIT_MODEL or second_cycle.get("dischargePressure") not in (
+        None,
+        SECOND_CYCLE_PRESSURE_ABSENT,
+    )
+    if not has_second_cycle:
+        unsupported.update(d.key for d in COMPRESSOR_SENSOR_DESCRIPTIONS if d.key.startswith("secondary_"))
+
+    return unsupported
+
+
 def _name_for(zone_name: str, friendly_name: str) -> str:
     """Build a backward-compatible entity name.
 
@@ -614,6 +659,16 @@ def _apply_description_attrs(entity: SensorEntity, description: SensorEntityDesc
     if description.options is not None:
         entity._attr_options = description.options
     entity.entity_description = description
+
+
+def _remove_unsupported_compressor_entities(hass, unsupported_keys) -> None:
+    """Drop registry entries left by sensors earlier versions created regardless."""
+    entity_registry = er.async_get(hass)
+    for key in unsupported_keys:
+        entity_id = entity_registry.async_get_entity_id("sensor", DOMAIN, f"{DOMAIN}-compressor-{key}")
+        if entity_id:
+            entity_registry.async_remove(entity_id)
+            _LOGGER.info("Removed %s: the outdoor unit has no such sensor", entity_id)
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -736,7 +791,12 @@ async def async_setup_entry(hass, entry, async_add_entities):
         }
         common_data = coordinator.get_common_data()
 
+        unsupported = unsupported_compressor_sensor_keys(installation_devices_data)
+        _remove_unsupported_compressor_entities(hass, unsupported)
+
         for description in COMPRESSOR_SENSOR_DESCRIPTIONS:
+            if description.key in unsupported:
+                continue
             sensors.append(
                 CSNetHomeCompressorSensor(
                     coordinator,
@@ -1798,7 +1858,7 @@ class CSNetHomeCompressorSensor(CoordinatorEntity, SensorEntity):
         },
         # Compressor Pressures
         "discharge_pressure": {"key": "ouDischargePress"},
-        "suction_pressure": {"key": "ouSuctionPress"},
+        "suction_pressure": {"key": "ouSuctionPress", "invalid": SUCTION_PRESSURE_ABSENT},
         "suction_pressure_correction": {"key": "ouSuctionPressCorrection"},
         # Expansion Valve and Control
         "expansion_valve_opening": {"key": "evi"},
