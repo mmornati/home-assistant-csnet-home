@@ -29,7 +29,7 @@ from .const import (
     WATER_CIRCUIT_MIN_COOL,
     WATER_CIRCUIT_MIN_HEAT,
 )
-from .helpers import extract_heating_status
+from .helpers import extract_heating_status, zone_device_identifier, zone_key
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -72,6 +72,13 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
         self._sensor_data = sensor_data
         self._common_data = common_data
         self._attr_name = self._sensor_data.get("room_name", "Unknown")
+        # Stable identity: CSNet room names can be renamed by the user
+        self._zone_ids = (
+            sensor_data.get("device_id"),
+            sensor_data.get("room_id"),
+            sensor_data.get("zone_id"),
+        )
+        self._zone_key = zone_key(sensor_data)
         self.entry = entry
         # Temperature limits will be computed dynamically based on mode
         # Expose all modes supported by the API
@@ -253,7 +260,7 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
     @property
     def unique_id(self) -> str:
         """Return unique id."""
-        return f"{DOMAIN}-climate-{self._sensor_data['device_id']}-{self._sensor_data.get('room_name', 'unknown')}"
+        return f"{DOMAIN}-climate-{self._zone_key}"
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -280,12 +287,7 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
             manufacturer="Hitachi",
             model=f"{device_name_from_status} Remote Controller",
             sw_version=firmware,  # None is acceptable for DeviceInfo
-            identifiers={
-                (
-                    DOMAIN,
-                    f"{device_name}-{room_name}",
-                )
-            },
+            identifiers={(DOMAIN, zone_device_identifier(self._sensor_data))},
         )
 
     @property
@@ -527,16 +529,16 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
         """Handle updated data from the coordinator."""
         _LOGGER.debug("Updating CSNet Home data for %s", self._attr_name)
 
-        self._sensor_data = next(
-            (x for x in self.coordinator.get_sensors_data() if x.get("room_name") == self._attr_name),
-            None,
-        )
+        self._sensor_data = self.coordinator.get_sensor_data_by_id(*self._zone_ids)
         if self._sensor_data is None:
             _LOGGER.warning(
-                "No sensor data found for room %s after coordinator refresh",
+                "No sensor data found for zone %s (%s) after coordinator refresh",
+                self._zone_key,
                 self._attr_name,
             )
             return
+        # Follow renames made in CSNet Manager
+        self._attr_name = self._sensor_data.get("room_name", self._attr_name)
 
         # Obtain real state from API
         api_fan_mode = self._get_fan_mode_from_data()

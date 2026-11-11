@@ -18,6 +18,8 @@ from custom_components.csnet_home.const import (
     DOMAIN,
 )
 from custom_components.csnet_home.coordinator import CSNetHomeCoordinator
+from custom_components.csnet_home.migration import async_migrate_zone_identifiers
+from custom_components.csnet_home.sensor import DEVICE_SENSOR_DESCRIPTIONS, ZONE_SENSOR_DESCRIPTIONS
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -67,6 +69,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     }
 
     await coordinator.async_config_entry_first_refresh()
+
+    # Entities used to be keyed on the CSNet room name; move them to stable
+    # zone ids before the platforms register them.
+    async_migrate_zone_identifiers(
+        hass,
+        entry,
+        coordinator.get_sensors_data(),
+        [d.key for d in (*ZONE_SENSOR_DESCRIPTIONS, *DEVICE_SENSOR_DESCRIPTIONS)],
+    )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 

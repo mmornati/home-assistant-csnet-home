@@ -114,6 +114,10 @@ def build_entity(
         async_request_refresh=AsyncMock(return_value=None),
         hass=hass,
     )
+    coordinator.get_sensor_data_by_id = lambda device_id, room_id, zone_id: next(
+        (s for s in coordinator.get_sensors_data() if (s.get("device_id"), s.get("room_id"), s.get("zone_id")) == (device_id, room_id, zone_id)),
+        None,
+    )
     hass.data[DOMAIN][entry.entry_id]["coordinator"] = coordinator
 
     entity = CSNetHomeClimate(coordinator, entry, sensor_data, common_data)
@@ -1313,7 +1317,8 @@ def test_device_info_with_complete_data(hass):
     assert device_info["manufacturer"] == "Hitachi"
     assert device_info["model"] == "Hitachi PAC Remote Controller"
     assert device_info["sw_version"] == "1.0.0"
-    assert (DOMAIN, "Hitachi PAC-Living") in device_info["identifiers"]
+    # Identified by the stable zone ids, not the renameable room name
+    assert (DOMAIN, "zone-1234-395-1") in device_info["identifiers"]
 
 
 def test_device_info_with_missing_firmware(hass):
@@ -1505,3 +1510,19 @@ async def test_set_fan_mode_for_c2_water_zone_uses_circuit2(hass):
     await entity.async_set_fan_mode("low")
 
     assert api.async_set_fan_speed.call_args[0][3] == 2
+
+
+def test_climate_follows_csnet_room_rename(hass):
+    """Renaming the room in CSNet Manager must not orphan the climate entity."""
+    entity = build_entity(hass, mode=1, on_off=1, cur=19.5, setp=20.0)
+    entity.async_write_ha_state = lambda: None
+    unique_id = entity.unique_id
+    coordinator = hass.data[DOMAIN][entity.entry.entry_id]["coordinator"]
+    renamed = dict(entity._sensor_data, room_name="Etage", current_temperature=21.0)
+    coordinator.get_sensors_data = lambda: [renamed]
+
+    entity._handle_coordinator_update()
+
+    assert entity.native_current_temperature == 21.0
+    assert entity.name == "Etage"
+    assert entity.unique_id == unique_id == f"{DOMAIN}-climate-1234-395-1"

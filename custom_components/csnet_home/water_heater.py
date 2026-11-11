@@ -19,6 +19,7 @@ from .const import (
     WATER_HEATER_MAX_TEMPERATURE,
     WATER_HEATER_MIN_TEMPERATURE,
 )
+from .helpers import zone_device_identifier, zone_key
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -102,18 +103,19 @@ class CSNetHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
                 self._attr_operation_mode = "eco"
 
         entity_type = "swimming-pool" if self._is_swimming_pool else "water-heater"
-        self._attr_unique_id = f"{DOMAIN}-{entity_type}-{sensor_data.get('room_name', 'unknown')}"
+        # Stable identity: CSNet room names can be renamed by the user
+        self._zone_ids = (
+            sensor_data.get("device_id"),
+            sensor_data.get("room_id"),
+            sensor_data.get("zone_id"),
+        )
+        self._attr_unique_id = f"{DOMAIN}-{entity_type}-{zone_key(sensor_data)}"
         self._attr_device_info = DeviceInfo(
             name=f"{sensor_data.get('device_name', 'Unknown')}-{sensor_data.get('room_name', 'Unknown')}",
             manufacturer="Hitachi",
             model=f"{common_data.get('name', 'Unknown')} Remote Controller",
             sw_version=common_data.get("firmware"),
-            identifiers={
-                (
-                    DOMAIN,
-                    f"{sensor_data.get('device_name', 'Unknown')}-{sensor_data.get('room_name', 'Unknown')}",
-                )
-            },
+            identifiers={(DOMAIN, zone_device_identifier(sensor_data))},
         )
 
         self._update_attributes()
@@ -167,16 +169,15 @@ class CSNetHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
 
     def _refresh_from_coordinator(self):
         """Load this entity's latest sensor data from the coordinator."""
-        sensors_data = self.coordinator.get_sensors_data()
-
-        expected_zone_id = 4 if self._is_swimming_pool else 3
-        for sensor in sensors_data:
-            if sensor.get("zone_id") == expected_zone_id and sensor.get("room_name") == self._attr_name:
-                self._sensor_data = sensor
-                self._update_attributes()
-                entity_type = "swimming pool" if self._is_swimming_pool else "water heater"
-                _LOGGER.debug("Updated %s data: %s", entity_type, self._attr_name)
-                return
+        sensor = self.coordinator.get_sensor_data_by_id(*self._zone_ids)
+        if sensor is not None:
+            self._sensor_data = sensor
+            # Follow renames made in CSNet Manager
+            self._attr_name = sensor.get("room_name", self._attr_name)
+            self._update_attributes()
+            entity_type = "swimming pool" if self._is_swimming_pool else "water heater"
+            _LOGGER.debug("Updated %s data: %s", entity_type, self._attr_name)
+            return
 
         entity_type = "swimming pool" if self._is_swimming_pool else "water heater"
         _LOGGER.warning("No updated data found for %s: %s", entity_type, self._attr_name)

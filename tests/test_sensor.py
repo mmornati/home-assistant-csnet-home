@@ -99,7 +99,8 @@ def test_metadata_and_identity():
     )
     assert s.device_class == "temperature"
     assert s.unit_of_measurement == UnitOfTemperature.CELSIUS
-    assert sensor_data["room_name"] in s.unique_id
+    # Keyed on the stable zone ids, not the renameable room name
+    assert s.unique_id == "csnet_home-zone-1234-395-1-current_temperature"
     assert s.name.endswith("current_temperature")
 
     info = s.device_info
@@ -1371,6 +1372,7 @@ def test_device_sensor_coordinator_update():
 
     coordinator = SimpleNamespace(
         get_sensors_data=lambda: [updated_sensor_data],
+        get_sensor_data_by_id=lambda device_id, room_id, zone_id: updated_sensor_data,
         get_common_data=lambda: updated_common_data,
     )
 
@@ -1448,7 +1450,7 @@ def test_device_sensor_metadata():
 
     # Test unique id
     assert "csnet_home" in s.unique_id
-    assert "Living" in s.unique_id
+    assert "zone-1709-395-None" in s.unique_id
     assert "wifi_signal" in s.unique_id
 
     # Test name

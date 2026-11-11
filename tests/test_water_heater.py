@@ -66,12 +66,17 @@ def build_water_heater_entity(
             55 if zone_id == 3 else 33,
         ),
     )
-    hass.data[DOMAIN][entry.entry_id]["coordinator"] = SimpleNamespace(
+    coordinator = SimpleNamespace(
         get_sensors_data=lambda: [sensor_data],
         get_common_data=lambda: {"device_status": {1234: common_data}},
         get_installation_devices_data=lambda: installation_devices_data,
         last_update_success=True,
     )
+    coordinator.get_sensor_data_by_id = lambda device_id, room_id, zone_id: next(
+        (s for s in coordinator.get_sensors_data() if (s.get("device_id"), s.get("room_id"), s.get("zone_id")) == (device_id, room_id, zone_id)),
+        None,
+    )
+    hass.data[DOMAIN][entry.entry_id]["coordinator"] = coordinator
 
     entity = CSNetHomeWaterHeater(hass, entry, sensor_data, common_data)
     return entity
@@ -171,13 +176,13 @@ def test_swimming_pool_current_temperature(hass):
 def test_water_heater_unique_id(hass):
     """Test water heater unique ID."""
     entity = build_water_heater_entity(hass, zone_id=3, room_name="DHW")
-    assert entity.unique_id == f"{DOMAIN}-water-heater-DHW"
+    assert entity.unique_id == f"{DOMAIN}-water-heater-1234-396-3"
 
 
 def test_swimming_pool_unique_id(hass):
     """Test swimming pool unique ID."""
     entity = build_water_heater_entity(hass, zone_id=4, room_name="Pool")
-    assert entity.unique_id == f"{DOMAIN}-swimming-pool-Pool"
+    assert entity.unique_id == f"{DOMAIN}-swimming-pool-1234-396-4"
 
 
 @pytest.mark.asyncio
@@ -276,6 +281,8 @@ async def test_water_heater_update(hass):
     # Update sensor data
     coordinator = hass.data[DOMAIN]["test-entry"]["coordinator"]
     updated_sensor = {
+        "device_id": 1234,
+        "room_id": 396,
         "zone_id": 3,
         "room_name": "DHW",
         "on_off": 1,
@@ -299,6 +306,8 @@ async def test_swimming_pool_update(hass):
     # Update sensor data
     coordinator = hass.data[DOMAIN]["test-entry"]["coordinator"]
     updated_sensor = {
+        "device_id": 1234,
+        "room_id": 396,
         "zone_id": 4,
         "room_name": "Pool",
         "on_off": 1,
@@ -353,7 +362,16 @@ def test_water_heater_coordinator_update_writes_state(hass):
     entity = build_water_heater_entity(hass, zone_id=3, room_name="DHW", cur=40.0)
     coordinator = hass.data[DOMAIN]["test-entry"]["coordinator"]
     coordinator.get_sensors_data = lambda: [
-        {"zone_id": 3, "room_name": "DHW", "on_off": 1, "doingBoost": False, "current_temperature": 47.0, "setting_temperature": 50}
+        {
+            "device_id": 1234,
+            "room_id": 396,
+            "zone_id": 3,
+            "room_name": "DHW",
+            "on_off": 1,
+            "doingBoost": False,
+            "current_temperature": 47.0,
+            "setting_temperature": 50,
+        }
     ]
     entity.async_write_ha_state = MagicMock()
 
@@ -361,3 +379,29 @@ def test_water_heater_coordinator_update_writes_state(hass):
 
     assert entity.current_temperature == 47.0
     entity.async_write_ha_state.assert_called_once()
+
+
+def test_water_heater_follows_csnet_room_rename(hass):
+    """A room renamed in CSNet Manager keeps feeding the same entity."""
+    entity = build_water_heater_entity(hass, zone_id=3, room_name="DHW", cur=40.0)
+    unique_id = entity.unique_id
+    coordinator = hass.data[DOMAIN]["test-entry"]["coordinator"]
+    coordinator.get_sensors_data = lambda: [
+        {
+            "device_id": 1234,
+            "room_id": 396,
+            "zone_id": 3,
+            "room_name": "Eau chaude",
+            "on_off": 1,
+            "doingBoost": False,
+            "current_temperature": 48.0,
+            "setting_temperature": 50,
+        }
+    ]
+    entity.async_write_ha_state = MagicMock()
+
+    entity._handle_coordinator_update()
+
+    assert entity.current_temperature == 48.0
+    assert entity.name == "Eau chaude"
+    assert entity.unique_id == unique_id
