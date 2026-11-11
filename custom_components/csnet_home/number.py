@@ -19,6 +19,7 @@ from .const import (
     WATER_CIRCUIT_MIN_HEAT,
 )
 from .coordinator import CSNetHomeCoordinator
+from .helpers import zone_device_identifier
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -287,12 +288,7 @@ class CSNetHomeFixedWaterTemperatureNumber(CoordinatorEntity, NumberEntity):
             manufacturer="Hitachi",
             model=f"{self._common_data.get('name', 'Unknown')} Remote Controller",
             sw_version=self._common_data.get("firmware"),
-            identifiers={
-                (
-                    DOMAIN,
-                    f"{self._sensor_data['device_name']}-{self._sensor_data['room_name']}",
-                )
-            },
+            identifiers={(DOMAIN, zone_device_identifier(self._sensor_data))},
         )
 
     @callback

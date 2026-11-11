@@ -27,6 +27,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, OPERATION_STATUS_MAP, OTC_COOLING_TYPE_NAMES, OTC_HEATING_TYPE_NAMES
 from .coordinator import CSNetHomeCoordinator
+from .helpers import zone_device_identifier, zone_key
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -141,6 +142,13 @@ INSTALLATION_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
     SensorEntityDescription(
         key="out_water_temperature_3",
         name="External Tank Temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    SensorEntityDescription(
+        key="c2_water_temperature",
+        name="Circuit 2 Water Temperature",
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         state_class=SensorStateClass.MEASUREMENT,
@@ -764,9 +772,8 @@ class CSNetHomeSensor(CoordinatorEntity, SensorEntity):
         self._device_id = sensor_data.get("device_id")
         self._room_id = sensor_data.get("room_id")
         self._zone_id = sensor_data.get("zone_id")
-        device_name = sensor_data.get("device_name", "Unknown")
-        room_name = sensor_data.get("room_name", "Unknown")
-        self._name = _name_for(f"{device_name} {room_name}", self._key)
+        self._zone_key = zone_key(sensor_data)
+        self._name = self._build_name(sensor_data)
         _LOGGER.debug("Configuring Sensor %s", self._name)
 
     @property
@@ -792,9 +799,18 @@ class CSNetHomeSensor(CoordinatorEntity, SensorEntity):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Update sensor with latest data from coordinator."""
-        self._sensor_data = self._coordinator.get_sensor_data_by_id(self._device_id, self._room_id, self._zone_id)
-        if self._sensor_data:
+        sensor_data = self._coordinator.get_sensor_data_by_id(self._device_id, self._room_id, self._zone_id)
+        if sensor_data:
+            self._sensor_data = sensor_data
+            # Follow renames made in CSNet Manager
+            self._name = self._build_name(sensor_data)
             self.async_write_ha_state()
+
+    def _build_name(self, sensor_data):
+        """Return the entity name for the zone's current room name."""
+        device_name = sensor_data.get("device_name", "Unknown")
+        room_name = sensor_data.get("room_name", "Unknown")
+        return _name_for(f"{device_name} {room_name}", self._key)
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -821,12 +837,7 @@ class CSNetHomeSensor(CoordinatorEntity, SensorEntity):
             manufacturer="Hitachi",
             model=f"{device_name_from_status} Remote Controller",
             sw_version=firmware,  # None is acceptable for DeviceInfo
-            identifiers={
-                (
-                    DOMAIN,
-                    f"{device_name}-{room_name}",
-                )
-            },
+            identifiers={(DOMAIN, zone_device_identifier(self._sensor_data))},
         )
 
     @property
@@ -837,9 +848,8 @@ class CSNetHomeSensor(CoordinatorEntity, SensorEntity):
     @property
     def unique_id(self) -> str:
         """Return unique id."""
-        # All entities must have a unique id.  Think carefully what you want this to be as
-        # changing it later will cause HA to create new entities.
-        return f"{DOMAIN}-{self._sensor_data.get('room_name', 'unknown')}-{self._key}"
+        # Built from the stable zone ids: CSNet room names can be renamed.
+        return f"{DOMAIN}-zone-{self._zone_key}-{self._key}"
 
 
 class CSNetHomeInstallationSensor(CoordinatorEntity, SensorEntity):
@@ -890,6 +900,7 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, SensorEntity):
             "in_water_temperature": ["waterInletTemp"],
             "out_water_temperature": ["waterOutletTemp"],
             "out_water_temperature_3": ["waterOutlet3Temp"],
+            "c2_water_temperature": ["waterOutlet2Temp"],
             "set_water_temperature": ["waterTempSetting"],
             "water_pressure": ["waterPressure"],
             "defrost": ["defrosting"],
@@ -1055,9 +1066,18 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, SensorEntity):
             return value
 
         if self._key == "water_pressure":
-            # waterPressure: app shows 4.48bar, value is 224, so divide by 50
+            # waterPressure is in hundredths of a bar: 224 is 2.24 bar. The
+            # CSNet app divides by 50 and shows twice the pressure read on the
+            # unit's gauge (issue #118: 4 bar shown for 2 bar on the gauge).
             if isinstance(value, (int, float)):
-                return value / 50
+                return value / 100
+            return value
+
+        if self._key == "c2_water_temperature":
+            # waterOutlet2Temp (THMwo2): mixed-circuit supply temperature. Units
+            # without a second-circuit sensor report a sentinel such as -127.
+            if isinstance(value, (int, float)) and value <= -60:
+                return None
             return value
 
         if self._key in ["pump_speed", "mix_valve_position"]:
@@ -1229,13 +1249,6 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
         if isinstance(operation_status, str):
             return operation_status
         return OPERATION_STATUS_MAP.get(operation_status, "")
-
-    @property
-    def native_value(self):
-        """Calculate and return the state."""
-        heating_status = self._get_heating_status()
-        if not heating_status:
-            return 0
 
     def _get_thermal_power_values(self, heating_status):
         """Calculate thermal output using heating or cooling delta temperature."""
@@ -1464,6 +1477,9 @@ class CSNetHomeDeviceSensor(CoordinatorEntity, SensorEntity):
         self._common_data = common_data
         self._key = description.key
         self._device_id = sensor_data.get("device_id")
+        self._room_id = sensor_data.get("room_id")
+        self._zone_id = sensor_data.get("zone_id")
+        self._zone_key = zone_key(sensor_data)
         self._name = _name_for(
             f"{sensor_data['device_name']}",
             description.name or description.key,
@@ -1518,15 +1534,13 @@ class CSNetHomeDeviceSensor(CoordinatorEntity, SensorEntity):
     def _handle_coordinator_update(self) -> None:
         """Update sensor with latest data from coordinator."""
         # Update sensor_data reference
-        self._sensor_data = next(
-            (x for x in self._coordinator.get_sensors_data() if x.get("device_id") == self._device_id),
-            None,
-        )
+        sensor_data = self._coordinator.get_sensor_data_by_id(self._device_id, self._room_id, self._zone_id)
 
         # Update common_data reference
         self._common_data = self._coordinator.get_common_data()
 
-        if self._sensor_data:
+        if sensor_data:
+            self._sensor_data = sensor_data
             self.async_write_ha_state()
 
     @property
@@ -1542,12 +1556,7 @@ class CSNetHomeDeviceSensor(CoordinatorEntity, SensorEntity):
             manufacturer="Hitachi",
             model=f"{controller_name} Remote Controller",
             sw_version=device_status.get("firmware"),
-            identifiers={
-                (
-                    DOMAIN,
-                    f"{device_name}-{room_name}",
-                )
-            },
+            identifiers={(DOMAIN, zone_device_identifier(self._sensor_data))},
         )
 
     @property
@@ -1558,7 +1567,7 @@ class CSNetHomeDeviceSensor(CoordinatorEntity, SensorEntity):
     @property
     def unique_id(self) -> str:
         """Return unique id."""
-        return f"{DOMAIN}-{self._sensor_data.get('room_name', 'unknown')}-{self._key}"
+        return f"{DOMAIN}-zone-{self._zone_key}-{self._key}"
 
 
 class CSNetHomeAlarmHistorySensor(CoordinatorEntity, SensorEntity):
