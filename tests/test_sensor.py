@@ -22,6 +22,7 @@ from custom_components.csnet_home.const import (
 from custom_components.csnet_home.sensor import (
     CALCULATED_SENSOR_DESCRIPTIONS,
     DAILY_SENSOR_DESCRIPTIONS,
+    INSTALLATION_SENSOR_DESCRIPTIONS,
     CSNetHomeAlarmHistorySensor,
     CSNetHomeAlarmStatisticsSensor,
     CSNetHomeCalculatedSensor,
@@ -244,7 +245,7 @@ def test_installation_sensor():
                             "waterOutletTemp": 20,
                             "waterOutlet3Temp": 25,
                             "waterTempSetting": 23,
-                            "waterPressure": 224,  # Will be divided by 50
+                            "waterPressure": 224,  # Hundredths of a bar
                             "gasTemp": 20,
                             "liquidTemp": 20,
                             "defrosting": 1,  # 1 = on, 0 = off
@@ -300,7 +301,7 @@ def test_installation_sensor():
         "bar",
         "Water Pressure",
     )
-    assert s.state == 4.48  # 224 / 50 = 4.48
+    assert s.state == 2.24  # 224 / 100 = 2.24 bar
 
     # Test defrost sensor
     s = CSNetHomeInstallationSensor(coordinator, device_data, common_data, "defrost", "binary", None, "Defrost")
@@ -418,7 +419,7 @@ def test_installation_sensor_edge_cases():
         "bar",
         "Water Pressure",
     )
-    assert s.state == 3.2  # 160 / 50 = 3.2
+    assert s.state == 1.6  # 160 / 100 = 1.6 bar
 
     # Test defrost with 0 value (off)
     s = CSNetHomeInstallationSensor(coordinator, device_data, common_data, "defrost", "binary", None, "Defrost")
@@ -555,7 +556,7 @@ def test_installation_sensor_nested_data():
         "bar",
         "Water Pressure",
     )
-    assert s.state == 4.0  # 200 / 50 = 4.0
+    assert s.state == 2.0  # 200 / 100 = 2.0 bar (issue #118: gauge read 2 bar)
 
 
 def test_installation_sensor_metadata():
@@ -3345,3 +3346,27 @@ def test_daily_sensor_descriptions_have_state_class():
             assert description.state_class == SensorStateClass.MEASUREMENT
         else:
             assert description.state_class == SensorStateClass.TOTAL_INCREASING
+
+
+def _c2_water_sensor(value):
+    """Build the circuit 2 water temperature sensor over a given raw value."""
+    installation_data = {"data": [{"indoors": [{"heatingStatus": {"waterOutlet2Temp": value}}]}]}
+    coordinator = SimpleNamespace(
+        get_installation_devices_data=lambda: installation_data,
+        get_common_data=lambda: {},
+    )
+    device_data = {"device_name": "System", "device_id": "global", "room_name": "Controller", "parent_id": "global", "room_id": "global"}
+    description = next(d for d in INSTALLATION_SENSOR_DESCRIPTIONS if d.key == "c2_water_temperature")
+    return CSNetHomeInstallationSensor(coordinator, device_data, {}, description)
+
+
+def test_c2_water_temperature_reads_water_outlet_2():
+    """The mixed circuit supply temperature comes from waterOutlet2Temp."""
+    s = _c2_water_sensor(27)
+    assert s.native_value == 27
+    assert s.device_class == "temperature"
+
+
+def test_c2_water_temperature_hides_missing_sensor_sentinel():
+    """Units without a second-circuit sensor report -127; show no value instead."""
+    assert _c2_water_sensor(-127).native_value is None

@@ -227,6 +227,12 @@ Monitor hydraulic system operation (installation-wide). These sensors belong to 
 **Device Class**: `temperature`  
 **Description**: Temperature reported by the third water outlet probe (`waterOutlet3Temp`, TWO3), typically an external tank
 
+### Circuit 2 Water Temperature
+**Entity**: `sensor.system_controller_circuit_2_water_temperature`  
+**Unit**: °C  
+**Device Class**: `temperature`  
+**Description**: Supply temperature of the mixed second circuit, after the mixing valve (`waterOutlet2Temp`, THMwo2). Use it with the Mix Valve Position sensor to check that the mixing valve holds the circuit 2 water law. Shows no value on units without a second-circuit sensor.
+
 ### Heat Exchanger Water Outlet Temperature
 **Entity**: `sensor.system_controller_heat_exchanger_water_outlet_temperature`  
 **Unit**: °C  
@@ -258,7 +264,7 @@ trigger:
 **Description**: System water pressure
 
 **Normal Range**: 1.0 - 2.5 bar  
-**Note**: The raw API value is divided by 50
+**Note**: The raw API value is in hundredths of a bar (224 = 2.24 bar). Before 2.11 it was divided by 50, which showed twice the pressure on the unit's gauge (the CSNet app has the same offset).
 
 ### Gas Temperature
 **Entity**: `sensor.system_controller_gas_temperature`  

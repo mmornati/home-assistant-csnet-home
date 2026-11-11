@@ -147,6 +147,13 @@ INSTALLATION_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
     ),
     SensorEntityDescription(
+        key="c2_water_temperature",
+        name="Circuit 2 Water Temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    SensorEntityDescription(
         key="heat_exchanger_water_outlet_temperature",
         name="Heat Exchanger Water Outlet Temperature",
         device_class=SensorDeviceClass.TEMPERATURE,
@@ -893,6 +900,7 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, SensorEntity):
             "in_water_temperature": ["waterInletTemp"],
             "out_water_temperature": ["waterOutletTemp"],
             "out_water_temperature_3": ["waterOutlet3Temp"],
+            "c2_water_temperature": ["waterOutlet2Temp"],
             "set_water_temperature": ["waterTempSetting"],
             "water_pressure": ["waterPressure"],
             "defrost": ["defrosting"],
@@ -1058,9 +1066,18 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, SensorEntity):
             return value
 
         if self._key == "water_pressure":
-            # waterPressure: app shows 4.48bar, value is 224, so divide by 50
+            # waterPressure is in hundredths of a bar: 224 is 2.24 bar. The
+            # CSNet app divides by 50 and shows twice the pressure read on the
+            # unit's gauge (issue #118: 4 bar shown for 2 bar on the gauge).
             if isinstance(value, (int, float)):
-                return value / 50
+                return value / 100
+            return value
+
+        if self._key == "c2_water_temperature":
+            # waterOutlet2Temp (THMwo2): mixed-circuit supply temperature. Units
+            # without a second-circuit sensor report a sentinel such as -127.
+            if isinstance(value, (int, float)) and value <= -60:
+                return None
             return value
 
         if self._key in ["pump_speed", "mix_valve_position"]:
