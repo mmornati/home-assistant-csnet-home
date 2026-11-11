@@ -51,6 +51,22 @@ def _legacy_unique_ids(sensor_data, sensor_keys):
         )
 
 
+def _entry_device(device_registry, identifier, entry_id):
+    """Return the config entry's device with this identifier.
+
+    Home Assistant 2026.11 deprecates ``async_get_device`` (identifiers are only
+    unique per config entry) in favour of ``async_get_device_by_identifier``;
+    older releases only have the former.
+    """
+    get_by_identifier = getattr(device_registry, "async_get_device_by_identifier", None)
+    if get_by_identifier is not None:
+        return get_by_identifier(identifier, entry_id)
+    device = device_registry.async_get_device(identifiers={identifier})
+    if device is None or entry_id not in device.config_entries:
+        return None
+    return device
+
+
 def async_migrate_zone_identifiers(hass: HomeAssistant, entry: ConfigEntry, sensors_data, sensor_keys) -> None:
     """Move zone entities and devices from room-name to stable zone identifiers."""
     # Two zones sharing a room name had colliding legacy identifiers: there is
@@ -72,11 +88,11 @@ def async_migrate_zone_identifiers(hass: HomeAssistant, entry: ConfigEntry, sens
             entity_registry.async_update_entity(entity_id, new_unique_id=new_id)
             _LOGGER.info("Migrated %s unique_id %s -> %s", entity_id, old_id, new_id)
 
-        old_device = device_registry.async_get_device(identifiers={(DOMAIN, legacy_zone_device_identifier(sensor_data))})
+        old_device = _entry_device(device_registry, (DOMAIN, legacy_zone_device_identifier(sensor_data)), entry.entry_id)
         new_identifier = (DOMAIN, zone_device_identifier(sensor_data))
-        if old_device is None or entry.entry_id not in old_device.config_entries:
+        if old_device is None:
             continue
-        if device_registry.async_get_device(identifiers={new_identifier}):
+        if _entry_device(device_registry, new_identifier, entry.entry_id):
             continue
         device_registry.async_update_device(old_device.id, new_identifiers={new_identifier})
         _LOGGER.info("Migrated device %s to identifier %s", old_device.name, new_identifier[1])

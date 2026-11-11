@@ -85,3 +85,19 @@ async def test_migration_is_idempotent(hass):
     async_migrate_zone_identifiers(hass, entry, [SALON], KEYS)
 
     assert ent_reg.async_get(climate.entity_id).unique_id == "csnet_home-climate-1234-395-5"
+
+
+def test_entry_device_prefers_per_entry_lookup():
+    """On HA 2026.11+ the device is looked up per config entry, without the deprecated call."""
+    from types import SimpleNamespace
+
+    from custom_components.csnet_home.migration import _entry_device
+
+    calls = []
+    registry = SimpleNamespace(
+        async_get_device_by_identifier=lambda identifier, entry_id: calls.append((identifier, entry_id)) or "device",
+        async_get_device=lambda **kwargs: (_ for _ in ()).throw(AssertionError("deprecated call")),
+    )
+
+    assert _entry_device(registry, (DOMAIN, "zone-1-2-3"), "entry") == "device"
+    assert calls == [((DOMAIN, "zone-1-2-3"), "entry")]
