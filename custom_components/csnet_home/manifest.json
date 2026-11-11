@@ -11,5 +11,5 @@
     "loggers": ["custom_components.csnet_home"],
     "requirements": [],
     "single_config_entry": true,
-    "version": "2.11.1"
+    "version": "2.11.2"
   }
