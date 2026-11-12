@@ -12,15 +12,18 @@ from .const import (
     CONF_FILTERED_ALARM_CODES,
     CONF_LANGUAGE,
     CONF_MAX_TEMP_OVERRIDE,
+    CONF_POWER_SUPPLY,
     DEFAULT_ENABLE_ALARM_NOTIFICATIONS,
     DEFAULT_FAN_COIL_MODEL,
     DEFAULT_FILTERED_ALARM_CODES,
     DEFAULT_LANGUAGE,
+    DEFAULT_POWER_SUPPLY,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     FAN_COIL_MODEL_LEGACY,
     FAN_COIL_MODEL_STANDARD,
     MIN_SCAN_INTERVAL,
+    POWER_SUPPLY_OPTIONS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -57,6 +60,7 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_FAN_COIL_MODEL: user_input.get(CONF_FAN_COIL_MODEL, DEFAULT_FAN_COIL_MODEL),
                         CONF_ENABLE_ALARM_NOTIFICATIONS: user_input.get(CONF_ENABLE_ALARM_NOTIFICATIONS, DEFAULT_ENABLE_ALARM_NOTIFICATIONS),
                         CONF_FILTERED_ALARM_CODES: user_input.get(CONF_FILTERED_ALARM_CODES, DEFAULT_FILTERED_ALARM_CODES),
+                        CONF_POWER_SUPPLY: user_input.get(CONF_POWER_SUPPLY, DEFAULT_POWER_SUPPLY),
                     },
                 )
 
@@ -72,6 +76,7 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Optional(CONF_FAN_COIL_MODEL, default=DEFAULT_FAN_COIL_MODEL): vol.In([FAN_COIL_MODEL_STANDARD, FAN_COIL_MODEL_LEGACY]),
                     vol.Optional(CONF_ENABLE_ALARM_NOTIFICATIONS, default=DEFAULT_ENABLE_ALARM_NOTIFICATIONS): bool,
                     vol.Optional(CONF_FILTERED_ALARM_CODES, default=DEFAULT_FILTERED_ALARM_CODES): str,
+                    vol.Optional(CONF_POWER_SUPPLY, default=DEFAULT_POWER_SUPPLY): vol.In(POWER_SUPPLY_OPTIONS),
                 }
             ),
             description_placeholders={
@@ -133,6 +138,7 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_FAN_COIL_MODEL: user_input.get(CONF_FAN_COIL_MODEL, DEFAULT_FAN_COIL_MODEL),
                         CONF_ENABLE_ALARM_NOTIFICATIONS: user_input.get(CONF_ENABLE_ALARM_NOTIFICATIONS, DEFAULT_ENABLE_ALARM_NOTIFICATIONS),
                         CONF_FILTERED_ALARM_CODES: user_input.get(CONF_FILTERED_ALARM_CODES, DEFAULT_FILTERED_ALARM_CODES),
+                        CONF_POWER_SUPPLY: user_input.get(CONF_POWER_SUPPLY, DEFAULT_POWER_SUPPLY),
                     },
                 )
 
@@ -170,6 +176,10 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_FILTERED_ALARM_CODES,
                         default=reconfigure_entry.data.get(CONF_FILTERED_ALARM_CODES, DEFAULT_FILTERED_ALARM_CODES),
                     ): str,
+                    vol.Optional(
+                        CONF_POWER_SUPPLY,
+                        default=reconfigure_entry.data.get(CONF_POWER_SUPPLY, DEFAULT_POWER_SUPPLY),
+                    ): vol.In(POWER_SUPPLY_OPTIONS),
                 }
             ),
             description_placeholders={

@@ -10,7 +10,8 @@
                     "scan_interval": "Scan Interval (seconds)",
                     "language": "Language",
                     "max_temp_override": "Maximum Temperature Override (°C)",
-                    "fan_coil_model": "Fan Coil Control Model"
+                    "fan_coil_model": "Fan Coil Control Model",
+                    "power_supply": "Outdoor Unit Power Supply"
                 },
                 "data_description": {
                     "username": "Your CSNet Manager username",
@@ -18,7 +19,8 @@
                     "scan_interval": "How often to poll for updates (default and minimum: 60 seconds)",
                     "language": "Preferred language for device names and alarms",
                     "max_temp_override": "Override the maximum temperature limit (8-80°C). Leave empty for defaults.",
-                    "fan_coil_model": "Select the fan coil control type (standard or legacy)"
+                    "fan_coil_model": "Select the fan coil control type (standard or legacy)",
+                    "power_supply": "Used to estimate instant power and COP. Auto detects 8/10 HP units as three phase, others as single phase."
                 }
             },
             "reconfigure": {
@@ -30,7 +32,8 @@
                     "scan_interval": "Scan Interval (seconds)",
                     "language": "Language",
                     "max_temp_override": "Maximum Temperature Override (°C)",
-                    "fan_coil_model": "Fan Coil Control Model"
+                    "fan_coil_model": "Fan Coil Control Model",
+                    "power_supply": "Outdoor Unit Power Supply"
                 },
                 "data_description": {
                     "username": "Your CSNet Manager username",
@@ -38,7 +41,8 @@
                     "scan_interval": "How often to poll for updates (minimum: 60 seconds)",
                     "language": "Preferred language for device names and alarms",
                     "max_temp_override": "Override the maximum temperature limit (8-80°C)",
-                    "fan_coil_model": "Select the fan coil control type"
+                    "fan_coil_model": "Select the fan coil control type",
+                    "power_supply": "Used to estimate instant power and COP. Auto detects 8/10 HP units as three phase, others as single phase."
                 }
             },
             "reauth_confirm": {

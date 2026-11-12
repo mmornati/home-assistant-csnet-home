@@ -4,6 +4,7 @@ from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import pytest
 from homeassistant.components.climate.const import HVACMode
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.const import STATE_OFF, STATE_ON, UnitOfEnergy, UnitOfPower, UnitOfTemperature
@@ -3073,6 +3074,56 @@ def test_calculated_sensor_instant_consumption_uses_amps_guardrail():
     result = s.state
     assert isinstance(result, int)
     assert 1380 <= result <= 1607
+
+
+def _issue_229_status(capacity_code):
+    """Heating status of a running compressor drawing 6 A."""
+    return {
+        "ouHz": 80,
+        "ouDischargePress": 25,
+        "ouSuctionPress": 8,
+        "ouDischargeTemperature": 70,
+        "ouCurrent": 6,
+        "ouCapacityCode": capacity_code,
+        "waterFlow": 0,
+        "waterInletTemp": 20,
+        "waterOutletTemp": 20,
+    }
+
+
+THREE_PHASE_W_PER_A = 400 * 1.732 * 0.95
+
+
+@pytest.mark.parametrize(
+    ("capacity_code", "power_supply", "watts_per_amp"),
+    [
+        # Auto: 8 HP (64) and 10 HP (80) Yutaki outdoor units are three phase only
+        (64, "auto", THREE_PHASE_W_PER_A),
+        (80, "auto", THREE_PHASE_W_PER_A),
+        (64 | 0x80, "auto", THREE_PHASE_W_PER_A),
+        # Auto: smaller units stay on the single phase model
+        (40, "auto", 230),
+        (None, "auto", 230),
+        # Manual override wins over detection
+        (40, "three_phase", THREE_PHASE_W_PER_A),
+        (64, "single_phase", 230),
+    ],
+)
+def test_issue_229_instant_consumption_power_supply(capacity_code, power_supply, watts_per_amp):
+    """Three phase units draw ~2.9x the power per Amp of single phase ones (#229)."""
+    coordinator = _build_installation_coordinator(_issue_229_status(capacity_code))
+    description = CALCULATED_SENSOR_DESCRIPTIONS["instant_consumption"]
+    s = CSNetHomeCalculatedSensor(coordinator, _global_device_data(), {}, description)
+    s.power_supply = power_supply
+    assert round(6 * watts_per_amp) <= s.state <= round(6.99 * watts_per_amp)
+
+
+def test_issue_229_default_power_supply_is_auto():
+    """Without a configured value the 8 HP unit is detected as three phase."""
+    coordinator = _build_installation_coordinator(_issue_229_status(64))
+    description = CALCULATED_SENSOR_DESCRIPTIONS["instant_consumption"]
+    s = CSNetHomeCalculatedSensor(coordinator, _global_device_data(), {}, description)
+    assert s.state >= round(6 * THREE_PHASE_W_PER_A)
 
 
 def test_calculated_sensor_heating_power_during_dhw():
