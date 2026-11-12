@@ -1126,11 +1126,12 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, SensorEntity):
             return value
 
         if self._key == "water_pressure":
-            # waterPressure is in hundredths of a bar: 224 is 2.24 bar. The
-            # CSNet app divides by 50 and shows twice the pressure read on the
-            # unit's gauge (issue #118: 4 bar shown for 2 bar on the gauge).
+            # waterPressure is in fiftieths of a bar, as the CSNet app reads it:
+            # 54 is 1.08 bar, 104 is 2.08 bar, matching the gauges on Yutaki
+            # units (issue #228). Units without a pressure sensor may report a
+            # constant value that does not track the gauge.
             if isinstance(value, (int, float)):
-                return value / 100
+                return value / 50
             return value
 
         if self._key == "c2_water_temperature":

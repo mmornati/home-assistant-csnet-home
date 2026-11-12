@@ -245,7 +245,7 @@ def test_installation_sensor():
                             "waterOutletTemp": 20,
                             "waterOutlet3Temp": 25,
                             "waterTempSetting": 23,
-                            "waterPressure": 224,  # Hundredths of a bar
+                            "waterPressure": 224,  # Fiftieths of a bar
                             "gasTemp": 20,
                             "liquidTemp": 20,
                             "defrosting": 1,  # 1 = on, 0 = off
@@ -301,7 +301,7 @@ def test_installation_sensor():
         "bar",
         "Water Pressure",
     )
-    assert s.state == 2.24  # 224 / 100 = 2.24 bar
+    assert s.state == 4.48  # 224 / 50 = 4.48 bar
 
     # Test defrost sensor
     s = CSNetHomeInstallationSensor(coordinator, device_data, common_data, "defrost", "binary", None, "Defrost")
@@ -419,7 +419,7 @@ def test_installation_sensor_edge_cases():
         "bar",
         "Water Pressure",
     )
-    assert s.state == 1.6  # 160 / 100 = 1.6 bar
+    assert s.state == 3.2  # 160 / 50 = 3.2 bar
 
     # Test defrost with 0 value (off)
     s = CSNetHomeInstallationSensor(coordinator, device_data, common_data, "defrost", "binary", None, "Defrost")
@@ -556,7 +556,7 @@ def test_installation_sensor_nested_data():
         "bar",
         "Water Pressure",
     )
-    assert s.state == 2.0  # 200 / 100 = 2.0 bar (issue #118: gauge read 2 bar)
+    assert s.state == 4.0  # 200 / 50 = 4.0 bar
 
 
 def test_installation_sensor_metadata():
