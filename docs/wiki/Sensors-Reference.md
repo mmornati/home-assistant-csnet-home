@@ -264,7 +264,7 @@ trigger:
 **Description**: System water pressure
 
 **Normal Range**: 1.0 - 2.5 bar  
-**Note**: The raw API value is in hundredths of a bar (224 = 2.24 bar). Before 2.11 it was divided by 50, which showed twice the pressure on the unit's gauge (the CSNet app has the same offset).
+**Note**: The raw API value is in fiftieths of a bar (104 = 2.08 bar), the same scale the CSNet app uses. Release 2.11.2 briefly divided it by 100, which halved the reading (issue #228). Some units without an electronic pressure sensor report a constant value that does not follow the gauge: if the sensor never changes, trust the gauge on the unit.
 
 ### Gas Temperature
 **Entity**: `sensor.system_controller_gas_temperature`  
