@@ -640,6 +640,19 @@ Restart Home Assistant, then:
 3. Reproduce issue
 4. Capture logs
 
+### Download Diagnostics
+
+The quickest way to share what the integration sees:
+
+1. Go to **Settings → Devices & services → Hitachi CSNet Home**
+2. Open the **⋮** menu of the entry and choose **Download diagnostics**
+3. Attach the file to your GitHub issue
+
+The file holds the data the integration last received from CSNet Manager. Your username, password,
+installation name, location, owner and installation ids, and hardware serial numbers are replaced by
+`**REDACTED**`. Zone and device names are kept because they are needed to read the data, so look the
+file over before you post it.
+
 ### Capture API Response
 
 1. Open browser Developer Tools (F12)

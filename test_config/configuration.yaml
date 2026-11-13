@@ -6,20 +6,13 @@
 # Configure a default setup of Home Assistant (frontend, api, etc)
 default_config:
 
-# Uncomment to set Home Assistant to debug mode
-# logger:
-#   default: info
-#   logs:
-#     custom_components.csnet_home: debug
-
-# HTTP Configuration - allow local testing without SSL
-http:
-  # Uncomment if you want to access from other machines on your network
-  # server_host: 0.0.0.0
-  use_x_forwarded_for: true
-  trusted_proxies:
-    - 172.16.0.0/12
-    - 192.168.0.0/16
+# Debug logging for the integration: the CSNet responses end up in the
+# container log. Credentials, location and account ids are redacted there, but
+# names and hardware ids are not: do not post this log publicly.
+logger:
+  default: info
+  logs:
+    custom_components.csnet_home: debug
 
 # Enable the recorder to store history (optional for testing)
 recorder:
