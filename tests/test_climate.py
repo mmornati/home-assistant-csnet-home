@@ -7,6 +7,7 @@ import pytest
 from homeassistant.components.climate import FAN_AUTO, FAN_ON, HVACAction, HVACMode
 from homeassistant.components.climate.const import ClimateEntityFeature
 from homeassistant.const import UnitOfTemperature
+from homeassistant.exceptions import HomeAssistantError
 
 from custom_components.csnet_home.climate import CSNetHomeClimate
 from custom_components.csnet_home.const import (
@@ -96,6 +97,7 @@ def build_entity(
         async_set_silent_mode=AsyncMock(return_value=True),
         async_set_fan_speed=AsyncMock(return_value=True),
         is_fan_coil_compatible=lambda data, indoor_id=None: is_fan_coil,
+        has_silent_mode=lambda data, indoor_id=None: True,
         get_fan_control_availability=lambda circuit, mode, data, indoor_id=None: is_fan_coil,
         get_temperature_limits=lambda zone_id, mode, data, indoor_id=None: (None, None),
     )
@@ -1579,3 +1581,59 @@ async def test_setpoint_is_shown_at_once_and_water_circuits_are_read_back(hass, 
     assert entity._sensor_data["setting_temperature"] == 21.0
     entity.async_write_ha_state.assert_called_once()
     assert entity.coordinator.async_schedule_refresh_after_write.called is reads_back
+
+
+@pytest.mark.parametrize(
+    ("mode", "real_mode", "expected_mode"),
+    [
+        (2, 0, 0),  # auto, unit cooling: the cooling fixed temperature
+        (2, 1, 1),  # auto, unit heating: the heating fixed temperature
+        (2, None, 2),  # auto, running mode unknown: as before
+        (1, 0, 1),  # heat stays heat whatever the unit reports
+        (0, 1, 0),  # cool stays cool
+    ],
+)
+async def test_water_circuit_setpoint_uses_the_running_mode(hass, mode, real_mode, expected_mode):
+    """In auto, the fixed water temperature written is the one of the mode the unit runs in."""
+    entity = build_entity(hass, mode=mode, zone_id=5, setp=35.0)
+    entity._sensor_data["real_mode"] = real_mode
+    api = entity.entry.runtime_data.api
+    checked = []
+    api.is_fixed_water_temperature_editable = lambda circuit, mode, data, indoor_id=None: checked.append((circuit, mode)) or True
+    entity.coordinator.get_installation_devices_data = lambda: {"heatingStatus": {}}
+
+    await entity.async_set_temperature(temperature=40.0)
+
+    assert checked == [(1, expected_mode)]
+    api.async_set_temperature.assert_awaited_once_with(5, 1706, expected_mode, temperature=40.0)
+    # shown at once, read back shortly after without blocking the call
+    assert entity._sensor_data["setting_temperature"] == 40.0
+    entity.coordinator.async_schedule_refresh_after_write.assert_called_once()
+
+
+@pytest.mark.parametrize(("real_mode", "expected_mode"), [(0, 0), (1, 1), (None, 2)])
+def test_water_circuit_target_is_shown_for_the_running_mode(hass, real_mode, expected_mode):
+    """The setpoint shown in auto is checked against the same mode as the one it is written for."""
+    entity = build_entity(hass, mode=2, zone_id=5, setp=35.0)
+    entity._sensor_data["real_mode"] = real_mode
+    checked = []
+    entity.entry.runtime_data.api.is_fixed_water_temperature_editable = lambda circuit, mode, data, indoor_id=None: checked.append(mode) or True
+    entity.coordinator.get_installation_devices_data = lambda: {"heatingStatus": {}}
+
+    assert entity.native_target_temperature == 35.0
+    assert checked == [expected_mode]
+
+
+async def test_silent_mode_is_not_sent_to_a_unit_without_one(hass):
+    """The order would be a real one for the unit: refuse it and say why."""
+    entity = build_entity(hass, silent_mode=0)
+    api = entity.entry.runtime_data.api
+    asked = []
+    api.has_silent_mode = lambda data, indoor_id=None: asked.append(indoor_id) or False
+
+    with pytest.raises(HomeAssistantError):
+        await entity.async_set_fan_mode(FAN_ON)
+
+    assert asked == [1706]
+    api.async_set_silent_mode.assert_not_awaited()
+    assert entity.fan_mode == FAN_AUTO
