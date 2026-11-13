@@ -7,7 +7,7 @@ so these tests add each entity type through ``EntityPlatform`` exactly like
 Home Assistant does at runtime.
 """
 
-from homeassistant.components.climate import ClimateEntityFeature
+from homeassistant.components.climate import ClimateEntityFeature, HVACMode
 from homeassistant.components.water_heater import WaterHeaterEntityFeature
 from pytest_homeassistant_custom_component.common import MockEntityPlatform
 
@@ -21,6 +21,8 @@ def _allow_listeners(entity):
     """Let a SimpleNamespace coordinator accept CoordinatorEntity listeners."""
     entity.coordinator.async_add_listener = lambda *_args, **_kwargs: lambda: None
     entity.coordinator.last_update_success = True
+    # the builders replace the state write with a mock: use the real one here
+    entity.__dict__.pop("async_write_ha_state", None)
     return entity
 
 
@@ -52,3 +54,32 @@ async def test_water_heater_entity_added_to_platform(hass):
     state = hass.states.get(entity.entity_id)
     assert state is not None
     assert state.attributes["operation_list"]
+
+
+async def test_accepted_orders_reach_the_state_machine_at_once(hass):
+    """After an order CSNet accepted, Home Assistant shows the new value before any poll."""
+    entity = _allow_listeners(build_climate_entity(hass, mode=1, on_off=1, setp=19.0, ecocomfort=1))
+    platform = MockEntityPlatform(hass, domain="climate", platform_name=DOMAIN)
+    await platform.async_add_entities([entity])
+    await hass.async_block_till_done()
+    assert hass.states.get(entity.entity_id).state == HVACMode.HEAT
+
+    await entity.async_set_temperature(temperature=21.5)
+    assert hass.states.get(entity.entity_id).attributes["temperature"] == 21.5
+
+    await entity.async_set_preset_mode("eco")
+    assert hass.states.get(entity.entity_id).attributes["preset_mode"] == "eco"
+
+    await entity.async_set_hvac_mode(HVACMode.OFF)
+    assert hass.states.get(entity.entity_id).state == HVACMode.OFF
+
+
+async def test_water_heater_orders_reach_the_state_machine_at_once(hass):
+    """The same for the hot water tank."""
+    entity = _allow_listeners(build_water_heater_entity(hass, zone_id=3, setp=45))
+    platform = MockEntityPlatform(hass, domain="water_heater", platform_name=DOMAIN)
+    await platform.async_add_entities([entity])
+    await hass.async_block_till_done()
+
+    await entity.async_set_temperature(temperature=50)
+    assert hass.states.get(entity.entity_id).attributes["temperature"] == 50

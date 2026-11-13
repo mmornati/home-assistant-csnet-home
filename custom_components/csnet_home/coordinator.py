@@ -13,6 +13,7 @@ from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -26,6 +27,9 @@ _LOGGER = logging.getLogger(__name__)
 # The alarm list of an installation rarely changes: ask for it less often than the readings
 ALARM_POLL_SECONDS = 300
 ALARM_STORAGE_VERSION = 1
+# CSNet needs a moment to apply an order: a read sent right after a write can
+# still return the old value
+WRITE_REFRESH_DELAY_SECONDS = 2.0
 ZONE_ALARM_NOTIFICATION_PREFIX = "csnet_home_alarm_"
 INSTALLATION_ALARM_NOTIFICATION_PREFIX = "csnet_home_inst_alarm_"
 
@@ -103,6 +107,7 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         self._dismissed_zone_alarm_codes: dict[str, int] = {}
         self._alarm_store = Store(hass, ALARM_STORAGE_VERSION, alarm_storage_key(entry_id))
         self._alarm_state_loaded = False
+        self._cancel_refresh_after_write: CALLBACK_TYPE | None = None
         self._saved_alarm_state: dict | None = None
         self._enable_alarm_notifications = enable_alarm_notifications
         self._filtered_alarm_codes = self._parse_filtered_alarm_codes(filtered_alarm_codes)
@@ -204,6 +209,28 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         # stays set until the alarms were processed, also when this poll fails later on
         self._installation_alarms_pending = True
         return data
+
+    @callback
+    def async_schedule_refresh_after_write(self) -> None:
+        """Read the data again shortly after an order was sent, without blocking the caller.
+
+        Several orders in a row give one refresh, after the last of them.
+        """
+        self.async_cancel_refresh_after_write()
+
+        @callback
+        def _refresh(_now) -> None:
+            self._cancel_refresh_after_write = None
+            self.hass.async_create_task(self.async_request_refresh())
+
+        self._cancel_refresh_after_write = async_call_later(self.hass, WRITE_REFRESH_DELAY_SECONDS, _refresh)
+
+    @callback
+    def async_cancel_refresh_after_write(self) -> None:
+        """Drop a refresh that is still waiting (on unload)."""
+        if self._cancel_refresh_after_write is not None:
+            self._cancel_refresh_after_write()
+            self._cancel_refresh_after_write = None
 
     def async_invalidate_installation_alarms(self) -> None:
         """Ask CSNet for the alarm list again on the next poll (after an alarm was deleted)."""

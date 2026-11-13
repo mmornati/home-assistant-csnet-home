@@ -1,6 +1,5 @@
 """Create a Number Component for Home Assistant to control fixed water temperature."""
 
-import asyncio
 import logging
 
 from homeassistant.components.number import NumberEntity, NumberMode
@@ -22,6 +21,9 @@ from .coordinator import CSNetHomeCoordinator
 from .helpers import extract_indoor_data, zone_device_identifier
 
 _LOGGER = logging.getLogger(__name__)
+
+# Orders to the unit go out one at a time; reads come from the coordinator
+PARALLEL_UPDATES = 1
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -255,11 +257,9 @@ class CSNetHomeFixedWaterTemperatureNumber(CoordinatorEntity, NumberEntity):
                 self._circuit,
                 self._mode,
             )
-            # Wait a short delay to ensure the server has processed the change
-            # The API sometimes ignores calls between two requests
-            await asyncio.sleep(1.5)
-            # Request coordinator refresh to update the value immediately
-            await self._coordinator.async_refresh()
+            # Read the value back once the server has processed the change,
+            # without holding the service call open meanwhile
+            self._coordinator.async_schedule_refresh_after_write()
         else:
             _LOGGER.error(
                 "Failed to set fixed water temperature for circuit %d (mode %d)",

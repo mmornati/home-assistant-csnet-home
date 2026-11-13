@@ -71,6 +71,7 @@ def build_water_heater_entity(
     entry.runtime_data.coordinator = coordinator
 
     entity = CSNetHomeWaterHeater(hass, entry, sensor_data, common_data)
+    entity.async_write_ha_state = MagicMock()
     return entity
 
 

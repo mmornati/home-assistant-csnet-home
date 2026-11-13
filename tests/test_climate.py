@@ -1,7 +1,7 @@
 """Test CSNet Home climate entity."""
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from homeassistant.components.climate import FAN_AUTO, FAN_ON, HVACAction, HVACMode
@@ -104,6 +104,7 @@ def build_entity(
         get_common_data=lambda: {"device_status": {1234: common_data}},
         get_installation_devices_data=lambda: installation_devices_data,
         async_request_refresh=AsyncMock(return_value=None),
+        async_schedule_refresh_after_write=MagicMock(),
         hass=hass,
     )
     coordinator.get_sensor_data_by_id = lambda device_id, room_id, zone_id: next(
@@ -113,6 +114,7 @@ def build_entity(
     entry.runtime_data.coordinator = coordinator
 
     entity = CSNetHomeClimate(coordinator, entry, sensor_data, common_data)
+    entity.async_write_ha_state = MagicMock()
     return entity
 
 
@@ -419,6 +421,7 @@ def test_dynamic_temperature_limits_heating_mode(hass):
         get_sensors_data=lambda: [entity._sensor_data],
         get_common_data=lambda: {"device_status": {1234: {"name": "Hitachi PAC", "firmware": "1.0.0"}}},
         async_request_refresh=AsyncMock(return_value=None),
+        async_schedule_refresh_after_write=MagicMock(),
     )
 
     entity.entry.runtime_data.api = mock_api
@@ -453,6 +456,7 @@ def test_dynamic_temperature_limits_cooling_mode(hass):
         get_sensors_data=lambda: [entity._sensor_data],
         get_common_data=lambda: {"device_status": {1234: {"name": "Hitachi PAC", "firmware": "1.0.0"}}},
         async_request_refresh=AsyncMock(return_value=None),
+        async_schedule_refresh_after_write=MagicMock(),
     )
 
     entity.entry.runtime_data.api = mock_api
@@ -482,6 +486,7 @@ def test_dynamic_temperature_limits_fallback_to_defaults(hass):
         get_sensors_data=lambda: [entity._sensor_data],
         get_common_data=lambda: {"device_status": {1234: {"name": "Hitachi PAC", "firmware": "1.0.0"}}},
         async_request_refresh=AsyncMock(return_value=None),
+        async_schedule_refresh_after_write=MagicMock(),
     )
 
     entity.entry.runtime_data.api = mock_api
@@ -539,6 +544,7 @@ def test_dynamic_temperature_limits_zone2(hass):
         get_sensors_data=lambda: [sensor_data],
         get_common_data=lambda: {"device_status": {1234: common_data}},
         async_request_refresh=AsyncMock(return_value=None),
+        async_schedule_refresh_after_write=MagicMock(),
     )
 
     entry.runtime_data.api = mock_api
@@ -546,6 +552,7 @@ def test_dynamic_temperature_limits_zone2(hass):
     entry.runtime_data.coordinator = mock_coordinator
 
     entity = CSNetHomeClimate(mock_coordinator, entry, sensor_data, common_data)
+    entity.async_write_ha_state = MagicMock()
 
     # Test min and max temperature for zone 2
     assert entity.min_temp == 12
@@ -599,6 +606,7 @@ def test_max_temp_override_in_config(hass):
         get_sensors_data=lambda: [sensor_data],
         get_common_data=lambda: {"device_status": {1234: common_data}},
         async_request_refresh=AsyncMock(return_value=None),
+        async_schedule_refresh_after_write=MagicMock(),
     )
 
     entry.runtime_data.api = mock_api
@@ -606,6 +614,7 @@ def test_max_temp_override_in_config(hass):
     entry.runtime_data.coordinator = mock_coordinator
 
     entity = CSNetHomeClimate(mock_coordinator, entry, sensor_data, common_data)
+    entity.async_write_ha_state = MagicMock()
 
     # Test that override value is used (45°C instead of API limit 30°C or default 35°C)
     assert entity.min_temp == 11  # Min is not overridden
@@ -659,6 +668,7 @@ def test_max_temp_no_override(hass):
         get_sensors_data=lambda: [sensor_data],
         get_common_data=lambda: {"device_status": {1234: common_data}},
         async_request_refresh=AsyncMock(return_value=None),
+        async_schedule_refresh_after_write=MagicMock(),
     )
 
     entry.runtime_data.api = mock_api
@@ -666,6 +676,7 @@ def test_max_temp_no_override(hass):
     entry.runtime_data.coordinator = mock_coordinator
 
     entity = CSNetHomeClimate(mock_coordinator, entry, sensor_data, common_data)
+    entity.async_write_ha_state = MagicMock()
 
     # Test that API value is used (30°C from API)
     assert entity.max_temp == 30
@@ -1015,11 +1026,13 @@ def test_otc_attributes_zone1_heating_fix(hass):
         get_common_data=lambda: {"device_status": {1234: common_data}},
         get_installation_devices_data=lambda: installation_devices_data,
         async_request_refresh=AsyncMock(return_value=None),
+        async_schedule_refresh_after_write=MagicMock(),
         hass=hass,
     )
     entry.runtime_data.coordinator = coordinator
 
     entity = CSNetHomeClimate(coordinator, entry, sensor_data, common_data)
+    entity.async_write_ha_state = MagicMock()
     attrs = entity.extra_state_attributes
 
     # Verify OTC attributes are present for zone 1 (circuit 1)
@@ -1085,11 +1098,13 @@ def test_otc_attributes_zone2_heating_gradient(hass):
         get_common_data=lambda: {"device_status": {1234: common_data}},
         get_installation_devices_data=lambda: installation_devices_data,
         async_request_refresh=AsyncMock(return_value=None),
+        async_schedule_refresh_after_write=MagicMock(),
         hass=hass,
     )
     entry.runtime_data.coordinator = coordinator
 
     entity = CSNetHomeClimate(coordinator, entry, sensor_data, common_data)
+    entity.async_write_ha_state = MagicMock()
     attrs = entity.extra_state_attributes
 
     # Verify OTC attributes are present for zone 2 (circuit 2)
@@ -1155,11 +1170,13 @@ def test_otc_attributes_zone5_water_circuit(hass):
         get_common_data=lambda: {"device_status": {1234: common_data}},
         get_installation_devices_data=lambda: installation_devices_data,
         async_request_refresh=AsyncMock(return_value=None),
+        async_schedule_refresh_after_write=MagicMock(),
         hass=hass,
     )
     entry.runtime_data.coordinator = coordinator
 
     entity = CSNetHomeClimate(coordinator, entry, sensor_data, common_data)
+    entity.async_write_ha_state = MagicMock()
     attrs = entity.extra_state_attributes
 
     # Verify OTC attributes are present for zone 5 (circuit 1 water)
@@ -1215,11 +1232,13 @@ def test_otc_attributes_no_installation_data(hass):
         get_common_data=lambda: {"device_status": {1234: common_data}},
         get_installation_devices_data=lambda: None,  # No installation data
         async_request_refresh=AsyncMock(return_value=None),
+        async_schedule_refresh_after_write=MagicMock(),
         hass=hass,
     )
     entry.runtime_data.coordinator = coordinator
 
     entity = CSNetHomeClimate(coordinator, entry, sensor_data, common_data)
+    entity.async_write_ha_state = MagicMock()
     attrs = entity.extra_state_attributes
 
     # Verify OTC attributes are not present when no installation data
@@ -1281,11 +1300,13 @@ def test_otc_attributes_zone3_dhw_no_otc(hass):
         get_common_data=lambda: {"device_status": {1234: common_data}},
         get_installation_devices_data=lambda: installation_devices_data,
         async_request_refresh=AsyncMock(return_value=None),
+        async_schedule_refresh_after_write=MagicMock(),
         hass=hass,
     )
     entry.runtime_data.coordinator = coordinator
 
     entity = CSNetHomeClimate(coordinator, entry, sensor_data, common_data)
+    entity.async_write_ha_state = MagicMock()
     attrs = entity.extra_state_attributes
 
     # Verify OTC attributes are NOT present for zone 3 (DHW has no circuits)
@@ -1351,11 +1372,13 @@ def test_device_info_with_missing_firmware(hass):
         get_common_data=lambda: {"device_status": {1234: common_data}},
         get_installation_devices_data=lambda: {},
         async_request_refresh=AsyncMock(return_value=None),
+        async_schedule_refresh_after_write=MagicMock(),
         hass=hass,
     )
     entry.runtime_data.coordinator = coordinator
 
     entity = CSNetHomeClimate(coordinator, entry, sensor_data, common_data)
+    entity.async_write_ha_state = MagicMock()
     device_info = entity.device_info
 
     # Should not raise KeyError, firmware should be None
@@ -1416,11 +1439,13 @@ def test_device_info_with_missing_sensor_data_keys(hass):
         get_common_data=lambda: {"device_status": {1234: common_data}},
         get_installation_devices_data=lambda: {},
         async_request_refresh=AsyncMock(return_value=None),
+        async_schedule_refresh_after_write=MagicMock(),
         hass=hass,
     )
     entry.runtime_data.coordinator = coordinator
 
     entity = CSNetHomeClimate(coordinator, entry, sensor_data, common_data)
+    entity.async_write_ha_state = MagicMock()
     device_info = entity.device_info
 
     # Should not raise KeyError, should use defaults
@@ -1505,3 +1530,52 @@ def test_climate_follows_csnet_room_rename(hass):
     assert entity.native_current_temperature == 21.0
     assert entity.name == "Etage"
     assert entity.unique_id == unique_id == f"{DOMAIN}-climate-1234-395-1"
+
+
+@pytest.mark.parametrize(
+    ("hvac_mode", "expected"),
+    [
+        (HVACMode.OFF, {"on_off": 0, "mode": 1}),  # the mode setting is kept for the next start
+        (HVACMode.HEAT, {"on_off": 1, "mode": 1}),
+        (HVACMode.COOL, {"on_off": 1, "mode": 0}),
+        (HVACMode.HEAT_COOL, {"on_off": 1, "mode": 2}),
+    ],
+)
+async def test_set_hvac_mode_shows_the_change_at_once(hass, hvac_mode, expected):
+    """An accepted order is shown without waiting for the next poll."""
+    entity = build_entity(hass, mode=1, on_off=1)
+    await entity.async_set_hvac_mode(hvac_mode)
+
+    assert {key: entity._sensor_data[key] for key in expected} == expected
+    assert entity.hvac_mode == hvac_mode
+    entity.async_write_ha_state.assert_called_once()
+
+
+async def test_refused_orders_change_nothing(hass):
+    """When CSNet does not accept an order, the entity keeps showing what the unit has."""
+    entity = build_entity(hass, mode=1, on_off=1, setp=19.0, ecocomfort=1)
+    api = entity.entry.runtime_data.api
+    api.async_set_hvac_mode = AsyncMock(return_value=False)
+    api.async_set_temperature = AsyncMock(return_value=False)
+    api.set_preset_modes = AsyncMock(return_value=False)
+
+    await entity.async_set_hvac_mode(HVACMode.OFF)
+    await entity.async_set_temperature(temperature=22.0)
+    await entity.async_set_preset_mode("eco")
+
+    assert entity.hvac_mode == HVACMode.HEAT
+    assert entity.native_target_temperature == 19.0
+    assert entity.preset_mode == "comfort"
+    entity.async_write_ha_state.assert_not_called()
+    entity.coordinator.async_schedule_refresh_after_write.assert_not_called()
+
+
+@pytest.mark.parametrize(("zone_id", "reads_back"), [(1, False), (2, False), (5, True), (6, True)])
+async def test_setpoint_is_shown_at_once_and_water_circuits_are_read_back(hass, zone_id, reads_back):
+    """The service call no longer waits; a water circuit asks for a read-back shortly after."""
+    entity = build_entity(hass, zone_id=zone_id, setp=19.0)
+    await entity.async_set_temperature(temperature=21.0)
+
+    assert entity._sensor_data["setting_temperature"] == 21.0
+    entity.async_write_ha_state.assert_called_once()
+    assert entity.coordinator.async_schedule_refresh_after_write.called is reads_back

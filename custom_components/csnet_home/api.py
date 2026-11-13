@@ -278,6 +278,8 @@ class CSNetHomeAPI:
         self.installation_id = None
         # Serialise logins so parallel reads/writes never sign in twice
         self._login_lock = asyncio.Lock()
+        # One order at a time, as the CSNet web app sends them
+        self._write_lock = asyncio.Lock()
         self._login_failures = 0
         self._login_generation = 0
         self._translations_next_attempt = 0.0
@@ -834,6 +836,11 @@ class CSNetHomeAPI:
             "origin": self.base_url,
         }
 
+        async with self._write_lock:
+            return await self._async_post_form_locked(url, headers, data, description)
+
+    async def _async_post_form_locked(self, url, headers, data, description) -> bool:
+        """Send one form, logging in again once if the session expired."""
         for attempt in range(2):
             data["_csrf"] = self.xsrf_token
             cookies = {

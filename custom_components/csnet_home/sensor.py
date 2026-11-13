@@ -41,6 +41,9 @@ from .helpers import zone_device_identifier, zone_key
 
 _LOGGER = logging.getLogger(__name__)
 
+# Sensors only read what the coordinator fetched
+PARALLEL_UPDATES = 0
+
 # API key(s) behind each installation sensor
 INSTALLATION_SENSOR_API_KEYS = {
     "pump_speed": ["pumpSpeed"],

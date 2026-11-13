@@ -434,12 +434,12 @@ def test_set_native_value(mock_deps, mock_hass_instance, mock_entry, mock_coordi
         api = mock_entry.runtime_data.api
         api.async_set_fixed_water_temperature = AsyncMock(return_value=True)
 
-        # Set value
-        with patch("asyncio.sleep", return_value=None):  # Skip sleep
-            await entity.async_set_native_value(45.0)
+        # Set value: the call returns without waiting, a read-back is scheduled
+        await entity.async_set_native_value(45.0)
 
         api.async_set_fixed_water_temperature.assert_called_with(1, 100, 1, 45.0)
-        mock_coordinator.async_refresh.assert_called_once()
+        mock_coordinator.async_schedule_refresh_after_write.assert_called_once()
+        mock_coordinator.async_refresh.assert_not_called()
 
     asyncio.run(run_test())
 
@@ -462,12 +462,11 @@ def test_set_native_value_failure(mock_deps, mock_hass_instance, mock_entry, moc
         api.async_set_fixed_water_temperature = AsyncMock(return_value=False)
 
         # Set value
-        with patch("asyncio.sleep", return_value=None):  # Skip sleep
-            await entity.async_set_native_value(45.0)
+        await entity.async_set_native_value(45.0)
 
         api.async_set_fixed_water_temperature.assert_called_with(1, 100, 1, 45.0)
-        # Verify coordinator refresh is NOT called on failure
-        mock_coordinator.async_refresh.assert_not_called()
+        # Verify no read-back is scheduled on failure
+        mock_coordinator.async_schedule_refresh_after_write.assert_not_called()
 
     asyncio.run(run_test())
 
