@@ -83,3 +83,36 @@ async def test_water_heater_orders_reach_the_state_machine_at_once(hass):
 
     await entity.async_set_temperature(temperature=50)
     assert hass.states.get(entity.entity_id).attributes["temperature"] == 50
+
+
+async def test_water_heater_operation_mode_reaches_the_state_machine_at_once(hass):
+    """The state shown is derived from the data: it must be derived again before it is written."""
+    entity = _allow_listeners(build_water_heater_entity(hass, zone_id=3, on_off=1))
+    platform = MockEntityPlatform(hass, domain="water_heater", platform_name=DOMAIN)
+    await platform.async_add_entities([entity])
+    await hass.async_block_till_done()
+    assert hass.states.get(entity.entity_id).state == "eco"
+
+    await entity.async_set_operation_mode("performance")
+    assert hass.states.get(entity.entity_id).state == "performance"
+
+    await entity.async_set_operation_mode("off")
+    assert hass.states.get(entity.entity_id).state == "off"
+
+
+async def test_fan_mode_reaches_the_state_machine_at_once(hass):
+    """Silent mode and fan speed orders are shown without waiting for a poll."""
+    entity = _allow_listeners(build_climate_entity(hass, silent_mode=0))
+    platform = MockEntityPlatform(hass, domain="climate", platform_name=DOMAIN)
+    await platform.async_add_entities([entity])
+    await hass.async_block_till_done()
+    assert hass.states.get(entity.entity_id).attributes["fan_mode"] == "auto"
+
+    await entity.async_set_fan_mode("on")
+    assert hass.states.get(entity.entity_id).attributes["fan_mode"] == "on"
+
+    fan_coil = _allow_listeners(build_climate_entity(hass, is_fan_coil=True, fan2_speed=3, zone_id=2))
+    await platform.async_add_entities([fan_coil])
+    await hass.async_block_till_done()
+    await fan_coil.async_set_fan_mode("low")
+    assert hass.states.get(fan_coil.entity_id).attributes["fan_mode"] == "low"

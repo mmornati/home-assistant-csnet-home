@@ -430,6 +430,9 @@ def test_set_native_value(mock_deps, mock_hass_instance, mock_entry, mock_coordi
         }
         entity = mock_deps.CSNetHomeFixedWaterTemperatureNumber(mock_coordinator, sensor_data, {}, circuit=1, mode=1, entry=mock_entry)
         entity.hass = mock_hass_instance
+        entity.async_write_ha_state = MagicMock()
+        mock_coordinator.get_installation_devices_data.return_value = {"data": [{"indoors": [{"id": 100, "heatingSetting": {"fixTempHeatC1": 40}}]}]}
+        assert entity.native_value == 40.0
 
         api = mock_entry.runtime_data.api
         api.async_set_fixed_water_temperature = AsyncMock(return_value=True)
@@ -440,6 +443,9 @@ def test_set_native_value(mock_deps, mock_hass_instance, mock_entry, mock_coordi
         api.async_set_fixed_water_temperature.assert_called_with(1, 100, 1, 45.0)
         mock_coordinator.async_schedule_refresh_after_write.assert_called_once()
         mock_coordinator.async_refresh.assert_not_called()
+        # the accepted value is shown at once, before any read-back
+        assert entity.native_value == 45.0
+        entity.async_write_ha_state.assert_called_once()
 
     asyncio.run(run_test())
 

@@ -56,3 +56,15 @@ def load_fixture():
 def auto_enable_custom_integrations(enable_custom_integrations):
     """Enable custom integrations for all tests."""
     yield
+
+
+@pytest.fixture(autouse=True)
+def no_wait_between_orders(monkeypatch):
+    """Do not really wait between two orders in tests; the spacing has its own test."""
+    try:
+        from custom_components.csnet_home import api
+    except ImportError:
+        yield
+        return
+    monkeypatch.setattr(api, "WRITE_SPACING_SECONDS", 0)
+    yield

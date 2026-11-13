@@ -271,6 +271,8 @@ class CSNetHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
                     self._sensor_data["doingBoost"] = operation_mode == "performance"
                 self._attr_operation_mode = operation_mode
 
+            # the state shown comes from the attributes derived from the data just changed
+            self._update_attributes()
             self.async_write_ha_state()
             entity_type = "swimming pool" if self._is_swimming_pool else "water heater"
             _LOGGER.info("Set %s operation : %s", entity_type, operation_mode)

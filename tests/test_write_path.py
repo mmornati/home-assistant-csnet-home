@@ -4,11 +4,14 @@ import asyncio
 from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.util import dt as dt_util
-from pytest_homeassistant_custom_component.common import async_fire_time_changed
+from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_time_changed
 
+from custom_components.csnet_home import api as api_module
 from custom_components.csnet_home import climate, number, sensor, water_heater
 from custom_components.csnet_home.api import CSNetHomeAPI
+from custom_components.csnet_home.const import DOMAIN
 from custom_components.csnet_home.coordinator import WRITE_REFRESH_DELAY_SECONDS, CSNetHomeCoordinator
 
 
@@ -79,7 +82,7 @@ async def test_a_failed_order_releases_the_lock(hass):
 def _coordinator(hass):
     """Return a coordinator whose refresh is counted instead of run."""
     coordinator = CSNetHomeCoordinator(hass, 60, "entry", api=MagicMock())
-    coordinator.async_request_refresh = AsyncMock()
+    coordinator.async_refresh = AsyncMock()
     return coordinator
 
 
@@ -95,10 +98,10 @@ async def test_read_back_waits_for_the_server_and_does_not_block(hass):
 
     coordinator.async_schedule_refresh_after_write()
     await hass.async_block_till_done()
-    coordinator.async_request_refresh.assert_not_awaited()
+    coordinator.async_refresh.assert_not_awaited()
 
     await _advance(hass, WRITE_REFRESH_DELAY_SECONDS + 0.1)
-    coordinator.async_request_refresh.assert_awaited_once()
+    coordinator.async_refresh.assert_awaited_once()
 
 
 async def test_several_orders_give_one_read_back(hass):
@@ -112,7 +115,7 @@ async def test_several_orders_give_one_read_back(hass):
         coordinator.async_schedule_refresh_after_write()
 
     await _advance(hass, WRITE_REFRESH_DELAY_SECONDS + 0.1)
-    coordinator.async_request_refresh.assert_awaited_once()
+    coordinator.async_refresh.assert_awaited_once()
 
 
 async def test_unload_drops_a_waiting_read_back(hass):
@@ -124,4 +127,63 @@ async def test_unload_drops_a_waiting_read_back(hass):
     coordinator.async_cancel_refresh_after_write()  # harmless twice
 
     await _advance(hass, WRITE_REFRESH_DELAY_SECONDS + 0.1)
-    coordinator.async_request_refresh.assert_not_awaited()
+    coordinator.async_refresh.assert_not_awaited()
+
+
+async def test_two_read_backs_close_together_both_run_on_time(hass):
+    """The read-back does not go through the 10 s cooldown of a requested refresh."""
+    coordinator = _coordinator(hass)
+
+    coordinator.async_schedule_refresh_after_write()
+    await _advance(hass, WRITE_REFRESH_DELAY_SECONDS + 0.1)
+    coordinator.async_schedule_refresh_after_write()
+    await _advance(hass, 2 * WRITE_REFRESH_DELAY_SECONDS + 0.2)
+
+    assert coordinator.async_refresh.await_count == 2
+
+
+async def test_consecutive_orders_are_spaced(hass, monkeypatch):
+    """A second order waits until the minimum time since the previous one has passed."""
+    monkeypatch.setattr(api_module, "WRITE_SPACING_SECONDS", 1.5)
+    clock = [100.0]
+    slept = []
+
+    async def fake_sleep(seconds):
+        slept.append(round(seconds, 3))
+        clock[0] += seconds
+
+    monkeypatch.setattr(api_module.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(api_module.asyncio, "sleep", fake_sleep)
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api._async_post_form_locked = AsyncMock(return_value=True)
+
+    assert await api._async_post_form({}, "first") is True  # nothing before it: no wait
+    clock[0] += 0.4
+    assert await api._async_post_form({}, "second") is True  # 0.4 s later: waits the rest
+    clock[0] += 5.0
+    assert await api._async_post_form({}, "third") is True  # long after: no wait
+
+    assert slept == [1.1]
+
+
+async def test_unloading_the_entry_drops_a_waiting_read_back(hass):
+    """Through a real setup and unload: no refresh runs for an entry that is gone."""
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_USERNAME: "user", CONF_PASSWORD: "pass"})
+    entry.add_to_hass(hass)
+    update = AsyncMock(return_value={"sensors": [], "common_data": {}})
+    with (
+        patch("custom_components.csnet_home.coordinator.CSNetHomeCoordinator._async_update_data", update),
+        patch("custom_components.csnet_home.CSNetHomeAPI.close", AsyncMock()),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = entry.runtime_data.coordinator
+        polls = update.await_count
+
+        coordinator.async_schedule_refresh_after_write()
+        assert await hass.config_entries.async_unload(entry.entry_id)
+        await _advance(hass, WRITE_REFRESH_DELAY_SECONDS + 0.1)
+
+    assert coordinator._cancel_refresh_after_write is None
+    assert update.await_count == polls

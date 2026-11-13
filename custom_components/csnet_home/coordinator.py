@@ -221,7 +221,9 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         @callback
         def _refresh(_now) -> None:
             self._cancel_refresh_after_write = None
-            self.hass.async_create_task(self.async_request_refresh())
+            # not async_request_refresh: its 10 s cooldown would delay a second
+            # read-back that follows a first one closely
+            self.hass.async_create_task(self.async_refresh())
 
         self._cancel_refresh_after_write = async_call_later(self.hass, WRITE_REFRESH_DELAY_SECONDS, _refresh)
 

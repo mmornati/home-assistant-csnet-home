@@ -35,6 +35,9 @@ from custom_components.csnet_home.helpers import extract_indoor_data
 
 _LOGGER = logging.getLogger(__name__)
 
+# Minimum time between two orders to the unit
+WRITE_SPACING_SECONDS = 1.5
+
 # CSNet Manager serves its login page (status 200) when the session is not valid
 LOGIN_PAGE_MARKER = 'loadContent("login")'
 
@@ -278,8 +281,11 @@ class CSNetHomeAPI:
         self.installation_id = None
         # Serialise logins so parallel reads/writes never sign in twice
         self._login_lock = asyncio.Lock()
-        # One order at a time, as the CSNet web app sends them
+        # One order at a time, as the CSNet web app sends them, and not back
+        # to back: CSNet has been seen to ignore an order that follows another
+        # too closely
         self._write_lock = asyncio.Lock()
+        self._last_write_at: float | None = None
         self._login_failures = 0
         self._login_generation = 0
         self._translations_next_attempt = 0.0
@@ -837,7 +843,14 @@ class CSNetHomeAPI:
         }
 
         async with self._write_lock:
-            return await self._async_post_form_locked(url, headers, data, description)
+            if self._last_write_at is not None:
+                wait = WRITE_SPACING_SECONDS - (time.monotonic() - self._last_write_at)
+                if wait > 0:
+                    await asyncio.sleep(wait)
+            try:
+                return await self._async_post_form_locked(url, headers, data, description)
+            finally:
+                self._last_write_at = time.monotonic()
 
     async def _async_post_form_locked(self, url, headers, data, description) -> bool:
         """Send one form, logging in again once if the session expired."""
