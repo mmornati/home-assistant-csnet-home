@@ -11,7 +11,9 @@
                     "language": "Idioma",
                     "max_temp_override": "Anulación de temperatura máxima (°C)",
                     "fan_coil_model": "Modelo de control del Fan Coil",
-                    "power_supply": "Alimentación de la unidad exterior"
+                    "power_supply": "Alimentación de la unidad exterior",
+                    "enable_alarm_notifications": "Activar las notificaciones de alarma",
+                    "filtered_alarm_codes": "Códigos de alarma filtrados"
                 },
                 "data_description": {
                     "username": "Su nombre de usuario de CSNet Manager",
@@ -20,12 +22,14 @@
                     "language": "Idioma preferido para los nombres de los dispositivos y las alarmas",
                     "max_temp_override": "Anule el límite máximo de temperatura (8-80°C). Déjelo vacío para los valores predeterminados.",
                     "fan_coil_model": "Seleccione el tipo de control del fan coil (estándar o heredado)",
-                    "power_supply": "Se usa para estimar la potencia instantánea y el COP. Auto detecta las unidades de 8/10 CV como trifásicas y las demás como monofásicas."
+                    "power_supply": "Se usa para estimar la potencia instantánea y el COP. Auto detecta las unidades de 8/10 CV como trifásicas y las demás como monofásicas.",
+                    "enable_alarm_notifications": "Crear una notificación de Home Assistant cuando la unidad informa de una alarma",
+                    "filtered_alarm_codes": "Códigos de alarma, separados por comas, que nunca notifican (por defecto: -1, errores de comunicación). Dejar vacío para notificar todos."
                 }
             },
             "reconfigure": {
                 "title": "Reconfigurar CSNet Home",
-                "description": "Actualice su configuración de CSNet Home. Puede cambiar las credenciales, el intervalo de escaneo, el idioma y otros ajustes.",
+                "description": "Actualice la configuración de CSNet Home. Deje la contraseña vacía para conservar la actual.",
                 "data": {
                     "username": "Nombre de usuario",
                     "password": "Contraseña",
@@ -33,16 +37,20 @@
                     "language": "Idioma",
                     "max_temp_override": "Anulación de temperatura máxima (°C)",
                     "fan_coil_model": "Modelo de control del Fan Coil",
-                    "power_supply": "Alimentación de la unidad exterior"
+                    "power_supply": "Alimentación de la unidad exterior",
+                    "enable_alarm_notifications": "Activar las notificaciones de alarma",
+                    "filtered_alarm_codes": "Códigos de alarma filtrados"
                 },
                 "data_description": {
                     "username": "Su nombre de usuario de CSNet Manager",
-                    "password": "Su contraseña de CSNet Manager",
+                    "password": "Dejar vacío para conservar la contraseña actual",
                     "scan_interval": "Con qué frecuencia buscar actualizaciones (mínimo: 60 segundos)",
                     "language": "Idioma preferido para los nombres de los dispositivos y las alarmas",
                     "max_temp_override": "Anule el límite máximo de temperatura (8-80°C)",
                     "fan_coil_model": "Seleccione el tipo de control del fan coil",
-                    "power_supply": "Se usa para estimar la potencia instantánea y el COP. Auto detecta las unidades de 8/10 CV como trifásicas y las demás como monofásicas."
+                    "power_supply": "Se usa para estimar la potencia instantánea y el COP. Auto detecta las unidades de 8/10 CV como trifásicas y las demás como monofásicas.",
+                    "enable_alarm_notifications": "Crear una notificación de Home Assistant cuando la unidad informa de una alarma",
+                    "filtered_alarm_codes": "Códigos de alarma, separados por comas, que nunca notifican (por defecto: -1, errores de comunicación). Dejar vacío para notificar todos."
                 }
             },
             "reauth_confirm": {
@@ -61,7 +69,8 @@
         "error": {
             "cannot_connect": "No se pudo conectar a CSNet Manager. Compruebe su conexión a Internet e inténtelo de nuevo.",
             "invalid_auth": "Nombre de usuario o contraseña no válidos. Compruebe sus credenciales.",
-            "unknown": "Produjo un error inesperado. Por favor, inténtelo de nuevo."
+            "unknown": "Se produjo un error inesperado. Por favor, inténtelo de nuevo.",
+            "invalid_alarm_codes": "Los códigos de alarma deben ser números enteros separados por comas, por ejemplo: -1, 62"
         },
         "abort": {
             "already_configured": "Esta integración de CSNet Home ya está configurada.",

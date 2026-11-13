@@ -450,3 +450,189 @@ async def test_reauth_started_by_home_assistant(hass: HomeAssistant):
 
     assert result["reason"] == "reauth_successful"
     assert hass.config_entries.async_get_entry(entry.entry_id).data[CONF_PASSWORD] == "new_password"
+
+
+VALIDATE = "custom_components.csnet_home.api.CSNetHomeAPI.async_validate_credentials"
+
+
+def _schema_key(result, name):
+    """Return the schema key of a form field."""
+    return next(key for key in result["data_schema"].schema if key == name)
+
+
+async def test_reconfigure_form_does_not_carry_the_stored_password(hass: HomeAssistant):
+    """The stored password is not sent to the browser, and the field is masked and optional."""
+    _, result = await _start_reconfigure(hass)
+
+    key = _schema_key(result, CONF_PASSWORD)
+    assert isinstance(key, vol.Optional)
+    assert key.default is vol.UNDEFINED
+    assert not key.description
+    assert TEST_PASSWORD not in repr(result["data_schema"].schema)
+    assert result["data_schema"].schema[key].config["type"] == "password"
+
+
+async def test_reconfigure_with_empty_password_keeps_it_and_does_not_log_in(hass: HomeAssistant):
+    """A settings change with unchanged credentials needs no CSNet login."""
+    entry, result = await _start_reconfigure(hass)
+    new_config = {key: value for key, value in TEST_CONFIG.items() if key != CONF_PASSWORD}
+    new_config[CONF_SCAN_INTERVAL] = 120
+
+    with patch(VALIDATE, return_value=True) as validate:
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=new_config)
+
+    assert result["reason"] == "reconfigure_successful"
+    validate.assert_not_called()
+    assert entry.data[CONF_PASSWORD] == TEST_PASSWORD
+    assert entry.data[CONF_SCAN_INTERVAL] == 120
+
+
+@pytest.mark.parametrize("change", [{CONF_PASSWORD: "new_password"}, {CONF_USERNAME: "someone_else"}])
+async def test_reconfigure_with_changed_credentials_checks_them(hass: HomeAssistant, change):
+    """A new username or password is checked against CSNet before it is stored."""
+    entry, result = await _start_reconfigure(hass)
+    new_config = {key: value for key, value in TEST_CONFIG.items() if key != CONF_PASSWORD} | change
+
+    with patch(VALIDATE, return_value=False) as validate:
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=new_config)
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["errors"] == {"base": "invalid_auth"}
+    validate.assert_called_once_with(hass, new_config[CONF_USERNAME], change.get(CONF_PASSWORD, TEST_PASSWORD))
+    assert entry.data == TEST_CONFIG
+
+    with patch(VALIDATE, return_value=True):
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=new_config)
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data[CONF_USERNAME] == new_config[CONF_USERNAME]
+    assert entry.data[CONF_PASSWORD] == change.get(CONF_PASSWORD, TEST_PASSWORD)
+
+
+async def test_reconfigure_can_remove_the_temperature_override(hass: HomeAssistant):
+    """Emptying the field removes the override; with no override stored the form still submits."""
+    entry, result = await _start_reconfigure(hass)
+    assert _schema_key(result, CONF_MAX_TEMP_OVERRIDE).description == {"suggested_value": TEST_MAX_TEMP}
+
+    without_override = {key: value for key, value in TEST_CONFIG.items() if key not in (CONF_PASSWORD, CONF_MAX_TEMP_OVERRIDE)}
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=without_override)
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data[CONF_MAX_TEMP_OVERRIDE] is None
+    await hass.async_block_till_done()
+
+    # second reconfigure, now with nothing stored
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_RECONFIGURE, "entry_id": entry.entry_id})
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=without_override)
+    assert result["reason"] == "reconfigure_successful"
+
+
+@pytest.mark.parametrize("codes", ["abc", "1;2", "-1, x"])
+async def test_invalid_alarm_codes_are_refused_on_the_field(hass: HomeAssistant, codes):
+    """A list that cannot be read is refused instead of being silently ignored later."""
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+    with patch(VALIDATE, return_value=True) as validate:
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=TEST_CONFIG | {CONF_FILTERED_ALARM_CODES: codes})
+
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["errors"] == {CONF_FILTERED_ALARM_CODES: "invalid_alarm_codes"}
+    validate.assert_not_called()
+    # what was typed is still there, except the password
+    assert _schema_key(result, CONF_USERNAME).description == {"suggested_value": TEST_USERNAME}
+    assert not _schema_key(result, CONF_PASSWORD).description
+
+
+@pytest.mark.parametrize("codes", ["", "-1", "-1, 62,70", " 5 ,"])
+async def test_valid_alarm_codes_are_accepted(hass: HomeAssistant, codes):
+    """Empty, single and spaced lists are fine."""
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+    with patch(VALIDATE, return_value=True):
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=TEST_CONFIG | {CONF_FILTERED_ALARM_CODES: codes})
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_FILTERED_ALARM_CODES] == codes
+
+
+async def test_a_second_entry_is_refused_by_home_assistant(hass: HomeAssistant):
+    """The manifest allows one entry: Home Assistant aborts a second setup before any form."""
+    MockConfigEntry(domain=DOMAIN, data=TEST_CONFIG).add_to_hass(hass)
+
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+
+    assert result["type"] == data_entry_flow.FlowResultType.ABORT
+    assert result["reason"] == "single_instance_allowed"
+
+
+async def test_password_fields_are_masked_everywhere(hass: HomeAssistant):
+    """Setup and reauthentication use a password field too."""
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+    assert result["data_schema"].schema[_schema_key(result, CONF_PASSWORD)].config["type"] == "password"
+
+    entry = MockConfigEntry(domain=DOMAIN, data=TEST_CONFIG)
+    entry.add_to_hass(hass)
+    result = await entry.start_reauth_flow(hass)
+    assert result["step_id"] == "reauth_confirm"
+    assert result["data_schema"].schema[_schema_key(result, CONF_PASSWORD)].config["type"] == "password"
+    assert _schema_key(result, CONF_USERNAME).default() == TEST_USERNAME
+
+
+def test_every_form_field_and_error_has_a_text_in_each_language():
+    """strings.json and the three translations describe the same fields and errors."""
+    import json
+    from pathlib import Path
+
+    base = Path(__file__).parent.parent / "custom_components" / "csnet_home"
+    reference = json.loads((base / "strings.json").read_text(encoding="utf-8"))["config"]
+    fields = {CONF_USERNAME, CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_LANGUAGE, CONF_MAX_TEMP_OVERRIDE, CONF_FAN_COIL_MODEL}
+    fields |= {CONF_ENABLE_ALARM_NOTIFICATIONS, CONF_FILTERED_ALARM_CODES, "power_supply"}
+    for step in ("user", "reconfigure"):
+        assert set(reference["step"][step]["data"]) == fields
+        assert set(reference["step"][step]["data_description"]) == fields
+    assert "invalid_alarm_codes" in reference["error"]
+
+    def keys(node, prefix=""):
+        if isinstance(node, dict):
+            return {path for key, value in node.items() for path in keys(value, f"{prefix}{key}.")}
+        return {prefix}
+
+    for language in ("en", "fr", "es"):
+        translated = json.loads((base / "translations" / f"{language}.json").read_text(encoding="utf-8"))["config"]
+        assert keys(translated) == keys(reference), language
+
+
+async def test_alarm_code_list_can_be_emptied(hass: HomeAssistant):
+    """The frontend leaves an emptied field out: that must mean "no filter", not "keep the old list"."""
+    entry, result = await _start_reconfigure(hass, TEST_CONFIG | {CONF_FILTERED_ALARM_CODES: "-1, 62"})
+    key = _schema_key(result, CONF_FILTERED_ALARM_CODES)
+    assert key.description == {"suggested_value": "-1, 62"}
+    assert key.default is vol.UNDEFINED
+
+    emptied = {k: v for k, v in TEST_CONFIG.items() if k not in (CONF_PASSWORD, CONF_FILTERED_ALARM_CODES)}
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=emptied)
+
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data[CONF_FILTERED_ALARM_CODES] == ""
+
+
+async def test_setup_suggests_the_default_alarm_filter_and_accepts_it_emptied(hass: HomeAssistant):
+    """New entries are offered -1 (communication errors) and may remove it."""
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+    assert _schema_key(result, CONF_FILTERED_ALARM_CODES).description == {"suggested_value": DEFAULT_FILTERED_ALARM_CODES}
+
+    emptied = {k: v for k, v in TEST_CONFIG.items() if k != CONF_FILTERED_ALARM_CODES}
+    with patch(VALIDATE, return_value=True):
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=emptied)
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_FILTERED_ALARM_CODES] == ""
+
+
+async def test_reconfigure_keeps_typed_values_after_an_error(hass: HomeAssistant):
+    """Back with an error, the form shows what was typed, and still no password."""
+    _, result = await _start_reconfigure(hass)
+    typed = {k: v for k, v in TEST_CONFIG.items() if k != CONF_PASSWORD} | {CONF_SCAN_INTERVAL: 300, CONF_FILTERED_ALARM_CODES: "abc"}
+    typed[CONF_PASSWORD] = "typed-password"
+
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=typed)
+
+    assert result["errors"] == {CONF_FILTERED_ALARM_CODES: "invalid_alarm_codes"}
+    assert _schema_key(result, CONF_SCAN_INTERVAL).description == {"suggested_value": 300}
+    assert _schema_key(result, CONF_FILTERED_ALARM_CODES).description == {"suggested_value": "abc"}
+    assert not _schema_key(result, CONF_PASSWORD).description
+    assert "typed-password" not in repr(result["data_schema"].schema)
+    assert TEST_PASSWORD not in repr(result["data_schema"].schema)
