@@ -42,6 +42,8 @@ METER_STORAGE_VERSION = 1
 PERIOD_START_TOLERANCE = timedelta(minutes=20)
 # Below this much electricity a ratio says nothing (the server counts heat in whole kWh)
 MIN_ELECTRICITY_FOR_COP_KWH = 0.5
+# Electricity recorded by the server counts as metered from this share of the recorded heat
+MIN_ELECTRICITY_SHARE = 0.05
 
 
 def meter_storage_key(entry_id: str) -> str:
@@ -109,6 +111,18 @@ def has_energy(energy, kind: str, use: str | None = None, period: str = "monthly
     return any(_amount(r, kind, use) > 0 for r in _records(energy, period))
 
 
+def has_pulse_meter(energy) -> bool:
+    """Return True when the recorded electricity is that of a real meter.
+
+    A unit without a pulse meter still gets a stray kWh now and then in the
+    server's records. A real meter records electricity in proportion to the
+    heat: at least MIN_ELECTRICITY_SHARE of it (a COP of 20 at the very most).
+    """
+    heat = sum(_amount(r, HEAT, None) for r in _records(energy, "monthly"))
+    electricity = sum(_amount(r, ELECTRICITY, None) for r in _records(energy, "monthly"))
+    return electricity > 0 and electricity >= heat * MIN_ELECTRICITY_SHARE
+
+
 @dataclass(frozen=True, kw_only=True)
 class ServerEnergyDescription(SensorEntityDescription):
     """An energy figure read from the server's records."""
@@ -140,9 +154,7 @@ def server_energy_descriptions(energy) -> list[ServerEnergyDescription]:
                 ServerEnergyDescription(key=f"server_heat_today_{use.lower()}", name=f"Heat produced today ({USES[use]})", use=use, **increasing)
                 for use in used
             ]
-    # A unit without a pulse meter reports no electricity, or a stray kWh in a
-    # month: only days with electricity say there is a meter
-    if has_energy(energy, ELECTRICITY, period="daily"):
+    if has_pulse_meter(energy):
         descriptions += [
             ServerEnergyDescription(key="server_electricity_today", name="Electricity consumed today", kind=ELECTRICITY, **increasing),
             ServerEnergyDescription(key="server_electricity_yesterday", name="Electricity consumed yesterday", kind=ELECTRICITY, span="yesterday", **common),

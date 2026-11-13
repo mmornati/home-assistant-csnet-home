@@ -824,6 +824,18 @@ def unit_device_info(coordinator) -> DeviceInfo:
     )
 
 
+def _unit_sensors(coordinator) -> list:
+    """Return the extra unit sensors this unit reports values for."""
+    from .unit_sensors import CSNetHomeUnitSensor, unit_sensor_descriptions  # pylint: disable=import-outside-toplevel
+
+    def read_status():
+        return _get_heating_status_from_installation_data(coordinator.get_installation_devices_data())
+
+    zone_ids = {sensor.get("zone_id") for sensor in coordinator.get_sensors_data()}
+    device_info = unit_device_info(coordinator)
+    return [CSNetHomeUnitSensor(coordinator, description, device_info, read_status) for description in unit_sensor_descriptions(read_status(), zone_ids)]
+
+
 def _server_energy_sensors(hass, entry, coordinator) -> list:
     """Return the sensors for the server's energy records, and for the COP when a meter is configured."""
     # imported here: that module is only needed by this platform's setup
@@ -845,6 +857,13 @@ def _server_energy_sensors(hass, entry, coordinator) -> list:
     if meter and has_energy(energy, HEAT):
         tracker = MeterTracker(hass, entry.entry_id, meter)
         sensors += [CSNetHomeMeteredCopSensor(coordinator, description, device_info, tracker) for description in METERED_COP_DESCRIPTIONS]
+    elif not meter:
+        # the meter was removed from the settings: its COP sensors go with it
+        entity_registry = er.async_get(hass)
+        for description in METERED_COP_DESCRIPTIONS:
+            entity_id = entity_registry.async_get_entity_id("sensor", DOMAIN, f"{DOMAIN}-{description.key}")
+            if entity_id:
+                entity_registry.async_remove(entity_id)
     return sensors
 
 
@@ -968,6 +987,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     # Energy the server recorded for the unit, and COP from the user's own meter
     sensors.extend(_server_energy_sensors(hass, entry, coordinator))
+
+    # More readings of the unit, where the unit reports them
+    sensors.extend(_unit_sensors(coordinator))
 
     # Add alarm history sensor (shows recent alarms from installation alarms API)
     sensors.append(CSNetHomeAlarmHistorySensor(coordinator, coordinator.get_common_data()))

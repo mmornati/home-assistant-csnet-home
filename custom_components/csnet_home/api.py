@@ -588,6 +588,11 @@ class CSNetHomeAPI:
                         "ecocomfort": element.get("ecocomfort"),  # 0 = Eco, 1 = Comfort, -1 = No available mode
                         "doingBoost": element.get("doingBoost"),
                         "silent_mode": element.get("silentMode"),  # 0 = Off, 1 = On
+                        # What the unit can do, as the web app reads it (None when not reported)
+                        "has_cooling": element.get("hasCooling"),
+                        "has_auto": element.get("hasAuto"),
+                        "has_boost": element.get("hasBoost"),
+                        "deactivated_in_current_mode": element.get("deactivatedInCurrentMode"),
                         "current_temperature": element.get("currentTemperature"),
                         "setting_temperature": self.get_current_temperature(element),
                         "zone_id": element.get("elementType"),

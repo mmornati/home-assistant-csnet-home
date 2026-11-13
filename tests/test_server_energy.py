@@ -19,6 +19,7 @@ from custom_components.csnet_home.server_energy import (
     energy_in_month,
     energy_on_day,
     has_energy,
+    has_pulse_meter,
     meter_reading_kwh,
     meter_storage_key,
     server_energy_descriptions,
@@ -83,14 +84,17 @@ def test_several_indoor_units_are_added_up():
 
 
 def test_unit_without_a_meter_gets_heat_sensors_only():
-    """A stray kWh in a monthly record is not a meter."""
+    """A stray kWh, in a month or in a day, is not a meter (seen on the maintainer's unit)."""
     assert has_energy(ENERGY, ELECTRICITY) is True
-    assert has_energy(ENERGY, ELECTRICITY, period="daily") is False
+    assert has_pulse_meter(ENERGY) is False
+    stray_day = [dict(ENERGY[0], daily=ENERGY[0]["daily"] + [rec(60, 1, year=2026, month=11, day=10)])]
+    assert has_pulse_meter(stray_day) is False
+    assert "server_electricity_today" not in [d.key for d in server_energy_descriptions(stray_day)]
     assert [d.key for d in server_energy_descriptions(ENERGY)] == ["server_heat_today", "server_heat_yesterday", "server_heat_month"]
 
 
 def test_unit_with_a_meter_and_hot_water_gets_the_split_and_the_electricity():
-    """Electricity sensors need days with electricity; the split needs two uses."""
+    """Electricity sensors need electricity in proportion to the heat; the split needs two uses."""
     energy = [{"daily": [rec(50, 12, dhw=8, year=2026, month=11, day=12)], "monthly": [rec(900, 250, dhw=120, year=2026, month=11)], "hourly": []}]
     keys = [d.key for d in server_energy_descriptions(energy)]
     assert keys == [
@@ -268,3 +272,29 @@ async def test_metered_cop_is_heat_over_measured_electricity(hass, hass_storage,
 
     _set_meter(hass, "unavailable")
     assert sensors["today"].native_value is None
+
+
+async def test_cop_sensors_exist_only_while_a_meter_is_configured(hass, hass_storage):
+    """With a meter: three COP sensors. Meter removed: their registry entries are removed too."""
+    from homeassistant.helpers import entity_registry as er
+
+    from custom_components.csnet_home.const import DOMAIN
+    from custom_components.csnet_home.sensor import _server_energy_sensors
+
+    coordinator = SimpleNamespace(
+        get_server_energy=lambda: ENERGY,
+        get_installation_devices_data=lambda: {},
+        get_common_data=lambda: {},
+        async_add_listener=lambda *a, **k: lambda: None,
+        last_update_success=True,
+    )
+    with_meter = SimpleNamespace(entry_id="entry", data={"energy_meter": "sensor.any_meter"})
+    keys = [s.entity_description.key for s in _server_energy_sensors(hass, with_meter, coordinator)]
+    assert keys[-3:] == ["metered_cop_today", "metered_cop_yesterday", "metered_cop_month"]
+
+    registry = er.async_get(hass)
+    registry.async_get_or_create("sensor", DOMAIN, f"{DOMAIN}-metered_cop_today")
+    without_meter = SimpleNamespace(entry_id="entry", data={"energy_meter": None})
+    keys = [s.entity_description.key for s in _server_energy_sensors(hass, without_meter, coordinator)]
+    assert not [key for key in keys if key.startswith("metered_cop")]
+    assert registry.async_get_entity_id("sensor", DOMAIN, f"{DOMAIN}-metered_cop_today") is None
