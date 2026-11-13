@@ -184,6 +184,37 @@ make stop
 
 ---
 
+## Automated Setup (no browser)
+
+`scripts/test_ha.py` sets up the test instance through the Home Assistant API, so the browser steps under
+"First Time Setup" are optional.
+
+1. Put your CSNet Manager login in a `.env` file at the repository root (git-ignored):
+
+   ```
+   CSNET_USERNAME=you@example.com
+   CSNET_PASSWORD=your-password
+   ```
+
+2. Run `make seed`. It starts the container, creates a local test user, finishes onboarding and adds the
+   integration. Re-running it is safe: finished steps are skipped.
+3. Run `make states` to print every entity of the integration, or `python3 scripts/test_ha.py states` for JSON.
+
+Notes:
+
+- The script only talks to a test instance on this machine (`localhost`) unless you pass `--allow-remote`,
+  and it never prints the credentials.
+- The local test user and its token are written to `csnet-test-ha.env` inside the repository's `.git`
+  directory (mode 600): git never tracks it and every worktree shares it.
+- The compose project has a fixed name (`csnet-home-test`), so all checkouts and git worktrees share one
+  test instance and one storage volume. `make clean` in any of them wipes it; seed again afterwards.
+- If you used this setup before the project name was fixed, remove the old container once with
+  `docker rm -f home-assistant-csnet-test`. Its old volume (`<folder>_ha_config`) can be deleted with
+  `docker volume rm`.
+- Debug logging is on in `test_config/configuration.yaml`, so `make logs` shows the CSNet responses.
+  Credentials, location and account ids are redacted there; names and hardware ids are not. Use
+  `python3 scripts/test_ha.py diagnostics` for a fully redacted copy.
+
 ## First Time Setup
 
 ### Step-by-Step

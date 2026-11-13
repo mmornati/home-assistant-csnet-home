@@ -1,4 +1,8 @@
 ---
+# Fixed project name: every checkout and worktree shares the same test
+# instance and its storage volume, so it is seeded only once.
+name: csnet-home-test
+
 services:
   home-assistant:
     container_name: home-assistant-csnet-test

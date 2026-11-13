@@ -1,6 +1,6 @@
 # Makefile for CSNet Home Custom Component Development
 
-.PHONY: help test test-unit test-integration start stop restart logs clean format lint install-dev package
+.PHONY: help test test-unit test-integration start stop restart logs seed states clean format lint install-dev package
 
 help:
 	@echo "CSNet Home Development Commands"
@@ -22,6 +22,8 @@ help:
 	@echo "  make stop             Stop Home Assistant"
 	@echo "  make restart          Restart Home Assistant"
 	@echo "  make logs             Show Home Assistant logs"
+	@echo "  make seed             Start HA, create the test user, add the integration from .env"
+	@echo "  make states           Print the integration's entity states"
 	@echo "  make clean            Clean all test data"
 	@echo ""
 
@@ -69,6 +71,13 @@ logs:
 
 status:
 	./scripts/integration-test.sh status
+
+seed:
+	docker compose up -d
+	python3 scripts/test_ha.py seed
+
+states:
+	python3 scripts/test_ha.py states --table
 
 clean:
 	./scripts/integration-test.sh clean
