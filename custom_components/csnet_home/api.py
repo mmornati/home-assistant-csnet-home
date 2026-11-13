@@ -534,7 +534,8 @@ class CSNetHomeAPI:
         try:
             data = await self._async_get_json(sensor_data_url, headers, "elements")
             if data is not None and data.get("status") == "success":
-                _LOGGER.debug("Sensor data retrieved: %s", redact_data(data["data"]))
+                if _LOGGER.isEnabledFor(logging.DEBUG):
+                    _LOGGER.debug("Sensor data retrieved: %s", redact_data(data["data"]))
 
                 # Parse the sensor data from the API response
                 elements = data.get("data", {}).get("elements", [])
@@ -595,9 +596,11 @@ class CSNetHomeAPI:
                     sensor["alarm_origin"] = self.get_alarm_origin(alarm_code, sensor["unit_type"], None)
 
                     sensors.append(sensor)
-                _LOGGER.debug("Retrieved Sensors: %s", redact_data(sensors))
+                if _LOGGER.isEnabledFor(logging.DEBUG):
+                    _LOGGER.debug("Retrieved Sensors: %s", redact_data(sensors))
                 data_elements = {"common_data": common_data, "sensors": sensors}
-                _LOGGER.debug("Retrieved Data Elements: %s", redact_data(data_elements))
+                if _LOGGER.isEnabledFor(logging.DEBUG):
+                    _LOGGER.debug("Retrieved Data Elements: %s", redact_data(data_elements))
                 return data_elements
 
             _LOGGER.error("Error in API response, status not 'success'")
@@ -621,7 +624,8 @@ class CSNetHomeAPI:
         try:
             data = await self._async_get_json(installation_devices_url, headers, "installation devices")
             if data is not None:
-                _LOGGER.debug("Installation devices data retrieved: %s", redact_data(data))
+                if _LOGGER.isEnabledFor(logging.DEBUG):
+                    _LOGGER.debug("Installation devices data retrieved: %s", redact_data(data))
                 return data
             _LOGGER.error("Error in installation devices API response")
             return None
@@ -648,7 +652,8 @@ class CSNetHomeAPI:
         try:
             data = await self._async_get_json(installation_alarms_url, headers, "installation alarms")
             if data is not None:
-                _LOGGER.debug("Installation alarms data retrieved: %s", redact_data(data))
+                if _LOGGER.isEnabledFor(logging.DEBUG):
+                    _LOGGER.debug("Installation alarms data retrieved: %s", redact_data(data))
                 return data
             _LOGGER.error("Error in installation alarms API response")
             return None
