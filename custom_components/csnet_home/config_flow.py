@@ -54,9 +54,10 @@ def _settings_schema(current: dict) -> dict:
             CONF_ENABLE_ALARM_NOTIFICATIONS,
             default=current.get(CONF_ENABLE_ALARM_NOTIFICATIONS, DEFAULT_ENABLE_ALARM_NOTIFICATIONS),
         ): bool,
+        # a suggestion, not a default: emptying the field means "notify every code"
         vol.Optional(
             CONF_FILTERED_ALARM_CODES,
-            default=current.get(CONF_FILTERED_ALARM_CODES, DEFAULT_FILTERED_ALARM_CODES),
+            description={"suggested_value": current.get(CONF_FILTERED_ALARM_CODES, DEFAULT_FILTERED_ALARM_CODES)},
         ): str,
         vol.Optional(CONF_POWER_SUPPLY, default=current.get(CONF_POWER_SUPPLY, DEFAULT_POWER_SUPPLY)): vol.In(POWER_SUPPLY_OPTIONS),
     }
@@ -70,14 +71,15 @@ def _settings_from_input(user_input: dict) -> dict:
         CONF_MAX_TEMP_OVERRIDE: user_input.get(CONF_MAX_TEMP_OVERRIDE),
         CONF_FAN_COIL_MODEL: user_input.get(CONF_FAN_COIL_MODEL, DEFAULT_FAN_COIL_MODEL),
         CONF_ENABLE_ALARM_NOTIFICATIONS: user_input.get(CONF_ENABLE_ALARM_NOTIFICATIONS, DEFAULT_ENABLE_ALARM_NOTIFICATIONS),
-        CONF_FILTERED_ALARM_CODES: user_input.get(CONF_FILTERED_ALARM_CODES, DEFAULT_FILTERED_ALARM_CODES),
+        # the frontend leaves an emptied field out of what it sends
+        CONF_FILTERED_ALARM_CODES: user_input.get(CONF_FILTERED_ALARM_CODES, ""),
         CONF_POWER_SUPPLY: user_input.get(CONF_POWER_SUPPLY, DEFAULT_POWER_SUPPLY),
     }
 
 
 def _settings_errors(user_input: dict) -> dict[str, str]:
     """Return the errors in the submitted settings, by field."""
-    codes = user_input.get(CONF_FILTERED_ALARM_CODES, DEFAULT_FILTERED_ALARM_CODES) or ""
+    codes = user_input.get(CONF_FILTERED_ALARM_CODES) or ""
     try:
         for code in codes.split(","):
             if code.strip():
@@ -187,6 +189,9 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 **_settings_schema(current),
             }
         )
+        if user_input is not None:
+            # back with an error: keep what was typed, except the password
+            schema = self.add_suggested_values_to_schema(schema, {k: v for k, v in user_input.items() if k != CONF_PASSWORD})
         return self.async_show_form(step_id="reconfigure", data_schema=schema, errors=errors)
 
     async def async_step_reauth(self, entry_data):

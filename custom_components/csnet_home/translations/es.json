@@ -69,7 +69,7 @@
         "error": {
             "cannot_connect": "No se pudo conectar a CSNet Manager. Compruebe su conexión a Internet e inténtelo de nuevo.",
             "invalid_auth": "Nombre de usuario o contraseña no válidos. Compruebe sus credenciales.",
-            "unknown": "Produjo un error inesperado. Por favor, inténtelo de nuevo.",
+            "unknown": "Se produjo un error inesperado. Por favor, inténtelo de nuevo.",
             "invalid_alarm_codes": "Los códigos de alarma deben ser números enteros separados por comas, por ejemplo: -1, 62"
         },
         "abort": {

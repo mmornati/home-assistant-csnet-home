@@ -594,3 +594,45 @@ def test_every_form_field_and_error_has_a_text_in_each_language():
     for language in ("en", "fr", "es"):
         translated = json.loads((base / "translations" / f"{language}.json").read_text(encoding="utf-8"))["config"]
         assert keys(translated) == keys(reference), language
+
+
+async def test_alarm_code_list_can_be_emptied(hass: HomeAssistant):
+    """The frontend leaves an emptied field out: that must mean "no filter", not "keep the old list"."""
+    entry, result = await _start_reconfigure(hass, TEST_CONFIG | {CONF_FILTERED_ALARM_CODES: "-1, 62"})
+    key = _schema_key(result, CONF_FILTERED_ALARM_CODES)
+    assert key.description == {"suggested_value": "-1, 62"}
+    assert key.default is vol.UNDEFINED
+
+    emptied = {k: v for k, v in TEST_CONFIG.items() if k not in (CONF_PASSWORD, CONF_FILTERED_ALARM_CODES)}
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=emptied)
+
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data[CONF_FILTERED_ALARM_CODES] == ""
+
+
+async def test_setup_suggests_the_default_alarm_filter_and_accepts_it_emptied(hass: HomeAssistant):
+    """New entries are offered -1 (communication errors) and may remove it."""
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+    assert _schema_key(result, CONF_FILTERED_ALARM_CODES).description == {"suggested_value": DEFAULT_FILTERED_ALARM_CODES}
+
+    emptied = {k: v for k, v in TEST_CONFIG.items() if k != CONF_FILTERED_ALARM_CODES}
+    with patch(VALIDATE, return_value=True):
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=emptied)
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_FILTERED_ALARM_CODES] == ""
+
+
+async def test_reconfigure_keeps_typed_values_after_an_error(hass: HomeAssistant):
+    """Back with an error, the form shows what was typed, and still no password."""
+    _, result = await _start_reconfigure(hass)
+    typed = {k: v for k, v in TEST_CONFIG.items() if k != CONF_PASSWORD} | {CONF_SCAN_INTERVAL: 300, CONF_FILTERED_ALARM_CODES: "abc"}
+    typed[CONF_PASSWORD] = "typed-password"
+
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=typed)
+
+    assert result["errors"] == {CONF_FILTERED_ALARM_CODES: "invalid_alarm_codes"}
+    assert _schema_key(result, CONF_SCAN_INTERVAL).description == {"suggested_value": 300}
+    assert _schema_key(result, CONF_FILTERED_ALARM_CODES).description == {"suggested_value": "abc"}
+    assert not _schema_key(result, CONF_PASSWORD).description
+    assert "typed-password" not in repr(result["data_schema"].schema)
+    assert TEST_PASSWORD not in repr(result["data_schema"].schema)
