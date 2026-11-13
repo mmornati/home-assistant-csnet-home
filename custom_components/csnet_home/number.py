@@ -19,7 +19,7 @@ from .const import (
     WATER_CIRCUIT_MIN_HEAT,
 )
 from .coordinator import CSNetHomeCoordinator
-from .helpers import zone_device_identifier
+from .helpers import extract_indoor_data, zone_device_identifier
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -40,20 +40,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
         _LOGGER.debug("No installation devices data available for number entities")
         return None
 
-    # Get heating status from installation devices
-    # Navigate through: data[0].indoors[0].heatingStatus and heatingSetting
-    heating_status = None
-    heating_setting = None
-    data_array = installation_devices_data.get("data", [])
-    if isinstance(data_array, list) and len(data_array) > 0:
-        first_device = data_array[0]
-        if isinstance(first_device, dict):
-            indoors_array = first_device.get("indoors", [])
-            if isinstance(indoors_array, list) and len(indoors_array) > 0:
-                first_indoors = indoors_array[0]
-                if isinstance(first_indoors, dict):
-                    heating_status = first_indoors.get("heatingStatus", {})
-                    heating_setting = first_indoors.get("heatingSetting", {})
+    # Fixed water temperature entities are created for the first indoor unit
+    heating_status = extract_indoor_data(installation_devices_data, "heatingStatus")
+    heating_setting = extract_indoor_data(installation_devices_data, "heatingSetting")
 
     if not heating_status or not heating_setting:
         _LOGGER.debug("No heating status or setting available for number entities")
@@ -211,17 +200,8 @@ class CSNetHomeFixedWaterTemperatureNumber(CoordinatorEntity, NumberEntity):
         if not installation_devices_data:
             return None
 
-        # Navigate through: data[0].indoors[0].heatingSetting
-        heating_setting = None
-        data_array = installation_devices_data.get("data", [])
-        if isinstance(data_array, list) and len(data_array) > 0:
-            first_device = data_array[0]
-            if isinstance(first_device, dict):
-                indoors_array = first_device.get("indoors", [])
-                if isinstance(indoors_array, list) and len(indoors_array) > 0:
-                    first_indoors = indoors_array[0]
-                    if isinstance(first_indoors, dict):
-                        heating_setting = first_indoors.get("heatingSetting", {})
+        # heatingSetting of the indoor unit this circuit belongs to
+        heating_setting = extract_indoor_data(installation_devices_data, "heatingSetting", self._sensor_data.get("parent_id"))
 
         if not heating_setting:
             return None
@@ -247,7 +227,7 @@ class CSNetHomeFixedWaterTemperatureNumber(CoordinatorEntity, NumberEntity):
             return False
 
         cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
-        is_editable = cloud_api.is_fixed_water_temperature_editable(self._circuit, self._mode, installation_devices_data)
+        is_editable = cloud_api.is_fixed_water_temperature_editable(self._circuit, self._mode, installation_devices_data, self._sensor_data.get("parent_id"))
 
         return is_editable
 

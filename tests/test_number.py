@@ -428,7 +428,7 @@ def test_number_available(mock_deps, mock_hass_instance, mock_entry, mock_coordi
     mock_coordinator.get_installation_devices_data.return_value = {"some": "data"}
     api.is_fixed_water_temperature_editable.return_value = True
     assert entity.available is True
-    api.is_fixed_water_temperature_editable.assert_called_with(1, 1, {"some": "data"})
+    api.is_fixed_water_temperature_editable.assert_called_with(1, 1, {"some": "data"}, None)
 
     # Mock available = False
     api.is_fixed_water_temperature_editable.return_value = False

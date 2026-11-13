@@ -61,7 +61,7 @@ def build_water_heater_entity(
     hass.data[DOMAIN][entry.entry_id]["api"] = SimpleNamespace(
         async_set_temperature=AsyncMock(return_value=True),
         set_water_heater_mode=AsyncMock(return_value=True),
-        get_temperature_limits=lambda zone_id, mode, data: (
+        get_temperature_limits=lambda zone_id, mode, data, indoor_id=None: (
             None,
             55 if zone_id == 3 else 33,
         ),

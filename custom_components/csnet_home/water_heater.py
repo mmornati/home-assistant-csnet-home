@@ -229,7 +229,7 @@ class CSNetHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
 
         # Get temperature limits from API
         cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
-        _, max_limit = cloud_api.get_temperature_limits(zone_id, mode, installation_devices_data)
+        _, max_limit = cloud_api.get_temperature_limits(zone_id, mode, installation_devices_data, self._sensor_data.get("parent_id"))
 
         # Return API limit if available, otherwise use static default
         return max_limit if max_limit is not None else WATER_HEATER_MAX_TEMPERATURE

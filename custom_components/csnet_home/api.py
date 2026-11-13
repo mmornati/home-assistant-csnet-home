@@ -31,11 +31,15 @@ from custom_components.csnet_home.const import (
     WATER_CIRCUIT_MIN_HEAT,
     WATER_HEATER_MAX_TEMPERATURE,
 )
+from custom_components.csnet_home.helpers import extract_indoor_data
 
 _LOGGER = logging.getLogger(__name__)
 
 # CSNet Manager serves its login page (status 200) when the session is not valid
 LOGIN_PAGE_MARKER = 'loadContent("login")'
+
+# Wait this long before loading the alarm translations again after a failure
+TRANSLATIONS_RETRY_SECONDS = 600
 
 
 @dataclass
@@ -276,6 +280,8 @@ class CSNetHomeAPI:
         # Serialise logins so parallel reads/writes never sign in twice
         self._login_lock = asyncio.Lock()
         self._login_failures = 0
+        self._login_generation = 0
+        self._translations_next_attempt = 0.0
         self._next_login_attempt = 0.0
         # Consecutive logins where the server answered with the login page again
         self.auth_rejections = 0
@@ -339,6 +345,7 @@ class CSNetHomeAPI:
                 success = False
 
             if success:
+                self._login_generation += 1
                 self._login_failures = 0
                 self._next_login_attempt = 0.0
                 self.auth_rejections = 0
@@ -444,6 +451,46 @@ class CSNetHomeAPI:
             except Exception as e:
                 _LOGGER.debug("Error closing validation session: %s", e)
 
+    async def _async_get_json(self, url, headers, description):
+        """GET a JSON document, signing in again once if the session has expired.
+
+        CSNet Manager answers an expired session with its login page (HTTP 200
+        after a redirect) instead of JSON. When that happens the session is
+        renewed and the request is sent a second time, so a poll does not fail
+        just because the session ran out. A timeout or a connection error is
+        not a session problem: it fails this request only and keeps the session.
+
+        Returns the parsed JSON, or None when no valid answer was obtained.
+        """
+        for attempt in (1, 2):
+            generation = self._login_generation
+            try:
+                async with asyncio.timeout(DEFAULT_API_TIMEOUT):
+                    # aiohttp uses the cookies from the session's cookie jar when cookies is None
+                    request_cookies = self.cookies if self.cookies else None
+                    async with self.session.get(url, headers=headers, cookies=request_cookies) as response:
+                        if not self._is_session_expired(response, None):
+                            return await self.check_api_response(response)
+            except (aiohttp.ContentTypeError, json.JSONDecodeError):
+                # 200 with something that is not JSON: treated like the login page
+                pass
+            except (asyncio.TimeoutError, aiohttp.ClientError) as err:
+                _LOGGER.warning("CSNet Manager did not answer the %s request: %s", description, err or type(err).__name__)
+                return None
+
+            if attempt == 2:
+                _LOGGER.error("CSNet Manager still returns its login page for the %s request after signing in again", description)
+                self.logged_in = False
+                return None
+
+            _LOGGER.debug("Session expired on the %s request, signing in again", description)
+            # Requests run in parallel: if another one already renewed the session, reuse it
+            if self._login_generation == generation:
+                self.logged_in = False
+            if not await self.async_login():
+                return None
+        return None
+
     async def async_get_elements_data(self):
         """Get sensor data from the cloud service."""
         sensor_data_url = f"{self.base_url}{ELEMENTS_PATH}"
@@ -459,84 +506,78 @@ class CSNetHomeAPI:
         }
 
         try:
-            async with asyncio.timeout(DEFAULT_API_TIMEOUT):
-                # Use cookies from session if self.cookies is not set
-                # aiohttp will automatically use cookies from cookie_jar if cookies=None
-                request_cookies = self.cookies if self.cookies else None
-                async with self.session.get(sensor_data_url, headers=headers, cookies=request_cookies) as response:
-                    data = await self.check_api_response(response)
-                    if data is not None and data.get("status") == "success":
-                        _LOGGER.debug("Sensor data retrieved: %s", redact_data(data["data"]))
+            data = await self._async_get_json(sensor_data_url, headers, "elements")
+            if data is not None and data.get("status") == "success":
+                _LOGGER.debug("Sensor data retrieved: %s", redact_data(data["data"]))
 
-                        # Parse the sensor data from the API response
-                        elements = data.get("data", {}).get("elements", [])
-                        sensors = []
+                # Parse the sensor data from the API response
+                elements = data.get("data", {}).get("elements", [])
+                sensors = []
 
-                        # Store installation ID for alarm API calls
-                        self.installation_id = data.get("data", {}).get("installation")
+                # Store installation ID for alarm API calls
+                self.installation_id = data.get("data", {}).get("installation")
 
-                        common_data = {
-                            "name": data.get("data", {}).get("name"),
-                            "latitude": data.get("data", {}).get("latitude"),
-                            "longitude": data.get("data", {}).get("longitude"),
-                            "weather_temperature": data.get("data", {}).get("weatherTemperature"),
-                            "device_status": {
-                                device.get("id"): {
-                                    "name": device.get("name"),
-                                    "status": device.get("status"),
-                                    "firmware": device.get("firmware"),
-                                    "lastComm": device.get("lastComm"),
-                                    "rssi": device.get("rssi"),
-                                    "currentTimeMillis": device.get("currentTimeMillis"),
-                                }
-                                for device in data.get("data", {}).get("device_status", [])
-                            },
+                common_data = {
+                    "name": data.get("data", {}).get("name"),
+                    "latitude": data.get("data", {}).get("latitude"),
+                    "longitude": data.get("data", {}).get("longitude"),
+                    "weather_temperature": data.get("data", {}).get("weatherTemperature"),
+                    "device_status": {
+                        device.get("id"): {
+                            "name": device.get("name"),
+                            "status": device.get("status"),
+                            "firmware": device.get("firmware"),
+                            "lastComm": device.get("lastComm"),
+                            "rssi": device.get("rssi"),
+                            "currentTimeMillis": device.get("currentTimeMillis"),
                         }
-                        for index, element in enumerate(elements):
-                            alarm_code = element.get("alarmCode")
-                            sensor = {
-                                "device_name": element.get("deviceName") or "Remote",
-                                "device_id": element.get("deviceId"),
-                                "room_name": element.get("parentName") or f"Room-{element.get('parentId')}-{index}",
-                                "parent_id": element.get("parentId"),
-                                "room_id": element.get("roomId"),
-                                "operation_status": element.get("operationStatus"),
-                                "mode": element.get("mode"),  # 0 = cool, 1 = heat, 2 = auto
-                                "real_mode": element.get("realMode"),
-                                "on_off": element.get("onOff"),  # 0 = Off, 1 = On
-                                "timer_running": element.get("timerRunning"),
-                                "alarm_code": alarm_code,
-                                "alarm_message": self.translate_alarm(alarm_code),
-                                "c1_demand": element.get("c1Demand"),
-                                "c2_demand": element.get("c2Demand"),
-                                "ecocomfort": element.get("ecocomfort"),  # 0 = Eco, 1 = Comfort, -1 = No available mode
-                                "doingBoost": element.get("doingBoost"),
-                                "silent_mode": element.get("silentMode"),  # 0 = Off, 1 = On
-                                "current_temperature": element.get("currentTemperature"),
-                                "setting_temperature": self.get_current_temperature(element),
-                                "zone_id": element.get("elementType"),
-                                "fan1_speed": element.get("fan1Speed"),  # Fan speed for C1 circuit
-                                "fan2_speed": element.get("fan2Speed"),  # Fan speed for C2 circuit
-                            }
+                        for device in data.get("data", {}).get("device_status", [])
+                    },
+                }
+                for index, element in enumerate(elements):
+                    alarm_code = element.get("alarmCode")
+                    sensor = {
+                        "device_name": element.get("deviceName") or "Remote",
+                        "device_id": element.get("deviceId"),
+                        "room_name": element.get("parentName") or f"Room-{element.get('parentId')}-{index}",
+                        "parent_id": element.get("parentId"),
+                        "room_id": element.get("roomId"),
+                        "operation_status": element.get("operationStatus"),
+                        "mode": element.get("mode"),  # 0 = cool, 1 = heat, 2 = auto
+                        "real_mode": element.get("realMode"),
+                        "on_off": element.get("onOff"),  # 0 = Off, 1 = On
+                        "timer_running": element.get("timerRunning"),
+                        "alarm_code": alarm_code,
+                        "alarm_message": self.translate_alarm(alarm_code),
+                        "c1_demand": element.get("c1Demand"),
+                        "c2_demand": element.get("c2Demand"),
+                        "ecocomfort": element.get("ecocomfort"),  # 0 = Eco, 1 = Comfort, -1 = No available mode
+                        "doingBoost": element.get("doingBoost"),
+                        "silent_mode": element.get("silentMode"),  # 0 = Off, 1 = On
+                        "current_temperature": element.get("currentTemperature"),
+                        "setting_temperature": self.get_current_temperature(element),
+                        "zone_id": element.get("elementType"),
+                        "fan1_speed": element.get("fan1Speed"),  # Fan speed for C1 circuit
+                        "fan2_speed": element.get("fan2Speed"),  # Fan speed for C2 circuit
+                    }
 
-                            # Add enhanced alarm fields
-                            # Note: installation_devices_data is not available here,
-                            # but coordinator can enrich with this data later if needed
-                            sensor["unit_type"] = self.get_unit_type(sensor, None)
-                            sensor["alarm_code_formatted"] = self.get_alarm_code_formatted(alarm_code)
-                            sensor["alarm_origin"] = self.get_alarm_origin(alarm_code, sensor["unit_type"], None)
+                    # Add enhanced alarm fields
+                    # Note: installation_devices_data is not available here,
+                    # but coordinator can enrich with this data later if needed
+                    sensor["unit_type"] = self.get_unit_type(sensor, None)
+                    sensor["alarm_code_formatted"] = self.get_alarm_code_formatted(alarm_code)
+                    sensor["alarm_origin"] = self.get_alarm_origin(alarm_code, sensor["unit_type"], None)
 
-                            sensors.append(sensor)
-                        _LOGGER.debug("Retrieved Sensors: %s", redact_data(sensors))
-                        data_elements = {"common_data": common_data, "sensors": sensors}
-                        _LOGGER.debug("Retrieved Data Elements: %s", redact_data(data_elements))
-                        return data_elements
+                    sensors.append(sensor)
+                _LOGGER.debug("Retrieved Sensors: %s", redact_data(sensors))
+                data_elements = {"common_data": common_data, "sensors": sensors}
+                _LOGGER.debug("Retrieved Data Elements: %s", redact_data(data_elements))
+                return data_elements
 
-                    _LOGGER.error("Error in API response, status not 'success'")
-                    return None
+            _LOGGER.error("Error in API response, status not 'success'")
+            return None
         except Exception as e:
             _LOGGER.error("Error during sensor data retrieval: %s", e)
-            self.logged_in = False
             return None
 
     async def async_get_installation_devices_data(self):
@@ -554,20 +595,14 @@ class CSNetHomeAPI:
         }
 
         try:
-            async with asyncio.timeout(DEFAULT_API_TIMEOUT):
-                # Use cookies from session if self.cookies is not set
-                # aiohttp will automatically use cookies from cookie_jar if cookies=None
-                request_cookies = self.cookies if self.cookies else None
-                async with self.session.get(installation_devices_url, headers=headers, cookies=request_cookies) as response:
-                    data = await self.check_api_response(response)
-                    if data is not None:
-                        _LOGGER.debug("Installation devices data retrieved: %s", redact_data(data))
-                        return data
-                    _LOGGER.error("Error in installation devices API response")
-                    return None
+            data = await self._async_get_json(installation_devices_url, headers, "installation devices")
+            if data is not None:
+                _LOGGER.debug("Installation devices data retrieved: %s", redact_data(data))
+                return data
+            _LOGGER.error("Error in installation devices API response")
+            return None
         except Exception as e:
             _LOGGER.error("Error during installation devices data retrieval: %s", e)
-            self.logged_in = False
             return None
 
     async def async_get_installation_alarms(self):
@@ -589,20 +624,14 @@ class CSNetHomeAPI:
         }
 
         try:
-            async with asyncio.timeout(DEFAULT_API_TIMEOUT):
-                # Use cookies from session if self.cookies is not set
-                # aiohttp will automatically use cookies from cookie_jar if cookies=None
-                request_cookies = self.cookies if self.cookies else None
-                async with self.session.get(installation_alarms_url, headers=headers, cookies=request_cookies) as response:
-                    data = await self.check_api_response(response)
-                    if data is not None:
-                        _LOGGER.debug("Installation alarms data retrieved: %s", redact_data(data))
-                        return data
-                    _LOGGER.error("Error in installation alarms API response")
-                    return None
+            data = await self._async_get_json(installation_alarms_url, headers, "installation alarms")
+            if data is not None:
+                _LOGGER.debug("Installation alarms data retrieved: %s", redact_data(data))
+                return data
+            _LOGGER.error("Error in installation alarms API response")
+            return None
         except Exception as e:
             _LOGGER.error("Error during installation alarms data retrieval: %s", e)
-            self.logged_in = False
             return None
 
     async def async_delete_alarm(self, installation_id, alarm_id):
@@ -625,64 +654,45 @@ class CSNetHomeAPI:
             return element.get("settingTemperature") * 10
         return element.get("settingTemperature")
 
-    def _get_nested_data_from_installation_devices(self, installation_devices_data, key):
+    def _get_nested_data_from_installation_devices(self, installation_devices_data, key, indoor_id=None):
         """Extract nested data from installation devices data structure.
 
-        Navigates through: data[0].indoors[0].{key}
+        Navigates through: data[].indoors[id == indoor_id].{key}, falling back
+        to the first indoor unit when indoor_id is None or matches no unit.
 
         Args:
             installation_devices_data: The installation devices API response
             key: The key to extract (e.g., "heatingStatus", "heatingSetting")
+            indoor_id: The indoor unit the zone belongs to (its parent_id)
 
         Returns:
             dict or None: The extracted dictionary, or None if not found
         """
-        if not installation_devices_data:
-            return None
+        return extract_indoor_data(installation_devices_data, key, indoor_id)
 
-        # Try direct access first (if already extracted)
-        value = installation_devices_data.get(key)
-        if value:
-            return value
-
-        # Navigate through: data[0].indoors[0].{key}
-        data_array = installation_devices_data.get("data", [])
-        if isinstance(data_array, list) and len(data_array) > 0:
-            first_device = data_array[0]
-            if isinstance(first_device, dict):
-                indoors_array = first_device.get("indoors", [])
-                if isinstance(indoors_array, list) and len(indoors_array) > 0:
-                    first_indoors = indoors_array[0]
-                    if isinstance(first_indoors, dict):
-                        return first_indoors.get(key, {})
-
-        return None
-
-    def get_heating_status_from_installation_devices(self, installation_devices_data):
-        """Extract heatingStatus from installation devices data structure.
-
-        Navigates through: data[0].indoors[0].heatingStatus
+    def get_heating_status_from_installation_devices(self, installation_devices_data, indoor_id=None):
+        """Extract heatingStatus of an indoor unit from installation devices data.
 
         Args:
             installation_devices_data: The installation devices API response
+            indoor_id: The indoor unit the zone belongs to (its parent_id)
 
         Returns:
             dict or None: heatingStatus dictionary, or None if not found
         """
-        return self._get_nested_data_from_installation_devices(installation_devices_data, "heatingStatus")
+        return self._get_nested_data_from_installation_devices(installation_devices_data, "heatingStatus", indoor_id)
 
-    def get_heating_setting_from_installation_devices(self, installation_devices_data):
-        """Extract heatingSetting from installation devices data structure.
-
-        Navigates through: data[0].indoors[0].heatingSetting
+    def get_heating_setting_from_installation_devices(self, installation_devices_data, indoor_id=None):
+        """Extract heatingSetting of an indoor unit from installation devices data.
 
         Args:
             installation_devices_data: The installation devices API response
+            indoor_id: The indoor unit the zone belongs to (its parent_id)
 
         Returns:
             dict or None: heatingSetting dictionary, or None if not found
         """
-        return self._get_nested_data_from_installation_devices(installation_devices_data, "heatingSetting")
+        return self._get_nested_data_from_installation_devices(installation_devices_data, "heatingSetting", indoor_id)
 
     def _validate_value(self, value, default):
         """Validate temperature limit value matching JavaScript validateValue logic.
@@ -712,7 +722,7 @@ class CSNetHomeAPI:
         except (TypeError, ValueError):
             return default
 
-    def get_temperature_limits(self, zone_id, mode, installation_devices_data):
+    def get_temperature_limits(self, zone_id, mode, installation_devices_data, indoor_id=None):
         """Extract temperature limits from installation devices data.
 
         Args:
@@ -737,7 +747,7 @@ class CSNetHomeAPI:
         if not installation_devices_data:
             return (None, None)
 
-        heating_status = self.get_heating_status_from_installation_devices(installation_devices_data)
+        heating_status = self.get_heating_status_from_installation_devices(installation_devices_data, indoor_id)
         if not heating_status:
             return (None, None)
 
@@ -1050,7 +1060,7 @@ class CSNetHomeAPI:
 
         return await self._async_post_form(data, f"set fan_speed={fan_speed} for zone {zone_id} circuit {circuit}")
 
-    def is_fan_coil_compatible(self, installation_devices_data):
+    def is_fan_coil_compatible(self, installation_devices_data, indoor_id=None):
         """Check if the system supports fan coil control.
 
         Args:
@@ -1062,14 +1072,14 @@ class CSNetHomeAPI:
         if not installation_devices_data:
             return False
 
-        heating_status = self.get_heating_status_from_installation_devices(installation_devices_data)
+        heating_status = self.get_heating_status_from_installation_devices(installation_devices_data, indoor_id)
         if not heating_status:
             return False
 
         system_config_bits = heating_status.get("systemConfigBits", 0)
         return (system_config_bits & 0x2000) > 0
 
-    def get_fan_control_availability(self, circuit: int, mode: int, installation_devices_data):
+    def get_fan_control_availability(self, circuit: int, mode: int, installation_devices_data, indoor_id=None):
         """Check if fan control is available for a specific circuit and mode.
 
         Args:
@@ -1080,10 +1090,10 @@ class CSNetHomeAPI:
         Returns:
             bool: True if fan control is available
         """
-        if not self.is_fan_coil_compatible(installation_devices_data):
+        if not self.is_fan_coil_compatible(installation_devices_data, indoor_id):
             return False
 
-        heating_status = self.get_heating_status_from_installation_devices(installation_devices_data)
+        heating_status = self.get_heating_status_from_installation_devices(installation_devices_data, indoor_id)
         if not heating_status:
             return False
 
@@ -1101,7 +1111,7 @@ class CSNetHomeAPI:
 
         return False
 
-    def is_fixed_water_temperature_editable(self, circuit: int, mode: int, installation_devices_data):
+    def is_fixed_water_temperature_editable(self, circuit: int, mode: int, installation_devices_data, indoor_id=None):
         """Check if fixed water temperature is editable for a circuit.
 
         Fixed water temperature is only editable when OTC (Outdoor Temperature
@@ -1119,7 +1129,7 @@ class CSNetHomeAPI:
         if not installation_devices_data:
             return False
 
-        heating_status = self.get_heating_status_from_installation_devices(installation_devices_data)
+        heating_status = self.get_heating_status_from_installation_devices(installation_devices_data, indoor_id)
         if not heating_status:
             return False
 
@@ -1145,7 +1155,7 @@ class CSNetHomeAPI:
 
         return False
 
-    def get_fixed_water_temperature(self, circuit: int, mode: int, installation_devices_data):
+    def get_fixed_water_temperature(self, circuit: int, mode: int, installation_devices_data, indoor_id=None):
         """Get the current fixed water temperature for a circuit.
 
         Args:
@@ -1159,7 +1169,7 @@ class CSNetHomeAPI:
         if not installation_devices_data:
             return None
 
-        heating_setting = self.get_heating_setting_from_installation_devices(installation_devices_data)
+        heating_setting = self.get_heating_setting_from_installation_devices(installation_devices_data, indoor_id)
         if not heating_setting:
             return None
 
@@ -1243,19 +1253,28 @@ class CSNetHomeAPI:
         return None
 
     async def load_translations(self):
-        """Load translations dictionaries for alarm messages (lazy)."""
+        """Load translations dictionaries for alarm messages (lazy).
+
+        Every language file is loaded so that a key missing in one can be
+        found in another, and the preferred language is applied last so that
+        it wins for the keys they share. If nothing could be loaded, the next
+        attempt waits TRANSLATIONS_RETRY_SECONDS instead of repeating the
+        requests on every poll.
+        """
         if self.translations:
             return
-        # load preferred language first, then fallback
-        endpoints = []
+        now = time.monotonic()
+        if self._translations_next_attempt > now:
+            return
+        self._translations_next_attempt = now + TRANSLATIONS_RETRY_SECONDS
+
         preferred = getattr(self, "preferred_language", None)
-        if preferred and preferred in LANGUAGE_FILES:
-            endpoints.append(LANGUAGE_FILES[preferred])
-        # ensure both are loaded to maximize hit rate
-        for key, file in LANGUAGE_FILES.items():
-            if file not in endpoints:
-                _LOGGER.debug("Adding language file for %s", key)
-                endpoints.append(file)
+        preferred_file = LANGUAGE_FILES.get(preferred) if preferred else None
+        # fallbacks first, preferred language last: the last file loaded wins
+        endpoints = [file for file in LANGUAGE_FILES.values() if file != preferred_file]
+        if preferred_file:
+            endpoints.append(preferred_file)
+
         headers = COMMON_API_HEADERS | {
             "accept": "*/*",
             "x-requested-with": "XMLHttpRequest",
@@ -1267,7 +1286,6 @@ class CSNetHomeAPI:
                     async with self.session.get(url, headers=headers) as response:
                         if response.status == 200:
                             data = await response.json()
-                            # merge/overwrite keeping last language wins for same key
                             self.translations.update(data or {})
             except Exception as e:
                 _LOGGER.debug("Translation load failed for %s: %s", ep, e)

@@ -103,9 +103,9 @@ def build_entity(
         set_preset_modes=AsyncMock(return_value=True),
         async_set_silent_mode=AsyncMock(return_value=True),
         async_set_fan_speed=AsyncMock(return_value=True),
-        is_fan_coil_compatible=lambda data: is_fan_coil,
-        get_fan_control_availability=lambda circuit, mode, data: is_fan_coil,
-        get_temperature_limits=lambda zone_id, mode, data: (None, None),
+        is_fan_coil_compatible=lambda data, indoor_id=None: is_fan_coil,
+        get_fan_control_availability=lambda circuit, mode, data, indoor_id=None: is_fan_coil,
+        get_temperature_limits=lambda zone_id, mode, data, indoor_id=None: (None, None),
     )
     coordinator = SimpleNamespace(
         get_sensors_data=lambda: [sensor_data],
@@ -365,7 +365,7 @@ def test_dynamic_temperature_limits_heating_mode(hass):
 
     # Mock the API and coordinator to return temperature limits
     mock_api = SimpleNamespace(
-        get_temperature_limits=lambda zone_id, mode, data: (11, 30),
+        get_temperature_limits=lambda zone_id, mode, data, indoor_id=None: (11, 30),
         async_set_hvac_mode=AsyncMock(return_value=True),
         async_set_temperature=AsyncMock(return_value=True),
         set_preset_modes=AsyncMock(return_value=True),
@@ -399,7 +399,7 @@ def test_dynamic_temperature_limits_cooling_mode(hass):
 
     # Mock the API and coordinator to return temperature limits for cooling
     mock_api = SimpleNamespace(
-        get_temperature_limits=lambda zone_id, mode, data: (16, 30),
+        get_temperature_limits=lambda zone_id, mode, data, indoor_id=None: (16, 30),
         async_set_hvac_mode=AsyncMock(return_value=True),
         async_set_temperature=AsyncMock(return_value=True),
         set_preset_modes=AsyncMock(return_value=True),
@@ -433,7 +433,7 @@ def test_dynamic_temperature_limits_fallback_to_defaults(hass):
 
     # Mock the API to return None (no data available)
     mock_api = SimpleNamespace(
-        get_temperature_limits=lambda zone_id, mode, data: (None, None),
+        get_temperature_limits=lambda zone_id, mode, data, indoor_id=None: (None, None),
         async_set_hvac_mode=AsyncMock(return_value=True),
         async_set_temperature=AsyncMock(return_value=True),
         set_preset_modes=AsyncMock(return_value=True),
@@ -491,13 +491,13 @@ def test_dynamic_temperature_limits_zone2(hass):
 
     # Mock the API to return zone 2 temperature limits
     mock_api = SimpleNamespace(
-        get_temperature_limits=lambda zone_id, mode, data: (12, 28),
+        get_temperature_limits=lambda zone_id, mode, data, indoor_id=None: (12, 28),
         async_set_hvac_mode=AsyncMock(return_value=True),
         async_set_temperature=AsyncMock(return_value=True),
         set_preset_modes=AsyncMock(return_value=True),
         async_set_silent_mode=AsyncMock(return_value=True),
-        is_fan_coil_compatible=lambda data: False,
-        get_fan_control_availability=lambda circuit, mode, data: False,
+        is_fan_coil_compatible=lambda data, indoor_id=None: False,
+        get_fan_control_availability=lambda circuit, mode, data, indoor_id=None: False,
     )
     mock_coordinator = SimpleNamespace(
         get_installation_devices_data=lambda: {
@@ -559,13 +559,13 @@ def test_max_temp_override_in_config(hass):
 
     # Mock the API to return normal temperature limits (should be overridden)
     mock_api = SimpleNamespace(
-        get_temperature_limits=lambda zone_id, mode, data: (11, 30),
+        get_temperature_limits=lambda zone_id, mode, data, indoor_id=None: (11, 30),
         async_set_hvac_mode=AsyncMock(return_value=True),
         async_set_temperature=AsyncMock(return_value=True),
         set_preset_modes=AsyncMock(return_value=True),
         async_set_silent_mode=AsyncMock(return_value=True),
-        is_fan_coil_compatible=lambda data: False,
-        get_fan_control_availability=lambda circuit, mode, data: False,
+        is_fan_coil_compatible=lambda data, indoor_id=None: False,
+        get_fan_control_availability=lambda circuit, mode, data, indoor_id=None: False,
     )
     mock_coordinator = SimpleNamespace(
         get_installation_devices_data=lambda: {
@@ -627,13 +627,13 @@ def test_max_temp_no_override(hass):
 
     # Mock the API to return temperature limits
     mock_api = SimpleNamespace(
-        get_temperature_limits=lambda zone_id, mode, data: (11, 30),
+        get_temperature_limits=lambda zone_id, mode, data, indoor_id=None: (11, 30),
         async_set_hvac_mode=AsyncMock(return_value=True),
         async_set_temperature=AsyncMock(return_value=True),
         set_preset_modes=AsyncMock(return_value=True),
         async_set_silent_mode=AsyncMock(return_value=True),
-        is_fan_coil_compatible=lambda data: False,
-        get_fan_control_availability=lambda circuit, mode, data: False,
+        is_fan_coil_compatible=lambda data, indoor_id=None: False,
+        get_fan_control_availability=lambda circuit, mode, data, indoor_id=None: False,
     )
     mock_coordinator = SimpleNamespace(
         get_installation_devices_data=lambda: {
@@ -997,9 +997,9 @@ def test_otc_attributes_zone1_heating_fix(hass):
         set_preset_modes=AsyncMock(return_value=True),
         async_set_silent_mode=AsyncMock(return_value=True),
         async_set_fan_speed=AsyncMock(return_value=True),
-        is_fan_coil_compatible=lambda data: False,
-        get_fan_control_availability=lambda circuit, mode, data: False,
-        get_temperature_limits=lambda zone_id, mode, data: (None, None),
+        is_fan_coil_compatible=lambda data, indoor_id=None: False,
+        get_fan_control_availability=lambda circuit, mode, data, indoor_id=None: False,
+        get_temperature_limits=lambda zone_id, mode, data, indoor_id=None: (None, None),
     )
     coordinator = SimpleNamespace(
         get_sensors_data=lambda: [sensor_data],
@@ -1072,9 +1072,9 @@ def test_otc_attributes_zone2_heating_gradient(hass):
         set_preset_modes=AsyncMock(return_value=True),
         async_set_silent_mode=AsyncMock(return_value=True),
         async_set_fan_speed=AsyncMock(return_value=True),
-        is_fan_coil_compatible=lambda data: False,
-        get_fan_control_availability=lambda circuit, mode, data: False,
-        get_temperature_limits=lambda zone_id, mode, data: (None, None),
+        is_fan_coil_compatible=lambda data, indoor_id=None: False,
+        get_fan_control_availability=lambda circuit, mode, data, indoor_id=None: False,
+        get_temperature_limits=lambda zone_id, mode, data, indoor_id=None: (None, None),
     )
     coordinator = SimpleNamespace(
         get_sensors_data=lambda: [sensor_data],
@@ -1147,9 +1147,9 @@ def test_otc_attributes_zone5_water_circuit(hass):
         set_preset_modes=AsyncMock(return_value=True),
         async_set_silent_mode=AsyncMock(return_value=True),
         async_set_fan_speed=AsyncMock(return_value=True),
-        is_fan_coil_compatible=lambda data: False,
-        get_fan_control_availability=lambda circuit, mode, data: False,
-        get_temperature_limits=lambda zone_id, mode, data: (None, None),
+        is_fan_coil_compatible=lambda data, indoor_id=None: False,
+        get_fan_control_availability=lambda circuit, mode, data, indoor_id=None: False,
+        get_temperature_limits=lambda zone_id, mode, data, indoor_id=None: (None, None),
     )
     coordinator = SimpleNamespace(
         get_sensors_data=lambda: [sensor_data],
@@ -1212,9 +1212,9 @@ def test_otc_attributes_no_installation_data(hass):
         set_preset_modes=AsyncMock(return_value=True),
         async_set_silent_mode=AsyncMock(return_value=True),
         async_set_fan_speed=AsyncMock(return_value=True),
-        is_fan_coil_compatible=lambda data: False,
-        get_fan_control_availability=lambda circuit, mode, data: False,
-        get_temperature_limits=lambda zone_id, mode, data: (None, None),
+        is_fan_coil_compatible=lambda data, indoor_id=None: False,
+        get_fan_control_availability=lambda circuit, mode, data, indoor_id=None: False,
+        get_temperature_limits=lambda zone_id, mode, data, indoor_id=None: (None, None),
     )
     coordinator = SimpleNamespace(
         get_sensors_data=lambda: [sensor_data],
@@ -1283,9 +1283,9 @@ def test_otc_attributes_zone3_dhw_no_otc(hass):
         set_preset_modes=AsyncMock(return_value=True),
         async_set_silent_mode=AsyncMock(return_value=True),
         async_set_fan_speed=AsyncMock(return_value=True),
-        is_fan_coil_compatible=lambda data: False,
-        get_fan_control_availability=lambda circuit, mode, data: False,
-        get_temperature_limits=lambda zone_id, mode, data: (None, None),
+        is_fan_coil_compatible=lambda data, indoor_id=None: False,
+        get_fan_control_availability=lambda circuit, mode, data, indoor_id=None: False,
+        get_temperature_limits=lambda zone_id, mode, data, indoor_id=None: (None, None),
     )
     coordinator = SimpleNamespace(
         get_sensors_data=lambda: [sensor_data],
@@ -1358,9 +1358,9 @@ def test_device_info_with_missing_firmware(hass):
         set_preset_modes=AsyncMock(return_value=True),
         async_set_silent_mode=AsyncMock(return_value=True),
         async_set_fan_speed=AsyncMock(return_value=True),
-        is_fan_coil_compatible=lambda data: False,
-        get_fan_control_availability=lambda circuit, mode, data: False,
-        get_temperature_limits=lambda zone_id, mode, data: (None, None),
+        is_fan_coil_compatible=lambda data, indoor_id=None: False,
+        get_fan_control_availability=lambda circuit, mode, data, indoor_id=None: False,
+        get_temperature_limits=lambda zone_id, mode, data, indoor_id=None: (None, None),
     )
     coordinator = SimpleNamespace(
         get_sensors_data=lambda: [sensor_data],
@@ -1428,9 +1428,9 @@ def test_device_info_with_missing_sensor_data_keys(hass):
         set_preset_modes=AsyncMock(return_value=True),
         async_set_silent_mode=AsyncMock(return_value=True),
         async_set_fan_speed=AsyncMock(return_value=True),
-        is_fan_coil_compatible=lambda data: False,
-        get_fan_control_availability=lambda circuit, mode, data: False,
-        get_temperature_limits=lambda zone_id, mode, data: (None, None),
+        is_fan_coil_compatible=lambda data, indoor_id=None: False,
+        get_fan_control_availability=lambda circuit, mode, data, indoor_id=None: False,
+        get_temperature_limits=lambda zone_id, mode, data, indoor_id=None: (None, None),
     )
     coordinator = SimpleNamespace(
         get_sensors_data=lambda: [sensor_data],
