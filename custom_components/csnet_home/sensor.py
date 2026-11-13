@@ -50,7 +50,7 @@ ZONE_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
     SensorEntityDescription(
         key="mode",
         device_class=SensorDeviceClass.ENUM,
-        options=[HVACMode.COOL, HVACMode.HEAT, HVACMode.OFF],
+        options=[HVACMode.COOL, HVACMode.HEAT, HVACMode.HEAT_COOL, HVACMode.OFF],
     ),
     SensorEntityDescription(
         key="on_off",
@@ -553,6 +553,59 @@ def _get_heating_status_from_installation_data(installation_data):
 
 
 # Raw values the outdoor unit reports for sensors it does not have
+# Temperature sensors. No real reading is this low; CSNet sends -127 or -67
+# when the probe does not exist.
+NO_SENSOR_TEMPERATURE_BELOW = -60
+NO_SENSOR_TEMPERATURE_KEYS = frozenset(
+    {
+        # installation sensors
+        "in_water_temperature",
+        "out_water_temperature",
+        "out_water_temperature_3",
+        "c2_water_temperature",
+        "set_water_temperature",
+        "heat_exchanger_water_outlet_temperature",
+        "gas_temperature",
+        "liquid_temperature",
+        "external_temperature",
+        "mean_external_temperature",
+        # compressor / outdoor unit sensors
+        "discharge_temperature",
+        "evaporator_temperature",
+        "outdoor_ambient_temperature",
+        "secondary_discharge_temp",
+        "secondary_suction_temp",
+    }
+)
+
+
+def _is_missing_probe(value) -> bool:
+    """Return True for the marker CSNet sends when a temperature probe is not fitted."""
+    return isinstance(value, (int, float)) and value <= NO_SENSOR_TEMPERATURE_BELOW
+
+
+# systemStatus2Flags: what is running right now (bit numbers from the CSNet web app)
+SYSTEM_STATUS_FLAG_BITS = {
+    "water_pump_1": 2,
+    "water_pump_2": 3,
+    "water_pump_3": 4,
+    "compressor_on": 5,
+    "boiler_on": 6,
+    "dhw_heater_on": 7,
+    "space_heater_on": 8,
+    "smart_function_input": 9,
+    "forced_off": 10,
+    "dhw_recirculation": 11,
+    "c1_demand": 13,
+    "c2_demand": 14,
+}
+
+# operationStatus values of the cooling states (demand off, thermostat off, thermostat on)
+COOLING_OPERATION_STATUSES = (1, 2, 3)
+
+# Longest interval one reading may stand for when accumulating daily energy
+MAX_ENERGY_INTEGRATION_HOURS = 5 / 60
+
 SUCTION_PRESSURE_ABSENT = 128  # 0x80, constant on units without the sensor
 SECOND_CYCLE_PRESSURE_ABSENT = 127
 YUTAKI_S80_UNIT_MODEL = 2  # Only the S80 has a second (R134a) refrigerant cycle
@@ -845,6 +898,8 @@ class CSNetHomeSensor(CoordinatorEntity, SensorEntity):
                 return HVACMode.COOL
             if value == 1:
                 return HVACMode.HEAT
+            if value == 2:
+                return HVACMode.HEAT_COOL
             return HVACMode.OFF
         if self._key == "on_off":
             return STATE_ON if value == 1 else STATE_OFF
@@ -1134,10 +1189,10 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, SensorEntity):
                 return value / 50
             return value
 
-        if self._key == "c2_water_temperature":
-            # waterOutlet2Temp (THMwo2): mixed-circuit supply temperature. Units
-            # without a second-circuit sensor report a sentinel such as -127.
-            if isinstance(value, (int, float)) and value <= -60:
+        if self._key in NO_SENSOR_TEMPERATURE_KEYS:
+            # A probe that is not fitted reports a marker such as -127 or -67
+            # instead of a temperature (second circuit, third outlet, tank...).
+            if _is_missing_probe(value):
                 return None
             return value
 
@@ -1320,13 +1375,29 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
         op_status_text = self._get_operation_status_text(op_status).lower()
 
         # Logic: If DHW (Status 8) use Exchanger Outlet, else use Normal Outlet
+        temp_out = heating_status.get("waterOutletTemp", 0)
         if op_status == 8:
-            temp_out = heating_status.get("waterOutletHPTemp", 0)
-        else:
-            temp_out = heating_status.get("waterOutletTemp", 0)
+            temp_out_hp = heating_status.get("waterOutletHPTemp", 0)
+            if not _is_missing_probe(temp_out_hp):
+                temp_out = temp_out_hp
+
+        # Without both probes there is no temperature difference to measure
+        if _is_missing_probe(temp_in) or _is_missing_probe(temp_out):
+            return 0, op_status, op_status_text
 
         is_cooling = "cooling thermostat on" in op_status_text
         is_heating = "heating thermostat on" in op_status_text or op_status in (6, 8)
+
+        # The compressor also runs outside "thermostat on" (for example in
+        # "heating thermostat off" while a circuit still calls for heat). The
+        # heat it delivers then counts too, except in cooling or while defrosting.
+        compressor_running = (heating_status.get("ouHz") or 0) > 0
+        in_cooling_state = op_status in COOLING_OPERATION_STATUSES or "cooling" in op_status_text
+        if compressor_running and not in_cooling_state:
+            is_heating = True
+        # A defrost takes heat from the water, whatever the status says
+        if heating_status.get("defrosting"):
+            is_heating = False
 
         if is_cooling:
             delta_t = temp_in - temp_out
@@ -1413,7 +1484,9 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
         # on ``RestoreEntity``. The ``_attr_native_value`` cache is what
         # ``SensorEntity`` reads on the next ``native_value`` access.
         last_state = await self.async_get_last_state()
-        if last_state and last_state.state not in (None, "unknown", "unavailable"):
+        # A total saved on an earlier day belongs to that day: start from zero
+        saved_today = bool(last_state) and dt_util.as_local(last_state.last_updated).date() == dt_util.now().date()
+        if last_state and saved_today and last_state.state not in (None, "unknown", "unavailable"):
             try:
                 clean_state = str(last_state.state).replace(",", ".")
                 self._state = float(clean_state)
@@ -1428,6 +1501,17 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
         """Return the accumulated state."""
         return round(self._state, 2)
 
+    def _max_integration_hours(self) -> float:
+        """Return the longest time one reading may stand for.
+
+        Two polling intervals, and never less than five minutes, so a slow
+        polling interval is integrated in full while an outage is not.
+        """
+        interval = getattr(self.coordinator, "update_interval", None)
+        if interval is None:
+            return MAX_ENERGY_INTEGRATION_HOURS
+        return max(MAX_ENERGY_INTEGRATION_HOURS, 2 * interval.total_seconds() / 3600.0)
+
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator to accumulate energy."""
@@ -1440,9 +1524,16 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
             self._energy_in = 0.0
             self._energy_out = 0.0
 
+        # A failed poll brings no new reading: do not add energy from old values
+        if getattr(self.coordinator, "last_update_success", True) is False:
+            self.async_write_ha_state()
+            return
+
         # Calculate time difference in hours (for Watts to Watt-hours)
         if self._last_update_time:
             time_diff = (now - self._last_update_time).total_seconds() / 3600.0
+            # After an outage the last reading says nothing about the gap
+            time_diff = min(time_diff, self._max_integration_hours())
         else:
             time_diff = 0
 
@@ -1481,18 +1572,22 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
             if self._key == "daily_cop_hvac":
                 # Accumulate if Heating (6) or Cooling
                 # OR Defrosting is active (AND we are not explicitly in DHW mode)
+                # Space heating states (demand off, thermostat off, thermostat on):
+                # the compressor can run in all three, and only what it uses and
+                # delivers is added (see the power check below).
                 if (
-                    op_status == 6
+                    op_status in (4, 5, 6)
                     or "heating thermostat on" in op_status_text
                     or "cooling thermostat on" in op_status_text
-                    or (defrost_active and op_status != 8)
+                    or (defrost_active and op_status not in (7, 8))
                 ):
                     should_accumulate = True
 
             elif self._key == "daily_cop_dhw":
                 # Accumulate if DHW (8)
                 # OR Defrosting is active (AND we are not explicitly in Heating mode)
-                if op_status == 8 or (defrost_active and op_status != 6):
+                # 7 is "DHW off": the compressor may still be finishing a DHW run
+                if op_status in (7, 8) or (defrost_active and op_status not in (4, 5, 6)):
                     should_accumulate = True
 
             if should_accumulate:
@@ -2053,7 +2148,10 @@ class CSNetHomeCompressorSensor(CoordinatorEntity, SensorEntity):
 
         # Apply transformation
         if "transform" in mapping:
-            return mapping["transform"](value)
+            value = mapping["transform"](value)
+
+        if self._key in NO_SENSOR_TEMPERATURE_KEYS and _is_missing_probe(value):
+            return None
 
         return value
 
@@ -2063,16 +2161,25 @@ class CSNetHomeCompressorSensor(CoordinatorEntity, SensorEntity):
         if self._key == "system_status_flags":
             heating_status = self._get_heating_status()
             if heating_status:
-                flags = heating_status.get("systemStatus2Flags", 0)
-                # Decode individual bits
-                return {
+                flags = heating_status.get("systemStatus2Flags") or 0
+                config_bits = heating_status.get("systemConfigBits") or 0
+                attrs = {
                     "raw_value": flags,
                     "hex_value": f"0x{flags:04X}",
-                    "cascade_slave": bool(flags & 0x1000),
-                    "fan_coil_mode": bool(flags & 0x2000),
-                    "c1_thermostat": bool(flags & 0x40),
-                    "c2_thermostat": bool(flags & 0x80),
                 }
+                # What is running, from the status flags
+                attrs.update({name: bool(flags & (1 << bit)) for name, bit in SYSTEM_STATUS_FLAG_BITS.items()})
+                # How the system is configured: these bits live in systemConfigBits,
+                # not in the status flags they used to be read from
+                attrs.update(
+                    {
+                        "cascade_slave": bool(config_bits & 0x1000),
+                        "fan_coil_mode": bool(config_bits & 0x2000),
+                        "c1_thermostat": bool(config_bits & 0x40),
+                        "c2_thermostat": bool(config_bits & 0x80),
+                    }
+                )
+                return attrs
 
         if self._key == "operation_status":
             heating_status = self._get_heating_status()

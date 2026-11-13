@@ -77,6 +77,8 @@ def test_state_mode_and_on_off_mapping():
     sensor_data["mode"] = 0
     assert s.state == HVACMode.COOL
     sensor_data["mode"] = 2
+    assert s.state == HVACMode.HEAT_COOL  # auto is not "off"
+    sensor_data["mode"] = 99
     assert s.state == HVACMode.OFF
 
     # on_off sensor
@@ -2770,7 +2772,7 @@ def test_compressor_secondary_suction_temperature_negative():
                     {
                         "heatingStatus": {"ouEvapTemperature": 20},
                         "secondCycle": {
-                            "suctionTemp": 128,  # Unsigned representation of -128°C (extreme cold)
+                            "suctionTemp": 236,  # Unsigned representation of -20°C
                         },
                     }
                 ],
@@ -2792,8 +2794,8 @@ def test_compressor_secondary_suction_temperature_negative():
         "Secondary Suction Temperature",
     )
 
-    # Should be -128, NOT 128
-    assert s.state == -128
+    # Should be -20, NOT 236
+    assert s.state == -20
 
 
 def test_compressor_temperatures_extreme_values():
