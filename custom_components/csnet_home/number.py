@@ -1,6 +1,5 @@
 """Create a Number Component for Home Assistant to control fixed water temperature."""
 
-import asyncio
 import logging
 
 from homeassistant.components.number import NumberEntity, NumberMode
@@ -22,6 +21,9 @@ from .coordinator import CSNetHomeCoordinator
 from .helpers import extract_indoor_data, zone_device_identifier
 
 _LOGGER = logging.getLogger(__name__)
+
+# Orders to the unit go out one at a time; reads come from the coordinator
+PARALLEL_UPDATES = 1
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -200,26 +202,29 @@ class CSNetHomeFixedWaterTemperatureNumber(CoordinatorEntity, NumberEntity):
             mode,
         )
 
-    @property
-    def native_value(self) -> float | None:
-        """Return the current fixed water temperature value."""
+    def _heating_setting(self):
+        """Return the heatingSetting of the indoor unit this circuit belongs to, or None."""
         installation_devices_data = self._coordinator.get_installation_devices_data()
         if not installation_devices_data:
             return None
+        return extract_indoor_data(installation_devices_data, "heatingSetting", self._sensor_data.get("parent_id"))
 
-        # heatingSetting of the indoor unit this circuit belongs to
-        heating_setting = extract_indoor_data(installation_devices_data, "heatingSetting", self._sensor_data.get("parent_id"))
+    @property
+    def _temp_key(self) -> str:
+        """Return the heatingSetting key of this entity's fixed temperature."""
+        if self._mode == 1:  # Heating mode
+            return f"fixTempHeatC{self._circuit}"
+        return f"fixTempCoolC{self._circuit}"  # Cooling mode
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the current fixed water temperature value."""
+        heating_setting = self._heating_setting()
 
         if not heating_setting:
             return None
 
-        # Get the appropriate fixed temperature field
-        if self._mode == 1:  # Heating mode
-            temp_key = f"fixTempHeatC{self._circuit}"
-        else:  # Cooling mode
-            temp_key = f"fixTempCoolC{self._circuit}"
-
-        value = heating_setting.get(temp_key)
+        value = heating_setting.get(self._temp_key)
         if value is not None:
             return float(value)
 
@@ -255,11 +260,15 @@ class CSNetHomeFixedWaterTemperatureNumber(CoordinatorEntity, NumberEntity):
                 self._circuit,
                 self._mode,
             )
-            # Wait a short delay to ensure the server has processed the change
-            # The API sometimes ignores calls between two requests
-            await asyncio.sleep(1.5)
-            # Request coordinator refresh to update the value immediately
-            await self._coordinator.async_refresh()
+            # Show the accepted value now, in the data the value is read from;
+            # the next poll replaces that data
+            heating_setting = self._heating_setting()
+            if isinstance(heating_setting, dict):
+                heating_setting[self._temp_key] = int(value)
+            self.async_write_ha_state()
+            # Read the value back once the server has processed the change,
+            # without holding the service call open meanwhile
+            self._coordinator.async_schedule_refresh_after_write()
         else:
             _LOGGER.error(
                 "Failed to set fixed water temperature for circuit %d (mode %d)",

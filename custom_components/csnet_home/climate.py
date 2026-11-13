@@ -1,6 +1,5 @@
 """Create a Climate Component for Home Assistant."""
 
-import asyncio
 import logging
 
 from homeassistant.components.climate import FAN_AUTO, ClimateEntity, HVACAction, HVACMode
@@ -33,6 +32,9 @@ from .const import (
 from .helpers import extract_heating_status, zone_device_identifier, zone_key
 
 _LOGGER = logging.getLogger(__name__)
+
+# Orders to the unit go out one at a time; reads come from the coordinator
+PARALLEL_UPDATES = 1
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -429,18 +431,24 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
         )
         if response:
             self._sensor_data["setting_temperature"] = temperature
-            # For water circuits (zone 5, 6), refresh data to get updated fixed temperature
+            self.async_write_ha_state()
+            # For water circuits (zone 5, 6), read the fixed temperature back
+            # once the server has processed the change
             if zone_id in [5, 6]:
-                # Wait a short delay to ensure the server has processed the change
-                await asyncio.sleep(1.5)
-                # Request coordinator refresh to update the value immediately
-                coordinator = self.coordinator
-                await coordinator.async_refresh()
+                self.coordinator.async_schedule_refresh_after_write()
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode):
         """Set new target hvac mode."""
         cloud_api = self.entry.runtime_data.api
-        await cloud_api.async_set_hvac_mode(self._sensor_data["zone_id"], self._sensor_data["parent_id"], hvac_mode)
+        response = await cloud_api.async_set_hvac_mode(self._sensor_data["zone_id"], self._sensor_data["parent_id"], hvac_mode)
+        if response:
+            # Show the change now; the next poll confirms it
+            if hvac_mode == HVACMode.OFF:
+                self._sensor_data["on_off"] = 0
+            else:
+                self._sensor_data["on_off"] = 1
+                self._sensor_data["mode"] = {HVACMode.COOL: 0, HVACMode.HEAT: 1, HVACMode.HEAT_COOL: 2}.get(hvac_mode, self._sensor_data.get("mode"))
+            self.async_write_ha_state()
 
     async def async_turn_on(self) -> None:
         """Turn the climate device on (preserve current mode if possible)."""
@@ -475,6 +483,7 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
         if response:
             # ecocomfort: 0 = Eco, 1 = Comfort
             self._sensor_data["ecocomfort"] = 0 if preset_mode == "eco" else 1
+            self.async_write_ha_state()
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
         """Set new fan mode (fan speed for fan coil, silent mode otherwise)."""
@@ -512,6 +521,7 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
                 # Optimistically update the sensor data
                 fan_speed_key = f"fan{circuit}_speed"
                 self._sensor_data[fan_speed_key] = fan_speed
+                self.async_write_ha_state()
         else:
             # For non-fan coil systems, set silent mode. Only on units that
             # have one: the order is a real one for the unit, and the CSNet web
@@ -528,6 +538,7 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
                 self._assumed_fan_mode = fan_mode
                 # Optimistically update the sensor data
                 self._sensor_data["silent_mode"] = 1 if silent_mode else 0
+                self.async_write_ha_state()
 
     def _temperatures(self):
         """Return (setpoint, room temperature), or None when either is missing."""

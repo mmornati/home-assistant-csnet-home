@@ -23,6 +23,9 @@ from .helpers import zone_device_identifier, zone_key
 
 _LOGGER = logging.getLogger(__name__)
 
+# Orders to the unit go out one at a time; reads come from the coordinator
+PARALLEL_UPDATES = 1
+
 
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up the Water Heater platform for CSNet Home."""
@@ -247,6 +250,7 @@ class CSNetHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
         )
         if response:
             self._sensor_data["setting_temperature"] = temperature
+            self.async_write_ha_state()
             _LOGGER.info("Set water heater target temperature to %s°C", temperature)
         else:
             _LOGGER.error("Failed to set water heater temperature.")
@@ -267,6 +271,9 @@ class CSNetHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
                     self._sensor_data["doingBoost"] = operation_mode == "performance"
                 self._attr_operation_mode = operation_mode
 
+            # the state shown comes from the attributes derived from the data just changed
+            self._update_attributes()
+            self.async_write_ha_state()
             entity_type = "swimming pool" if self._is_swimming_pool else "water heater"
             _LOGGER.info("Set %s operation : %s", entity_type, operation_mode)
         else:

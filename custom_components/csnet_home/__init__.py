@@ -69,6 +69,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CSNetHomeConfigEntry):
 
         entry.runtime_data = CSNetHomeData(api=api, coordinator=coordinator)
         entry.async_on_unload(coordinator.async_track_dismissed_notifications())
+        entry.async_on_unload(coordinator.async_cancel_refresh_after_write)
 
         # Entities used to be keyed on the CSNet room name; move them to stable
         # zone ids before the platforms register them.
