@@ -9,8 +9,9 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
+from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -25,6 +26,21 @@ _LOGGER = logging.getLogger(__name__)
 # The alarm list of an installation rarely changes: ask for it less often than the readings
 ALARM_POLL_SECONDS = 300
 ALARM_STORAGE_VERSION = 1
+ZONE_ALARM_NOTIFICATION_PREFIX = "csnet_home_alarm_"
+INSTALLATION_ALARM_NOTIFICATION_PREFIX = "csnet_home_inst_alarm_"
+
+
+def installation_alarm_list(answer) -> list | None:
+    """Return the alarms of an answer from CSNet, or None when it carries no alarm list."""
+    if not isinstance(answer, dict):
+        return None
+    data = answer.get("data")
+    alarms = answer.get("alarms")
+    if isinstance(data, list) and data:
+        return data
+    if isinstance(alarms, list):
+        return alarms
+    return data if isinstance(data, list) else None
 
 
 def alarm_storage_key(entry_id: str) -> str:
@@ -75,11 +91,16 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         self._sensors_by_id = {}
         self._last_alarm_codes: dict[str, int] = {}
         self._notified_installation_alarm_ids: set[int] = set()
-        # Last alarm list CSNet answered with, when it was asked, and whether this poll got a new answer
+        # Last alarm list CSNet answered with, when it was asked, and whether it still has to be processed
         self._installation_alarms_data = None
         self._installation_alarms_fetched_at: float | None = None
-        self._installation_alarms_fresh = False
-        # What was already notified survives restarts, so a restart does not notify everything again
+        self._installation_alarms_pending = False
+        # Alarms that must not be notified again: the user dismissed the
+        # notification, or they appeared while notifications were off. Stored,
+        # because Home Assistant drops all notifications on a restart and the
+        # ones still wanted are created again then.
+        self._dismissed_installation_alarm_ids: set = set()
+        self._dismissed_zone_alarm_codes: dict[str, int] = {}
         self._alarm_store = Store(hass, ALARM_STORAGE_VERSION, alarm_storage_key(entry_id))
         self._alarm_state_loaded = False
         self._saved_alarm_state: dict | None = None
@@ -165,23 +186,23 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
     async def _async_get_installation_alarms(self, cloud_api):
         """Return the installation alarms, asking CSNet at most every ALARM_POLL_SECONDS.
 
-        Between two requests, and when a request fails, the last answer is
-        kept: a failed request must not look like "no alarms".
+        Between two requests, and when a request fails or answers without an
+        alarm list, the last answer is kept: that must not look like "no alarms".
         """
-        self._installation_alarms_fresh = False
         now = time.monotonic()
         fetched_at = self._installation_alarms_fetched_at
         if fetched_at is not None and now - fetched_at < ALARM_POLL_SECONDS:
             return self._installation_alarms_data
 
         data = await cloud_api.async_get_installation_alarms()
-        if data is None:
+        if installation_alarm_list(data) is None:
             # asked again on the next poll
             return self._installation_alarms_data
 
         self._installation_alarms_data = data
         self._installation_alarms_fetched_at = now
-        self._installation_alarms_fresh = True
+        # stays set until the alarms were processed, also when this poll fails later on
+        self._installation_alarms_pending = True
         return data
 
     def async_invalidate_installation_alarms(self) -> None:
@@ -189,14 +210,14 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         self._installation_alarms_fetched_at = None
 
     def _alarm_state(self) -> dict:
-        """Return what has been notified, in the form it is stored."""
+        """Return the alarms that must not be notified again, in the form they are stored."""
         return {
-            "installation_alarm_ids": sorted(self._notified_installation_alarm_ids),
-            "zone_alarm_codes": dict(self._last_alarm_codes),
+            "dismissed_installation_alarm_ids": sorted(self._dismissed_installation_alarm_ids, key=str),
+            "dismissed_zone_alarm_codes": dict(self._dismissed_zone_alarm_codes),
         }
 
     async def _async_load_alarm_state(self) -> None:
-        """Load once what was notified before the last restart."""
+        """Load once the alarms that were dismissed before the last restart."""
         if self._alarm_state_loaded:
             return
         self._alarm_state_loaded = True
@@ -207,17 +228,18 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
             return
         if not isinstance(stored, dict):
             return
-        ids = stored.get("installation_alarm_ids")
+        ids = stored.get("dismissed_installation_alarm_ids")
         if isinstance(ids, list):
-            self._notified_installation_alarm_ids.update(i for i in ids if isinstance(i, int))
-        codes = stored.get("zone_alarm_codes")
+            self._dismissed_installation_alarm_ids.update(i for i in ids if isinstance(i, (int, str)) and not isinstance(i, bool))
+        codes = stored.get("dismissed_zone_alarm_codes")
         if isinstance(codes, dict):
             for key, code in codes.items():
-                self._last_alarm_codes.setdefault(key, code)
+                if isinstance(code, int) and not isinstance(code, bool):
+                    self._dismissed_zone_alarm_codes.setdefault(key, code)
         self._saved_alarm_state = self._alarm_state()
 
     async def _async_save_alarm_state(self) -> None:
-        """Store what has been notified, when it changed."""
+        """Store the alarms that must not be notified again, when they changed."""
         state = self._alarm_state()
         if state == self._saved_alarm_state:
             return
@@ -227,6 +249,33 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
             _LOGGER.debug("Could not save the notified alarms: %s", exc)
             return
         self._saved_alarm_state = state
+
+    @callback
+    def async_track_dismissed_notifications(self) -> CALLBACK_TYPE:
+        """Follow which alarm notifications the user dismisses; returns the function that stops it."""
+        return persistent_notification.async_register_callback(self.hass, self._async_notifications_updated)
+
+    @callback
+    def _async_notifications_updated(self, update_type, notifications) -> None:
+        """Remember the alarms whose notification was dismissed."""
+        if update_type != persistent_notification.UpdateType.REMOVED:
+            return
+        changed = False
+        notified_by_text = {str(alarm_id): alarm_id for alarm_id in self._notified_installation_alarm_ids}
+        for notification_id in notifications:
+            if notification_id.startswith(INSTALLATION_ALARM_NOTIFICATION_PREFIX):
+                alarm_id = notified_by_text.get(notification_id[len(INSTALLATION_ALARM_NOTIFICATION_PREFIX) :])
+                if alarm_id is not None and alarm_id not in self._dismissed_installation_alarm_ids:
+                    self._dismissed_installation_alarm_ids.add(alarm_id)
+                    changed = True
+            elif notification_id.startswith(ZONE_ALARM_NOTIFICATION_PREFIX):
+                key = notification_id[len(ZONE_ALARM_NOTIFICATION_PREFIX) :]
+                code = self._last_alarm_codes.get(key)
+                if code is not None and self._dismissed_zone_alarm_codes.get(key) != code:
+                    self._dismissed_zone_alarm_codes[key] = code
+                    changed = True
+        if changed:
+            self.hass.async_create_task(self._async_save_alarm_state())
 
     @staticmethod
     def _raise_login_failure(cloud_api):
@@ -266,7 +315,7 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
             self._device_data["common_data"]["installation_devices"] = installation_devices_data
 
         # Add installation alarms data to common_data
-        if installation_alarms_data and self._device_data.get("common_data"):
+        if installation_alarms_data is not None and self._device_data.get("common_data"):
             self._device_data["common_data"]["installation_alarms"] = installation_alarms_data
 
     def _enrich_sensor_data(self, cloud_api, installation_devices_data):
@@ -332,9 +381,11 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
             _LOGGER.error("Error enriching sensor data: %s", exc)
 
     async def _handle_alarm_notifications(self):
-        """Raise notification if new alarm codes appear."""
-        if not self._enable_alarm_notifications:
-            return
+        """Raise notification if new alarm codes appear.
+
+        The codes are followed with notifications off too: a stored code that
+        was never cleared would hide the same alarm when it comes back.
+        """
         try:
             for sensor in self._device_data.get("sensors", []):
                 key = f"{sensor.get('device_id')}-{sensor.get('room_id')}-{sensor.get('zone_id')}"
@@ -342,7 +393,11 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
                 if alarm_code is None or alarm_code == 0:
                     # clear last stored to allow future notifications
                     self._last_alarm_codes.pop(key, None)
+                    self._dismissed_zone_alarm_codes.pop(key, None)
                     continue
+                if self._dismissed_zone_alarm_codes.get(key, alarm_code) != alarm_code:
+                    # the dismissed alarm was replaced by another one
+                    self._dismissed_zone_alarm_codes.pop(key, None)
 
                 if alarm_code in self._filtered_alarm_codes:
                     _LOGGER.debug("Skipping notification for filtered alarm code: %s", alarm_code)
@@ -354,6 +409,12 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
                 if prev_code != alarm_code:
                     # store and notify
                     self._last_alarm_codes[key] = alarm_code
+                    if not self._enable_alarm_notifications:
+                        # seen with notifications off: not notified when they are turned on
+                        self._dismissed_zone_alarm_codes[key] = alarm_code
+                        continue
+                    if self._dismissed_zone_alarm_codes.get(key) == alarm_code:
+                        continue
                     title = "Hitachi Device Alarm"
 
                     # Build enhanced notification message
@@ -390,7 +451,7 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
                         {
                             "title": title,
                             "message": message,
-                            "notification_id": f"csnet_home_alarm_{key}",
+                            "notification_id": f"{ZONE_ALARM_NOTIFICATION_PREFIX}{key}",
                         },
                         blocking=False,
                     )
@@ -400,19 +461,19 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
     async def _handle_installation_alarms(self, api):
         """Notify each active installation alarm once.
 
-        Only runs on a new answer from CSNet: forgetting alarms because a
+        Only runs on a new alarm list from CSNet: forgetting alarms because a
         request failed would notify every one of them again on the next poll.
         """
-        if not self._installation_alarms_fresh:
+        if not self._installation_alarms_pending:
             return
-        installation_alarms_data = self.get_installation_alarms_data()
-        alarms = installation_alarms_data.get("data", [])
-        if not alarms:
-            alarms = installation_alarms_data.get("alarms", [])
+        self._installation_alarms_pending = False
+        alarms = installation_alarm_list(self._installation_alarms_data) or []
 
         current_active_ids = set()
 
         for alarm in alarms:
+            if not isinstance(alarm, dict):
+                continue
             # Check if active
             # User provided: "recoveredAtString": "1980-01-01 00:00:00" means active
             is_active = alarm.get("recoveredAtString") == "1980-01-01 00:00:00"
@@ -420,7 +481,7 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
                 continue
 
             alarm_id = alarm.get("id")
-            if alarm_id is None:
+            if not isinstance(alarm_id, (int, str)) or isinstance(alarm_id, bool):
                 continue
 
             code = alarm.get("code")
@@ -434,10 +495,13 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
             if alarm_id in self._notified_installation_alarm_ids:
                 continue
 
-            # New active alarm found. It counts as seen even with notifications
-            # off, so that turning them on later does not notify old alarms.
+            # New active alarm found. Seen with notifications off, it is not
+            # notified when they are turned on later.
             self._notified_installation_alarm_ids.add(alarm_id)
             if not self._enable_alarm_notifications:
+                self._dismissed_installation_alarm_ids.add(alarm_id)
+                continue
+            if alarm_id in self._dismissed_installation_alarm_ids:
                 continue
 
             unit_id = alarm.get("unitId")
@@ -452,7 +516,7 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
                 {
                     "title": "CSNet Home Installation Alarm",
                     "message": message,
-                    "notification_id": f"csnet_home_inst_alarm_{alarm_id}",
+                    "notification_id": f"{INSTALLATION_ALARM_NOTIFICATION_PREFIX}{alarm_id}",
                 },
                 blocking=False,
             )
@@ -460,6 +524,7 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         # Clean up notified IDs for alarms that are no longer active
         # We only keep IDs that are currently active
         self._notified_installation_alarm_ids = self._notified_installation_alarm_ids.intersection(current_active_ids)
+        self._dismissed_installation_alarm_ids = self._dismissed_installation_alarm_ids.intersection(current_active_ids)
 
     def get_sensors_data(self):
         """Return the list of sensor data."""

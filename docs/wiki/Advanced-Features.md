@@ -594,7 +594,7 @@ Two options control this ([Configuration Guide](Configuration-Guide.md#field-det
 - **Enable Alarm Notifications** - turn all of the above off
 - **Filtered Alarm Codes** - comma-separated codes that never notify (default `-1`, communication errors); applies to both sources
 
-Each alarm is notified once. What was already notified is stored, so restarting Home Assistant or reloading the integration does not bring the notifications back, and an alarm you dismissed stays dismissed while it remains active. The installation alarm list is read from CSNet Manager every 5 minutes (zone alarm codes follow the normal polling interval), so a new installation alarm can take up to 5 minutes to appear.
+Each alarm is notified once, and an alarm whose notification you dismissed is not notified again while it stays active; this is remembered across restarts. Home Assistant itself drops all notifications when it restarts, so the notifications you had not dismissed are created again after a restart. Alarms that appear while notifications are turned off are not notified when you turn them on later. The installation alarm list is read from CSNet Manager every 5 minutes (zone alarm codes follow the normal polling interval), so a new installation alarm can take up to 5 minutes to appear.
 
 !!! note
     Notifications are not dismissed automatically when the alarm clears; dismiss them yourself, or use the automation in [Auto-Delete on Notification Dismiss](#auto-delete-on-notification-dismiss).
