@@ -11,6 +11,7 @@ from homeassistant.const import (
     SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
     STATE_OFF,
     STATE_ON,
+    EntityCategory,
     UnitOfElectricCurrent,
     UnitOfEnergy,
     UnitOfFrequency,
@@ -766,6 +767,48 @@ def _coerce_description(
     )
 
 
+# heatingStatus.unitModel to the commercial name of the unit
+UNIT_MODEL_NAMES = {
+    0: "Yutaki S",
+    1: "Yutaki SC",
+    2: "Yutaki S80",
+    3: "Yutaki M",
+    4: "Yutaki SC Lite",
+    5: "Yutampo",
+}
+
+# Sensors about the equipment and its configuration rather than about the
+# heating itself: versions, model and capacity codes, configuration flags,
+# connectivity. Home Assistant lists them under "Diagnostic" on the device
+# page and leaves them out of generated dashboards. The status flags sensor is
+# not in the list: its attributes say what is running right now.
+DIAGNOSTIC_SENSOR_KEYS = frozenset(
+    {
+        "unit_type",
+        "wifi_signal",
+        "connectivity",
+        "last_communication",
+        "central_config",
+        "lcd_software_version",
+        "unit_model",
+        "central_control_enabled",
+        "cascade_slave_mode",
+        "fan_coil_compatible",
+        "c1_thermostat_present",
+        "c2_thermostat_present",
+        "otc_heating_type_c1",
+        "otc_cooling_type_c1",
+        "otc_heating_type_c2",
+        "otc_cooling_type_c2",
+        "ou_code",
+        "ou_capacity_code",
+        "ou_pcb_software",
+        "secondary_stop_code",
+        "secondary_retry_code",
+    }
+)
+
+
 def _apply_description_attrs(entity: SensorEntity, description: SensorEntityDescription) -> None:
     """Copy the relevant description fields onto the entity's ``_attr_*`` slots.
 
@@ -788,6 +831,8 @@ def _apply_description_attrs(entity: SensorEntity, description: SensorEntityDesc
         entity._attr_native_unit_of_measurement = description.native_unit_of_measurement
     if description.options is not None:
         entity._attr_options = description.options
+    if description.key in DIAGNOSTIC_SENSOR_KEYS:
+        entity._attr_entity_category = EntityCategory.DIAGNOSTIC
     entity.entity_description = description
 
 
@@ -1079,6 +1124,14 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, SensorEntity):
         installation_data = self._coordinator.get_installation_devices_data()
         return _get_heating_status_from_installation_data(installation_data)
 
+    def _unit_model_name(self) -> str:
+        """Return the unit's commercial name, or a generic one when the unit reports no known model."""
+        heating_status = self._get_heating_status()
+        unit_model = heating_status.get("unitModel") if isinstance(heating_status, dict) else None
+        if isinstance(unit_model, int) and not isinstance(unit_model, bool):
+            return UNIT_MODEL_NAMES.get(unit_model, "HVAC System")
+        return "HVAC System"
+
     def _get_raw_value(self):
         """Get raw value from installation data or heating status."""
         installation_data = self._coordinator.get_installation_devices_data()
@@ -1109,15 +1162,7 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, SensorEntity):
         """Handle central control configuration sensors."""
         if self._key == "unit_model":
             # Decode unit model codes
-            unit_models = {
-                0: "Yutaki S",
-                1: "Yutaki SC",
-                2: "Yutaki S80",
-                3: "Yutaki M",
-                4: "Yutaki SC Lite",
-                5: "Yutampo",
-            }
-            return unit_models.get(value, f"Unknown ({value})")
+            return UNIT_MODEL_NAMES.get(value, f"Unknown ({value})")
 
         if self._key == "lcd_software_version":
             # Format as hex version (e.g., 0x0222 = v2.34)
@@ -1284,7 +1329,8 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, SensorEntity):
         return DeviceInfo(
             name=f"{self._device_data['device_name']}-{self._device_data['room_name']}",
             manufacturer="Hitachi",
-            model="HVAC System",
+            # the unit's commercial name when the unit reports a known model
+            model=self._unit_model_name(),
             sw_version=self._common_data.get("firmware"),
             identifiers={
                 (
