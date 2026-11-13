@@ -122,10 +122,9 @@ async def run_benchmark(hass=None):
     mock_api.get_heating_status_from_installation_devices = MagicMock(return_value={})
 
     # Setup HASS data
-    hass.data = {"csnet_home": {"test_entry": {"api": mock_api}}}
 
     # Initialize Coordinator
-    coordinator = CSNetHomeCoordinator(hass, 30, "test_entry")
+    coordinator = CSNetHomeCoordinator(hass, 30, "test_entry", api=mock_api)
 
     # Measure execution time
     start_time = time.perf_counter()

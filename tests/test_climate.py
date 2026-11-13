@@ -75,15 +75,7 @@ def build_entity(
         "fan2_speed": fan2_speed,
     }
     common_data = {"name": "Hitachi PAC", "firmware": "1.0.0"}
-    entry = SimpleNamespace(entry_id="test-entry", data={})
-
-    # Minimal hass structure for the entity
-    if not hasattr(hass, "data"):
-        hass.data = {}
-    if DOMAIN not in hass.data:
-        hass.data[DOMAIN] = {}
-    if entry.entry_id not in hass.data[DOMAIN]:
-        hass.data[DOMAIN][entry.entry_id] = {}
+    entry = SimpleNamespace(entry_id="test-entry", data={}, runtime_data=SimpleNamespace(api=None, coordinator=None))
 
     # Setup installation devices data for fan coil compatibility check
     installation_devices_data = {}
@@ -97,7 +89,7 @@ def build_entity(
         }
 
     # Inject a fake API; will be overridden in tests that call it
-    hass.data[DOMAIN][entry.entry_id]["api"] = SimpleNamespace(
+    entry.runtime_data.api = SimpleNamespace(
         async_set_hvac_mode=AsyncMock(return_value=True),
         async_set_temperature=AsyncMock(return_value=True),
         set_preset_modes=AsyncMock(return_value=True),
@@ -118,7 +110,7 @@ def build_entity(
         (s for s in coordinator.get_sensors_data() if (s.get("device_id"), s.get("room_id"), s.get("zone_id")) == (device_id, room_id, zone_id)),
         None,
     )
-    hass.data[DOMAIN][entry.entry_id]["coordinator"] = coordinator
+    entry.runtime_data.coordinator = coordinator
 
     entity = CSNetHomeClimate(coordinator, entry, sensor_data, common_data)
     return entity
@@ -199,7 +191,7 @@ def test_auto_mode_limits_follow_what_the_unit_is_doing(hass, real_mode, expecte
         asked.append(mode)
         return (None, None)
 
-    api = entity.hass.data[DOMAIN][entity.entry.entry_id]["api"]
+    api = entity.entry.runtime_data.api
     api.get_temperature_limits = limits
 
     entity._calculate_temperature_limits()
@@ -229,7 +221,7 @@ def test_extra_state_attributes(hass):
 async def test_turn_off_calls_api(hass):
     """Call API with hvac_mode OFF when turning off."""
     entity = build_entity(hass, mode=1, on_off=1)
-    api = hass.data[DOMAIN][entity.entry.entry_id]["api"]
+    api = entity.entry.runtime_data.api
     await entity.async_turn_off()
     api.async_set_hvac_mode.assert_awaited()
     called_args = api.async_set_hvac_mode.call_args[0]
@@ -242,21 +234,21 @@ async def test_turn_on_preserves_mode(hass):
     """Restore last mode when turning on (heat/cool/auto)."""
     # When last mode is heat
     entity = build_entity(hass, mode=1, on_off=0)
-    api = hass.data[DOMAIN][entity.entry.entry_id]["api"]
+    api = entity.entry.runtime_data.api
     await entity.async_turn_on()
     called_args = api.async_set_hvac_mode.call_args[0]
     assert called_args[2] == HVACMode.HEAT
 
     # When last mode is cool
     entity = build_entity(hass, mode=0, on_off=0)
-    api = hass.data[DOMAIN][entity.entry.entry_id]["api"]
+    api = entity.entry.runtime_data.api
     await entity.async_turn_on()
     called_args = api.async_set_hvac_mode.call_args[0]
     assert called_args[2] == HVACMode.COOL
 
     # When last mode is auto
     entity = build_entity(hass, mode=2, on_off=0)
-    api = hass.data[DOMAIN][entity.entry.entry_id]["api"]
+    api = entity.entry.runtime_data.api
     await entity.async_turn_on()
     called_args = api.async_set_hvac_mode.call_args[0]
     assert called_args[2] == HVACMode.HEAT_COOL
@@ -294,7 +286,7 @@ async def test_handle_coordinator_update_handles_missing_sensor_data(hass):
     entity = build_entity(hass, mode=1, on_off=1, cur=19.5, setp=20.0)
 
     # Modify coordinator to return empty list (simulating room not found)
-    coordinator = hass.data[DOMAIN][entity.entry.entry_id]["coordinator"]
+    coordinator = entity.entry.runtime_data.coordinator
     coordinator.get_sensors_data = lambda: []
 
     # This should not raise TypeError even though sensor_data becomes None
@@ -352,7 +344,7 @@ def test_fan_mode_mapping_silent_none(hass):
 async def test_set_fan_mode_to_silent(hass):
     """Test setting fan mode to silent (FAN_ON)."""
     entity = build_entity(hass, silent_mode=0)
-    api = hass.data[DOMAIN][entity.entry.entry_id]["api"]
+    api = entity.entry.runtime_data.api
 
     await entity.async_set_fan_mode(FAN_ON)
 
@@ -370,7 +362,7 @@ async def test_set_fan_mode_to_silent(hass):
 async def test_set_fan_mode_to_normal(hass):
     """Test setting fan mode to normal (FAN_AUTO)."""
     entity = build_entity(hass, silent_mode=1)
-    api = hass.data[DOMAIN][entity.entry.entry_id]["api"]
+    api = entity.entry.runtime_data.api
 
     await entity.async_set_fan_mode(FAN_AUTO)
 
@@ -429,9 +421,9 @@ def test_dynamic_temperature_limits_heating_mode(hass):
         async_request_refresh=AsyncMock(return_value=None),
     )
 
-    hass.data[DOMAIN][entity.entry.entry_id]["api"] = mock_api
+    entity.entry.runtime_data.api = mock_api
     mock_coordinator.hass = hass
-    hass.data[DOMAIN][entity.entry.entry_id]["coordinator"] = mock_coordinator
+    entity.entry.runtime_data.coordinator = mock_coordinator
     entity.coordinator = mock_coordinator
 
     # Test min and max temperature
@@ -463,9 +455,9 @@ def test_dynamic_temperature_limits_cooling_mode(hass):
         async_request_refresh=AsyncMock(return_value=None),
     )
 
-    hass.data[DOMAIN][entity.entry.entry_id]["api"] = mock_api
+    entity.entry.runtime_data.api = mock_api
     mock_coordinator.hass = hass
-    hass.data[DOMAIN][entity.entry.entry_id]["coordinator"] = mock_coordinator
+    entity.entry.runtime_data.coordinator = mock_coordinator
     entity.coordinator = mock_coordinator
 
     # Test min and max temperature for cooling mode
@@ -492,9 +484,9 @@ def test_dynamic_temperature_limits_fallback_to_defaults(hass):
         async_request_refresh=AsyncMock(return_value=None),
     )
 
-    hass.data[DOMAIN][entity.entry.entry_id]["api"] = mock_api
+    entity.entry.runtime_data.api = mock_api
     mock_coordinator.hass = hass
-    hass.data[DOMAIN][entity.entry.entry_id]["coordinator"] = mock_coordinator
+    entity.entry.runtime_data.coordinator = mock_coordinator
     entity.coordinator = mock_coordinator
 
     # Test that defaults are used
@@ -525,15 +517,7 @@ def test_dynamic_temperature_limits_zone2(hass):
         "zone_id": 2,  # Zone 2
     }
     common_data = {"name": "Hitachi PAC", "firmware": "1.0.0"}
-    entry = SimpleNamespace(entry_id="test-entry", data={})
-
-    # Setup hass data
-    if not hasattr(hass, "data"):
-        hass.data = {}
-    if DOMAIN not in hass.data:
-        hass.data[DOMAIN] = {}
-    if entry.entry_id not in hass.data[DOMAIN]:
-        hass.data[DOMAIN][entry.entry_id] = {}
+    entry = SimpleNamespace(entry_id="test-entry", data={}, runtime_data=SimpleNamespace(api=None, coordinator=None))
 
     # Mock the API to return zone 2 temperature limits
     mock_api = SimpleNamespace(
@@ -557,9 +541,9 @@ def test_dynamic_temperature_limits_zone2(hass):
         async_request_refresh=AsyncMock(return_value=None),
     )
 
-    hass.data[DOMAIN][entry.entry_id]["api"] = mock_api
+    entry.runtime_data.api = mock_api
     mock_coordinator.hass = hass
-    hass.data[DOMAIN][entry.entry_id]["coordinator"] = mock_coordinator
+    entry.runtime_data.coordinator = mock_coordinator
 
     entity = CSNetHomeClimate(mock_coordinator, entry, sensor_data, common_data)
 
@@ -593,15 +577,7 @@ def test_max_temp_override_in_config(hass):
     common_data = {"name": "Hitachi PAC", "firmware": "1.0.0"}
 
     # Create entry with max_temp_override set to 45
-    entry = SimpleNamespace(entry_id="test-entry", data={CONF_MAX_TEMP_OVERRIDE: 45})
-
-    # Setup hass data
-    if not hasattr(hass, "data"):
-        hass.data = {}
-    if DOMAIN not in hass.data:
-        hass.data[DOMAIN] = {}
-    if entry.entry_id not in hass.data[DOMAIN]:
-        hass.data[DOMAIN][entry.entry_id] = {}
+    entry = SimpleNamespace(entry_id="test-entry", data={CONF_MAX_TEMP_OVERRIDE: 45}, runtime_data=SimpleNamespace(api=None, coordinator=None))
 
     # Mock the API to return normal temperature limits (should be overridden)
     mock_api = SimpleNamespace(
@@ -625,9 +601,9 @@ def test_max_temp_override_in_config(hass):
         async_request_refresh=AsyncMock(return_value=None),
     )
 
-    hass.data[DOMAIN][entry.entry_id]["api"] = mock_api
+    entry.runtime_data.api = mock_api
     mock_coordinator.hass = hass
-    hass.data[DOMAIN][entry.entry_id]["coordinator"] = mock_coordinator
+    entry.runtime_data.coordinator = mock_coordinator
 
     entity = CSNetHomeClimate(mock_coordinator, entry, sensor_data, common_data)
 
@@ -661,15 +637,7 @@ def test_max_temp_no_override(hass):
     common_data = {"name": "Hitachi PAC", "firmware": "1.0.0"}
 
     # Create entry WITHOUT max_temp_override
-    entry = SimpleNamespace(entry_id="test-entry", data={})  # No override
-
-    # Setup hass data
-    if not hasattr(hass, "data"):
-        hass.data = {}
-    if DOMAIN not in hass.data:
-        hass.data[DOMAIN] = {}
-    if entry.entry_id not in hass.data[DOMAIN]:
-        hass.data[DOMAIN][entry.entry_id] = {}
+    entry = SimpleNamespace(entry_id="test-entry", data={}, runtime_data=SimpleNamespace(api=None, coordinator=None))  # No override
 
     # Mock the API to return temperature limits
     mock_api = SimpleNamespace(
@@ -693,9 +661,9 @@ def test_max_temp_no_override(hass):
         async_request_refresh=AsyncMock(return_value=None),
     )
 
-    hass.data[DOMAIN][entry.entry_id]["api"] = mock_api
+    entry.runtime_data.api = mock_api
     mock_coordinator.hass = hass
-    hass.data[DOMAIN][entry.entry_id]["coordinator"] = mock_coordinator
+    entry.runtime_data.coordinator = mock_coordinator
 
     entity = CSNetHomeClimate(mock_coordinator, entry, sensor_data, common_data)
 
@@ -769,7 +737,7 @@ def test_fan_mode_reading_none_for_fan_coil(hass):
 async def test_set_fan_mode_for_fan_coil_low(hass):
     """Test setting fan mode to low for fan coil system."""
     entity = build_entity(hass, is_fan_coil=True, zone_id=1, fan1_speed=3)
-    api = hass.data[DOMAIN][entity.entry.entry_id]["api"]
+    api = entity.entry.runtime_data.api
 
     await entity.async_set_fan_mode("low")
 
@@ -788,7 +756,7 @@ async def test_set_fan_mode_for_fan_coil_low(hass):
 async def test_set_fan_mode_for_fan_coil_medium(hass):
     """Test setting fan mode to medium for fan coil system."""
     entity = build_entity(hass, is_fan_coil=True, zone_id=1, fan1_speed=0)
-    api = hass.data[DOMAIN][entity.entry.entry_id]["api"]
+    api = entity.entry.runtime_data.api
 
     await entity.async_set_fan_mode("medium")
 
@@ -802,7 +770,7 @@ async def test_set_fan_mode_for_fan_coil_medium(hass):
 async def test_set_fan_mode_for_fan_coil_auto(hass):
     """Test setting fan mode to auto for fan coil system."""
     entity = build_entity(hass, is_fan_coil=True, zone_id=1, fan1_speed=1)
-    api = hass.data[DOMAIN][entity.entry.entry_id]["api"]
+    api = entity.entry.runtime_data.api
 
     await entity.async_set_fan_mode("auto")
 
@@ -816,7 +784,7 @@ async def test_set_fan_mode_for_fan_coil_auto(hass):
 async def test_set_fan_mode_for_fan_coil_off(hass):
     """Test setting fan mode to off for fan coil system."""
     entity = build_entity(hass, is_fan_coil=True, zone_id=1, fan1_speed=2)
-    api = hass.data[DOMAIN][entity.entry.entry_id]["api"]
+    api = entity.entry.runtime_data.api
 
     await entity.async_set_fan_mode("off")
 
@@ -830,7 +798,7 @@ async def test_set_fan_mode_for_fan_coil_off(hass):
 async def test_set_fan_mode_for_fan_coil_c2(hass):
     """Test setting fan mode for fan coil circuit 2."""
     entity = build_entity(hass, is_fan_coil=True, zone_id=2, fan2_speed=0)
-    api = hass.data[DOMAIN][entity.entry.entry_id]["api"]
+    api = entity.entry.runtime_data.api
 
     await entity.async_set_fan_mode("low")
 
@@ -845,7 +813,7 @@ async def test_set_fan_mode_for_fan_coil_c2(hass):
 async def test_set_fan_mode_invalid_for_fan_coil(hass):
     """Test setting invalid fan mode for fan coil system does nothing."""
     entity = build_entity(hass, is_fan_coil=True, zone_id=1, fan1_speed=2)
-    api = hass.data[DOMAIN][entity.entry.entry_id]["api"]
+    api = entity.entry.runtime_data.api
 
     await entity.async_set_fan_mode("invalid_mode")
 
@@ -1020,7 +988,7 @@ def test_otc_attributes_zone1_heating_fix(hass):
         "fan2_speed": None,
     }
     common_data = {"name": "Hitachi PAC", "firmware": "1.0.0"}
-    entry = SimpleNamespace(entry_id="test-entry", data={})
+    entry = SimpleNamespace(entry_id="test-entry", data={}, runtime_data=SimpleNamespace(api=None, coordinator=None))
 
     # Setup installation devices data with OTC information
     installation_devices_data = {
@@ -1032,12 +1000,7 @@ def test_otc_attributes_zone1_heating_fix(hass):
         }
     }
 
-    if DOMAIN not in hass.data:
-        hass.data[DOMAIN] = {}
-    if entry.entry_id not in hass.data[DOMAIN]:
-        hass.data[DOMAIN][entry.entry_id] = {}
-
-    hass.data[DOMAIN][entry.entry_id]["api"] = SimpleNamespace(
+    entry.runtime_data.api = SimpleNamespace(
         async_set_hvac_mode=AsyncMock(return_value=True),
         async_set_temperature=AsyncMock(return_value=True),
         set_preset_modes=AsyncMock(return_value=True),
@@ -1054,7 +1017,7 @@ def test_otc_attributes_zone1_heating_fix(hass):
         async_request_refresh=AsyncMock(return_value=None),
         hass=hass,
     )
-    hass.data[DOMAIN][entry.entry_id]["coordinator"] = coordinator
+    entry.runtime_data.coordinator = coordinator
 
     entity = CSNetHomeClimate(coordinator, entry, sensor_data, common_data)
     attrs = entity.extra_state_attributes
@@ -1095,7 +1058,7 @@ def test_otc_attributes_zone2_heating_gradient(hass):
         "fan2_speed": None,
     }
     common_data = {"name": "Hitachi PAC", "firmware": "1.0.0"}
-    entry = SimpleNamespace(entry_id="test-entry", data={})
+    entry = SimpleNamespace(entry_id="test-entry", data={}, runtime_data=SimpleNamespace(api=None, coordinator=None))
 
     # Setup installation devices data with OTC information for circuit 2
     installation_devices_data = {
@@ -1107,12 +1070,7 @@ def test_otc_attributes_zone2_heating_gradient(hass):
         }
     }
 
-    if DOMAIN not in hass.data:
-        hass.data[DOMAIN] = {}
-    if entry.entry_id not in hass.data[DOMAIN]:
-        hass.data[DOMAIN][entry.entry_id] = {}
-
-    hass.data[DOMAIN][entry.entry_id]["api"] = SimpleNamespace(
+    entry.runtime_data.api = SimpleNamespace(
         async_set_hvac_mode=AsyncMock(return_value=True),
         async_set_temperature=AsyncMock(return_value=True),
         set_preset_modes=AsyncMock(return_value=True),
@@ -1129,7 +1087,7 @@ def test_otc_attributes_zone2_heating_gradient(hass):
         async_request_refresh=AsyncMock(return_value=None),
         hass=hass,
     )
-    hass.data[DOMAIN][entry.entry_id]["coordinator"] = coordinator
+    entry.runtime_data.coordinator = coordinator
 
     entity = CSNetHomeClimate(coordinator, entry, sensor_data, common_data)
     attrs = entity.extra_state_attributes
@@ -1170,7 +1128,7 @@ def test_otc_attributes_zone5_water_circuit(hass):
         "fan2_speed": None,
     }
     common_data = {"name": "Hitachi Yutaki", "firmware": "1.0.0"}
-    entry = SimpleNamespace(entry_id="test-entry", data={})
+    entry = SimpleNamespace(entry_id="test-entry", data={}, runtime_data=SimpleNamespace(api=None, coordinator=None))
 
     # Setup installation devices data with OTC information
     installation_devices_data = {
@@ -1182,12 +1140,7 @@ def test_otc_attributes_zone5_water_circuit(hass):
         }
     }
 
-    if DOMAIN not in hass.data:
-        hass.data[DOMAIN] = {}
-    if entry.entry_id not in hass.data[DOMAIN]:
-        hass.data[DOMAIN][entry.entry_id] = {}
-
-    hass.data[DOMAIN][entry.entry_id]["api"] = SimpleNamespace(
+    entry.runtime_data.api = SimpleNamespace(
         async_set_hvac_mode=AsyncMock(return_value=True),
         async_set_temperature=AsyncMock(return_value=True),
         set_preset_modes=AsyncMock(return_value=True),
@@ -1204,7 +1157,7 @@ def test_otc_attributes_zone5_water_circuit(hass):
         async_request_refresh=AsyncMock(return_value=None),
         hass=hass,
     )
-    hass.data[DOMAIN][entry.entry_id]["coordinator"] = coordinator
+    entry.runtime_data.coordinator = coordinator
 
     entity = CSNetHomeClimate(coordinator, entry, sensor_data, common_data)
     attrs = entity.extra_state_attributes
@@ -1245,14 +1198,9 @@ def test_otc_attributes_no_installation_data(hass):
         "fan2_speed": None,
     }
     common_data = {"name": "Hitachi PAC", "firmware": "1.0.0"}
-    entry = SimpleNamespace(entry_id="test-entry", data={})
+    entry = SimpleNamespace(entry_id="test-entry", data={}, runtime_data=SimpleNamespace(api=None, coordinator=None))
 
-    if DOMAIN not in hass.data:
-        hass.data[DOMAIN] = {}
-    if entry.entry_id not in hass.data[DOMAIN]:
-        hass.data[DOMAIN][entry.entry_id] = {}
-
-    hass.data[DOMAIN][entry.entry_id]["api"] = SimpleNamespace(
+    entry.runtime_data.api = SimpleNamespace(
         async_set_hvac_mode=AsyncMock(return_value=True),
         async_set_temperature=AsyncMock(return_value=True),
         set_preset_modes=AsyncMock(return_value=True),
@@ -1269,7 +1217,7 @@ def test_otc_attributes_no_installation_data(hass):
         async_request_refresh=AsyncMock(return_value=None),
         hass=hass,
     )
-    hass.data[DOMAIN][entry.entry_id]["coordinator"] = coordinator
+    entry.runtime_data.coordinator = coordinator
 
     entity = CSNetHomeClimate(coordinator, entry, sensor_data, common_data)
     attrs = entity.extra_state_attributes
@@ -1306,7 +1254,7 @@ def test_otc_attributes_zone3_dhw_no_otc(hass):
         "fan2_speed": None,
     }
     common_data = {"name": "Hitachi PAC", "firmware": "1.0.0"}
-    entry = SimpleNamespace(entry_id="test-entry", data={})
+    entry = SimpleNamespace(entry_id="test-entry", data={}, runtime_data=SimpleNamespace(api=None, coordinator=None))
 
     # Setup installation devices data with OTC information
     installation_devices_data = {
@@ -1318,12 +1266,7 @@ def test_otc_attributes_zone3_dhw_no_otc(hass):
         }
     }
 
-    if DOMAIN not in hass.data:
-        hass.data[DOMAIN] = {}
-    if entry.entry_id not in hass.data[DOMAIN]:
-        hass.data[DOMAIN][entry.entry_id] = {}
-
-    hass.data[DOMAIN][entry.entry_id]["api"] = SimpleNamespace(
+    entry.runtime_data.api = SimpleNamespace(
         async_set_hvac_mode=AsyncMock(return_value=True),
         async_set_temperature=AsyncMock(return_value=True),
         set_preset_modes=AsyncMock(return_value=True),
@@ -1340,7 +1283,7 @@ def test_otc_attributes_zone3_dhw_no_otc(hass):
         async_request_refresh=AsyncMock(return_value=None),
         hass=hass,
     )
-    hass.data[DOMAIN][entry.entry_id]["coordinator"] = coordinator
+    entry.runtime_data.coordinator = coordinator
 
     entity = CSNetHomeClimate(coordinator, entry, sensor_data, common_data)
     attrs = entity.extra_state_attributes
@@ -1391,14 +1334,9 @@ def test_device_info_with_missing_firmware(hass):
     }
     # Missing firmware key
     common_data = {"name": "Hitachi PAC"}
-    entry = SimpleNamespace(entry_id="test-entry", data={})
+    entry = SimpleNamespace(entry_id="test-entry", data={}, runtime_data=SimpleNamespace(api=None, coordinator=None))
 
-    if DOMAIN not in hass.data:
-        hass.data[DOMAIN] = {}
-    if entry.entry_id not in hass.data[DOMAIN]:
-        hass.data[DOMAIN][entry.entry_id] = {}
-
-    hass.data[DOMAIN][entry.entry_id]["api"] = SimpleNamespace(
+    entry.runtime_data.api = SimpleNamespace(
         async_set_hvac_mode=AsyncMock(return_value=True),
         async_set_temperature=AsyncMock(return_value=True),
         set_preset_modes=AsyncMock(return_value=True),
@@ -1415,7 +1353,7 @@ def test_device_info_with_missing_firmware(hass):
         async_request_refresh=AsyncMock(return_value=None),
         hass=hass,
     )
-    hass.data[DOMAIN][entry.entry_id]["coordinator"] = coordinator
+    entry.runtime_data.coordinator = coordinator
 
     entity = CSNetHomeClimate(coordinator, entry, sensor_data, common_data)
     device_info = entity.device_info
@@ -1461,14 +1399,9 @@ def test_device_info_with_missing_sensor_data_keys(hass):
         # Missing device_name and room_name
     }
     common_data = {"name": "Hitachi PAC", "firmware": "1.0.0"}
-    entry = SimpleNamespace(entry_id="test-entry", data={})
+    entry = SimpleNamespace(entry_id="test-entry", data={}, runtime_data=SimpleNamespace(api=None, coordinator=None))
 
-    if DOMAIN not in hass.data:
-        hass.data[DOMAIN] = {}
-    if entry.entry_id not in hass.data[DOMAIN]:
-        hass.data[DOMAIN][entry.entry_id] = {}
-
-    hass.data[DOMAIN][entry.entry_id]["api"] = SimpleNamespace(
+    entry.runtime_data.api = SimpleNamespace(
         async_set_hvac_mode=AsyncMock(return_value=True),
         async_set_temperature=AsyncMock(return_value=True),
         set_preset_modes=AsyncMock(return_value=True),
@@ -1485,7 +1418,7 @@ def test_device_info_with_missing_sensor_data_keys(hass):
         async_request_refresh=AsyncMock(return_value=None),
         hass=hass,
     )
-    hass.data[DOMAIN][entry.entry_id]["coordinator"] = coordinator
+    entry.runtime_data.coordinator = coordinator
 
     entity = CSNetHomeClimate(coordinator, entry, sensor_data, common_data)
     device_info = entity.device_info
@@ -1521,7 +1454,7 @@ async def test_set_preset_mode_failure_keeps_value(hass):
     """A failed preset write leaves the current value untouched."""
     entity = build_entity(hass, ecocomfort=1)
     entity.hass = hass
-    hass.data[DOMAIN][entity.entry.entry_id]["api"].set_preset_modes = AsyncMock(return_value=False)
+    entity.entry.runtime_data.api.set_preset_modes = AsyncMock(return_value=False)
 
     await entity.async_set_preset_mode("eco")
     assert entity._sensor_data["ecocomfort"] == 1
@@ -1538,7 +1471,7 @@ async def test_set_fan_mode_for_c1_water_zone_uses_circuit1(hass):
     """Zone 5 (C1 water) sets the fan speed on circuit 1, not circuit 2."""
     entity = build_entity(hass, is_fan_coil=True, zone_id=5, fan1_speed=3)
     entity.hass = hass
-    api = hass.data[DOMAIN][entity.entry.entry_id]["api"]
+    api = entity.entry.runtime_data.api
 
     await entity.async_set_fan_mode("low")
 
@@ -1551,7 +1484,7 @@ async def test_set_fan_mode_for_c2_water_zone_uses_circuit2(hass):
     """Zone 6 (C2 water) keeps using circuit 2."""
     entity = build_entity(hass, is_fan_coil=True, zone_id=6, fan2_speed=3)
     entity.hass = hass
-    api = hass.data[DOMAIN][entity.entry.entry_id]["api"]
+    api = entity.entry.runtime_data.api
 
     await entity.async_set_fan_mode("low")
 
@@ -1563,7 +1496,7 @@ def test_climate_follows_csnet_room_rename(hass):
     entity = build_entity(hass, mode=1, on_off=1, cur=19.5, setp=20.0)
     entity.async_write_ha_state = lambda: None
     unique_id = entity.unique_id
-    coordinator = hass.data[DOMAIN][entity.entry.entry_id]["coordinator"]
+    coordinator = entity.entry.runtime_data.coordinator
     renamed = dict(entity._sensor_data, room_name="Etage", current_temperature=21.0)
     coordinator.get_sensors_data = lambda: [renamed]
 

@@ -13,7 +13,6 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
 from .api import TO_REDACT
-from .const import DOMAIN
 
 REDACTED = "**REDACTED**"
 
@@ -69,7 +68,7 @@ def redact(data: Any) -> Any:
 
 async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]:
     """Return diagnostics for a config entry."""
-    coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    coordinator = entry.runtime_data.coordinator
 
     common_data = dict(coordinator.get_common_data() or {})
     if common_data.get(_INSTALLATION_NAME_KEY):

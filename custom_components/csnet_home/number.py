@@ -28,7 +28,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     """Set up the number platform for CSNet Home fixed water temperature."""
     _LOGGER.debug("Starting CSNet Home number setup")
 
-    coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    coordinator = entry.runtime_data.coordinator
     if not coordinator:
         _LOGGER.error("No coordinator instance found!")
         return None
@@ -236,7 +236,7 @@ class CSNetHomeFixedWaterTemperatureNumber(CoordinatorEntity, NumberEntity):
         if not installation_devices_data:
             return False
 
-        cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
+        cloud_api = self.entry.runtime_data.api
         is_editable = cloud_api.is_fixed_water_temperature_editable(self._circuit, self._mode, installation_devices_data, self._sensor_data.get("parent_id"))
 
         return is_editable
@@ -248,7 +248,7 @@ class CSNetHomeFixedWaterTemperatureNumber(CoordinatorEntity, NumberEntity):
             _LOGGER.error("No parent_id found for fixed water temperature")
             return
 
-        cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
+        cloud_api = self.entry.runtime_data.api
         success = await cloud_api.async_set_fixed_water_temperature(self._circuit, parent_id, self._mode, value)
 
         if success:

@@ -11,7 +11,6 @@ from homeassistant.const import STATE_OFF, STATE_ON, UnitOfEnergy, UnitOfPower, 
 from homeassistant.util import dt as dt_util
 
 from custom_components.csnet_home.const import (
-    DOMAIN,
     OTC_COOLING_TYPE_FIX,
     OTC_COOLING_TYPE_NONE,
     OTC_COOLING_TYPE_POINTS,
@@ -1586,13 +1585,10 @@ def test_alarm_history_sensor():
     mock_api = MagicMock()
     mock_api.translate_alarm.side_effect = lambda code: f"Test Alarm {code}"
 
-    # Mock hass structure to hold API
-    mock_hass = MagicMock()
-    mock_hass.data = {DOMAIN: {"test_entry": {"api": mock_api}}}
-
-    # Mock coordinator with alarm history and hass reference
+    # Mock coordinator with alarm history and the API it reads from
     coordinator = SimpleNamespace(
-        hass=mock_hass,
+        hass=MagicMock(),
+        api=mock_api,
         entry_id="test_entry",
         get_common_data=lambda: common_data,
         get_installation_alarms_data=lambda: {

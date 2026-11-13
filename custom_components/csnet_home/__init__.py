@@ -2,7 +2,7 @@
 
 import logging
 
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import CONF_SCAN_INTERVAL, Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import config_validation as cv
@@ -17,7 +17,7 @@ from custom_components.csnet_home.const import (
     DEFAULT_FILTERED_ALARM_CODES,
     DOMAIN,
 )
-from custom_components.csnet_home.coordinator import CSNetHomeCoordinator
+from custom_components.csnet_home.coordinator import CSNetHomeConfigEntry, CSNetHomeCoordinator, CSNetHomeData
 from custom_components.csnet_home.migration import async_migrate_zone_identifiers
 from custom_components.csnet_home.sensor import DEVICE_SENSOR_DESCRIPTIONS, ZONE_SENSOR_DESCRIPTIONS
 
@@ -41,10 +41,8 @@ async def async_setup(hass: HomeAssistant, config: dict):
     return True
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
+async def async_setup_entry(hass: HomeAssistant, entry: CSNetHomeConfigEntry):
     """Set up CSNet Home from a config entry."""
-    hass.data.setdefault(DOMAIN, {})
-
     _LOGGER.debug("Config entry found")
     username = entry.data.get("username")
     password = entry.data.get("password")
@@ -61,14 +59,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         entry.entry_id,
         entry.data.get(CONF_ENABLE_ALARM_NOTIFICATIONS, DEFAULT_ENABLE_ALARM_NOTIFICATIONS),
         entry.data.get(CONF_FILTERED_ALARM_CODES, DEFAULT_FILTERED_ALARM_CODES),
+        api=api,
+        config_entry=entry,
     )
 
-    hass.data[DOMAIN][entry.entry_id] = {
-        "coordinator": coordinator,
-        "api": api,
-    }
+    try:
+        await coordinator.async_config_entry_first_refresh()
+    except BaseException:
+        # setup will be retried with a new client: do not leave this one's session open
+        await api.close()
+        raise
 
-    await coordinator.async_config_entry_first_refresh()
+    entry.runtime_data = CSNetHomeData(api=api, coordinator=coordinator)
 
     # Entities used to be keyed on the CSNet room name; move them to stable
     # zone ids before the platforms register them.
@@ -97,9 +99,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
         # Iterate over all configured entries to find the API
         # In most cases there's only one
-        for entry_data in hass.data[DOMAIN].values():
-            api_instance = entry_data.get("api")
-            coordinator_instance = entry_data.get("coordinator")
+        for loaded_entry in hass.config_entries.async_entries(DOMAIN):
+            if loaded_entry.state is not ConfigEntryState.LOADED:
+                continue
+            api_instance = loaded_entry.runtime_data.api
+            coordinator_instance = loaded_entry.runtime_data.coordinator
 
             if api_instance and api_instance.installation_id:
                 _LOGGER.debug(
@@ -132,7 +136,7 @@ async def async_remove_config_entry_device(hass: HomeAssistant, config_entry: Co
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: CSNetHomeConfigEntry) -> bool:
     """Unload a config entry."""
     # This is called when you remove your integration or shutdown HA.
     # If you have created any custom services, they need to be removed here too.
@@ -140,12 +144,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Unload platforms
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
-    # Remove the config entry from the hass data object.
+    # Home Assistant drops entry.runtime_data itself; the session is ours to close
     if unload_ok:
-        data = hass.data[DOMAIN].pop(entry.entry_id)
-        api = data.get("api")
-        if api:
-            await api.close()
+        await entry.runtime_data.api.close()
 
     # Return that unloading was successful.
     return unload_ok

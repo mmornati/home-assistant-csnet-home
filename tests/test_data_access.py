@@ -113,8 +113,7 @@ def test_api_limits_and_capabilities_use_the_zones_unit(hass):
 
 
 def _coordinator_with_api(hass, api):
-    hass.data["csnet_home"] = {"test": {"api": api}}
-    return CSNetHomeCoordinator(hass=hass, update_interval=60, entry_id="test")
+    return CSNetHomeCoordinator(hass=hass, update_interval=60, entry_id="test", api=api)
 
 
 def _api_returning(elements, installation_devices):

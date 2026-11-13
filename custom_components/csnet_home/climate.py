@@ -38,7 +38,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     """Set up the climate platform for CSNet Home."""
     _LOGGER.debug("Starting CSNet Home climate setup")
 
-    coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    coordinator = entry.runtime_data.coordinator
     if not coordinator:
         _LOGGER.error("No coordinator instance found!")
         return None
@@ -97,7 +97,7 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
             self._attr_preset_mode = "comfort"
 
         installation_devices_data = self.coordinator.get_installation_devices_data()
-        cloud_api = self.coordinator.hass.data[DOMAIN][self.entry.entry_id]["api"]
+        cloud_api = self.entry.runtime_data.api
 
         # Determine Fan Coil type from config
         self._fan_model = self.entry.data.get(CONF_FAN_COIL_MODEL, DEFAULT_FAN_COIL_MODEL)
@@ -221,7 +221,7 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
             installation_devices_data = coordinator.get_installation_devices_data()
 
             if installation_devices_data:
-                cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
+                cloud_api = self.entry.runtime_data.api
                 mode = self._sensor_data.get("mode", 1)
 
                 # Determine circuit number from zone_id
@@ -344,7 +344,7 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
             attrs["fan2_speed"] = self._sensor_data.get("fan2_speed")
 
             # Add fan control availability info
-            cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
+            cloud_api = self.entry.runtime_data.api
             mode = self._sensor_data.get("mode", 1)
 
             attrs["fan1_control_available"] = cloud_api.get_fan_control_availability(1, mode, installation_devices_data, self._sensor_data.get("parent_id"))
@@ -394,7 +394,7 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
             installation_devices_data = coordinator.get_installation_devices_data()
 
             if installation_devices_data:
-                cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
+                cloud_api = self.entry.runtime_data.api
                 mode = self._sensor_data.get("mode", 1)
 
                 # Determine circuit number from zone_id
@@ -410,7 +410,7 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
                     )
                     return
 
-        cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
+        cloud_api = self.entry.runtime_data.api
         response = await cloud_api.async_set_temperature(
             zone_id,
             self._sensor_data["parent_id"],
@@ -429,7 +429,7 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode):
         """Set new target hvac mode."""
-        cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
+        cloud_api = self.entry.runtime_data.api
         await cloud_api.async_set_hvac_mode(self._sensor_data["zone_id"], self._sensor_data["parent_id"], hvac_mode)
 
     async def async_turn_on(self) -> None:
@@ -454,7 +454,7 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
         """Set new preset mode."""
-        cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
+        cloud_api = self.entry.runtime_data.api
         response = await cloud_api.set_preset_modes(
             self._sensor_data["zone_id"],
             self._sensor_data["parent_id"],
@@ -468,7 +468,7 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
         """Set new fan mode (fan speed for fan coil, silent mode otherwise)."""
-        cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
+        cloud_api = self.entry.runtime_data.api
 
         if self._is_fan_coil:
             # For fan coil systems, set the fan speed
@@ -625,7 +625,7 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
         installation_devices_data = coordinator.get_installation_devices_data()
 
         if installation_devices_data:
-            cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
+            cloud_api = self.entry.runtime_data.api
             raw_min, raw_max = cloud_api.get_temperature_limits(zone_id, mode, installation_devices_data, self._sensor_data.get("parent_id"))
 
             normalized_min = self._normalize_temperature_limit(raw_min)

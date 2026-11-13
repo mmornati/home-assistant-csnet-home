@@ -145,24 +145,15 @@ def mock_coordinator():
 def mock_hass_instance(mock_coordinator):
     """Mock the Home Assistant instance."""
     hass = MagicMock()
-    # Need to access DOMAIN constant, assume it's "csnet_home" or import it
-    domain = "csnet_home"
-    hass.data = {
-        domain: {
-            "entry_id": {
-                "coordinator": mock_coordinator,
-                "api": MagicMock(),
-            }
-        }
-    }
     return hass
 
 
 @pytest.fixture
-def mock_entry():
+def mock_entry(mock_coordinator):
     """Mock the config entry."""
     entry = MagicMock()
     entry.entry_id = "entry_id"
+    entry.runtime_data = SimpleNamespace(api=MagicMock(), coordinator=mock_coordinator)
     return entry
 
 
@@ -170,9 +161,7 @@ def test_setup_no_coordinator(mock_deps, mock_hass_instance, mock_entry):
     """Test setup without coordinator."""
 
     async def run_test():
-        # DOMAIN constant needs to be imported from module or mocked
-        domain = mock_deps.DOMAIN
-        mock_hass_instance.data[domain][mock_entry.entry_id]["coordinator"] = None
+        mock_entry.runtime_data.coordinator = None
         assert await mock_deps.async_setup_entry(mock_hass_instance, mock_entry, MagicMock()) is None
 
     asyncio.run(run_test())
@@ -422,7 +411,7 @@ def test_number_available(mock_deps, mock_hass_instance, mock_entry, mock_coordi
     entity = mock_deps.CSNetHomeFixedWaterTemperatureNumber(mock_coordinator, sensor_data, {}, circuit=1, mode=1, entry=mock_entry)
     entity.hass = mock_hass_instance
 
-    api = mock_hass_instance.data[mock_deps.DOMAIN][mock_entry.entry_id]["api"]
+    api = mock_entry.runtime_data.api
 
     # Mock available = True
     mock_coordinator.get_installation_devices_data.return_value = {"some": "data"}
@@ -452,7 +441,7 @@ def test_set_native_value(mock_deps, mock_hass_instance, mock_entry, mock_coordi
         entity = mock_deps.CSNetHomeFixedWaterTemperatureNumber(mock_coordinator, sensor_data, {}, circuit=1, mode=1, entry=mock_entry)
         entity.hass = mock_hass_instance
 
-        api = mock_hass_instance.data[mock_deps.DOMAIN][mock_entry.entry_id]["api"]
+        api = mock_entry.runtime_data.api
         api.async_set_fixed_water_temperature = AsyncMock(return_value=True)
 
         # Set value
@@ -478,7 +467,7 @@ def test_set_native_value_failure(mock_deps, mock_hass_instance, mock_entry, moc
         entity = mock_deps.CSNetHomeFixedWaterTemperatureNumber(mock_coordinator, sensor_data, {}, circuit=1, mode=1, entry=mock_entry)
         entity.hass = mock_hass_instance
 
-        api = mock_hass_instance.data[mock_deps.DOMAIN][mock_entry.entry_id]["api"]
+        api = mock_entry.runtime_data.api
         # Simulate API failure (returns False)
         api.async_set_fixed_water_temperature = AsyncMock(return_value=False)
 
