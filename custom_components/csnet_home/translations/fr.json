@@ -11,7 +11,9 @@
                     "language": "Langue",
                     "max_temp_override": "Température maximale (°C)",
                     "fan_coil_model": "Modèle de contrôle du ventilo-convecteur",
-                    "power_supply": "Alimentation de l'unité extérieure"
+                    "power_supply": "Alimentation de l'unité extérieure",
+                    "enable_alarm_notifications": "Activer les notifications d'alarme",
+                    "filtered_alarm_codes": "Codes d'alarme filtrés"
                 },
                 "data_description": {
                     "username": "Votre nom d'utilisateur CSNet Manager",
@@ -20,12 +22,14 @@
                     "language": "Langue préférée pour les noms d'appareils et les alarmes",
                     "max_temp_override": "Remplacer la limite de température maximale (8-80°C). Laisser vide pour les valeurs par défaut.",
                     "fan_coil_model": "Sélectionnez le type de contrôle du ventilo-convecteur (standard ou legacy)",
-                    "power_supply": "Utilisée pour estimer la puissance instantanée et le COP. Auto détecte les unités 8/10 CV comme triphasées, les autres comme monophasées."
+                    "power_supply": "Utilisée pour estimer la puissance instantanée et le COP. Auto détecte les unités 8/10 CV comme triphasées, les autres comme monophasées.",
+                    "enable_alarm_notifications": "Créer une notification Home Assistant quand l'unité signale une alarme",
+                    "filtered_alarm_codes": "Codes d'alarme, séparés par des virgules, qui ne notifient jamais (par défaut : -1, erreurs de communication). Laisser vide pour tout notifier."
                 }
             },
             "reconfigure": {
                 "title": "Reconfigurer CSNet Home",
-                "description": "Mettez à jour votre configuration CSNet Home. Vous pouvez modifier les identifiants, l'intervalle de scan, la langue et d'autres paramètres.",
+                "description": "Modifiez la configuration de CSNet Home. Laissez le mot de passe vide pour conserver l'actuel.",
                 "data": {
                     "username": "Nom d'utilisateur",
                     "password": "Mot de passe",
@@ -33,16 +37,20 @@
                     "language": "Langue",
                     "max_temp_override": "Température maximale (°C)",
                     "fan_coil_model": "Modèle de contrôle du ventilo-convecteur",
-                    "power_supply": "Alimentation de l'unité extérieure"
+                    "power_supply": "Alimentation de l'unité extérieure",
+                    "enable_alarm_notifications": "Activer les notifications d'alarme",
+                    "filtered_alarm_codes": "Codes d'alarme filtrés"
                 },
                 "data_description": {
                     "username": "Votre nom d'utilisateur CSNet Manager",
-                    "password": "Votre mot de passe CSNet Manager",
+                    "password": "Laisser vide pour conserver le mot de passe actuel",
                     "scan_interval": "Fréquence de mise à jour des données (minimum : 60 secondes)",
                     "language": "Langue préférée pour les noms d'appareils et les alarmes",
                     "max_temp_override": "Remplacer la limite de température maximale (8-80°C)",
                     "fan_coil_model": "Sélectionnez le type de contrôle du ventilo-convecteur",
-                    "power_supply": "Utilisée pour estimer la puissance instantanée et le COP. Auto détecte les unités 8/10 CV comme triphasées, les autres comme monophasées."
+                    "power_supply": "Utilisée pour estimer la puissance instantanée et le COP. Auto détecte les unités 8/10 CV comme triphasées, les autres comme monophasées.",
+                    "enable_alarm_notifications": "Créer une notification Home Assistant quand l'unité signale une alarme",
+                    "filtered_alarm_codes": "Codes d'alarme, séparés par des virgules, qui ne notifient jamais (par défaut : -1, erreurs de communication). Laisser vide pour tout notifier."
                 }
             },
             "reauth_confirm": {
@@ -61,7 +69,8 @@
         "error": {
             "cannot_connect": "Impossible de se connecter à CSNet Manager. Veuillez vérifier votre connexion Internet et réessayer.",
             "invalid_auth": "Nom d'utilisateur ou mot de passe invalide. Veuillez vérifier vos identifiants.",
-            "unknown": "Une erreur inattendue s'est produite. Veuillez réessayer."
+            "unknown": "Une erreur inattendue s'est produite. Veuillez réessayer.",
+            "invalid_alarm_codes": "Les codes d'alarme doivent être des nombres entiers séparés par des virgules, par exemple : -1, 62"
         },
         "abort": {
             "already_configured": "Cette intégration CSNet Home est déjà configurée.",

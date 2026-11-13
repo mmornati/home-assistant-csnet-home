@@ -11,7 +11,9 @@
                     "language": "Language",
                     "max_temp_override": "Maximum Temperature Override (°C)",
                     "fan_coil_model": "Fan Coil Control Model",
-                    "power_supply": "Outdoor Unit Power Supply"
+                    "power_supply": "Outdoor Unit Power Supply",
+                    "enable_alarm_notifications": "Enable alarm notifications",
+                    "filtered_alarm_codes": "Filtered alarm codes"
                 },
                 "data_description": {
                     "username": "Your CSNet Manager username",
@@ -20,12 +22,14 @@
                     "language": "Preferred language for device names and alarms",
                     "max_temp_override": "Override the maximum temperature limit (8-80°C). Leave empty for defaults.",
                     "fan_coil_model": "Select the fan coil control type (standard or legacy)",
-                    "power_supply": "Used to estimate instant power and COP. Auto detects 8/10 HP units as three phase, others as single phase."
+                    "power_supply": "Used to estimate instant power and COP. Auto detects 8/10 HP units as three phase, others as single phase.",
+                    "enable_alarm_notifications": "Create a Home Assistant notification when the unit reports an alarm",
+                    "filtered_alarm_codes": "Comma-separated alarm codes that never notify (default: -1, communication errors). Leave empty to notify all."
                 }
             },
             "reconfigure": {
                 "title": "Reconfigure CSNet Home",
-                "description": "Update your CSNet Home configuration. You can change credentials, scan interval, language, and other settings.",
+                "description": "Update your CSNet Home configuration. Leave the password empty to keep the current one.",
                 "data": {
                     "username": "Username",
                     "password": "Password",
@@ -33,16 +37,20 @@
                     "language": "Language",
                     "max_temp_override": "Maximum Temperature Override (°C)",
                     "fan_coil_model": "Fan Coil Control Model",
-                    "power_supply": "Outdoor Unit Power Supply"
+                    "power_supply": "Outdoor Unit Power Supply",
+                    "enable_alarm_notifications": "Enable alarm notifications",
+                    "filtered_alarm_codes": "Filtered alarm codes"
                 },
                 "data_description": {
                     "username": "Your CSNet Manager username",
-                    "password": "Your CSNet Manager password",
+                    "password": "Leave empty to keep the current password",
                     "scan_interval": "How often to poll for updates",
                     "language": "Preferred language for device names and alarms",
                     "max_temp_override": "Override the maximum temperature limit (8-80°C)",
                     "fan_coil_model": "Select the fan coil control type",
-                    "power_supply": "Used to estimate instant power and COP. Auto detects 8/10 HP units as three phase, others as single phase."
+                    "power_supply": "Used to estimate instant power and COP. Auto detects 8/10 HP units as three phase, others as single phase.",
+                    "enable_alarm_notifications": "Create a Home Assistant notification when the unit reports an alarm",
+                    "filtered_alarm_codes": "Comma-separated alarm codes that never notify (default: -1, communication errors). Leave empty to notify all."
                 }
             },
             "reauth_confirm": {
@@ -61,7 +69,8 @@
         "error": {
             "cannot_connect": "Unable to connect to CSNet Manager. Please check your internet connection and try again.",
             "invalid_auth": "Invalid username or password. Please check your credentials.",
-            "unknown": "An unexpected error occurred. Please try again."
+            "unknown": "An unexpected error occurred. Please try again.",
+            "invalid_alarm_codes": "Alarm codes must be whole numbers separated by commas, for example: -1, 62"
         },
         "abort": {
             "already_configured": "This CSNet Home integration is already configured.",
