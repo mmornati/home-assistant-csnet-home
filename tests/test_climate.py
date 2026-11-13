@@ -7,6 +7,7 @@ import pytest
 from homeassistant.components.climate import FAN_AUTO, FAN_ON, HVACAction, HVACMode
 from homeassistant.components.climate.const import ClimateEntityFeature
 from homeassistant.const import UnitOfTemperature
+from homeassistant.exceptions import HomeAssistantError
 
 from custom_components.csnet_home.climate import CSNetHomeClimate
 from custom_components.csnet_home.const import (
@@ -96,6 +97,7 @@ def build_entity(
         async_set_silent_mode=AsyncMock(return_value=True),
         async_set_fan_speed=AsyncMock(return_value=True),
         is_fan_coil_compatible=lambda data, indoor_id=None: is_fan_coil,
+        has_silent_mode=lambda data, indoor_id=None: True,
         get_fan_control_availability=lambda circuit, mode, data, indoor_id=None: is_fan_coil,
         get_temperature_limits=lambda zone_id, mode, data, indoor_id=None: (None, None),
     )
@@ -1545,3 +1547,18 @@ def test_water_circuit_target_is_shown_for_the_running_mode(hass, real_mode, exp
 
     assert entity.native_target_temperature == 35.0
     assert checked == [expected_mode]
+
+
+async def test_silent_mode_is_not_sent_to_a_unit_without_one(hass):
+    """The order would be a real one for the unit: refuse it and say why."""
+    entity = build_entity(hass, silent_mode=0)
+    api = entity.entry.runtime_data.api
+    asked = []
+    api.has_silent_mode = lambda data, indoor_id=None: asked.append(indoor_id) or False
+
+    with pytest.raises(HomeAssistantError):
+        await entity.async_set_fan_mode(FAN_ON)
+
+    assert asked == [1706]
+    api.async_set_silent_mode.assert_not_awaited()
+    assert entity.fan_mode == FAN_AUTO

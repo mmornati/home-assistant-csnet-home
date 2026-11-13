@@ -6,6 +6,7 @@ import logging
 from homeassistant.components.climate import FAN_AUTO, ClimateEntity, HVACAction, HVACMode
 from homeassistant.components.climate.const import FAN_ON, ClimateEntityFeature
 from homeassistant.const import UnitOfTemperature
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -512,7 +513,11 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
                 fan_speed_key = f"fan{circuit}_speed"
                 self._sensor_data[fan_speed_key] = fan_speed
         else:
-            # For non-fan coil systems, set silent mode
+            # For non-fan coil systems, set silent mode. Only on units that
+            # have one: the order is a real one for the unit, and the CSNet web
+            # app does not offer it elsewhere.
+            if not cloud_api.has_silent_mode(self.coordinator.get_installation_devices_data(), self._sensor_data.get("parent_id")):
+                raise HomeAssistantError("This unit does not report a silent mode, so the order was not sent")
             silent_mode = fan_mode == FAN_ON
             response = await cloud_api.async_set_silent_mode(
                 self._sensor_data["zone_id"],

@@ -1219,7 +1219,7 @@ async def test_api_set_silent_mode_off(mock_aiohttp_client, hass):
 
 @pytest.mark.asyncio
 async def test_api_set_silent_mode_from_a_water_zone(mock_aiohttp_client, hass):
-    """Test that zone_id 5 uses C1 in silent mode parameter names."""
+    """Test that zone_id 5 sends the unit-level key."""
     mock_client_instance = mock_aiohttp_client.return_value
 
     mock_response = mock_client_instance.post.return_value.__aenter__.return_value
@@ -1239,10 +1239,9 @@ async def test_api_set_silent_mode_from_a_water_zone(mock_aiohttp_client, hass):
     call_args = mock_client_instance.post.call_args
     assert call_args is not None
     data_sent = call_args[1]["data"]
-    # Zone 5 should use C1 parameters
+    # Zone 5 sends the same unit-level key
     assert data_sent["silentMode"] == "1"
     assert not [key for key in data_sent if key.startswith("silentModeC")]
-    # Should not have C5 parameters
 
 
 @pytest.mark.asyncio
@@ -2790,3 +2789,27 @@ async def test_validate_credentials_does_not_log_username_at_info(hass, caplog):
     with patch.object(CSNetHomeAPI, "async_login", AsyncMock(return_value=True)), patch("aiohttp.ClientSession"):
         await CSNetHomeAPI.async_validate_credentials(hass, "someone@example.com", "pass")
     assert "someone@example.com" not in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("heating_status", "expected"),
+    [
+        ({"systemConfigBits": 0x4000}, True),
+        ({"systemConfigBits": 0x4FC3}, True),
+        ({"systemConfigBits": 0x0FC3}, False),  # the maintainer's unit: no silent mode
+        ({"systemConfigBits": None}, False),
+        ({}, False),
+    ],
+)
+def test_has_silent_mode_follows_the_units_capability_bit(hass, heating_status, expected):
+    """Silent mode exists only where the unit reports it, as in the web app."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+    data = {"data": [{"indoors": [{"id": 1234, "heatingStatus": heating_status}]}]}
+    assert api.has_silent_mode(data, 1234) is expected
+
+
+def test_has_silent_mode_is_false_without_unit_data(hass):
+    """Without the unit's status the capability cannot be confirmed."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+    assert api.has_silent_mode(None) is False
+    assert api.has_silent_mode({}) is False

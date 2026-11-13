@@ -1057,8 +1057,7 @@ class CSNetHomeAPI:
         """Set silent/quiet mode of the unit a zone belongs to.
 
         Silent mode is a setting of the whole unit: the CSNet web app sends
-        ``silentMode`` and reads it back under the same name. There is no
-        per-circuit key.
+        ``silentMode``. There is no per-circuit key.
         """
         data = {
             "id": f"{parent_id}{zone_id}",  # device id + zone id
@@ -1107,6 +1106,22 @@ class CSNetHomeAPI:
 
         system_config_bits = heating_status.get("systemConfigBits", 0)
         return (system_config_bits & 0x2000) > 0
+
+    def has_silent_mode(self, installation_devices_data, indoor_id=None):
+        """Return True when the unit reports a silent mode (systemConfigBits & 0x4000).
+
+        The CSNet web app only offers silent mode on such units. Without the
+        unit's status the answer is False: it cannot be confirmed.
+        """
+        if not installation_devices_data:
+            return False
+
+        heating_status = self.get_heating_status_from_installation_devices(installation_devices_data, indoor_id)
+        if not heating_status:
+            return False
+
+        system_config_bits = heating_status.get("systemConfigBits", 0)
+        return isinstance(system_config_bits, int) and (system_config_bits & 0x4000) > 0
 
     def get_fan_control_availability(self, circuit: int, mode: int, installation_devices_data, indoor_id=None):
         """Check if fan control is available for a specific circuit and mode.
