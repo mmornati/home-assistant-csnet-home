@@ -65,23 +65,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: CSNetHomeConfigEntry):
 
     try:
         await coordinator.async_config_entry_first_refresh()
+
+        entry.runtime_data = CSNetHomeData(api=api, coordinator=coordinator)
+
+        # Entities used to be keyed on the CSNet room name; move them to stable
+        # zone ids before the platforms register them.
+        async_migrate_zone_identifiers(
+            hass,
+            entry,
+            coordinator.get_sensors_data(),
+            [d.key for d in (*ZONE_SENSOR_DESCRIPTIONS, *DEVICE_SENSOR_DESCRIPTIONS)],
+        )
+
+        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     except BaseException:
-        # setup will be retried with a new client: do not leave this one's session open
+        # a failed setup is never unloaded, and a retry makes a new client:
+        # do not leave this one's session open
         await api.close()
         raise
-
-    entry.runtime_data = CSNetHomeData(api=api, coordinator=coordinator)
-
-    # Entities used to be keyed on the CSNet room name; move them to stable
-    # zone ids before the platforms register them.
-    async_migrate_zone_identifiers(
-        hass,
-        entry,
-        coordinator.get_sensors_data(),
-        [d.key for d in (*ZONE_SENSOR_DESCRIPTIONS, *DEVICE_SENSOR_DESCRIPTIONS)],
-    )
-
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     async def async_handle_delete_alarm(call: ServiceCall):
         """Handle the delete alarm service call."""

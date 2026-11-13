@@ -115,3 +115,51 @@ async def test_delete_alarm_service_uses_the_loaded_entry(hass):
         await hass.services.async_call(DOMAIN, "delete_alarm", {"alarm_id": "17"}, blocking=True)
         delete_alarm.assert_awaited_once_with(4242, 17)
     coordinator.async_request_refresh.assert_awaited_once()
+
+
+async def test_real_coordinator_through_setup_reload_and_unload(hass, enable_custom_integrations):
+    """Home Assistant sets up, reloads and unloads the entry with the real coordinator."""
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_USERNAME: "user", CONF_PASSWORD: "pass"})
+    entry.add_to_hass(hass)
+
+    with (
+        patch(
+            "custom_components.csnet_home.coordinator.CSNetHomeCoordinator._async_update_data",
+            AsyncMock(return_value={"sensors": [], "common_data": {}}),
+        ),
+        patch("custom_components.csnet_home.CSNetHomeAPI.close", AsyncMock()) as close,
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        assert entry.state is ConfigEntryState.LOADED
+        coordinator = entry.runtime_data.coordinator
+        assert coordinator.config_entry is entry
+        assert coordinator.api is entry.runtime_data.api
+
+        assert await hass.config_entries.async_reload(entry.entry_id)
+        await hass.async_block_till_done()
+        assert entry.state is ConfigEntryState.LOADED
+        assert entry.runtime_data.coordinator is not coordinator
+        assert close.await_count == 1
+
+        assert await hass.config_entries.async_unload(entry.entry_id)
+        assert close.await_count == 2
+        # with nothing loaded the service finds no entry and does not raise
+        await hass.services.async_call(DOMAIN, "delete_alarm", {"alarm_id": 1}, blocking=True)
+
+
+async def test_failed_platform_setup_closes_the_session(hass):
+    """A failure after the first refresh also ends setup, so the session is closed there too."""
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_USERNAME: "user", CONF_PASSWORD: "pass"})
+    entry.add_to_hass(hass)
+
+    coordinator = MagicMock()
+    coordinator.async_config_entry_first_refresh = AsyncMock()
+    with (
+        patch("custom_components.csnet_home.CSNetHomeCoordinator", return_value=coordinator),
+        patch.object(hass.config_entries, "async_forward_entry_setups", AsyncMock(side_effect=RuntimeError("platform failed"))),
+        patch("custom_components.csnet_home.CSNetHomeAPI.close", AsyncMock()) as close,
+        pytest.raises(RuntimeError),
+    ):
+        await async_setup_entry(hass, entry)
+    close.assert_awaited_once()
