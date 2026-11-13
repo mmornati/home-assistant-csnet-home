@@ -25,6 +25,7 @@ from custom_components.csnet_home.const import (
     LOGIN_BACKOFF_MAX,
     LOGIN_PATH,
     MAX_AUTH_REJECTIONS,
+    POWER_INDOORS_PATH,
     WATER_CIRCUIT_MAX_COOL,
     WATER_CIRCUIT_MAX_HEAT,
     WATER_CIRCUIT_MIN_COOL,
@@ -666,6 +667,34 @@ class CSNetHomeAPI:
         except Exception as e:
             _LOGGER.error("Error during installation alarms data retrieval: %s", e)
             return None
+
+    async def async_get_power_data(self):
+        """Return the energy records CSNet keeps per indoor unit, or None.
+
+        One entry per indoor unit with ``hourly``, ``daily`` and ``monthly``
+        lists; each record has a ``time`` and, per use (space heating, space
+        cooling, hot water, pool), the electricity taken (``input``) and the
+        heat produced (``capacity``) in kWh. This is what the web app's
+        consumption page shows.
+        """
+        installation_id = self.installation_id if self.installation_id else -1
+        url = f"{self.base_url}{POWER_INDOORS_PATH}?installationId={installation_id}&_csrf={self.xsrf_token}"
+
+        if not await self._async_ensure_session():
+            return None
+
+        headers = COMMON_API_HEADERS | {
+            "accept": "*/*",
+            "x-requested-with": "XMLHttpRequest",
+        }
+
+        try:
+            answer = await self._async_get_json(url, headers, "energy records")
+        except Exception as e:  # pylint: disable=broad-except
+            _LOGGER.debug("Error during energy records retrieval: %s", e)
+            return None
+        data = answer.get("data") if isinstance(answer, dict) else None
+        return data if isinstance(data, list) else None
 
     async def async_delete_alarm(self, installation_id, alarm_id):
         """Delete an installation alarm."""

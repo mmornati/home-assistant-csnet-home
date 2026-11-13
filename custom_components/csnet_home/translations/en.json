@@ -13,7 +13,8 @@
                     "fan_coil_model": "Fan Coil Control Model",
                     "power_supply": "Outdoor Unit Power Supply",
                     "enable_alarm_notifications": "Enable alarm notifications",
-                    "filtered_alarm_codes": "Filtered alarm codes"
+                    "filtered_alarm_codes": "Filtered alarm codes",
+                    "energy_meter": "Electricity meter of the heat pump (optional)"
                 },
                 "data_description": {
                     "username": "Your CSNet Manager username",
@@ -24,7 +25,8 @@
                     "fan_coil_model": "Select the fan coil control type (standard or legacy)",
                     "power_supply": "Used to estimate instant power and COP. Auto detects 8/10 HP units as three phase, others as single phase.",
                     "enable_alarm_notifications": "Create a Home Assistant notification when the unit reports an alarm",
-                    "filtered_alarm_codes": "Comma-separated alarm codes that never notify (default: -1, communication errors). Leave empty to notify all."
+                    "filtered_alarm_codes": "Comma-separated alarm codes that never notify (default: -1, communication errors). Leave empty to notify all.",
+                    "energy_meter": "Any energy sensor (kWh) that measures the heat pump's electricity, from any device. Used to compute the COP from the heat CSNet records. Leave empty to keep the estimate only."
                 }
             },
             "reconfigure": {
@@ -39,7 +41,8 @@
                     "fan_coil_model": "Fan Coil Control Model",
                     "power_supply": "Outdoor Unit Power Supply",
                     "enable_alarm_notifications": "Enable alarm notifications",
-                    "filtered_alarm_codes": "Filtered alarm codes"
+                    "filtered_alarm_codes": "Filtered alarm codes",
+                    "energy_meter": "Electricity meter of the heat pump (optional)"
                 },
                 "data_description": {
                     "username": "Your CSNet Manager username",
@@ -50,7 +53,8 @@
                     "fan_coil_model": "Select the fan coil control type",
                     "power_supply": "Used to estimate instant power and COP. Auto detects 8/10 HP units as three phase, others as single phase.",
                     "enable_alarm_notifications": "Create a Home Assistant notification when the unit reports an alarm",
-                    "filtered_alarm_codes": "Comma-separated alarm codes that never notify (default: -1, communication errors). Leave empty to notify all."
+                    "filtered_alarm_codes": "Comma-separated alarm codes that never notify (default: -1, communication errors). Leave empty to notify all.",
+                    "energy_meter": "Any energy sensor (kWh) that measures the heat pump's electricity, from any device. Used to compute the COP from the heat CSNet records. Leave empty to keep the estimate only."
                 }
             },
             "reauth_confirm": {

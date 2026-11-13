@@ -13,7 +13,8 @@
                     "fan_coil_model": "Modelo de control del Fan Coil",
                     "power_supply": "Alimentación de la unidad exterior",
                     "enable_alarm_notifications": "Activar las notificaciones de alarma",
-                    "filtered_alarm_codes": "Códigos de alarma filtrados"
+                    "filtered_alarm_codes": "Códigos de alarma filtrados",
+                    "energy_meter": "Contador eléctrico de la bomba de calor (opcional)"
                 },
                 "data_description": {
                     "username": "Su nombre de usuario de CSNet Manager",
@@ -24,7 +25,8 @@
                     "fan_coil_model": "Seleccione el tipo de control del fan coil (estándar o heredado)",
                     "power_supply": "Se usa para estimar la potencia instantánea y el COP. Auto detecta las unidades de 8/10 CV como trifásicas y las demás como monofásicas.",
                     "enable_alarm_notifications": "Crear una notificación de Home Assistant cuando la unidad informa de una alarma",
-                    "filtered_alarm_codes": "Códigos de alarma, separados por comas, que nunca notifican (por defecto: -1, errores de comunicación). Dejar vacío para notificar todos."
+                    "filtered_alarm_codes": "Códigos de alarma, separados por comas, que nunca notifican (por defecto: -1, errores de comunicación). Dejar vacío para notificar todos.",
+                    "energy_meter": "Cualquier sensor de energía (kWh) que mida la electricidad de la bomba de calor, de cualquier dispositivo. Se usa para calcular el COP con el calor que registra CSNet. Dejar vacío para mantener solo la estimación."
                 }
             },
             "reconfigure": {
@@ -39,7 +41,8 @@
                     "fan_coil_model": "Modelo de control del Fan Coil",
                     "power_supply": "Alimentación de la unidad exterior",
                     "enable_alarm_notifications": "Activar las notificaciones de alarma",
-                    "filtered_alarm_codes": "Códigos de alarma filtrados"
+                    "filtered_alarm_codes": "Códigos de alarma filtrados",
+                    "energy_meter": "Contador eléctrico de la bomba de calor (opcional)"
                 },
                 "data_description": {
                     "username": "Su nombre de usuario de CSNet Manager",
@@ -50,7 +53,8 @@
                     "fan_coil_model": "Seleccione el tipo de control del fan coil",
                     "power_supply": "Se usa para estimar la potencia instantánea y el COP. Auto detecta las unidades de 8/10 CV como trifásicas y las demás como monofásicas.",
                     "enable_alarm_notifications": "Crear una notificación de Home Assistant cuando la unidad informa de una alarma",
-                    "filtered_alarm_codes": "Códigos de alarma, separados por comas, que nunca notifican (por defecto: -1, errores de comunicación). Dejar vacío para notificar todos."
+                    "filtered_alarm_codes": "Códigos de alarma, separados por comas, que nunca notifican (por defecto: -1, errores de comunicación). Dejar vacío para notificar todos.",
+                    "energy_meter": "Cualquier sensor de energía (kWh) que mida la electricidad de la bomba de calor, de cualquier dispositivo. Se usa para calcular el COP con el calor que registra CSNet. Dejar vacío para mantener solo la estimación."
                 }
             },
             "reauth_confirm": {

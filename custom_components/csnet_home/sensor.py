@@ -28,6 +28,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    CONF_ENERGY_METER,
     CONF_POWER_SUPPLY,
     DEFAULT_POWER_SUPPLY,
     DOMAIN,
@@ -809,6 +810,44 @@ DIAGNOSTIC_SENSOR_KEYS = frozenset(
 )
 
 
+def unit_device_info(coordinator) -> DeviceInfo:
+    """Return the device of the unit: the one the installation sensors are on."""
+    heating_status = _get_heating_status_from_installation_data(coordinator.get_installation_devices_data())
+    unit_model = heating_status.get("unitModel") if isinstance(heating_status, dict) else None
+    known = isinstance(unit_model, int) and not isinstance(unit_model, bool)
+    return DeviceInfo(
+        name="System-Controller",
+        manufacturer="Hitachi",
+        model=UNIT_MODEL_NAMES.get(unit_model, "HVAC System") if known else "HVAC System",
+        sw_version=(coordinator.get_common_data() or {}).get("firmware"),
+        identifiers={(DOMAIN, "System-Controller")},
+    )
+
+
+def _server_energy_sensors(hass, entry, coordinator) -> list:
+    """Return the sensors for the server's energy records, and for the COP when a meter is configured."""
+    # imported here: that module is only needed by this platform's setup
+    from .server_energy import (  # pylint: disable=import-outside-toplevel
+        HEAT,
+        METERED_COP_DESCRIPTIONS,
+        CSNetHomeMeteredCopSensor,
+        CSNetHomeServerEnergySensor,
+        MeterTracker,
+        has_energy,
+        server_energy_descriptions,
+    )
+
+    energy = coordinator.get_server_energy()
+    device_info = unit_device_info(coordinator)
+    sensors: list = [CSNetHomeServerEnergySensor(coordinator, description, device_info) for description in server_energy_descriptions(energy)]
+
+    meter = entry.data.get(CONF_ENERGY_METER)
+    if meter and has_energy(energy, HEAT):
+        tracker = MeterTracker(hass, entry.entry_id, meter)
+        sensors += [CSNetHomeMeteredCopSensor(coordinator, description, device_info, tracker) for description in METERED_COP_DESCRIPTIONS]
+    return sensors
+
+
 def _apply_description_attrs(entity: SensorEntity, description: SensorEntityDescription) -> None:
     """Copy the relevant description fields onto the entity's ``_attr_*`` slots.
 
@@ -926,6 +965,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
             )
             calculated_sensor.power_supply = power_supply
             sensors.append(calculated_sensor)
+
+    # Energy the server recorded for the unit, and COP from the user's own meter
+    sensors.extend(_server_energy_sensors(hass, entry, coordinator))
 
     # Add alarm history sensor (shows recent alarms from installation alarms API)
     sensors.append(CSNetHomeAlarmHistorySensor(coordinator, coordinator.get_common_data()))

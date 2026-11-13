@@ -17,7 +17,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import CSNetHomeConfigEntry, CSNetHomeCoordinator
-from .sensor import SYSTEM_STATUS_FLAG_BITS, UNIT_MODEL_NAMES, _get_heating_status_from_installation_data
+from .sensor import SYSTEM_STATUS_FLAG_BITS, _get_heating_status_from_installation_data, unit_device_info
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -151,13 +151,4 @@ class CSNetHomeBinarySensor(CoordinatorEntity, BinarySensorEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return the device of the unit, the one its sensors are on."""
-        heating_status = self._heating_status()
-        unit_model = heating_status.get("unitModel") if isinstance(heating_status, dict) else None
-        model = UNIT_MODEL_NAMES.get(unit_model, "HVAC System") if isinstance(unit_model, int) and not isinstance(unit_model, bool) else "HVAC System"
-        return DeviceInfo(
-            name="System-Controller",
-            manufacturer="Hitachi",
-            model=model,
-            sw_version=(self.coordinator.get_common_data() or {}).get("firmware"),
-            identifiers={(DOMAIN, "System-Controller")},
-        )
+        return unit_device_info(self.coordinator)

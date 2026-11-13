@@ -27,6 +27,8 @@ _LOGGER = logging.getLogger(__name__)
 # The alarm list of an installation rarely changes: ask for it less often than the readings
 ALARM_POLL_SECONDS = 300
 ALARM_STORAGE_VERSION = 1
+# The server adds to its energy records once an hour
+SERVER_ENERGY_POLL_SECONDS = 900
 # CSNet needs a moment to apply an order: a read sent right after a write can
 # still return the old value
 WRITE_REFRESH_DELAY_SECONDS = 2.0
@@ -107,6 +109,9 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         self._dismissed_zone_alarm_codes: dict[str, int] = {}
         self._alarm_store = Store(hass, ALARM_STORAGE_VERSION, alarm_storage_key(entry_id))
         self._alarm_state_loaded = False
+        # Energy records of the server: last good answer and when it was asked for
+        self._server_energy = None
+        self._server_energy_fetched_at: float | None = None
         self._cancel_refresh_after_write: CALLBACK_TYPE | None = None
         self._saved_alarm_state: dict | None = None
         self._enable_alarm_notifications = enable_alarm_notifications
@@ -176,6 +181,8 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         # Enrich sensor data
         self._enrich_sensor_data(cloud_api, installation_devices_data)
 
+        await self._async_update_server_energy(cloud_api)
+
         await self._async_load_alarm_state()
 
         # Handle alarm notifications
@@ -233,6 +240,31 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         if self._cancel_refresh_after_write is not None:
             self._cancel_refresh_after_write()
             self._cancel_refresh_after_write = None
+
+    async def _async_update_server_energy(self, cloud_api) -> None:
+        """Read the server's energy records at most every SERVER_ENERGY_POLL_SECONDS.
+
+        The last answer is kept between requests and when a request fails. A
+        failure here never fails the poll: the readings do not depend on it.
+        """
+        now = time.monotonic()
+        fetched_at = self._server_energy_fetched_at
+        if fetched_at is not None and now - fetched_at < SERVER_ENERGY_POLL_SECONDS:
+            return
+        try:
+            data = await cloud_api.async_get_power_data()
+        except Exception as exc:  # pylint: disable=broad-except
+            _LOGGER.debug("Could not read the energy records: %s", exc)
+            return
+        if not isinstance(data, list):
+            # asked again on the next poll
+            return
+        self._server_energy = data
+        self._server_energy_fetched_at = now
+
+    def get_server_energy(self):
+        """Return the server's energy records (a list per indoor unit), or None if never read."""
+        return self._server_energy
 
     def async_invalidate_installation_alarms(self) -> None:
         """Ask CSNet for the alarm list again on the next poll (after an alarm was deleted)."""
