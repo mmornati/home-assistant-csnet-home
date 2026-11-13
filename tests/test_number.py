@@ -157,16 +157,6 @@ def mock_entry(mock_coordinator):
     return entry
 
 
-def test_setup_no_coordinator(mock_deps, mock_hass_instance, mock_entry):
-    """Test setup without coordinator."""
-
-    async def run_test():
-        mock_entry.runtime_data.coordinator = None
-        assert await mock_deps.async_setup_entry(mock_hass_instance, mock_entry, MagicMock()) is None
-
-    asyncio.run(run_test())
-
-
 def test_setup_no_installation_data(mock_deps, mock_hass_instance, mock_entry, mock_coordinator):
     """Test setup without installation data."""
 

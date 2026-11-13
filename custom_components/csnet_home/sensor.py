@@ -41,6 +41,48 @@ from .helpers import zone_device_identifier, zone_key
 
 _LOGGER = logging.getLogger(__name__)
 
+# API key(s) behind each installation sensor
+INSTALLATION_SENSOR_API_KEYS = {
+    "pump_speed": ["pumpSpeed"],
+    "water_flow": ["waterFlow"],
+    "in_water_temperature": ["waterInletTemp"],
+    "out_water_temperature": ["waterOutletTemp"],
+    "out_water_temperature_3": ["waterOutlet3Temp"],
+    "c2_water_temperature": ["waterOutlet2Temp"],
+    "set_water_temperature": ["waterTempSetting"],
+    "water_pressure": ["waterPressure"],
+    "defrost": ["defrosting"],
+    "mix_valve_position": ["mixingValveOpening"],
+    "external_temperature": ["outdoorAmbientTemp"],
+    "mean_external_temperature": ["outdoorAmbientAverageTemp"],
+    "gas_temperature": ["gasTemp"],
+    "liquid_temperature": ["liquidTemp"],
+    # Central control configuration
+    "central_config": ["centralConfig"],
+    "lcd_software_version": ["lcdSoft"],
+    "unit_model": ["unitModel"],
+    # DHW temperatures (Issue #155)
+    "bottom_dhw_temperature": ["bottomTempDHW"],
+    "top_dhw_temperature": ["topTempDHW"],
+    "heat_exchanger_water_outlet_temperature": ["waterOutletHPTemp"],
+}
+
+# systemConfigBits mask behind each configuration sensor
+SYSTEM_CONFIG_BIT_MASKS = {
+    "cascade_slave_mode": 0x1000,  # 4096
+    "fan_coil_compatible": 0x2000,  # 8192
+    "c1_thermostat_present": 0x40,  # 64
+    "c2_thermostat_present": 0x80,  # 128
+}
+
+# heatingStatus key behind each OTC type sensor
+OTC_TYPE_API_KEYS = {
+    "otc_heating_type_c1": "otcTypeHeatC1",
+    "otc_cooling_type_c1": "otcTypeCoolC1",
+    "otc_heating_type_c2": "otcTypeHeatC2",
+    "otc_cooling_type_c2": "otcTypeCoolC2",
+}
+
 
 # Per-zone sensor descriptions (current_temperature, mode, alarm_code, etc.)
 ZONE_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
@@ -761,9 +803,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
     _LOGGER.debug("Starting CSNet Home sensor setup")
 
     coordinator = entry.runtime_data.coordinator
-    if not coordinator:
-        _LOGGER.error("No coordinator instance found!")
-        return None
 
     sensors = []
     common_data = coordinator.get_common_data()
@@ -1041,34 +1080,8 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, SensorEntity):
         """Get raw value from installation data or heating status."""
         installation_data = self._coordinator.get_installation_devices_data()
 
-        # Map the sensor keys to actual API response keys from indoors/heatingStatus
-        key_mappings = {
-            "pump_speed": ["pumpSpeed"],
-            "water_flow": ["waterFlow"],
-            "in_water_temperature": ["waterInletTemp"],
-            "out_water_temperature": ["waterOutletTemp"],
-            "out_water_temperature_3": ["waterOutlet3Temp"],
-            "c2_water_temperature": ["waterOutlet2Temp"],
-            "set_water_temperature": ["waterTempSetting"],
-            "water_pressure": ["waterPressure"],
-            "defrost": ["defrosting"],
-            "mix_valve_position": ["mixingValveOpening"],
-            "external_temperature": ["outdoorAmbientTemp"],
-            "mean_external_temperature": ["outdoorAmbientAverageTemp"],
-            "gas_temperature": ["gasTemp"],
-            "liquid_temperature": ["liquidTemp"],
-            # Central control configuration
-            "central_config": ["centralConfig"],
-            "lcd_software_version": ["lcdSoft"],
-            "unit_model": ["unitModel"],
-            # DHW temperatures (Issue #155)
-            "bottom_dhw_temperature": ["bottomTempDHW"],
-            "top_dhw_temperature": ["topTempDHW"],
-            "heat_exchanger_water_outlet_temperature": ["waterOutletHPTemp"],
-        }
-
         # Try to find the value using different possible key names
-        possible_keys = key_mappings.get(self._key, [self._key])
+        possible_keys = INSTALLATION_SENSOR_API_KEYS.get(self._key, [self._key])
         value = None
 
         # Look in the correct API response structure: data[0].indoors[0].heatingStatus
@@ -1162,15 +1175,7 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, SensorEntity):
 
         system_config_bits = heating_status.get("systemConfigBits", 0)
 
-        # Decode the specific bit based on the sensor key
-        bit_masks = {
-            "cascade_slave_mode": 0x1000,  # 4096
-            "fan_coil_compatible": 0x2000,  # 8192
-            "c1_thermostat_present": 0x40,  # 64
-            "c2_thermostat_present": 0x80,  # 128
-        }
-
-        mask = bit_masks.get(self._key)
+        mask = SYSTEM_CONFIG_BIT_MASKS.get(self._key)
         if mask:
             return STATE_ON if (system_config_bits & mask) > 0 else STATE_OFF
 
@@ -1182,15 +1187,7 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, SensorEntity):
         if not heating_status:
             return "Unknown"
 
-        # Map sensor key to API key
-        otc_key_map = {
-            "otc_heating_type_c1": "otcTypeHeatC1",
-            "otc_cooling_type_c1": "otcTypeCoolC1",
-            "otc_heating_type_c2": "otcTypeHeatC2",
-            "otc_cooling_type_c2": "otcTypeCoolC2",
-        }
-
-        api_key = otc_key_map.get(self._key)
+        api_key = OTC_TYPE_API_KEYS.get(self._key)
         if api_key:
             otc_value = heating_status.get(api_key)
             if otc_value is not None:

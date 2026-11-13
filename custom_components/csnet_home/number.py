@@ -29,9 +29,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
     _LOGGER.debug("Starting CSNet Home number setup")
 
     coordinator = entry.runtime_data.coordinator
-    if not coordinator:
-        _LOGGER.error("No coordinator instance found!")
-        return None
 
     entities = []
     installation_devices_data = coordinator.get_installation_devices_data()

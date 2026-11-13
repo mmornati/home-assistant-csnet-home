@@ -8,7 +8,6 @@ INSTALLATION_DEVICES_PATH = "/data/installationdevices"
 INSTALLATION_ALARMS_PATH = "/data/installationalarms"
 DELETESPECIFICALARM_PATH = "/data/deletemyspecificalarm"
 HEAT_SETTINGS_PATH = "/data/indoor/heat_setting"
-CONF_ENABLE_DEVICE_LOGGING = "enable_device_logging"
 CONF_MAX_TEMP_OVERRIDE = "max_temp_override"
 CONF_FAN_COIL_MODEL = "fan_coil_model"
 CONF_ENABLE_ALARM_NOTIFICATIONS = "enable_alarm_notifications"
@@ -60,11 +59,6 @@ WATER_CIRCUIT_MAX_COOL = 22  # C1_MAX_COOL / C2_MAX_COOL from JavaScript
 WATER_CIRCUIT_MIN_COOL = 5  # C1_MIN_COOL / C2_MIN_COOL from JavaScript
 
 # Fan Speed Control (for fan coil systems)
-FAN_SPEED_OFF = "0"
-FAN_SPEED_LOW = "1"
-FAN_SPEED_MEDIUM = "2"
-FAN_SPEED_AUTO = "3"
-
 # Standard
 FAN_SPEED_MAP_STANDARD = {
     "off": 0,
@@ -94,9 +88,6 @@ FAN_SPEED_REVERSE_MAP_LEGACY = {
     2: "high",
     3: "auto",
 }
-
-FAN_SPEED_MAP = FAN_SPEED_MAP_STANDARD
-FAN_SPEED_REVERSE_MAP = FAN_SPEED_REVERSE_MAP_STANDARD
 
 # Operation Status Constants
 OPST_OFF = 0

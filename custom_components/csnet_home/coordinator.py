@@ -284,22 +284,6 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
             raise ConfigEntryAuthFailed("CSNet Manager rejected the credentials")
         raise UpdateFailed("Could not log in to CSNet Manager")
 
-    async def _fetch_data(self, cloud_api):
-        """Fetch all data from the API."""
-        try:
-            # ensure translations are loaded before elements to enrich alarm messages
-            await cloud_api.load_translations()
-
-            # Fetch elements data, installation devices data, and alarms
-            elements_data = await cloud_api.async_get_elements_data()
-            installation_devices_data = await cloud_api.async_get_installation_devices_data()
-            installation_alarms_data = await cloud_api.async_get_installation_alarms()
-
-            return elements_data, installation_devices_data, installation_alarms_data
-        except Exception as exc:
-            _LOGGER.error("Error fetching data from API: %s", exc)
-            return None, None, None
-
     def _update_internal_data(self, elements_data, installation_devices_data, installation_alarms_data):
         """Update internal data structures with fetched data."""
         if elements_data:

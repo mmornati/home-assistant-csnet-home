@@ -390,7 +390,7 @@ async def test_api_get_elements_data_success(mock_aiohttp_client, hass):
             },
         ],
     }
-    mock_client_instance.get.assert_called_with("https://www.csnetmanager.com/data/elements", headers=ANY, cookies=ANY)
+    mock_client_instance.get.assert_called_with("https://www.csnetmanager.com/data/elements", headers=ANY)
 
 
 @pytest.mark.asyncio
@@ -587,7 +587,7 @@ async def test_api_get_elements_data_empty_names(mock_aiohttp_client, hass):
             },
         ],
     }
-    mock_client_instance.get.assert_called_with("https://www.csnetmanager.com/data/elements", headers=ANY, cookies=ANY)
+    mock_client_instance.get.assert_called_with("https://www.csnetmanager.com/data/elements", headers=ANY)
 
 
 @pytest.mark.asyncio
@@ -648,7 +648,6 @@ async def test_api_get_installation_devices_data_success(mock_aiohttp_client, ha
     api = CSNetHomeAPI(hass, "user", "pass")
     api.session = mock_client_instance
     api.logged_in = True
-    api.cookies = {"test": "cookie"}
 
     data = await api.async_get_installation_devices_data()
 
@@ -669,7 +668,6 @@ async def test_api_get_installation_devices_data_success(mock_aiohttp_client, ha
     mock_client_instance.get.assert_called_with(
         "https://www.csnetmanager.com/data/installationdevices?installationId=-1",
         headers=ANY,
-        cookies=ANY,
     )
 
 
@@ -748,7 +746,6 @@ async def test_api_get_installation_devices_data_failure(mock_aiohttp_client, ha
     api = CSNetHomeAPI(hass, "user", "pass")
     api.session = mock_client_instance
     api.logged_in = True
-    api.cookies = {"test": "cookie"}
 
     data = await api.async_get_installation_devices_data()
 
@@ -824,7 +821,6 @@ async def test_api_set_hvac_mode_zone5_uses_circuit1(mock_aiohttp_client, hass):
     api.session = mock_client_instance
     api.logged_in = True
     api.xsrf_token = "test-token"
-    api.cookies = {"test": "cookie"}
 
     # Test with zone_id 5 turning on heat
     result = await api.async_set_hvac_mode(5, 2486, "heat")
@@ -858,7 +854,6 @@ async def test_api_set_hvac_mode_zone1_uses_circuit1(mock_aiohttp_client, hass):
     api.session = mock_client_instance
     api.logged_in = True
     api.xsrf_token = "test-token"
-    api.cookies = {"test": "cookie"}
 
     # Test with zone_id 1 turning on heat (zone 1 is typically an air circuit)
     result = await api.async_set_hvac_mode(1, 1706, "heat")
@@ -888,7 +883,6 @@ async def test_api_set_hvac_mode_auto_zone1_air(mock_aiohttp_client, hass):
     api.session = mock_client_instance
     api.logged_in = True
     api.xsrf_token = "test-token"
-    api.cookies = {"test": "cookie"}
 
     # Test with zone_id 1 setting AUTO mode
     result = await api.async_set_hvac_mode(1, 1706, "heat_cool")
@@ -920,7 +914,6 @@ async def test_api_set_hvac_mode_auto_zone5_water(mock_aiohttp_client, hass):
     api.session = mock_client_instance
     api.logged_in = True
     api.xsrf_token = "test-token"
-    api.cookies = {"test": "cookie"}
 
     # Test with zone_id 5 setting AUTO mode
     result = await api.async_set_hvac_mode(5, 2486, "heat_cool")
@@ -952,7 +945,6 @@ async def test_api_set_preset_mode_zone5_uses_circuit1(mock_aiohttp_client, hass
     api.session = mock_client_instance
     api.logged_in = True
     api.xsrf_token = "test-token"
-    api.cookies = {"test": "cookie"}
 
     # Test with zone_id 5 setting eco mode (zone 5 is a water circuit)
     result = await api.set_preset_modes(5, 2486, "eco", current_mode=1, on_off=1)
@@ -985,7 +977,6 @@ async def test_api_set_hvac_mode_zone2_uses_circuit2_air(mock_aiohttp_client, ha
     api.session = mock_client_instance
     api.logged_in = True
     api.xsrf_token = "test-token"
-    api.cookies = {"test": "cookie"}
 
     # Test with zone_id 2 turning on cool (zone 2 is air circuit)
     result = await api.async_set_hvac_mode(2, 1706, "cool")
@@ -1016,7 +1007,6 @@ async def test_api_set_hvac_mode_off_zone5_water(mock_aiohttp_client, hass):
     api.session = mock_client_instance
     api.logged_in = True
     api.xsrf_token = "test-token"
-    api.cookies = {"test": "cookie"}
 
     # Test with zone_id 5 turning off
     result = await api.async_set_hvac_mode(5, 2486, "off")
@@ -1048,7 +1038,6 @@ async def test_api_set_hvac_mode_off_zone1_air(mock_aiohttp_client, hass):
     api.session = mock_client_instance
     api.logged_in = True
     api.xsrf_token = "test-token"
-    api.cookies = {"test": "cookie"}
 
     # Test with zone_id 1 turning off
     result = await api.async_set_hvac_mode(1, 1706, "off")
@@ -1080,7 +1069,6 @@ async def test_api_set_preset_mode_zone1_air(mock_aiohttp_client, hass):
     api.session = mock_client_instance
     api.logged_in = True
     api.xsrf_token = "test-token"
-    api.cookies = {"test": "cookie"}
 
     # Test with zone_id 1 setting comfort mode
     result = await api.set_preset_modes(1, 1706, "comfort", current_mode=1, on_off=1)
@@ -1122,7 +1110,6 @@ async def test_api_get_installation_alarms_success(mock_aiohttp_client, hass):
     api = CSNetHomeAPI(hass, "user", "pass")
     api.session = mock_client_instance
     api.logged_in = True
-    api.cookies = {"test": "cookie"}
     api.installation_id = 4529
     api.xsrf_token = "test-token"
 
@@ -1142,7 +1129,6 @@ async def test_api_get_installation_alarms_success(mock_aiohttp_client, hass):
     mock_client_instance.get.assert_called_with(
         "https://www.csnetmanager.com/data/installationalarms?installationId=4529&_csrf=test-token",
         headers=ANY,
-        cookies=ANY,
     )
 
 
@@ -1169,7 +1155,6 @@ async def test_api_get_installation_alarms_failure(mock_aiohttp_client, hass):
     api = CSNetHomeAPI(hass, "user", "pass")
     api.session = mock_client_instance
     api.logged_in = True
-    api.cookies = {"test": "cookie"}
     api.installation_id = 4529
     api.xsrf_token = "test-token"
 
@@ -1192,7 +1177,6 @@ async def test_api_set_silent_mode_on(mock_aiohttp_client, hass):
     api.session = mock_client_instance
     api.logged_in = True
     api.xsrf_token = "test-token"
-    api.cookies = {"test": "cookie"}
 
     # Test with zone_id 1 turning silent mode on
     result = await api.async_set_silent_mode(1, 1706, True)
@@ -1221,7 +1205,6 @@ async def test_api_set_silent_mode_off(mock_aiohttp_client, hass):
     api.session = mock_client_instance
     api.logged_in = True
     api.xsrf_token = "test-token"
-    api.cookies = {"test": "cookie"}
 
     # Test with zone_id 1 turning silent mode off
     result = await api.async_set_silent_mode(1, 1706, False)
@@ -1248,7 +1231,6 @@ async def test_api_set_silent_mode_zone5_uses_circuit1(mock_aiohttp_client, hass
     api.session = mock_client_instance
     api.logged_in = True
     api.xsrf_token = "test-token"
-    api.cookies = {"test": "cookie"}
 
     # Test with zone_id 5 setting silent mode
     result = await api.async_set_silent_mode(5, 2486, True)
@@ -1278,7 +1260,6 @@ async def test_api_set_silent_mode_zone2_uses_circuit2(mock_aiohttp_client, hass
     api.session = mock_client_instance
     api.logged_in = True
     api.xsrf_token = "test-token"
-    api.cookies = {"test": "cookie"}
 
     # Test with zone_id 2 setting silent mode
     result = await api.async_set_silent_mode(2, 1706, True)
@@ -1305,7 +1286,6 @@ async def test_api_set_silent_mode_http_error(mock_aiohttp_client, hass):
     api.session = mock_client_instance
     api.logged_in = True
     api.xsrf_token = "test-token"
-    api.cookies = {"test": "cookie"}
 
     # Test with zone_id 1 - should fail
     result = await api.async_set_silent_mode(1, 1706, True)
@@ -1325,7 +1305,6 @@ async def test_api_set_silent_mode_timeout_error(mock_aiohttp_client, hass):
     api.session = mock_client_instance
     api.logged_in = True
     api.xsrf_token = "test-token"
-    api.cookies = {"test": "cookie"}
 
     # Test with zone_id 1 - should fail
     result = await api.async_set_silent_mode(1, 1706, True)
@@ -1656,7 +1635,6 @@ async def test_api_set_fan_speed_c1_low(mock_aiohttp_client, hass):
     api.session = mock_client_instance
     api.logged_in = True
     api.xsrf_token = "test-token"
-    api.cookies = {"test": "cookie"}
 
     # Test with zone_id 1, circuit 1, fan speed low (1)
     result = await api.async_set_fan_speed(1, 1706, 1, 1)
@@ -1685,7 +1663,6 @@ async def test_api_set_fan_speed_c2_medium(mock_aiohttp_client, hass):
     api.session = mock_client_instance
     api.logged_in = True
     api.xsrf_token = "test-token"
-    api.cookies = {"test": "cookie"}
 
     # Test with zone_id 2, circuit 2, fan speed medium (2)
     result = await api.async_set_fan_speed(2, 1706, 2, 2)
@@ -1712,7 +1689,6 @@ async def test_api_set_fan_speed_auto(mock_aiohttp_client, hass):
     api.session = mock_client_instance
     api.logged_in = True
     api.xsrf_token = "test-token"
-    api.cookies = {"test": "cookie"}
 
     # Test with fan speed auto (3)
     result = await api.async_set_fan_speed(1, 1706, 3, 1)
@@ -1739,7 +1715,6 @@ async def test_api_set_fan_speed_off(mock_aiohttp_client, hass):
     api.session = mock_client_instance
     api.logged_in = True
     api.xsrf_token = "test-token"
-    api.cookies = {"test": "cookie"}
 
     # Test with fan speed off (0)
     result = await api.async_set_fan_speed(1, 1706, 0, 1)
@@ -1766,7 +1741,6 @@ async def test_api_set_fan_speed_http_error(mock_aiohttp_client, hass):
     api.session = mock_client_instance
     api.logged_in = True
     api.xsrf_token = "test-token"
-    api.cookies = {"test": "cookie"}
 
     # Test with zone_id 1 - should fail
     result = await api.async_set_fan_speed(1, 1706, 1, 1)
@@ -1786,7 +1760,6 @@ async def test_api_set_fan_speed_timeout_error(mock_aiohttp_client, hass):
     api.session = mock_client_instance
     api.logged_in = True
     api.xsrf_token = "test-token"
-    api.cookies = {"test": "cookie"}
 
     # Test with zone_id 1 - should fail
     result = await api.async_set_fan_speed(1, 1706, 1, 1)
