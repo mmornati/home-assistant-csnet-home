@@ -1185,8 +1185,8 @@ async def test_api_set_silent_mode_on(mock_aiohttp_client, hass):
     call_args = mock_client_instance.post.call_args
     assert call_args is not None
     data_sent = call_args[1]["data"]
-    assert "silentModeC1" in data_sent
-    assert data_sent["silentModeC1"] == "1"
+    assert data_sent["silentMode"] == "1"
+    assert not [key for key in data_sent if key.startswith("silentModeC")]
     assert data_sent["indoorId"] == 1706
     assert data_sent["orderStatus"] == "PENDING"
 
@@ -1213,13 +1213,13 @@ async def test_api_set_silent_mode_off(mock_aiohttp_client, hass):
     call_args = mock_client_instance.post.call_args
     assert call_args is not None
     data_sent = call_args[1]["data"]
-    assert "silentModeC1" in data_sent
-    assert data_sent["silentModeC1"] == "0"
+    assert data_sent["silentMode"] == "0"
+    assert not [key for key in data_sent if key.startswith("silentModeC")]
 
 
 @pytest.mark.asyncio
-async def test_api_set_silent_mode_zone5_uses_circuit1(mock_aiohttp_client, hass):
-    """Test that zone_id 5 uses C1 in silent mode parameter names."""
+async def test_api_set_silent_mode_from_a_water_zone(mock_aiohttp_client, hass):
+    """Test that zone_id 5 sends the unit-level key."""
     mock_client_instance = mock_aiohttp_client.return_value
 
     mock_response = mock_client_instance.post.return_value.__aenter__.return_value
@@ -1239,15 +1239,13 @@ async def test_api_set_silent_mode_zone5_uses_circuit1(mock_aiohttp_client, hass
     call_args = mock_client_instance.post.call_args
     assert call_args is not None
     data_sent = call_args[1]["data"]
-    # Zone 5 should use C1 parameters
-    assert "silentModeC1" in data_sent
-    assert data_sent["silentModeC1"] == "1"
-    # Should not have C5 parameters
-    assert "silentModeC5" not in data_sent
+    # Zone 5 sends the same unit-level key
+    assert data_sent["silentMode"] == "1"
+    assert not [key for key in data_sent if key.startswith("silentModeC")]
 
 
 @pytest.mark.asyncio
-async def test_api_set_silent_mode_zone2_uses_circuit2(mock_aiohttp_client, hass):
+async def test_api_set_silent_mode_from_circuit_2(mock_aiohttp_client, hass):
     """Test that zone_id 2 uses C2 in silent mode parameter names."""
     mock_client_instance = mock_aiohttp_client.return_value
 
@@ -1268,8 +1266,8 @@ async def test_api_set_silent_mode_zone2_uses_circuit2(mock_aiohttp_client, hass
     call_args = mock_client_instance.post.call_args
     assert call_args is not None
     data_sent = call_args[1]["data"]
-    assert "silentModeC2" in data_sent
-    assert data_sent["silentModeC2"] == "1"
+    assert data_sent["silentMode"] == "1"
+    assert not [key for key in data_sent if key.startswith("silentModeC")]
 
 
 @pytest.mark.asyncio
@@ -2750,11 +2748,24 @@ async def test_preset_mode_zone6_uses_c2_water_circuit(hass):
 
 
 @pytest.mark.asyncio
-async def test_silent_mode_zone6_uses_c2(hass):
-    """Zone 6 (C2 water) uses silentModeC2."""
+@pytest.mark.parametrize("zone_id", [1, 2, 5, 6])
+async def test_silent_mode_is_sent_for_the_unit_whatever_the_zone(hass, zone_id):
+    """Silent mode belongs to the unit: the web app's key, the same for every zone."""
     api = _logged_in_api(hass, [_response_cm()])
-    assert await api.async_set_silent_mode(6, 1234, True) is True
-    assert api.session.post.call_args[1]["data"]["silentModeC2"] == "1"
+    assert await api.async_set_silent_mode(zone_id, 1234, True) is True
+    data = api.session.post.call_args[1]["data"]
+    assert data["silentMode"] == "1"
+    assert data["indoorId"] == 1234
+    assert not [key for key in data if key.startswith("silentModeC")]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("temperature", "sent"), [(19.9, "199"), (20.0, "200"), (19.5, "195"), (20.3, "203"), (7.1, "71")])
+async def test_room_setpoint_is_rounded_not_truncated(hass, temperature, sent):
+    """19.9 * 10 is 198.99999999999997 as a float; the unit must get 199."""
+    api = _logged_in_api(hass, [_response_cm()])
+    assert await api.async_set_temperature(1, 1234, 1, temperature=temperature) is True
+    assert api.session.post.call_args[1]["data"]["settingTempRoomZ1"] == sent
 
 
 def test_circuit_for_zone():
@@ -2778,3 +2789,27 @@ async def test_validate_credentials_does_not_log_username_at_info(hass, caplog):
     with patch.object(CSNetHomeAPI, "async_login", AsyncMock(return_value=True)), patch("aiohttp.ClientSession"):
         await CSNetHomeAPI.async_validate_credentials(hass, "someone@example.com", "pass")
     assert "someone@example.com" not in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("heating_status", "expected"),
+    [
+        ({"systemConfigBits": 0x4000}, True),
+        ({"systemConfigBits": 0x4FC3}, True),
+        ({"systemConfigBits": 0x0FC3}, False),  # the maintainer's unit: no silent mode
+        ({"systemConfigBits": None}, False),
+        ({}, False),
+    ],
+)
+def test_has_silent_mode_follows_the_units_capability_bit(hass, heating_status, expected):
+    """Silent mode exists only where the unit reports it, as in the web app."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+    data = {"data": [{"indoors": [{"id": 1234, "heatingStatus": heating_status}]}]}
+    assert api.has_silent_mode(data, 1234) is expected
+
+
+def test_has_silent_mode_is_false_without_unit_data(hass):
+    """Without the unit's status the capability cannot be confirmed."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+    assert api.has_silent_mode(None) is False
+    assert api.has_silent_mode({}) is False

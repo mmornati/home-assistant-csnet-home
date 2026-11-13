@@ -6,6 +6,7 @@ import logging
 from homeassistant.components.climate import FAN_AUTO, ClimateEntity, HVACAction, HVACMode
 from homeassistant.components.climate.const import FAN_ON, ClimateEntityFeature
 from homeassistant.const import UnitOfTemperature
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -219,7 +220,8 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
 
             if installation_devices_data:
                 cloud_api = self.entry.runtime_data.api
-                mode = self._sensor_data.get("mode", 1)
+                # the same mode as the one the setpoint is written for
+                mode = self._running_mode()
 
                 # Determine circuit number from zone_id
                 circuit = 1 if zone_id == 5 else 2
@@ -379,10 +381,22 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
 
         return attrs
 
+    def _running_mode(self):
+        """Return the mode the unit works in: in auto, heating or cooling as the unit reports it.
+
+        A water circuit has one fixed temperature for heating and one for
+        cooling. Like the CSNet web app, the one of the running mode is used.
+        """
+        mode = self._sensor_data.get("mode", 1)
+        if mode == 2 and self._sensor_data.get("real_mode") in (0, 1):
+            return self._sensor_data.get("real_mode")
+        return mode
+
     async def async_set_temperature(self, **kwargs):
         """Set the target temperature for a room."""
         temperature = kwargs.get("temperature")
         zone_id = self._sensor_data.get("zone_id")
+        mode = self._running_mode()
 
         # For water circuits (zone 5, 6), only allow temperature changes if OTC type is FIX
         if zone_id in [5, 6]:  # Water circuits (C1_WATER, C2_WATER)
@@ -392,7 +406,6 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
 
             if installation_devices_data:
                 cloud_api = self.entry.runtime_data.api
-                mode = self._sensor_data.get("mode", 1)
 
                 # Determine circuit number from zone_id
                 circuit = 1 if zone_id == 5 else 2
@@ -411,7 +424,7 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
         response = await cloud_api.async_set_temperature(
             zone_id,
             self._sensor_data["parent_id"],
-            self._sensor_data["mode"],
+            mode,
             temperature=temperature,
         )
         if response:
@@ -500,7 +513,11 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
                 fan_speed_key = f"fan{circuit}_speed"
                 self._sensor_data[fan_speed_key] = fan_speed
         else:
-            # For non-fan coil systems, set silent mode
+            # For non-fan coil systems, set silent mode. Only on units that
+            # have one: the order is a real one for the unit, and the CSNet web
+            # app does not offer it elsewhere.
+            if not cloud_api.has_silent_mode(self.coordinator.get_installation_devices_data(), self._sensor_data.get("parent_id")):
+                raise HomeAssistantError("This unit does not report a silent mode, so the order was not sent")
             silent_mode = fan_mode == FAN_ON
             response = await cloud_api.async_set_silent_mode(
                 self._sensor_data["zone_id"],
@@ -598,10 +615,8 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
             return self._cached_limits
 
         zone_id = self._sensor_data.get("zone_id")
-        mode = self._sensor_data.get("mode", 1)
         # In auto the limits are those of what the unit is doing right now
-        if mode == 2 and self._sensor_data.get("real_mode") in (0, 1):
-            mode = self._sensor_data.get("real_mode")
+        mode = self._running_mode()
         is_cooling = mode == 0
 
         if zone_id in [5, 6]:

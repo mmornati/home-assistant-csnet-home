@@ -906,7 +906,8 @@ class CSNetHomeAPI:
             else:  # Heating mode
                 data["fixTempHeatC2"] = str(int(temperature))
         else:
-            data[f"settingTempRoomZ{zone_id}"] = str(int(temperature * 10))
+            # round, not truncate: 19.9 * 10 is 198.99999999999997 as a float
+            data[f"settingTempRoomZ{zone_id}"] = str(round(temperature * 10))
 
         return await self._async_post_form(data, f"set temperature={temperature} for zone {zone_id}")
 
@@ -1053,15 +1054,17 @@ class CSNetHomeAPI:
         return await self._async_post_form(data, f"set water heater mode={preset_mode} for zone {zone_id}")
 
     async def async_set_silent_mode(self, zone_id, parent_id, silent_mode: bool):
-        """Set silent/quiet mode for a zone."""
-        circuit_id, _ = self.circuit_for_zone(zone_id)
+        """Set silent/quiet mode of the unit a zone belongs to.
 
+        Silent mode is a setting of the whole unit: the CSNet web app sends
+        ``silentMode``. There is no per-circuit key.
+        """
         data = {
             "id": f"{parent_id}{zone_id}",  # device id + zone id
             "updatedOn": str(int(time.time() * 1000)),  # current timestamp in ms
             "orderStatus": "PENDING",
             "indoorId": parent_id,
-            f"silentModeC{circuit_id}": "1" if silent_mode else "0",
+            "silentMode": "1" if silent_mode else "0",
         }
 
         return await self._async_post_form(data, f"set silent_mode={silent_mode} for zone {zone_id}")
@@ -1103,6 +1106,22 @@ class CSNetHomeAPI:
 
         system_config_bits = heating_status.get("systemConfigBits", 0)
         return (system_config_bits & 0x2000) > 0
+
+    def has_silent_mode(self, installation_devices_data, indoor_id=None):
+        """Return True when the unit reports a silent mode (systemConfigBits & 0x4000).
+
+        The CSNet web app only offers silent mode on such units. Without the
+        unit's status the answer is False: it cannot be confirmed.
+        """
+        if not installation_devices_data:
+            return False
+
+        heating_status = self.get_heating_status_from_installation_devices(installation_devices_data, indoor_id)
+        if not heating_status:
+            return False
+
+        system_config_bits = heating_status.get("systemConfigBits", 0)
+        return isinstance(system_config_bits, int) and (system_config_bits & 0x4000) > 0
 
     def get_fan_control_availability(self, circuit: int, mode: int, installation_devices_data, indoor_id=None):
         """Check if fan control is available for a specific circuit and mode.
