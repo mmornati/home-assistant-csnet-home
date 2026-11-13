@@ -59,6 +59,11 @@ def _installation_sensor(key, heating_status):
         ("in_water_temperature", "waterInletTemp"),
         ("out_water_temperature", "waterOutletTemp"),
         ("heat_exchanger_water_outlet_temperature", "waterOutletHPTemp"),
+        ("set_water_temperature", "waterTempSetting"),
+        ("gas_temperature", "gasTemp"),
+        ("liquid_temperature", "liquidTemp"),
+        ("external_temperature", "outdoorAmbientTemp"),
+        ("mean_external_temperature", "outdoorAmbientAverageTemp"),
     ],
 )
 @pytest.mark.parametrize("marker", [-127, -67])
@@ -73,9 +78,39 @@ def test_real_water_temperatures_are_kept(value):
     assert _installation_sensor("out_water_temperature_3", {"waterOutlet3Temp": value}).native_value == value
 
 
-def test_outdoor_temperature_is_not_filtered():
-    """The marker rule applies to water-side probes only."""
+def test_cold_outdoor_temperature_is_kept():
+    """A real winter reading is far above the marker."""
     assert _installation_sensor("external_temperature", {"outdoorAmbientTemp": -25}).native_value == -25
+
+
+def _compressor_sensor(key, heating_status=None, second_cycle=None):
+    data = {"data": [{"indoors": [{"heatingStatus": heating_status or {"ouHz": 30}, "secondCycle": second_cycle or {}}]}]}
+    coordinator = SimpleNamespace(get_installation_devices_data=lambda: data, get_common_data=lambda: {})
+    return CSNetHomeCompressorSensor(coordinator, DEVICE_DATA, {}, _description(COMPRESSOR_SENSOR_DESCRIPTIONS, key))
+
+
+@pytest.mark.parametrize(
+    ("key", "raw_key"),
+    [
+        ("discharge_temperature", "ouDischargeTemperature"),
+        ("evaporator_temperature", "ouEvapTemperature"),
+        ("outdoor_ambient_temperature", "ouAmbientTemperature"),
+    ],
+)
+@pytest.mark.parametrize("raw", [129, 189, 128])
+def test_outdoor_unit_marker_bytes_are_not_shown(key, raw_key, raw):
+    """129, 189 and 128 are -127, -67 and -128 as signed bytes: no probe."""
+    assert _compressor_sensor(key, {raw_key: raw}).native_value is None
+
+
+def test_outdoor_unit_negative_temperature_is_kept():
+    """252 is -4 °C, a normal evaporator temperature."""
+    assert _compressor_sensor("evaporator_temperature", {"ouEvapTemperature": 252}).native_value == -4
+
+
+def test_second_cycle_marker_is_not_shown():
+    """The second refrigerant cycle reports the same markers."""
+    assert _compressor_sensor("secondary_suction_temp", second_cycle={"suctionTemp": 129}).native_value is None
 
 
 # --------------------------------------------------------------------------
@@ -176,9 +211,27 @@ def test_no_heat_when_the_compressor_is_stopped(status):
     assert _thermal_power(RUNNING | {"operationStatus": status, "ouHz": 0}) == 0
 
 
-def test_no_heat_while_defrosting():
-    """Defrosting takes heat from the water."""
-    assert _thermal_power(RUNNING | {"operationStatus": 5, "defrosting": 1}) == 0
+@pytest.mark.parametrize("status", [5, 6, 8])
+def test_no_heat_while_defrosting(status):
+    """Defrosting takes heat from the water, in every status."""
+    assert _thermal_power(RUNNING | {"operationStatus": status, "defrosting": 1, "waterOutletHPTemp": 45}) == 0
+
+
+def test_cooling_status_sent_as_text_is_not_counted_as_heating():
+    """Some units send the status as text."""
+    assert _thermal_power(RUNNING | {"operationStatus": "Cooling Thermostat Off"}) == 0
+
+
+@pytest.mark.parametrize("probe", ["waterInletTemp", "waterOutletTemp"])
+def test_no_heat_from_a_missing_probe(probe):
+    """A -127 marker must not turn into hundreds of kilowatts."""
+    assert _thermal_power(RUNNING | {"operationStatus": 5, probe: -127}) == 0
+
+
+def test_hot_water_falls_back_to_the_circuit_outlet_probe():
+    """Status 8 uses the exchanger outlet, or the normal outlet when that probe is missing."""
+    assert _thermal_power(RUNNING | {"operationStatus": 8, "waterOutletHPTemp": 45}) == 2.5 * 1160 * 5
+    assert _thermal_power(RUNNING | {"operationStatus": 8, "waterOutletHPTemp": -127}) == EXPECTED_W
 
 
 @pytest.mark.parametrize("status", [1, 2])
@@ -203,7 +256,7 @@ POWERED = RUNNING | {"operationStatus": 6, "ouDischargePress": 20, "ouSuctionPre
 
 
 def _daily_sensor(key="daily_heating", last_update_success=True):
-    sensor = CSNetHomeDailySensor(_coordinator(POWERED, last_update_success), DEVICE_DATA, {}, DAILY_SENSOR_DESCRIPTIONS[key])
+    sensor = CSNetHomeDailySensor(_coordinator(dict(POWERED), last_update_success), DEVICE_DATA, {}, DAILY_SENSOR_DESCRIPTIONS[key])
     sensor.hass = SimpleNamespace()
     sensor.async_write_ha_state = lambda: None
     return sensor
@@ -252,11 +305,55 @@ def test_failed_poll_adds_no_energy():
 def test_gap_after_an_outage_is_capped():
     """One reading stands for a few minutes at most, not for a whole outage."""
     sensor = _daily_sensor()
-    sensor._last_update_time = dt_util.now() - timedelta(hours=3)
+    now = dt_util.now().replace(hour=12, minute=0, second=0, microsecond=0)
+    sensor._last_update_time = now - timedelta(hours=3)
 
-    sensor._handle_coordinator_update()
+    with patch("custom_components.csnet_home.sensor.dt_util.now", return_value=now):
+        sensor._handle_coordinator_update()
 
     assert sensor.native_value == round(EXPECTED_W * MAX_ENERGY_INTEGRATION_HOURS / 1000, 2)
+
+
+def test_slow_polling_interval_is_integrated_in_full():
+    """With a 10-minute interval each reading stands for the whole 10 minutes."""
+    sensor = _daily_sensor()
+    sensor.coordinator.update_interval = timedelta(minutes=10)
+    now = dt_util.now().replace(hour=12, minute=0, second=0, microsecond=0)
+    sensor._last_update_time = now - timedelta(minutes=10)
+
+    with patch("custom_components.csnet_home.sensor.dt_util.now", return_value=now):
+        sensor._handle_coordinator_update()
+
+    assert sensor.native_value == round(EXPECTED_W * (10 / 60) / 1000, 2)
+
+
+def test_failed_poll_across_midnight_resets_once_and_adds_nothing():
+    """The day's total is cleared at midnight even when that poll failed."""
+    sensor = _daily_sensor(last_update_success=False)
+    midnight = dt_util.now().replace(hour=0, minute=0, second=10, microsecond=0)
+    sensor._state = 42.0
+    sensor._last_update_time = midnight - timedelta(seconds=30)
+
+    with patch("custom_components.csnet_home.sensor.dt_util.now", return_value=midnight):
+        sensor._handle_coordinator_update()
+
+    assert sensor.native_value == 0
+
+
+@pytest.mark.parametrize(("status", "key"), [(5, "daily_cop_hvac"), (4, "daily_cop_hvac"), (7, "daily_cop_dhw")])
+def test_daily_cop_counts_the_compressor_outside_thermostat_on(status, key):
+    """Heat counted in these statuses also reaches the matching daily COP."""
+    sensor = _daily_sensor(key)
+    heating_status = sensor._get_heating_status()
+    heating_status["operationStatus"] = status
+    now = dt_util.now().replace(hour=12, minute=0, second=0, microsecond=0)
+    sensor._last_update_time = now - timedelta(minutes=1)
+
+    with patch("custom_components.csnet_home.sensor.dt_util.now", return_value=now):
+        sensor._handle_coordinator_update()
+
+    assert sensor._energy_out > 0
+    assert sensor._energy_in > 0
 
 
 def test_normal_poll_interval_is_integrated_in_full():
