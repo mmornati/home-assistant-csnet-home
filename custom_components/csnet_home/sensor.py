@@ -26,7 +26,16 @@ from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN, OPERATION_STATUS_MAP, OTC_COOLING_TYPE_NAMES, OTC_HEATING_TYPE_NAMES
+from .const import (
+    CONF_POWER_SUPPLY,
+    DEFAULT_POWER_SUPPLY,
+    DOMAIN,
+    OPERATION_STATUS_MAP,
+    OTC_COOLING_TYPE_NAMES,
+    OTC_HEATING_TYPE_NAMES,
+    POWER_SUPPLY_SINGLE_PHASE,
+    POWER_SUPPLY_THREE_PHASE,
+)
 from .coordinator import CSNetHomeCoordinator
 from .helpers import zone_device_identifier, zone_key
 
@@ -611,6 +620,29 @@ SECOND_CYCLE_PRESSURE_ABSENT = 127
 YUTAKI_S80_UNIT_MODEL = 2  # Only the S80 has a second (R134a) refrigerant cycle
 SUCTION_PRESSURE_KEYS = ("suction_pressure", "suction_pressure_correction")
 
+# Watts per reported compressor Amp, by outdoor unit power supply (Issue #229).
+# Single phase keeps the original PR #155 model (230 V). Three phase uses
+# 400 V * sqrt(3) * cos(phi), with cos(phi) assumed to be 0.95.
+WATTS_PER_AMP_SINGLE_PHASE = 230.0
+WATTS_PER_AMP_THREE_PHASE = 400.0 * 1.732 * 0.95
+# Yutaki outdoor capacity codes (ouCapacityCode & 0x7F, as decoded by CSNet
+# Manager's getUnitCapacitiText): 64 = 8 HP, 80 = 10 HP. These sizes only
+# exist with a three phase power supply.
+THREE_PHASE_ONLY_CAPACITY_CODES = (64, 80)
+
+
+def _detect_power_supply(heating_status):
+    """Guess the outdoor unit power supply from its capacity code.
+
+    CSNet Manager does not expose the number of phases. 8 and 10 HP outdoor
+    units are three phase only; smaller sizes exist in both variants, so
+    they default to single phase unless the user overrides it.
+    """
+    capacity_code = heating_status.get("ouCapacityCode")
+    if isinstance(capacity_code, int) and (capacity_code & 0x7F) in THREE_PHASE_ONLY_CAPACITY_CODES:
+        return POWER_SUPPLY_THREE_PHASE
+    return POWER_SUPPLY_SINGLE_PHASE
+
 
 def _get_second_cycle_from_installation_data(installation_data):
     """Get secondCycle from installation devices data (first indoor)."""
@@ -770,6 +802,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
             "room_id": "global",
         }
         common_data = coordinator.get_common_data()
+        power_supply = entry.data.get(CONF_POWER_SUPPLY, DEFAULT_POWER_SUPPLY)
 
         for description in INSTALLATION_SENSOR_DESCRIPTIONS:
             sensors.append(
@@ -785,27 +818,27 @@ async def async_setup_entry(hass, entry, async_add_entities):
         # Calculated Sensors (Instantaneous)
         # ----------------------------------------------------------------------
         for description in CALCULATED_SENSOR_DESCRIPTIONS.values():
-            sensors.append(
-                CSNetHomeCalculatedSensor(
-                    coordinator,
-                    global_device_data,
-                    common_data,
-                    description,
-                )
+            calculated_sensor = CSNetHomeCalculatedSensor(
+                coordinator,
+                global_device_data,
+                common_data,
+                description,
             )
+            calculated_sensor.power_supply = power_supply
+            sensors.append(calculated_sensor)
 
         # ----------------------------------------------------------------------
         # Accumulated Sensors (Daily)
         # ----------------------------------------------------------------------
         for description in DAILY_SENSOR_DESCRIPTIONS.values():
-            sensors.append(
-                CSNetHomeDailySensor(
-                    coordinator,
-                    global_device_data,
-                    common_data,
-                    description,
-                )
+            calculated_sensor = CSNetHomeDailySensor(
+                coordinator,
+                global_device_data,
+                common_data,
+                description,
             )
+            calculated_sensor.power_supply = power_supply
+            sensors.append(calculated_sensor)
 
     # Add alarm history sensor (shows recent alarms from installation alarms API)
     sensors.append(CSNetHomeAlarmHistorySensor(coordinator, coordinator.get_common_data()))
@@ -1281,6 +1314,19 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
     reported Amperage.
     """
 
+    # Configured outdoor unit power supply ("auto", "single_phase" or
+    # "three_phase"); set from the config entry in async_setup_entry.
+    power_supply = DEFAULT_POWER_SUPPLY
+
+    def _watts_per_amp(self, heating_status):
+        """Return the Watts drawn per reported compressor Amp."""
+        power_supply = self.power_supply
+        if power_supply not in (POWER_SUPPLY_SINGLE_PHASE, POWER_SUPPLY_THREE_PHASE):
+            power_supply = _detect_power_supply(heating_status)
+        if power_supply == POWER_SUPPLY_THREE_PHASE:
+            return WATTS_PER_AMP_THREE_PHASE
+        return WATTS_PER_AMP_SINGLE_PHASE
+
     def _calculate_complex_power(self, heating_status):
         """Calculate power using the complex physical model with guardrails."""
         # 1. Inputs
@@ -1294,7 +1340,7 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
             t_discharge = 0
 
         current_amps = heating_status.get("ouCurrent", 0)
-        voltage = 230
+        watts_per_amp = self._watts_per_amp(heating_status)
 
         # If compressor is OFF (0 Hz), consumption is 0 W
         if hz == 0:
@@ -1343,11 +1389,11 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
             calculated_power = base_power + (hz * 15)
 
         # 5. Guardrail System (Protection)
-        # Lower limit: reported amps * voltage (e.g., 6A -> 1380W)
-        min_watts = current_amps * voltage
+        # Lower limit: reported amps * W/A (e.g., 6A -> 1380W single phase)
+        min_watts = current_amps * watts_per_amp
 
         # Upper limit: reported amps + 0.99 (next integer) (e.g., 6A means < 7A)
-        max_watts = (current_amps + 0.99) * voltage
+        max_watts = (current_amps + 0.99) * watts_per_amp
 
         final_power = calculated_power
 

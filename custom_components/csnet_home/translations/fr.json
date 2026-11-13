@@ -10,7 +10,8 @@
                     "scan_interval": "Intervalle de scan (secondes)",
                     "language": "Langue",
                     "max_temp_override": "Température maximale (°C)",
-                    "fan_coil_model": "Modèle de contrôle du ventilo-convecteur"
+                    "fan_coil_model": "Modèle de contrôle du ventilo-convecteur",
+                    "power_supply": "Alimentation de l'unité extérieure"
                 },
                 "data_description": {
                     "username": "Votre nom d'utilisateur CSNet Manager",
@@ -18,7 +19,8 @@
                     "scan_interval": "Fréquence de mise à jour des données (par défaut et minimum : 60 secondes)",
                     "language": "Langue préférée pour les noms d'appareils et les alarmes",
                     "max_temp_override": "Remplacer la limite de température maximale (8-80°C). Laisser vide pour les valeurs par défaut.",
-                    "fan_coil_model": "Sélectionnez le type de contrôle du ventilo-convecteur (standard ou legacy)"
+                    "fan_coil_model": "Sélectionnez le type de contrôle du ventilo-convecteur (standard ou legacy)",
+                    "power_supply": "Utilisée pour estimer la puissance instantanée et le COP. Auto détecte les unités 8/10 CV comme triphasées, les autres comme monophasées."
                 }
             },
             "reconfigure": {
@@ -30,7 +32,8 @@
                     "scan_interval": "Intervalle de scan (secondes)",
                     "language": "Langue",
                     "max_temp_override": "Température maximale (°C)",
-                    "fan_coil_model": "Modèle de contrôle du ventilo-convecteur"
+                    "fan_coil_model": "Modèle de contrôle du ventilo-convecteur",
+                    "power_supply": "Alimentation de l'unité extérieure"
                 },
                 "data_description": {
                     "username": "Votre nom d'utilisateur CSNet Manager",
@@ -38,7 +41,8 @@
                     "scan_interval": "Fréquence de mise à jour des données (minimum : 60 secondes)",
                     "language": "Langue préférée pour les noms d'appareils et les alarmes",
                     "max_temp_override": "Remplacer la limite de température maximale (8-80°C)",
-                    "fan_coil_model": "Sélectionnez le type de contrôle du ventilo-convecteur"
+                    "fan_coil_model": "Sélectionnez le type de contrôle du ventilo-convecteur",
+                    "power_supply": "Utilisée pour estimer la puissance instantanée et le COP. Auto détecte les unités 8/10 CV comme triphasées, les autres comme monophasées."
                 }
             },
             "reauth_confirm": {
