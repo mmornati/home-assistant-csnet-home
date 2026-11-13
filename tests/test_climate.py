@@ -156,33 +156,20 @@ def test_preset_mode(hass):
     assert build_entity(hass, ecocomfort=-1).preset_mode == "comfort"
 
 
-def _without_unit_report(entity):
-    """Drop what the unit reports, as on units and zones that do not send it."""
-    entity._sensor_data.pop("operation_status", None)
-    entity._sensor_data.pop("c1_demand", None)
-    entity._sensor_data.pop("c2_demand", None)
-    return entity
-
-
 def test_hvac_action_heat_and_cool(hass):
-    """Without a report from the unit, fall back to temperatures and mode."""
+    """Use temperatures and mode to infer action."""
     # Heating when setpoint > current in heat mode
-    entity = _without_unit_report(build_entity(hass, mode=1, on_off=1, cur=19.0, setp=20.0))
-    assert entity.hvac_action == HVACAction.HEATING
+    assert build_entity(hass, mode=1, on_off=1, cur=19.0, setp=20.0).hvac_action == HVACAction.HEATING
     # Cooling when setpoint < current in cool mode
-    entity = _without_unit_report(build_entity(hass, mode=0, on_off=1, cur=23.0, setp=21.0))
-    assert entity.hvac_action == HVACAction.COOLING
+    assert build_entity(hass, mode=0, on_off=1, cur=23.0, setp=21.0).hvac_action == HVACAction.COOLING
     # Idle otherwise
-    entity = _without_unit_report(build_entity(hass, mode=1, on_off=1, cur=20.0, setp=20.0))
-    assert entity.hvac_action == HVACAction.IDLE
+    assert build_entity(hass, mode=1, on_off=1, cur=20.0, setp=20.0).hvac_action == HVACAction.IDLE
 
 
-def test_hvac_action_fallback_with_missing_temperatures(hass):
+def test_hvac_action_with_missing_temperatures(hass):
     """A missing temperature gives idle instead of a TypeError."""
-    entity = _without_unit_report(build_entity(hass, mode=1, on_off=1, cur=None, setp=20.0))
-    assert entity.hvac_action == HVACAction.IDLE
-    entity = _without_unit_report(build_entity(hass, mode=0, on_off=1, cur=23.0, setp=None))
-    assert entity.hvac_action == HVACAction.IDLE
+    assert build_entity(hass, mode=1, on_off=1, cur=None, setp=20.0).hvac_action == HVACAction.IDLE
+    assert build_entity(hass, mode=0, on_off=1, cur=23.0, setp=None).hvac_action == HVACAction.IDLE
 
 
 def test_hvac_action_is_off_when_the_zone_is_off(hass):
@@ -191,34 +178,13 @@ def test_hvac_action_is_off_when_the_zone_is_off(hass):
     assert entity.hvac_action == HVACAction.OFF
 
 
-@pytest.mark.parametrize(
-    ("operation_status", "expected"),
-    [
-        (6, HVACAction.HEATING),  # heating thermostat on
-        (5, HVACAction.HEATING),  # heating thermostat off, circuit still served
-        (3, HVACAction.COOLING),  # cooling thermostat on
-        (2, HVACAction.COOLING),  # cooling thermostat off
-        (4, HVACAction.IDLE),  # heating demand off
-        (8, HVACAction.IDLE),  # unit busy with hot water
-        (0, HVACAction.IDLE),  # unit off
-    ],
-)
-def test_hvac_action_follows_the_unit_when_the_circuit_has_demand(hass, operation_status, expected):
-    """The action comes from the unit, not from comparing temperatures."""
-    # room already above the setpoint: the old guess would say idle
-    entity = build_entity(hass, mode=1, on_off=1, cur=22.0, setp=19.0, zone_id=1, operation_status=operation_status)
-    assert entity.hvac_action == expected
-
-
-def test_hvac_action_is_idle_without_demand_on_the_zones_circuit(hass):
-    """Circuit 2 has no demand in the fixture: its zones are idle while circuit 1 heats."""
-    # room below the setpoint: the old guess would say heating
-    for zone_id in (2, 6):
-        entity = build_entity(hass, mode=1, on_off=1, cur=17.0, setp=21.0, zone_id=zone_id, operation_status=6)
-        assert entity.hvac_action == HVACAction.IDLE
-    for zone_id in (1, 5):
-        entity = build_entity(hass, mode=1, on_off=1, cur=17.0, setp=21.0, zone_id=zone_id, operation_status=6)
-        assert entity.hvac_action == HVACAction.HEATING
+@pytest.mark.parametrize("zone_id", [1, 2, 5, 6])
+def test_hvac_action_ignores_circuit_demand_when_the_room_is_satisfied(hass, zone_id):
+    """The unit keeps demand set and the compressor running with the room above its setpoint: the zone is idle."""
+    entity = build_entity(hass, mode=1, on_off=1, cur=20.0, setp=19.0, zone_id=zone_id, operation_status=6)
+    entity._sensor_data["c1_demand"] = True
+    entity._sensor_data["c2_demand"] = True
+    assert entity.hvac_action == HVACAction.IDLE
 
 
 @pytest.mark.parametrize(("real_mode", "expected_mode"), [(1, 1), (0, 0), (None, 2), (2, 2)])

@@ -31,10 +31,6 @@ from .const import (
 )
 from .helpers import extract_heating_status, zone_device_identifier, zone_key
 
-# operationStatus values in which a circuit with demand is being served
-HEATING_THERMOSTAT_STATUSES = (5, 6)  # heating thermostat off / on
-COOLING_THERMOSTAT_STATUSES = (2, 3)  # cooling thermostat off / on
-
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -300,42 +296,17 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
     def hvac_action(self):
         """Return what the zone is doing right now.
 
-        Uses what the unit reports, like the CSNet web app: the zone is active
-        when the unit is in a heating or cooling thermostat state and the
-        zone's circuit calls for it. Units or zones that do not report this
-        fall back to comparing the setpoint with the room temperature.
+        Compares the setpoint with the room temperature. The unit's circuit
+        demand is not used: it stays set while the room is above its setpoint.
         """
         if self._sensor_data is None:
             return HVACAction.IDLE
         if self._sensor_data.get("on_off") != 1:
             return HVACAction.OFF
 
-        reported = self._reported_hvac_action()
-        if reported is not None:
-            return reported
-
         if self.is_heating():
             return HVACAction.HEATING
         if self.is_cooling():
-            return HVACAction.COOLING
-        return HVACAction.IDLE
-
-    def _reported_hvac_action(self):
-        """Return the action from the unit's operation status and circuit demand, or None if not reported."""
-        operation_status = self._sensor_data.get("operation_status")
-        zone_id = self._sensor_data.get("zone_id")
-        if zone_id in (1, 5):
-            demand = self._sensor_data.get("c1_demand")
-        elif zone_id in (2, 6):
-            demand = self._sensor_data.get("c2_demand")
-        else:
-            return None
-        if not isinstance(operation_status, int) or not isinstance(demand, bool):
-            return None
-
-        if demand and operation_status in HEATING_THERMOSTAT_STATUSES:
-            return HVACAction.HEATING
-        if demand and operation_status in COOLING_THERMOSTAT_STATUSES:
             return HVACAction.COOLING
         return HVACAction.IDLE
 
