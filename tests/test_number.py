@@ -428,7 +428,7 @@ def test_number_available(mock_deps, mock_hass_instance, mock_entry, mock_coordi
     mock_coordinator.get_installation_devices_data.return_value = {"some": "data"}
     api.is_fixed_water_temperature_editable.return_value = True
     assert entity.available is True
-    api.is_fixed_water_temperature_editable.assert_called_with(1, 1, {"some": "data"})
+    api.is_fixed_water_temperature_editable.assert_called_with(1, 1, {"some": "data"}, None)
 
     # Mock available = False
     api.is_fixed_water_temperature_editable.return_value = False
@@ -511,3 +511,36 @@ def test_handle_coordinator_update(mock_deps, mock_entry, mock_coordinator):
 
     assert entity._sensor_data == new_sensor_data
     entity.async_write_ha_state.assert_called_once()
+
+
+def test_setup_uses_the_indoor_unit_of_the_circuit_zone(mock_deps, mock_hass_instance, mock_entry, mock_coordinator):
+    """With several indoor units, the entity follows the unit its zone belongs to."""
+
+    async def run_test():
+        mock_coordinator.get_installation_devices_data.return_value = {
+            "data": [
+                {
+                    "indoors": [
+                        # first unit: curve-based, no fixed temperature
+                        {"id": 100, "heatingStatus": {"otcTypeHeatC1": 1}, "heatingSetting": {"fixTempHeatC1": 30}},
+                        # second unit: fixed temperature
+                        {"id": 200, "heatingStatus": {"otcTypeHeatC1": mock_deps.OTC_HEATING_TYPE_FIX}, "heatingSetting": {"fixTempHeatC1": 45}},
+                    ]
+                }
+            ]
+        }
+        mock_coordinator.get_sensors_data.return_value = [
+            {"zone_id": 1, "device_id": 123, "room_name": "Living Room", "parent_id": 200},
+        ]
+        mock_coordinator.get_common_data.return_value = {"device_status": {123: {"firmware": "1.0"}}}
+
+        async_add_entities = MagicMock()
+        await mock_deps.async_setup_entry(mock_hass_instance, mock_entry, async_add_entities)
+
+        entities = async_add_entities.call_args[0][0]
+        assert len(entities) == 1
+        assert entities[0]._circuit == 1
+        # the value is read from the same unit the entity was created from
+        assert entities[0].native_value == 45.0
+
+    asyncio.run(run_test())

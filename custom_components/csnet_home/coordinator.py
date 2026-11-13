@@ -139,6 +139,9 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         else:
             self._device_data = {"sensors": [], "common_data": {}}
 
+        # Update fast lookup dictionary (enrichment changes these same dicts in place)
+        self._sensors_by_id = {(s.get("device_id"), s.get("room_id"), s.get("zone_id")): s for s in self._device_data.get("sensors", [])}
+
         # Add installation devices data to common_data
         if installation_devices_data and self._device_data.get("common_data"):
             self._device_data["common_data"]["installation_devices"] = installation_devices_data
@@ -155,11 +158,12 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
             return
 
         try:
-            heating_status = cloud_api.get_heating_status_from_installation_devices(installation_devices_data)
-            if not heating_status:
-                return
-
             for sensor in self._device_data["sensors"]:
+                # Each zone reads the heatingStatus of its own indoor unit
+                heating_status = cloud_api.get_heating_status_from_installation_devices(installation_devices_data, sensor.get("parent_id"))
+                if not heating_status:
+                    continue
+
                 zone_id = sensor.get("zone_id")
                 # For zone_id 3 (DHW/water heater), use tempDHW from heatingStatus
                 if zone_id == 3:
@@ -199,9 +203,6 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
                             "Enriched zone_id 6 (C2_WATER) current_temperature: %s",
                             temp_c2_water,
                         )
-
-            # Update fast lookup dictionary
-            self._sensors_by_id = {(s.get("device_id"), s.get("room_id"), s.get("zone_id")): s for s in self._device_data.get("sensors", [])}
         except Exception as exc:
             _LOGGER.error("Error enriching sensor data: %s", exc)
 

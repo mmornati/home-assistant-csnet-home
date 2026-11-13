@@ -113,7 +113,7 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
             self._is_fan_coil = True
         else:
             # If it's Standard, then API detection is used
-            self._is_fan_coil = cloud_api.is_fan_coil_compatible(installation_devices_data)
+            self._is_fan_coil = cloud_api.is_fan_coil_compatible(installation_devices_data, self._sensor_data.get("parent_id"))
 
         if self._is_fan_coil:
             # Fan coil systems use fan speed control
@@ -226,7 +226,7 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
                 circuit = 1 if zone_id == 5 else 2
 
                 # Check if fixed temperature is editable (OTC type is FIX)
-                is_editable = cloud_api.is_fixed_water_temperature_editable(circuit, mode, installation_devices_data)
+                is_editable = cloud_api.is_fixed_water_temperature_editable(circuit, mode, installation_devices_data, self._sensor_data.get("parent_id"))
 
                 if not is_editable:
                     return None
@@ -337,14 +337,14 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
             cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
             mode = self._sensor_data.get("mode", 1)
 
-            attrs["fan1_control_available"] = cloud_api.get_fan_control_availability(1, mode, installation_devices_data)
-            attrs["fan2_control_available"] = cloud_api.get_fan_control_availability(2, mode, installation_devices_data)
+            attrs["fan1_control_available"] = cloud_api.get_fan_control_availability(1, mode, installation_devices_data, self._sensor_data.get("parent_id"))
+            attrs["fan2_control_available"] = cloud_api.get_fan_control_availability(2, mode, installation_devices_data, self._sensor_data.get("parent_id"))
         else:
             attrs["is_fan_coil_compatible"] = False
 
         # Add OTC (Outdoor Temperature Compensation) information
         if installation_devices_data:
-            heating_status = extract_heating_status(installation_devices_data) or {}
+            heating_status = extract_heating_status(installation_devices_data, self._sensor_data.get("parent_id")) or {}
             zone_id = self._sensor_data.get("zone_id")
 
             # Determine which circuit this zone belongs to
@@ -391,7 +391,7 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
                 circuit = 1 if zone_id == 5 else 2
 
                 # Check if fixed temperature is editable (OTC type is FIX)
-                is_editable = cloud_api.is_fixed_water_temperature_editable(circuit, mode, installation_devices_data)
+                is_editable = cloud_api.is_fixed_water_temperature_editable(circuit, mode, installation_devices_data, self._sensor_data.get("parent_id"))
 
                 if not is_editable:
                     _LOGGER.warning(
@@ -477,7 +477,7 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
             # Skip the API check if the user has selected Legacy
             check_availability = self._fan_model != FAN_COIL_MODEL_LEGACY
 
-            if check_availability and not cloud_api.get_fan_control_availability(circuit, mode, installation_devices_data):
+            if check_availability and not cloud_api.get_fan_control_availability(circuit, mode, installation_devices_data, self._sensor_data.get("parent_id")):
                 _LOGGER.warning("Fan control not available for circuit %s in mode %s", circuit, mode)
                 return
 
@@ -607,7 +607,7 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
 
         if installation_devices_data:
             cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
-            raw_min, raw_max = cloud_api.get_temperature_limits(zone_id, mode, installation_devices_data)
+            raw_min, raw_max = cloud_api.get_temperature_limits(zone_id, mode, installation_devices_data, self._sensor_data.get("parent_id"))
 
             normalized_min = self._normalize_temperature_limit(raw_min)
             normalized_max = self._normalize_temperature_limit(raw_max)

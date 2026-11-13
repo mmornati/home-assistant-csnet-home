@@ -19,7 +19,7 @@ from .const import (
     WATER_CIRCUIT_MIN_HEAT,
 )
 from .coordinator import CSNetHomeCoordinator
-from .helpers import zone_device_identifier
+from .helpers import extract_indoor_data, zone_device_identifier
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -40,20 +40,8 @@ async def async_setup_entry(hass, entry, async_add_entities):
         _LOGGER.debug("No installation devices data available for number entities")
         return None
 
-    # Get heating status from installation devices
-    # Navigate through: data[0].indoors[0].heatingStatus and heatingSetting
-    heating_status = None
-    heating_setting = None
-    data_array = installation_devices_data.get("data", [])
-    if isinstance(data_array, list) and len(data_array) > 0:
-        first_device = data_array[0]
-        if isinstance(first_device, dict):
-            indoors_array = first_device.get("indoors", [])
-            if isinstance(indoors_array, list) and len(indoors_array) > 0:
-                first_indoors = indoors_array[0]
-                if isinstance(first_indoors, dict):
-                    heating_status = first_indoors.get("heatingStatus", {})
-                    heating_setting = first_indoors.get("heatingSetting", {})
+    heating_status = extract_indoor_data(installation_devices_data, "heatingStatus")
+    heating_setting = extract_indoor_data(installation_devices_data, "heatingSetting")
 
     if not heating_status or not heating_setting:
         _LOGGER.debug("No heating status or setting available for number entities")
@@ -71,9 +59,20 @@ async def async_setup_entry(hass, entry, async_add_entities):
         air_zone_id = circuit  # Zone 1 = C1_AIR, Zone 2 = C2_AIR
         water_zone_id = circuit + 4  # Zone 5 = C1_WATER, Zone 6 = C2_WATER
 
+        # The entity is attached to one zone of the circuit: decide from, and
+        # later read, the indoor unit that zone belongs to. One entity per
+        # circuit and mode exists per device (see unique_id), so with several
+        # indoor units only the first matching zone gets one.
+        circuit_sensor = next((x for x in sensors_data if x.get("zone_id") == air_zone_id), None) or next(
+            (x for x in sensors_data if x.get("zone_id") == water_zone_id), None
+        )
+        indoor_id = circuit_sensor.get("parent_id") if circuit_sensor else None
+        circuit_status = extract_indoor_data(installation_devices_data, "heatingStatus", indoor_id) or heating_status
+        circuit_setting = extract_indoor_data(installation_devices_data, "heatingSetting", indoor_id) or heating_setting
+
         # Check heating mode
         otc_heat_key = f"otcTypeHeatC{circuit}"
-        otc_heat_type = heating_status.get(otc_heat_key, 0)
+        otc_heat_type = circuit_status.get(otc_heat_key, 0)
         if otc_heat_type == OTC_HEATING_TYPE_FIX:
             # Try to find sensor data for air zone first (preferred for UI)
             # If not available, fall back to water zone
@@ -90,7 +89,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 )
 
             if sensor_data:
-                fix_temp_heat = heating_setting.get(f"fixTempHeatC{circuit}")
+                fix_temp_heat = circuit_setting.get(f"fixTempHeatC{circuit}")
                 _LOGGER.debug(
                     "Creating fixed water temperature number entity for C%d heating (OTC type: %d, current temp: %s, zone: %d)",
                     circuit,
@@ -111,7 +110,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
         # Check cooling mode
         otc_cool_key = f"otcTypeCoolC{circuit}"
-        otc_cool_type = heating_status.get(otc_cool_key, 0)
+        otc_cool_type = circuit_status.get(otc_cool_key, 0)
         if otc_cool_type == OTC_COOLING_TYPE_FIX:
             # Try to find sensor data for air zone first (preferred for UI)
             # If not available, fall back to water zone
@@ -128,7 +127,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 )
 
             if sensor_data:
-                fix_temp_cool = heating_setting.get(f"fixTempCoolC{circuit}")
+                fix_temp_cool = circuit_setting.get(f"fixTempCoolC{circuit}")
                 _LOGGER.debug(
                     "Creating fixed water temperature number entity for C%d cooling (OTC type: %d, current temp: %s, zone: %d)",
                     circuit,
@@ -211,17 +210,8 @@ class CSNetHomeFixedWaterTemperatureNumber(CoordinatorEntity, NumberEntity):
         if not installation_devices_data:
             return None
 
-        # Navigate through: data[0].indoors[0].heatingSetting
-        heating_setting = None
-        data_array = installation_devices_data.get("data", [])
-        if isinstance(data_array, list) and len(data_array) > 0:
-            first_device = data_array[0]
-            if isinstance(first_device, dict):
-                indoors_array = first_device.get("indoors", [])
-                if isinstance(indoors_array, list) and len(indoors_array) > 0:
-                    first_indoors = indoors_array[0]
-                    if isinstance(first_indoors, dict):
-                        heating_setting = first_indoors.get("heatingSetting", {})
+        # heatingSetting of the indoor unit this circuit belongs to
+        heating_setting = extract_indoor_data(installation_devices_data, "heatingSetting", self._sensor_data.get("parent_id"))
 
         if not heating_setting:
             return None
@@ -247,7 +237,7 @@ class CSNetHomeFixedWaterTemperatureNumber(CoordinatorEntity, NumberEntity):
             return False
 
         cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
-        is_editable = cloud_api.is_fixed_water_temperature_editable(self._circuit, self._mode, installation_devices_data)
+        is_editable = cloud_api.is_fixed_water_temperature_editable(self._circuit, self._mode, installation_devices_data, self._sensor_data.get("parent_id"))
 
         return is_editable
 

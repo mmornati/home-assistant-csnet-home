@@ -1547,11 +1547,22 @@ class CSNetHomeDeviceSensor(CoordinatorEntity, SensorEntity):
         )
         _LOGGER.debug("Configuring Device Sensor %s", self._name)
 
+    def _device_status(self) -> dict:
+        """Return this device's entry of common_data["device_status"].
+
+        The entity is created with that entry itself and, after the first
+        coordinator update, holds the whole common_data dict: accept both, so
+        the values are there from the start instead of after the first poll.
+        """
+        common_data = self._common_data or {}
+        if "device_status" in common_data:
+            return common_data["device_status"].get(self._device_id) or {}
+        return common_data
+
     @property
     def native_value(self):
         """Return the current state of the sensor."""
-        # Get the device status from common_data
-        device_status = self._common_data.get("device_status", {}).get(self._device_id)
+        device_status = self._device_status()
 
         if not device_status:
             return None
@@ -1607,7 +1618,7 @@ class CSNetHomeDeviceSensor(CoordinatorEntity, SensorEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return device information."""
-        device_status = self._common_data.get("device_status", {}).get(self._device_id, {})
+        device_status = self._device_status()
         device_name = self._sensor_data["device_name"]
         room_name = self._sensor_data.get("room_name", "Unknown")
         controller_name = device_status.get("name", "Unknown")
