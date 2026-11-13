@@ -7,6 +7,7 @@ from homeassistant.const import CONF_SCAN_INTERVAL, Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.device_registry import DeviceEntry
+from homeassistant.helpers.storage import Store
 
 from custom_components.csnet_home.api import CSNetHomeAPI
 from custom_components.csnet_home.const import (
@@ -17,7 +18,7 @@ from custom_components.csnet_home.const import (
     DEFAULT_FILTERED_ALARM_CODES,
     DOMAIN,
 )
-from custom_components.csnet_home.coordinator import CSNetHomeConfigEntry, CSNetHomeCoordinator, CSNetHomeData
+from custom_components.csnet_home.coordinator import ALARM_STORAGE_VERSION, CSNetHomeConfigEntry, CSNetHomeCoordinator, CSNetHomeData, alarm_storage_key
 from custom_components.csnet_home.migration import async_migrate_zone_identifiers
 from custom_components.csnet_home.sensor import DEVICE_SENSOR_DESCRIPTIONS, ZONE_SENSOR_DESCRIPTIONS
 
@@ -116,6 +117,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CSNetHomeConfigEntry):
                 if success:
                     _LOGGER.info("Successfully deleted alarm %s", alarm_id)
                     # Refresh data to remove the alarm from sensors/notifications
+                    coordinator_instance.async_invalidate_installation_alarms()
                     await coordinator_instance.async_request_refresh()
                     return
 
@@ -124,7 +126,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: CSNetHomeConfigEntry):
             alarm_id,
         )
 
-    hass.services.async_register(DOMAIN, "delete_alarm", async_handle_delete_alarm)
+    # One service for all entries: it looks the entries up when it is called
+    if not hass.services.has_service(DOMAIN, "delete_alarm"):
+        hass.services.async_register(DOMAIN, "delete_alarm", async_handle_delete_alarm)
 
     return True
 
@@ -135,6 +139,11 @@ async def async_remove_config_entry_device(hass: HomeAssistant, config_entry: Co
     # Remove this function if you do not want that option.
     # You may need to do some checks here before allowing devices to be removed.
     return True
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Delete what the removed entry kept in storage."""
+    await Store(hass, ALARM_STORAGE_VERSION, alarm_storage_key(entry.entry_id)).async_remove()
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: CSNetHomeConfigEntry) -> bool:

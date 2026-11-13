@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import TYPE_CHECKING
@@ -11,6 +12,7 @@ from typing import TYPE_CHECKING
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import DOMAIN, MIN_SCAN_INTERVAL
@@ -19,6 +21,15 @@ if TYPE_CHECKING:
     from .api import CSNetHomeAPI
 
 _LOGGER = logging.getLogger(__name__)
+
+# The alarm list of an installation rarely changes: ask for it less often than the readings
+ALARM_POLL_SECONDS = 300
+ALARM_STORAGE_VERSION = 1
+
+
+def alarm_storage_key(entry_id: str) -> str:
+    """Return the storage key of the alarms an entry has already notified."""
+    return f"{DOMAIN}.notified_alarms.{entry_id}"
 
 
 @dataclass
@@ -64,6 +75,14 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         self._sensors_by_id = {}
         self._last_alarm_codes: dict[str, int] = {}
         self._notified_installation_alarm_ids: set[int] = set()
+        # Last alarm list CSNet answered with, when it was asked, and whether this poll got a new answer
+        self._installation_alarms_data = None
+        self._installation_alarms_fetched_at: float | None = None
+        self._installation_alarms_fresh = False
+        # What was already notified survives restarts, so a restart does not notify everything again
+        self._alarm_store = Store(hass, ALARM_STORAGE_VERSION, alarm_storage_key(entry_id))
+        self._alarm_state_loaded = False
+        self._saved_alarm_state: dict | None = None
         self._enable_alarm_notifications = enable_alarm_notifications
         self._filtered_alarm_codes = self._parse_filtered_alarm_codes(filtered_alarm_codes)
         super().__init__(
@@ -104,7 +123,7 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
             await cloud_api.load_translations()
             # Fetch elements data and alarms
             elements = await cloud_api.async_get_elements_data()
-            alarms = await cloud_api.async_get_installation_alarms()
+            alarms = await self._async_get_installation_alarms(cloud_api)
             return elements, alarms
 
         # Run independent fetch operations in parallel
@@ -131,13 +150,83 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         # Enrich sensor data
         self._enrich_sensor_data(cloud_api, installation_devices_data)
 
+        await self._async_load_alarm_state()
+
         # Handle alarm notifications
         await self._handle_alarm_notifications()
 
         # Handle installation-level alarms
         await self._handle_installation_alarms(cloud_api)
 
+        await self._async_save_alarm_state()
+
         return self._device_data
+
+    async def _async_get_installation_alarms(self, cloud_api):
+        """Return the installation alarms, asking CSNet at most every ALARM_POLL_SECONDS.
+
+        Between two requests, and when a request fails, the last answer is
+        kept: a failed request must not look like "no alarms".
+        """
+        self._installation_alarms_fresh = False
+        now = time.monotonic()
+        fetched_at = self._installation_alarms_fetched_at
+        if fetched_at is not None and now - fetched_at < ALARM_POLL_SECONDS:
+            return self._installation_alarms_data
+
+        data = await cloud_api.async_get_installation_alarms()
+        if data is None:
+            # asked again on the next poll
+            return self._installation_alarms_data
+
+        self._installation_alarms_data = data
+        self._installation_alarms_fetched_at = now
+        self._installation_alarms_fresh = True
+        return data
+
+    def async_invalidate_installation_alarms(self) -> None:
+        """Ask CSNet for the alarm list again on the next poll (after an alarm was deleted)."""
+        self._installation_alarms_fetched_at = None
+
+    def _alarm_state(self) -> dict:
+        """Return what has been notified, in the form it is stored."""
+        return {
+            "installation_alarm_ids": sorted(self._notified_installation_alarm_ids),
+            "zone_alarm_codes": dict(self._last_alarm_codes),
+        }
+
+    async def _async_load_alarm_state(self) -> None:
+        """Load once what was notified before the last restart."""
+        if self._alarm_state_loaded:
+            return
+        self._alarm_state_loaded = True
+        try:
+            stored = await self._alarm_store.async_load()
+        except Exception as exc:  # pylint: disable=broad-except
+            _LOGGER.debug("Could not load the notified alarms: %s", exc)
+            return
+        if not isinstance(stored, dict):
+            return
+        ids = stored.get("installation_alarm_ids")
+        if isinstance(ids, list):
+            self._notified_installation_alarm_ids.update(i for i in ids if isinstance(i, int))
+        codes = stored.get("zone_alarm_codes")
+        if isinstance(codes, dict):
+            for key, code in codes.items():
+                self._last_alarm_codes.setdefault(key, code)
+        self._saved_alarm_state = self._alarm_state()
+
+    async def _async_save_alarm_state(self) -> None:
+        """Store what has been notified, when it changed."""
+        state = self._alarm_state()
+        if state == self._saved_alarm_state:
+            return
+        try:
+            await self._alarm_store.async_save(state)
+        except Exception as exc:  # pylint: disable=broad-except
+            _LOGGER.debug("Could not save the notified alarms: %s", exc)
+            return
+        self._saved_alarm_state = state
 
     @staticmethod
     def _raise_login_failure(cloud_api):
@@ -309,8 +398,12 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
             _LOGGER.debug("Alarm notification handling error: %s", exc)
 
     async def _handle_installation_alarms(self, api):
-        """Handle notifications for installation-level alarms."""
-        if not self._enable_alarm_notifications:
+        """Notify each active installation alarm once.
+
+        Only runs on a new answer from CSNet: forgetting alarms because a
+        request failed would notify every one of them again on the next poll.
+        """
+        if not self._installation_alarms_fresh:
             return
         installation_alarms_data = self.get_installation_alarms_data()
         alarms = installation_alarms_data.get("data", [])
@@ -330,7 +423,6 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
             if alarm_id is None:
                 continue
 
-            # Generate notification
             code = alarm.get("code")
 
             if code in self._filtered_alarm_codes:
@@ -342,8 +434,11 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
             if alarm_id in self._notified_installation_alarm_ids:
                 continue
 
-            # New active alarm found
+            # New active alarm found. It counts as seen even with notifications
+            # off, so that turning them on later does not notify old alarms.
             self._notified_installation_alarm_ids.add(alarm_id)
+            if not self._enable_alarm_notifications:
+                continue
 
             unit_id = alarm.get("unitId")
 
