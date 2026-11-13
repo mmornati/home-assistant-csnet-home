@@ -272,7 +272,6 @@ class CSNetHomeAPI:
         self.username = username
         self.password = password
         self.session = None
-        self.cookies = None
         self.logged_in = False
         self.xsrf_token = None
         self.translations = {}
@@ -483,9 +482,8 @@ class CSNetHomeAPI:
             generation = self._login_generation
             try:
                 async with asyncio.timeout(DEFAULT_API_TIMEOUT):
-                    # aiohttp uses the cookies from the session's cookie jar when cookies is None
-                    request_cookies = self.cookies if self.cookies else None
-                    async with self.session.get(url, headers=headers, cookies=request_cookies) as response:
+                    # the session's cookie jar carries the cookies
+                    async with self.session.get(url, headers=headers) as response:
                         if not self._is_session_expired(response, None):
                             if response.status != 200:
                                 _LOGGER.warning("CSNet Manager answered the %s request with HTTP %s", description, response.status)

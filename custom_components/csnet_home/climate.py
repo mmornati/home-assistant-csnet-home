@@ -39,9 +39,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
     _LOGGER.debug("Starting CSNet Home climate setup")
 
     coordinator = entry.runtime_data.coordinator
-    if not coordinator:
-        _LOGGER.error("No coordinator instance found!")
-        return None
     # Add sensors based on the coordinator's data
     async_add_entities(
         [
