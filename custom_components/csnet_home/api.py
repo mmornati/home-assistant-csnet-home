@@ -351,16 +351,29 @@ class CSNetHomeAPI:
                 self.auth_rejections = 0
                 return True
 
-            self._login_failures += 1
-            self.auth_rejections = self.auth_rejections + 1 if rejected else 0
-            delay = min(LOGIN_BACKOFF_BASE * 2 ** (self._login_failures - 1), LOGIN_BACKOFF_MAX)
-            self._next_login_attempt = time.monotonic() + delay
-            _LOGGER.warning(
-                "CSNet login failed (%s consecutive failure(s)), next attempt in %d s",
-                self._login_failures,
-                delay,
-            )
+            self._register_login_failure(rejected)
             return False
+
+    def _register_login_failure(self, rejected: bool) -> None:
+        """Count a failed login and push back the next attempt (call with the login lock held)."""
+        self._login_failures += 1
+        self.auth_rejections = self.auth_rejections + 1 if rejected else 0
+        delay = min(LOGIN_BACKOFF_BASE * 2 ** (self._login_failures - 1), LOGIN_BACKOFF_MAX)
+        self._next_login_attempt = time.monotonic() + delay
+        _LOGGER.warning(
+            "CSNet login failed (%s consecutive failure(s)), next attempt in %d s",
+            self._login_failures,
+            delay,
+        )
+
+    async def _async_ensure_session(self) -> bool:
+        """Make sure there is an open, signed-in session before a request."""
+        if self.session is not None and getattr(self.session, "closed", False) is not True and self.logged_in:
+            return True
+        _LOGGER.debug("No active session found, logging in.")
+        # a closed session can only be replaced by a new login
+        self.logged_in = False
+        return await self.async_login()
 
     async def _async_do_login(self):
         """Perform the login requests: fetch the XSRF token, then post the login form."""
@@ -457,8 +470,12 @@ class CSNetHomeAPI:
         CSNet Manager answers an expired session with its login page (HTTP 200
         after a redirect) instead of JSON. When that happens the session is
         renewed and the request is sent a second time, so a poll does not fail
-        just because the session ran out. A timeout or a connection error is
-        not a session problem: it fails this request only and keeps the session.
+        just because the session ran out. If the login page comes back again,
+        it counts as a failed login and the usual back-off applies.
+
+        A timeout, a connection error, an HTTP error status or a JSON body
+        that cannot be parsed are not session problems: they fail this request
+        only and keep the session.
 
         Returns the parsed JSON, or None when no valid answer was obtained.
         """
@@ -470,17 +487,28 @@ class CSNetHomeAPI:
                     request_cookies = self.cookies if self.cookies else None
                     async with self.session.get(url, headers=headers, cookies=request_cookies) as response:
                         if not self._is_session_expired(response, None):
-                            return await self.check_api_response(response)
-            except (aiohttp.ContentTypeError, json.JSONDecodeError):
-                # 200 with something that is not JSON: treated like the login page
+                            if response.status != 200:
+                                _LOGGER.warning("CSNet Manager answered the %s request with HTTP %s", description, response.status)
+                                return None
+                            return await response.json()
+            except aiohttp.ContentTypeError:
+                # 200 with a page that is not JSON: handled like the login page
                 pass
+            except json.JSONDecodeError as err:
+                _LOGGER.error("CSNet Manager sent unreadable JSON for the %s request: %s", description, err)
+                return None
             except (asyncio.TimeoutError, aiohttp.ClientError) as err:
                 _LOGGER.warning("CSNet Manager did not answer the %s request: %s", description, err or type(err).__name__)
                 return None
 
             if attempt == 2:
                 _LOGGER.error("CSNet Manager still returns its login page for the %s request after signing in again", description)
-                self.logged_in = False
+                async with self._login_lock:
+                    # The new session does not work either: back off like a failed login
+                    # instead of signing in again on every request.
+                    if self._login_generation == generation:
+                        self.logged_in = False
+                        self._register_login_failure(rejected=False)
                 return None
 
             _LOGGER.debug("Session expired on the %s request, signing in again", description)
@@ -495,10 +523,8 @@ class CSNetHomeAPI:
         """Get sensor data from the cloud service."""
         sensor_data_url = f"{self.base_url}{ELEMENTS_PATH}"
 
-        if not self.session or not self.logged_in:
-            _LOGGER.debug("No active session found, logging in.")
-            if not await self.async_login():
-                return None
+        if not await self._async_ensure_session():
+            return None
 
         headers = COMMON_API_HEADERS | {
             "accept": "application/json, text/javascript, */*; q=0.01",
@@ -584,10 +610,8 @@ class CSNetHomeAPI:
         """Get installation devices data from the cloud service."""
         installation_devices_url = f"{self.base_url}{INSTALLATION_DEVICES_PATH}?installationId=-1"
 
-        if not self.session or not self.logged_in:
-            _LOGGER.debug("No active session found, logging in.")
-            if not await self.async_login():
-                return None
+        if not await self._async_ensure_session():
+            return None
 
         headers = COMMON_API_HEADERS | {
             "accept": "application/json, text/javascript, */*; q=0.01",
@@ -613,10 +637,8 @@ class CSNetHomeAPI:
 
         installation_alarms_url = f"{self.base_url}{INSTALLATION_ALARMS_PATH}" f"?installationId={self.installation_id}&_csrf={self.xsrf_token}"
 
-        if not self.session or not self.logged_in:
-            _LOGGER.debug("No active session found, logging in.")
-            if not await self.async_login():
-                return None
+        if not await self._async_ensure_session():
+            return None
 
         headers = COMMON_API_HEADERS | {
             "accept": "*/*",

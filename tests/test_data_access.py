@@ -5,6 +5,7 @@ the alarm translation language and the device status sensors.
 """
 
 import asyncio
+import json
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -336,6 +337,90 @@ async def test_parallel_reads_share_one_sign_in(hass):
     assert [r["n"] for r in results] == [1, 2]
     assert api._async_do_login.await_count == 1
     assert api.logged_in is True
+
+
+async def test_second_login_page_starts_the_login_back_off(hass):
+    """A renewed session that still gets the login page must not sign in on every request."""
+    api = _api_with_session(hass, [_login_page(), _login_page()])
+    api._async_do_login = _successful_login(api)
+
+    assert await api._async_get_json("https://example.test/x", {}, "elements") is None
+    assert api.login_backoff_remaining > 0
+
+    # the next request is refused by the back-off without another sign-in
+    assert await api.async_get_installation_devices_data() is None
+    assert api._async_do_login.await_count == 1
+    assert api.session.get_calls == 2
+
+
+async def test_unreadable_json_keeps_the_session(hass):
+    """A broken body is a bad answer, not an expired session."""
+    broken = json.JSONDecodeError("Expecting value", "", 0)
+    api = _api_with_session(hass, [FakeResponse(error=broken)])
+    api._async_do_login = AsyncMock(return_value=True)
+
+    assert await api._async_get_json("https://example.test/x", {}, "elements") is None
+    assert api._async_do_login.await_count == 0
+    assert api.logged_in is True
+
+
+async def test_http_error_status_keeps_the_session(hass):
+    """A server error fails the request without a new sign-in."""
+    api = _api_with_session(hass, [FakeResponse(status=500)])
+    api._async_do_login = AsyncMock(return_value=True)
+
+    assert await api._async_get_json("https://example.test/x", {}, "elements") is None
+    assert api._async_do_login.await_count == 0
+    assert api.logged_in is True
+
+
+@pytest.mark.parametrize("status", [401, 403])
+async def test_unauthorized_status_renews_the_session(hass, status):
+    """401 and 403 mean the session is no longer accepted."""
+    api = _api_with_session(hass, [FakeResponse(status=status), FakeResponse(payload={"ok": 1})])
+    api._async_do_login = _successful_login(api)
+
+    assert await api._async_get_json("https://example.test/x", {}, "elements") == {"ok": 1}
+    assert api._async_do_login.await_count == 1
+
+
+async def test_getter_recovers_from_an_expired_session(hass):
+    """The public read goes through the renewal: one poll, data returned."""
+    payload = {"status": "success", "data": [{"indoors": []}]}
+    api = _api_with_session(hass, [_login_page(), FakeResponse(payload=payload)])
+    api._async_do_login = _successful_login(api)
+
+    assert await api.async_get_installation_devices_data() == payload
+    assert api._async_do_login.await_count == 1
+
+
+async def test_getter_replaces_a_closed_session(hass):
+    """A closed session is noticed before the request and replaced by a login."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.session = SimpleNamespace(closed=True)
+    api.logged_in = True
+    fresh = FakeSession([FakeResponse(payload={"status": "success"})])
+
+    async def do_login():
+        api.session = fresh
+        api.logged_in = True
+        return True
+
+    api._async_do_login = AsyncMock(side_effect=do_login)
+
+    assert await api.async_get_installation_devices_data() == {"status": "success"}
+    assert api._async_do_login.await_count == 1
+    assert fresh.get_calls == 1
+
+
+async def test_getter_timeout_does_not_sign_in_again(hass):
+    """A timeout fails the read and leaves the session for the next poll."""
+    api = _api_with_session(hass, [asyncio.TimeoutError()])
+    api._async_do_login = AsyncMock(return_value=True)
+
+    assert await api.async_get_elements_data() is None
+    assert api.logged_in is True
+    assert api._async_do_login.await_count == 0
 
 
 # --------------------------------------------------------------------------

@@ -1,5 +1,9 @@
 """Helper functions for CSNet Home integration."""
 
+import logging
+
+_LOGGER = logging.getLogger(__name__)
+
 
 def find_indoor_unit(installation_devices_data, indoor_id=None):
     """Return the indoor unit a zone belongs to, from installation devices data.
@@ -30,6 +34,8 @@ def find_indoor_unit(installation_devices_data, indoor_id=None):
             for indoor in indoors_array:
                 if isinstance(indoor, dict) and indoor.get("id") is not None and str(indoor.get("id")) == str(indoor_id):
                     return indoor
+
+        _LOGGER.debug("Indoor unit %s not found in installation devices data, using the first unit", indoor_id)
 
     if len(data_array) > 0 and isinstance(data_array[0], dict):
         indoors_array = data_array[0].get("indoors", [])
