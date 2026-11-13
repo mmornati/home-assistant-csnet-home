@@ -780,7 +780,8 @@ UNIT_MODEL_NAMES = {
 # Sensors about the equipment and its configuration rather than about the
 # heating itself: versions, model and capacity codes, configuration flags,
 # connectivity. Home Assistant lists them under "Diagnostic" on the device
-# page and leaves them out of generated dashboards.
+# page and leaves them out of generated dashboards. The status flags sensor is
+# not in the list: its attributes say what is running right now.
 DIAGNOSTIC_SENSOR_KEYS = frozenset(
     {
         "unit_type",
@@ -799,7 +800,6 @@ DIAGNOSTIC_SENSOR_KEYS = frozenset(
         "otc_cooling_type_c1",
         "otc_heating_type_c2",
         "otc_cooling_type_c2",
-        "system_status_flags",
         "ou_code",
         "ou_capacity_code",
         "ou_pcb_software",
@@ -1124,6 +1124,14 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, SensorEntity):
         installation_data = self._coordinator.get_installation_devices_data()
         return _get_heating_status_from_installation_data(installation_data)
 
+    def _unit_model_name(self) -> str:
+        """Return the unit's commercial name, or a generic one when the unit reports no known model."""
+        heating_status = self._get_heating_status()
+        unit_model = heating_status.get("unitModel") if isinstance(heating_status, dict) else None
+        if isinstance(unit_model, int) and not isinstance(unit_model, bool):
+            return UNIT_MODEL_NAMES.get(unit_model, "HVAC System")
+        return "HVAC System"
+
     def _get_raw_value(self):
         """Get raw value from installation data or heating status."""
         installation_data = self._coordinator.get_installation_devices_data()
@@ -1322,7 +1330,7 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, SensorEntity):
             name=f"{self._device_data['device_name']}-{self._device_data['room_name']}",
             manufacturer="Hitachi",
             # the unit's commercial name when the unit reports a known model
-            model=UNIT_MODEL_NAMES.get((self._get_heating_status() or {}).get("unitModel"), "HVAC System"),
+            model=self._unit_model_name(),
             sw_version=self._common_data.get("firmware"),
             identifiers={
                 (

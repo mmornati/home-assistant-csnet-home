@@ -13,7 +13,10 @@ from custom_components.csnet_home.sensor import (
     INSTALLATION_SENSOR_DESCRIPTIONS,
     UNIT_MODEL_NAMES,
     ZONE_SENSOR_DESCRIPTIONS,
+    CSNetHomeCompressorSensor,
+    CSNetHomeDeviceSensor,
     CSNetHomeInstallationSensor,
+    CSNetHomeSensor,
     _apply_description_attrs,
 )
 
@@ -65,8 +68,8 @@ def test_measurements_are_not_diagnostic():
 
 
 @pytest.mark.parametrize("description", ALL_DESCRIPTIONS, ids=lambda description: description.key)
-def test_category_is_applied_from_the_list(description):
-    """Every sensor class applies its description through the same helper."""
+def test_helper_sets_the_category_from_the_list(description):
+    """The helper every sensor class calls marks exactly the listed keys."""
     entity = SimpleNamespace()
     _apply_description_attrs(entity, description)
 
@@ -74,6 +77,56 @@ def test_category_is_applied_from_the_list(description):
         assert entity._attr_entity_category is EntityCategory.DIAGNOSTIC
     else:
         assert not hasattr(entity, "_attr_entity_category")
+
+
+ZONE = {"device_name": "Hitachi PAC", "room_name": "Living", "device_id": 1, "room_id": 2, "zone_id": 1, "parent_id": 1706}
+
+
+def _coordinator():
+    """Return the little of a coordinator the sensor classes need to be built."""
+    return SimpleNamespace(
+        get_installation_devices_data=lambda: {},
+        get_common_data=lambda: {"device_status": {1: {"name": "Hitachi PAC", "firmware": "1.0"}}},
+        get_sensors_data=lambda: [ZONE],
+        get_sensor_data_by_id=lambda device_id, room_id, zone_id: ZONE,
+        async_add_listener=lambda *args, **kwargs: lambda: None,
+        last_update_success=True,
+        hass=None,
+    )
+
+
+def _build(cls, description):
+    """Build a real sensor entity of the given class."""
+    if cls is CSNetHomeSensor:
+        return cls(_coordinator(), dict(ZONE), {"name": "Hitachi PAC", "firmware": "1.0"}, description)
+    if cls is CSNetHomeDeviceSensor:
+        return cls(_coordinator(), dict(ZONE), {"device_status": {}}, description)
+    device_data = {"device_name": "System", "room_name": "Controller", "device_id": 1, "room_id": 2}
+    return cls(_coordinator(), device_data, {"firmware": "1.0"}, description)
+
+
+@pytest.mark.parametrize(
+    ("cls", "descriptions"),
+    [
+        (CSNetHomeSensor, ZONE_SENSOR_DESCRIPTIONS),
+        (CSNetHomeDeviceSensor, DEVICE_SENSOR_DESCRIPTIONS),
+        (CSNetHomeInstallationSensor, INSTALLATION_SENSOR_DESCRIPTIONS),
+        (CSNetHomeCompressorSensor, COMPRESSOR_SENSOR_DESCRIPTIONS),
+    ],
+    ids=["zone", "device", "installation", "compressor"],
+)
+def test_real_entities_report_the_category_to_home_assistant(cls, descriptions):
+    """Through the real classes and Home Assistant's own ``entity_category`` property."""
+    for description in descriptions:
+        entity = _build(cls, description)
+        expected = EntityCategory.DIAGNOSTIC if description.key in DIAGNOSTIC_SENSOR_KEYS else None
+        assert entity.entity_category is expected, description.key
+
+
+def test_status_flags_stay_an_ordinary_sensor():
+    """Its attributes tell what is running right now: not a diagnostic value."""
+    assert "system_status_flags" not in DIAGNOSTIC_SENSOR_KEYS
+    assert "operation_status" not in DIAGNOSTIC_SENSOR_KEYS
 
 
 def _installation_sensor(heating_status):
@@ -98,7 +151,10 @@ def test_unit_device_shows_the_commercial_model(code, name):
     assert entity.native_value == name
 
 
-@pytest.mark.parametrize("heating_status", [None, {}, {"unitModel": 99}, {"unitModel": None}])
+@pytest.mark.parametrize(
+    "heating_status",
+    [None, {}, {"unitModel": 99}, {"unitModel": None}, {"unitModel": "1"}, {"unitModel": [1]}, {"unitModel": True}, "not a dict", ["x"]],
+)
 def test_unit_device_keeps_the_generic_model_when_the_unit_is_unknown(heating_status):
     """Without a known model the device is described as before."""
     assert _installation_sensor(heating_status).device_info["model"] == "HVAC System"
