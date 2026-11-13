@@ -1,7 +1,7 @@
 """Test CSNet Home climate entity."""
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from homeassistant.components.climate import FAN_AUTO, FAN_ON, HVACAction, HVACMode
@@ -1505,3 +1505,43 @@ def test_climate_follows_csnet_room_rename(hass):
     assert entity.native_current_temperature == 21.0
     assert entity.name == "Etage"
     assert entity.unique_id == unique_id == f"{DOMAIN}-climate-1234-395-1"
+
+
+@pytest.mark.parametrize(
+    ("mode", "real_mode", "expected_mode"),
+    [
+        (2, 0, 0),  # auto, unit cooling: the cooling fixed temperature
+        (2, 1, 1),  # auto, unit heating: the heating fixed temperature
+        (2, None, 2),  # auto, running mode unknown: as before
+        (1, 0, 1),  # heat stays heat whatever the unit reports
+        (0, 1, 0),  # cool stays cool
+    ],
+)
+async def test_water_circuit_setpoint_uses_the_running_mode(hass, mode, real_mode, expected_mode):
+    """In auto, the fixed water temperature written is the one of the mode the unit runs in."""
+    entity = build_entity(hass, mode=mode, zone_id=5, setp=35.0)
+    entity._sensor_data["real_mode"] = real_mode
+    api = entity.entry.runtime_data.api
+    checked = []
+    api.is_fixed_water_temperature_editable = lambda circuit, mode, data, indoor_id=None: checked.append((circuit, mode)) or True
+    entity.coordinator.get_installation_devices_data = lambda: {"heatingStatus": {}}
+    entity.coordinator.async_refresh = AsyncMock()
+
+    with patch("custom_components.csnet_home.climate.asyncio.sleep", AsyncMock()):
+        await entity.async_set_temperature(temperature=40.0)
+
+    assert checked == [(1, expected_mode)]
+    api.async_set_temperature.assert_awaited_once_with(5, 1706, expected_mode, temperature=40.0)
+
+
+@pytest.mark.parametrize(("real_mode", "expected_mode"), [(0, 0), (1, 1), (None, 2)])
+def test_water_circuit_target_is_shown_for_the_running_mode(hass, real_mode, expected_mode):
+    """The setpoint shown in auto is checked against the same mode as the one it is written for."""
+    entity = build_entity(hass, mode=2, zone_id=5, setp=35.0)
+    entity._sensor_data["real_mode"] = real_mode
+    checked = []
+    entity.entry.runtime_data.api.is_fixed_water_temperature_editable = lambda circuit, mode, data, indoor_id=None: checked.append(mode) or True
+    entity.coordinator.get_installation_devices_data = lambda: {"heatingStatus": {}}
+
+    assert entity.native_target_temperature == 35.0
+    assert checked == [expected_mode]

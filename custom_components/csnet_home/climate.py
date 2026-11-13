@@ -219,7 +219,8 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
 
             if installation_devices_data:
                 cloud_api = self.entry.runtime_data.api
-                mode = self._sensor_data.get("mode", 1)
+                # the same mode as the one the setpoint is written for
+                mode = self._running_mode()
 
                 # Determine circuit number from zone_id
                 circuit = 1 if zone_id == 5 else 2
@@ -379,10 +380,22 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
 
         return attrs
 
+    def _running_mode(self):
+        """Return the mode the unit works in: in auto, heating or cooling as the unit reports it.
+
+        A water circuit has one fixed temperature for heating and one for
+        cooling. Like the CSNet web app, the one of the running mode is used.
+        """
+        mode = self._sensor_data.get("mode", 1)
+        if mode == 2 and self._sensor_data.get("real_mode") in (0, 1):
+            return self._sensor_data.get("real_mode")
+        return mode
+
     async def async_set_temperature(self, **kwargs):
         """Set the target temperature for a room."""
         temperature = kwargs.get("temperature")
         zone_id = self._sensor_data.get("zone_id")
+        mode = self._running_mode()
 
         # For water circuits (zone 5, 6), only allow temperature changes if OTC type is FIX
         if zone_id in [5, 6]:  # Water circuits (C1_WATER, C2_WATER)
@@ -392,7 +405,6 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
 
             if installation_devices_data:
                 cloud_api = self.entry.runtime_data.api
-                mode = self._sensor_data.get("mode", 1)
 
                 # Determine circuit number from zone_id
                 circuit = 1 if zone_id == 5 else 2
@@ -411,7 +423,7 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
         response = await cloud_api.async_set_temperature(
             zone_id,
             self._sensor_data["parent_id"],
-            self._sensor_data["mode"],
+            mode,
             temperature=temperature,
         )
         if response:
@@ -598,10 +610,8 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
             return self._cached_limits
 
         zone_id = self._sensor_data.get("zone_id")
-        mode = self._sensor_data.get("mode", 1)
         # In auto the limits are those of what the unit is doing right now
-        if mode == 2 and self._sensor_data.get("real_mode") in (0, 1):
-            mode = self._sensor_data.get("real_mode")
+        mode = self._running_mode()
         is_cooling = mode == 0
 
         if zone_id in [5, 6]:
