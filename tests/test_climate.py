@@ -157,16 +157,62 @@ def test_preset_mode(hass):
 
 
 def test_hvac_action_heat_and_cool(hass):
-    """Report HEATING/COOLING/IDLE based on temperatures and mode."""
+    """Use temperatures and mode to infer action."""
     # Heating when setpoint > current in heat mode
-    entity = build_entity(hass, mode=1, on_off=1, cur=19.0, setp=20.0)
-    assert entity.hvac_action == HVACAction.HEATING
+    assert build_entity(hass, mode=1, on_off=1, cur=19.0, setp=20.0).hvac_action == HVACAction.HEATING
     # Cooling when setpoint < current in cool mode
-    entity = build_entity(hass, mode=0, on_off=1, cur=23.0, setp=21.0)
-    assert entity.hvac_action == HVACAction.COOLING
+    assert build_entity(hass, mode=0, on_off=1, cur=23.0, setp=21.0).hvac_action == HVACAction.COOLING
     # Idle otherwise
-    entity = build_entity(hass, mode=1, on_off=1, cur=20.0, setp=20.0)
+    assert build_entity(hass, mode=1, on_off=1, cur=20.0, setp=20.0).hvac_action == HVACAction.IDLE
+
+
+def test_hvac_action_with_missing_temperatures(hass):
+    """A missing temperature gives idle instead of a TypeError."""
+    assert build_entity(hass, mode=1, on_off=1, cur=None, setp=20.0).hvac_action == HVACAction.IDLE
+    assert build_entity(hass, mode=0, on_off=1, cur=23.0, setp=None).hvac_action == HVACAction.IDLE
+
+
+def test_hvac_action_is_off_when_the_zone_is_off(hass):
+    """A stopped zone is off, whatever the unit is doing for other zones."""
+    entity = build_entity(hass, mode=1, on_off=0, cur=18.0, setp=21.0, operation_status=6)
+    assert entity.hvac_action == HVACAction.OFF
+
+
+@pytest.mark.parametrize("zone_id", [1, 2, 5, 6])
+def test_hvac_action_ignores_circuit_demand_when_the_room_is_satisfied(hass, zone_id):
+    """The unit keeps demand set and the compressor running with the room above its setpoint: the zone is idle."""
+    entity = build_entity(hass, mode=1, on_off=1, cur=20.0, setp=19.0, zone_id=zone_id, operation_status=6)
+    entity._sensor_data["c1_demand"] = True
+    entity._sensor_data["c2_demand"] = True
     assert entity.hvac_action == HVACAction.IDLE
+
+
+@pytest.mark.parametrize(("real_mode", "expected_mode"), [(1, 1), (0, 0), (None, 2), (2, 2)])
+def test_auto_mode_limits_follow_what_the_unit_is_doing(hass, real_mode, expected_mode):
+    """In auto, limits are asked for the running mode; without one, as before."""
+    entity = build_entity(hass, mode=2, is_fan_coil=True)
+    entity._sensor_data["real_mode"] = real_mode
+    entity._cached_limits = None
+    asked = []
+
+    def limits(zone_id, mode, data, indoor_id=None):
+        asked.append(mode)
+        return (None, None)
+
+    api = entity.hass.data[DOMAIN][entity.entry.entry_id]["api"]
+    api.get_temperature_limits = limits
+
+    entity._calculate_temperature_limits()
+
+    assert asked == [expected_mode]
+
+
+def test_target_temperature_step_by_zone_type(hass):
+    """Room setpoints move by 0.5 °C, water setpoints by 1 °C."""
+    assert build_entity(hass, zone_id=1).target_temperature_step == 0.5
+    assert build_entity(hass, zone_id=2).target_temperature_step == 0.5
+    assert build_entity(hass, zone_id=5).target_temperature_step == 1.0
+    assert build_entity(hass, zone_id=6).target_temperature_step == 1.0
 
 
 def test_extra_state_attributes(hass):

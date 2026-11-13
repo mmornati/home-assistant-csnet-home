@@ -88,6 +88,8 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
             HVACMode.COOL,
             HVACMode.HEAT_COOL,
         ]
+        # Room setpoints move in half degrees, water setpoints in whole degrees
+        self._attr_target_temperature_step = 1.0 if sensor_data.get("zone_id") in (5, 6) else 0.5
         self._attr_preset_modes = ["comfort", "eco"]
         if self._sensor_data.get("ecocomfort") == 0:
             self._attr_preset_mode = "eco"
@@ -292,8 +294,16 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
 
     @property
     def hvac_action(self):
-        """Return the current running HVAC action."""
-        # Prefer real operating mode if available
+        """Return what the zone is doing right now.
+
+        Compares the setpoint with the room temperature. The unit's circuit
+        demand is not used: it stays set while the room is above its setpoint.
+        """
+        if self._sensor_data is None:
+            return HVACAction.IDLE
+        if self._sensor_data.get("on_off") != 1:
+            return HVACAction.OFF
+
         if self.is_heating():
             return HVACAction.HEATING
         if self.is_cooling():
@@ -505,25 +515,31 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
                 # Optimistically update the sensor data
                 self._sensor_data["silent_mode"] = 1 if silent_mode else 0
 
+    def _temperatures(self):
+        """Return (setpoint, room temperature), or None when either is missing."""
+        setting = self._sensor_data.get("setting_temperature")
+        current = self._sensor_data.get("current_temperature")
+        if not isinstance(setting, (int, float)) or not isinstance(current, (int, float)):
+            return None
+        return setting, current
+
     def is_heating(self):
         """Return true if the thermostat is currently heating."""
         if self._sensor_data is None:
             return False
-        return (
-            self._sensor_data.get("on_off") == 1
-            and self._sensor_data.get("mode") == 1
-            and self._sensor_data.get("setting_temperature") > self._sensor_data.get("current_temperature")
-        )
+        temperatures = self._temperatures()
+        if temperatures is None:
+            return False
+        return self._sensor_data.get("on_off") == 1 and self._sensor_data.get("mode") == 1 and temperatures[0] > temperatures[1]
 
     def is_cooling(self):
         """Return true if the thermostat is currently cooling."""
         if self._sensor_data is None:
             return False
-        return (
-            self._sensor_data.get("on_off") == 1
-            and self._sensor_data.get("mode") == 0
-            and self._sensor_data.get("setting_temperature") < self._sensor_data.get("current_temperature")
-        )
+        temperatures = self._temperatures()
+        if temperatures is None:
+            return False
+        return self._sensor_data.get("on_off") == 1 and self._sensor_data.get("mode") == 0 and temperatures[0] < temperatures[1]
 
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
@@ -586,6 +602,9 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
 
         zone_id = self._sensor_data.get("zone_id")
         mode = self._sensor_data.get("mode", 1)
+        # In auto the limits are those of what the unit is doing right now
+        if mode == 2 and self._sensor_data.get("real_mode") in (0, 1):
+            mode = self._sensor_data.get("real_mode")
         is_cooling = mode == 0
 
         if zone_id in [5, 6]:
