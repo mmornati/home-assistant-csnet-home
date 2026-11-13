@@ -174,6 +174,12 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
                             "Enriched zone_id 3 (DHW) current_temperature: %s",
                             temp_dhw,
                         )
+                # For zone_id 4 (swimming pool), use tempSWP from heatingStatus
+                elif zone_id == 4:
+                    temp_swp = heating_status.get("tempSWP")
+                    if self._is_valid_temperature(temp_swp):
+                        sensor["current_temperature"] = temp_swp
+                        _LOGGER.debug("Enriched zone_id 4 (SWP) current_temperature: %s", temp_swp)
                 # For zone_id 5 (C1_WATER), use waterOutletHPTemp from heatingStatus
                 # BUT: elementType 5 can also represent HEAT elements (parentName "Heat")
                 # Only enrich if it's actually a water circuit, not a heat circuit

@@ -77,6 +77,8 @@ def test_state_mode_and_on_off_mapping():
     sensor_data["mode"] = 0
     assert s.state == HVACMode.COOL
     sensor_data["mode"] = 2
+    assert s.state == HVACMode.HEAT_COOL  # auto is not "off"
+    sensor_data["mode"] = 99
     assert s.state == HVACMode.OFF
 
     # on_off sensor
