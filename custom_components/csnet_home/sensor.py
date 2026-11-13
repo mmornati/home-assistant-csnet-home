@@ -760,7 +760,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     """Set up sensors for CSNet Home."""
     _LOGGER.debug("Starting CSNet Home sensor setup")
 
-    coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    coordinator = entry.runtime_data.coordinator
     if not coordinator:
         _LOGGER.error("No coordinator instance found!")
         return None
@@ -1824,7 +1824,7 @@ class CSNetHomeAlarmHistorySensor(CoordinatorEntity, SensorEntity):
 
         # Format alarm history for display
         alarm_list = []
-        api = self._coordinator.hass.data[DOMAIN][self._coordinator.entry_id]["api"]
+        api = self._coordinator.api
 
         for alarm in recent_alarms:
             code = alarm.get("code")

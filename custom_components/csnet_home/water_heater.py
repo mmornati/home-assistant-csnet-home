@@ -28,7 +28,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     """Set up the Water Heater platform for CSNet Home."""
     _LOGGER.debug("Starting CSNet Home water heater setup")
 
-    coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    coordinator = entry.runtime_data.coordinator
     if not coordinator:
         _LOGGER.error("No coordinator instance found!")
         return None
@@ -64,7 +64,7 @@ class CSNetHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
         """Initialize the water heater entity."""
         # Follow the coordinator: no polling of our own, and the entity becomes
         # unavailable when a CSNet Manager poll fails
-        super().__init__(hass.data[DOMAIN][entry.entry_id]["coordinator"])
+        super().__init__(entry.runtime_data.coordinator)
         self.hass = hass
         self.entry = entry
         self._sensor_data = sensor_data
@@ -224,11 +224,11 @@ class CSNetHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
         mode = 1
 
         # Get installation devices data from coordinator
-        coordinator = self.hass.data[DOMAIN][self.entry.entry_id]["coordinator"]
+        coordinator = self.entry.runtime_data.coordinator
         installation_devices_data = coordinator.get_installation_devices_data()
 
         # Get temperature limits from API
-        cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
+        cloud_api = self.entry.runtime_data.api
         _, max_limit = cloud_api.get_temperature_limits(zone_id, mode, installation_devices_data, self._sensor_data.get("parent_id"))
 
         # Return API limit if available, otherwise use static default
@@ -241,7 +241,7 @@ class CSNetHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
             _LOGGER.warning("No temperature provided for setting target temperature.")
             return
 
-        cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
+        cloud_api = self.entry.runtime_data.api
         response = await cloud_api.async_set_temperature(
             self._sensor_data["zone_id"],
             self._sensor_data["parent_id"],
@@ -256,7 +256,7 @@ class CSNetHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
 
     async def async_set_operation_mode(self, operation_mode: str) -> None:
         """Set new target operation mode."""
-        cloud_api = self.hass.data[DOMAIN][self.entry.entry_id]["api"]
+        cloud_api = self.entry.runtime_data.api
         _LOGGER.warning("Operation mode: %s", operation_mode)
         response = await cloud_api.set_water_heater_mode(self._sensor_data["zone_id"], self._sensor_data["parent_id"], operation_mode)
         if response:

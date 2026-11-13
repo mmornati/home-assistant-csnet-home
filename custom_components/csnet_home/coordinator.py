@@ -1,26 +1,56 @@
 """Coordinator Class to centralise all data fetching from CSNet Home."""
 
+from __future__ import annotations
+
 import asyncio
 import logging
+from dataclasses import dataclass
 from datetime import timedelta
+from typing import TYPE_CHECKING
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import DOMAIN, MIN_SCAN_INTERVAL
 
+if TYPE_CHECKING:
+    from .api import CSNetHomeAPI
+
 _LOGGER = logging.getLogger(__name__)
+
+
+@dataclass
+class CSNetHomeData:
+    """What a loaded config entry keeps in ``entry.runtime_data``."""
+
+    api: CSNetHomeAPI
+    coordinator: CSNetHomeCoordinator
+
+
+CSNetHomeConfigEntry = ConfigEntry[CSNetHomeData]
 
 
 class CSNetHomeCoordinator(DataUpdateCoordinator):
     """Coordinator to fetch all sensor data from the cloud API."""
 
-    def __init__(self, hass: HomeAssistant, update_interval: int, entry_id: str, enable_alarm_notifications: bool = True, filtered_alarm_codes: str = "-1"):
-        """Initialize the coordinator."""
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        update_interval: int,
+        entry_id: str,
+        enable_alarm_notifications: bool = True,
+        filtered_alarm_codes: str = "-1",
+        *,
+        api: CSNetHomeAPI | None = None,
+        config_entry: ConfigEntry | None = None,
+    ):
+        """Initialize the coordinator for one config entry and the API client it reads from."""
         _LOGGER.debug("Configuring CSNetHome Coordinator")
         self.hass = hass
         self.entry_id = entry_id
+        self.api = api
         if update_interval < MIN_SCAN_INTERVAL:
             _LOGGER.warning(
                 "Scan interval of %s s is below the %s s minimum, using %s s",
@@ -42,6 +72,7 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
             name=DOMAIN,
             update_method=self._async_update_data,
             update_interval=self.update_interval,
+            config_entry=config_entry,
         )
 
     def _parse_filtered_alarm_codes(self, codes_string: str) -> set[int]:
@@ -59,8 +90,7 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
 
         _LOGGER.debug("Fetching all CSNet Home sensor data from API.")
 
-        # Retrieve the CloudServiceAPI object from hass data
-        cloud_api = self.hass.data[DOMAIN][self.entry_id]["api"]
+        cloud_api = self.api
         if not cloud_api:
             raise UpdateFailed("No CSNet API instance found")
 

@@ -382,8 +382,7 @@ async def _poll_with_pool(hass, temp_swp):
     api.async_get_installation_alarms = AsyncMock(return_value=None)
     api.load_translations = AsyncMock()
     api.get_heating_status_from_installation_devices = lambda data, indoor_id=None: extract_heating_status(data, indoor_id)
-    hass.data["csnet_home"] = {"test": {"api": api}}
-    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=60, entry_id="test")
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=60, entry_id="test", api=api)
     await coordinator._async_update_data()
     return coordinator.get_sensor_data_by_id(1, 5, 4)
 

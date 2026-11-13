@@ -51,9 +51,7 @@ async def test_coordinator_update_success(hass: HomeAssistant):
     mock_api.async_get_installation_alarms = AsyncMock(return_value={"alarms": [{"code": 42, "message": "Test alarm"}]})
     mock_api.load_translations = AsyncMock()
 
-    hass.data["csnet_home"] = {"test": {"api": mock_api}}
-
-    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test")
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test", api=mock_api)
     result = await coordinator._async_update_data()
 
     assert result is not None
@@ -86,9 +84,7 @@ async def test_coordinator_update_elements_data_only(hass: HomeAssistant):
     mock_api.async_get_installation_alarms = AsyncMock(return_value=None)
     mock_api.load_translations = AsyncMock()
 
-    hass.data["csnet_home"] = {"test": {"api": mock_api}}
-
-    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test")
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test", api=mock_api)
     result = await coordinator._async_update_data()
 
     assert result is not None
@@ -101,9 +97,8 @@ async def test_coordinator_update_elements_data_only(hass: HomeAssistant):
 @pytest.mark.asyncio
 async def test_coordinator_update_no_api(hass: HomeAssistant):
     """Test data update when no API is available."""
-    hass.data["csnet_home"] = {"test": {"api": None}}
 
-    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test")
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test", api=None)
     with pytest.raises(UpdateFailed):
         await coordinator._async_update_data()
 
@@ -125,9 +120,8 @@ def _failing_api(logged_in=True, login_result=True, auth_failed=False):
 async def test_coordinator_update_no_data_raises_update_failed(hass: HomeAssistant):
     """No elements data must mark the update failed, not publish empty data."""
     mock_api = _failing_api()
-    hass.data["csnet_home"] = {"test": {"api": mock_api}}
 
-    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=60, entry_id="test")
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=60, entry_id="test", api=mock_api)
     with pytest.raises(UpdateFailed):
         await coordinator._async_update_data()
 
@@ -136,9 +130,8 @@ async def test_coordinator_update_no_data_raises_update_failed(hass: HomeAssista
 async def test_coordinator_login_failure_raises_update_failed(hass: HomeAssistant):
     """A transient login failure raises UpdateFailed and skips all reads."""
     mock_api = _failing_api(logged_in=False, login_result=False, auth_failed=False)
-    hass.data["csnet_home"] = {"test": {"api": mock_api}}
 
-    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=60, entry_id="test")
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=60, entry_id="test", api=mock_api)
     with pytest.raises(UpdateFailed):
         await coordinator._async_update_data()
     mock_api.async_get_elements_data.assert_not_called()
@@ -149,9 +142,8 @@ async def test_coordinator_login_failure_raises_update_failed(hass: HomeAssistan
 async def test_coordinator_rejected_credentials_raise_auth_failed(hass: HomeAssistant):
     """Rejected credentials raise ConfigEntryAuthFailed so HA starts reauth."""
     mock_api = _failing_api(logged_in=False, login_result=False, auth_failed=True)
-    hass.data["csnet_home"] = {"test": {"api": mock_api}}
 
-    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=60, entry_id="test")
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=60, entry_id="test", api=mock_api)
     with pytest.raises(ConfigEntryAuthFailed):
         await coordinator._async_update_data()
 
@@ -165,9 +157,8 @@ async def test_coordinator_session_lost_during_fetch_with_rejected_credentials(h
         mock_api.logged_in = False
 
     mock_api.load_translations = AsyncMock(side_effect=lose_session)
-    hass.data["csnet_home"] = {"test": {"api": mock_api}}
 
-    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=60, entry_id="test")
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=60, entry_id="test", api=mock_api)
     with pytest.raises(ConfigEntryAuthFailed):
         await coordinator._async_update_data()
 
@@ -289,9 +280,7 @@ async def test_coordinator_alarm_tracking(hass: HomeAssistant):
     mock_api.async_get_installation_devices_data = AsyncMock(return_value=None)
     mock_api.async_get_installation_alarms = AsyncMock(return_value=None)
 
-    hass.data["csnet_home"] = {"test": {"api": mock_api}}
-
-    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test")
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test", api=mock_api)
 
     # Test that alarm codes are tracked
     await coordinator._async_update_data()
@@ -324,9 +313,7 @@ async def test_coordinator_alarm_clearing(hass: HomeAssistant):
     mock_api.async_get_installation_devices_data = AsyncMock(return_value=None)
     mock_api.async_get_installation_alarms = AsyncMock(return_value=None)
 
-    hass.data["csnet_home"] = {"test": {"api": mock_api}}
-
-    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test")
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test", api=mock_api)
 
     # Pre-populate with an alarm
     coordinator._last_alarm_codes["123-456-789"] = 42
@@ -364,9 +351,7 @@ async def test_coordinator_alarm_notification(hass: HomeAssistant):
     mock_api.async_get_installation_devices_data = AsyncMock(return_value=None)
     mock_api.async_get_installation_alarms = AsyncMock(return_value=None)
 
-    hass.data["csnet_home"] = {"test": {"api": mock_api}}
-
-    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test")
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test", api=mock_api)
 
     # Trigger update with new alarm
     # Patch ServiceRegistry.async_call as it's typically read-only on the instance
@@ -429,9 +414,7 @@ async def test_coordinator_dhw_temperature_issue(hass: HomeAssistant):
     mock_api.async_get_installation_alarms = AsyncMock(return_value=None)
     mock_api.load_translations = AsyncMock()
 
-    hass.data["csnet_home"] = {"test": {"api": mock_api}}
-
-    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test")
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test", api=mock_api)
 
     # We need to make sure _is_valid_temperature is called
     result = await coordinator._async_update_data()
@@ -487,10 +470,8 @@ async def test_coordinator_filtered_alarm_code_skipped(hass: HomeAssistant):
     mock_api.async_get_installation_devices_data = AsyncMock(return_value=None)
     mock_api.async_get_installation_alarms = AsyncMock(return_value=None)
 
-    hass.data["csnet_home"] = {"test": {"api": mock_api}}
-
     # Default: filtered_alarm_codes = "-1" which should filter out alarm_code -1
-    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test")
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test", api=mock_api)
 
     with patch("homeassistant.core.ServiceRegistry.async_call", new_callable=AsyncMock) as mock_async_call:
         await coordinator._async_update_data()
@@ -527,10 +508,8 @@ async def test_coordinator_filtered_alarm_codes_custom(hass: HomeAssistant):
     mock_api.async_get_installation_devices_data = AsyncMock(return_value=None)
     mock_api.async_get_installation_alarms = AsyncMock(return_value=None)
 
-    hass.data["csnet_home"] = {"test": {"api": mock_api}}
-
     # Custom filtered codes: -5 should be filtered
-    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test", filtered_alarm_codes="-5,-10")
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test", filtered_alarm_codes="-5,-10", api=mock_api)
 
     with patch("homeassistant.core.ServiceRegistry.async_call", new_callable=AsyncMock) as mock_async_call:
         await coordinator._async_update_data()
@@ -565,10 +544,8 @@ async def test_coordinator_disabled_alarm_notifications(hass: HomeAssistant):
     mock_api.async_get_installation_devices_data = AsyncMock(return_value=None)
     mock_api.async_get_installation_alarms = AsyncMock(return_value=None)
 
-    hass.data["csnet_home"] = {"test": {"api": mock_api}}
-
     # Disable all alarm notifications
-    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test", enable_alarm_notifications=False)
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test", enable_alarm_notifications=False, api=mock_api)
 
     with patch("homeassistant.core.ServiceRegistry.async_call", new_callable=AsyncMock) as mock_async_call:
         await coordinator._async_update_data()
@@ -626,9 +603,7 @@ async def test_coordinator_installation_alarm_filtered(hass: HomeAssistant):
         }
     )
 
-    hass.data["csnet_home"] = {"test": {"api": mock_api}}
-
-    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test")
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test", api=mock_api)
 
     with patch("homeassistant.core.ServiceRegistry.async_call", new_callable=AsyncMock) as mock_async_call:
         await coordinator._async_update_data()
@@ -663,9 +638,7 @@ async def test_coordinator_installation_alarm_not_filtered(hass: HomeAssistant):
     )
     mock_api.translate_alarm = MagicMock(return_value="Test Alarm")
 
-    hass.data["csnet_home"] = {"test": {"api": mock_api}}
-
-    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test")
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=30, entry_id="test", api=mock_api)
 
     with patch("homeassistant.core.ServiceRegistry.async_call", new_callable=AsyncMock) as mock_async_call:
         await coordinator._async_update_data()

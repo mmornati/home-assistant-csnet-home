@@ -7,6 +7,7 @@ from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.csnet_home.const import DOMAIN
+from custom_components.csnet_home.coordinator import CSNetHomeData
 from custom_components.csnet_home.diagnostics import REDACTED, async_get_config_entry_diagnostics, redact
 
 SECRETS = [
@@ -69,7 +70,7 @@ async def test_diagnostics_redacts_account_and_hardware_identifiers(hass):
     """Nothing that identifies the account, place or hardware is in the download."""
     entry = MockConfigEntry(domain=DOMAIN, data={CONF_USERNAME: "someone@example.com", CONF_PASSWORD: "s3cret-pass"})
     entry.add_to_hass(hass)
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {"coordinator": _coordinator(), "api": MagicMock()}
+    entry.runtime_data = CSNetHomeData(api=MagicMock(), coordinator=_coordinator())
 
     result = await async_get_config_entry_diagnostics(hass, entry)
 
@@ -86,7 +87,7 @@ async def test_diagnostics_keeps_the_values_needed_to_debug(hass):
     """Readings, ids used for lookups and zone names stay readable."""
     entry = MockConfigEntry(domain=DOMAIN, data={CONF_USERNAME: "u", CONF_PASSWORD: "p"})
     entry.add_to_hass(hass)
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {"coordinator": _coordinator(), "api": MagicMock()}
+    entry.runtime_data = CSNetHomeData(api=MagicMock(), coordinator=_coordinator())
 
     result = await async_get_config_entry_diagnostics(hass, entry)
 
@@ -108,7 +109,7 @@ async def test_diagnostics_does_not_change_the_coordinator_data(hass):
     entry = MockConfigEntry(domain=DOMAIN, data={CONF_USERNAME: "u", CONF_PASSWORD: "p"})
     entry.add_to_hass(hass)
     coordinator = _coordinator()
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {"coordinator": coordinator, "api": MagicMock()}
+    entry.runtime_data = CSNetHomeData(api=MagicMock(), coordinator=coordinator)
 
     await async_get_config_entry_diagnostics(hass, entry)
 
@@ -142,7 +143,7 @@ async def test_diagnostics_with_no_data_yet(hass):
     coordinator.update_interval = None
     coordinator.get_sensors_data.return_value = []
     coordinator.get_common_data.return_value = {}
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {"coordinator": coordinator, "api": MagicMock()}
+    entry.runtime_data = CSNetHomeData(api=MagicMock(), coordinator=coordinator)
 
     result = await async_get_config_entry_diagnostics(hass, entry)
 

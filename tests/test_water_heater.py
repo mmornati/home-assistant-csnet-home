@@ -40,15 +40,7 @@ def build_water_heater_entity(
         "zone_id": zone_id,
     }
     common_data = {"name": "Hitachi PAC", "firmware": "1.0.0"}
-    entry = SimpleNamespace(entry_id="test-entry", data={})
-
-    # Minimal hass structure for the entity
-    if not hasattr(hass, "data"):
-        hass.data = {}
-    if DOMAIN not in hass.data:
-        hass.data[DOMAIN] = {}
-    if entry.entry_id not in hass.data[DOMAIN]:
-        hass.data[DOMAIN][entry.entry_id] = {}
+    entry = SimpleNamespace(entry_id="test-entry", data={}, runtime_data=SimpleNamespace(api=None, coordinator=None))
 
     # Setup installation devices data
     installation_devices_data = {
@@ -58,7 +50,7 @@ def build_water_heater_entity(
     }
 
     # Inject a fake API
-    hass.data[DOMAIN][entry.entry_id]["api"] = SimpleNamespace(
+    entry.runtime_data.api = SimpleNamespace(
         async_set_temperature=AsyncMock(return_value=True),
         set_water_heater_mode=AsyncMock(return_value=True),
         get_temperature_limits=lambda zone_id, mode, data, indoor_id=None: (
@@ -76,7 +68,7 @@ def build_water_heater_entity(
         (s for s in coordinator.get_sensors_data() if (s.get("device_id"), s.get("room_id"), s.get("zone_id")) == (device_id, room_id, zone_id)),
         None,
     )
-    hass.data[DOMAIN][entry.entry_id]["coordinator"] = coordinator
+    entry.runtime_data.coordinator = coordinator
 
     entity = CSNetHomeWaterHeater(hass, entry, sensor_data, common_data)
     return entity
@@ -191,7 +183,7 @@ async def test_water_heater_set_temperature(hass):
     entity = build_water_heater_entity(hass, zone_id=3, setp=45)
     await entity.async_set_temperature(temperature=50)
 
-    api = hass.data[DOMAIN]["test-entry"]["api"]
+    api = entity.entry.runtime_data.api
     api.async_set_temperature.assert_called_once()
     assert entity._sensor_data["setting_temperature"] == 50
     assert entity.native_target_temperature == 50
@@ -203,7 +195,7 @@ async def test_swimming_pool_set_temperature(hass):
     entity = build_water_heater_entity(hass, zone_id=4, setp=28)
     await entity.async_set_temperature(temperature=30)
 
-    api = hass.data[DOMAIN]["test-entry"]["api"]
+    api = entity.entry.runtime_data.api
     api.async_set_temperature.assert_called_once()
     assert entity._sensor_data["setting_temperature"] == 30
     assert entity.native_target_temperature == 30
@@ -215,7 +207,7 @@ async def test_water_heater_set_operation_mode_eco(hass):
     entity = build_water_heater_entity(hass, zone_id=3, doing_boost=True)
     await entity.async_set_operation_mode("eco")
 
-    api = hass.data[DOMAIN]["test-entry"]["api"]
+    api = entity.entry.runtime_data.api
     api.set_water_heater_mode.assert_called_once_with(3, 1706, "eco")
     assert entity._sensor_data["on_off"] == 1
     assert not entity._sensor_data["doingBoost"]
@@ -228,7 +220,7 @@ async def test_water_heater_set_operation_mode_performance(hass):
     entity = build_water_heater_entity(hass, zone_id=3, doing_boost=False)
     await entity.async_set_operation_mode("performance")
 
-    api = hass.data[DOMAIN]["test-entry"]["api"]
+    api = entity.entry.runtime_data.api
     api.set_water_heater_mode.assert_called_once_with(3, 1706, "performance")
     assert entity._sensor_data["on_off"] == 1
     assert entity._sensor_data["doingBoost"]
@@ -241,7 +233,7 @@ async def test_water_heater_set_operation_mode_off(hass):
     entity = build_water_heater_entity(hass, zone_id=3, on_off=1)
     await entity.async_set_operation_mode("off")
 
-    api = hass.data[DOMAIN]["test-entry"]["api"]
+    api = entity.entry.runtime_data.api
     api.set_water_heater_mode.assert_called_once_with(3, 1706, "off")
     assert entity._sensor_data["on_off"] == 0
     assert entity._attr_operation_mode == "off"
@@ -253,7 +245,7 @@ async def test_swimming_pool_set_operation_mode_on(hass):
     entity = build_water_heater_entity(hass, zone_id=4, on_off=0)
     await entity.async_set_operation_mode("on")
 
-    api = hass.data[DOMAIN]["test-entry"]["api"]
+    api = entity.entry.runtime_data.api
     api.set_water_heater_mode.assert_called_once_with(4, 1706, "on")
     assert entity._sensor_data["on_off"] == 1
     assert entity._attr_operation_mode == "on"
@@ -267,7 +259,7 @@ async def test_swimming_pool_set_operation_mode_off(hass):
     entity = build_water_heater_entity(hass, zone_id=4, on_off=1)
     await entity.async_set_operation_mode("off")
 
-    api = hass.data[DOMAIN]["test-entry"]["api"]
+    api = entity.entry.runtime_data.api
     api.set_water_heater_mode.assert_called_once_with(4, 1706, "off")
     assert entity._sensor_data["on_off"] == 0
     assert entity._attr_operation_mode == "off"
@@ -279,7 +271,7 @@ async def test_water_heater_update(hass):
     entity = build_water_heater_entity(hass, zone_id=3, room_name="DHW")
 
     # Update sensor data
-    coordinator = hass.data[DOMAIN]["test-entry"]["coordinator"]
+    coordinator = entity.entry.runtime_data.coordinator
     updated_sensor = {
         "device_id": 1234,
         "room_id": 396,
@@ -304,7 +296,7 @@ async def test_swimming_pool_update(hass):
     entity = build_water_heater_entity(hass, zone_id=4, room_name="Pool")
 
     # Update sensor data
-    coordinator = hass.data[DOMAIN]["test-entry"]["coordinator"]
+    coordinator = entity.entry.runtime_data.coordinator
     updated_sensor = {
         "device_id": 1234,
         "room_id": 396,
@@ -347,7 +339,7 @@ def test_swimming_pool_device_info(hass):
 def test_water_heater_follows_coordinator(hass):
     """The entity does not poll and is unavailable when the coordinator update failed."""
     entity = build_water_heater_entity(hass, zone_id=3, room_name="DHW")
-    coordinator = hass.data[DOMAIN]["test-entry"]["coordinator"]
+    coordinator = entity.entry.runtime_data.coordinator
 
     assert entity.coordinator is coordinator
     assert entity.should_poll is False
@@ -360,7 +352,7 @@ def test_water_heater_follows_coordinator(hass):
 def test_water_heater_coordinator_update_writes_state(hass):
     """A coordinator update refreshes the attributes and writes the state."""
     entity = build_water_heater_entity(hass, zone_id=3, room_name="DHW", cur=40.0)
-    coordinator = hass.data[DOMAIN]["test-entry"]["coordinator"]
+    coordinator = entity.entry.runtime_data.coordinator
     coordinator.get_sensors_data = lambda: [
         {
             "device_id": 1234,
@@ -385,7 +377,7 @@ def test_water_heater_follows_csnet_room_rename(hass):
     """A room renamed in CSNet Manager keeps feeding the same entity."""
     entity = build_water_heater_entity(hass, zone_id=3, room_name="DHW", cur=40.0)
     unique_id = entity.unique_id
-    coordinator = hass.data[DOMAIN]["test-entry"]["coordinator"]
+    coordinator = entity.entry.runtime_data.coordinator
     coordinator.get_sensors_data = lambda: [
         {
             "device_id": 1234,

@@ -5,7 +5,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from custom_components.csnet_home.api import CSNetHomeAPI
-from custom_components.csnet_home.const import DOMAIN
 from custom_components.csnet_home.coordinator import CSNetHomeCoordinator
 from custom_components.csnet_home.sensor import CSNetHomeAlarmHistorySensor
 
@@ -76,7 +75,7 @@ async def test_alarm_history_sensor(hass, mock_api):
     # Setup coordinator
     setup_hass_services(hass)
     coordinator = CSNetHomeCoordinator(hass, 60, "test_entry", filtered_alarm_codes="")
-    hass.data[DOMAIN] = {"test_entry": {"api": mock_api, "coordinator": coordinator}}
+    coordinator.api = mock_api
 
     # Trigger update
     await coordinator._async_update_data()
@@ -103,7 +102,7 @@ async def test_coordinator_alarm_notifications(hass, mock_api):
     # Setup coordinator
     setup_hass_services(hass)
     coordinator = CSNetHomeCoordinator(hass, 60, "test_entry", filtered_alarm_codes="")
-    hass.data[DOMAIN] = {"test_entry": {"api": mock_api, "coordinator": coordinator}}
+    coordinator.api = mock_api
 
     # Trigger update
     await coordinator._async_update_data()
