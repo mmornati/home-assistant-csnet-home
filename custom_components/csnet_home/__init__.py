@@ -28,6 +28,7 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 SCAN_INTERVAL = 60
 PLATFORMS: list[Platform] = [
+    Platform.BINARY_SENSOR,
     Platform.SENSOR,
     Platform.CLIMATE,
     Platform.WATER_HEATER,
