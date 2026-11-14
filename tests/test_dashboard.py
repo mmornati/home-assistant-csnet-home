@@ -215,3 +215,12 @@ def test_numbers_and_dates_follow_the_card_language():
         body = source[source.index(helper) : source.index("}", source.index(helper))]
         assert "textLocale(hass)" in body
     assert "hass.locale?.language || undefined" not in source
+
+
+def test_cards_keep_their_element_and_skip_unchanged_content():
+    """A redraw keeps the style and the ha-card, and only replaces content that changed (phones lost their scroll position)."""
+    source = FRONTEND_FILE.read_text(encoding="utf-8")
+    assert source.count("this.shadowRoot.innerHTML =") == 1
+    show = source[source.index("  _show(css, html) {") :]
+    show = show[: show.index("\n  }\n")]
+    assert "if (!this._card)" in show and "if (html !== this._html)" in show and "if (css !== this._css)" in show

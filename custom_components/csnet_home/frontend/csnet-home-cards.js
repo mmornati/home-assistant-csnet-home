@@ -12,7 +12,7 @@
  * power meter.
  */
 
-const CARD_VERSION = "1.1.3";
+const CARD_VERSION = "1.1.4";
 
 // ---------------------------------------------------------------------------
 // Texts
@@ -938,7 +938,7 @@ class CsnetBaseCard extends HTMLElement {
       const text = this._roles?.error ? t(hass, "no_integration") : t(hass, "loading");
       if (this._signature !== text) {
         this._signature = text;
-        this.shadowRoot.innerHTML = `<style>${BASE_CSS}</style><ha-card><div class="message">${escapeHtml(text)}</div></ha-card>`;
+        this._show(BASE_CSS, `<div class="message">${escapeHtml(text)}</div>`);
       }
       return;
     }
@@ -950,7 +950,28 @@ class CsnetBaseCard extends HTMLElement {
     this._ensureData();
     if (signature === this._signature) return;
     this._signature = signature;
-    this.shadowRoot.innerHTML = `<style>${BASE_CSS}${this.css()}</style><ha-card>${this.content(hass)}</ha-card>`;
+    this._show(BASE_CSS + this.css(), this.content(hass));
+  }
+
+  /**
+   * Put the content in the card. The style and the ha-card stay in place, and the
+   * content is only replaced when it changed: rebuilding the whole card on every
+   * state change made phones (iOS) lose their scroll position.
+   */
+  _show(css, html) {
+    if (!this._card) {
+      this.shadowRoot.innerHTML = "<style></style><ha-card></ha-card>";
+      this._style = this.shadowRoot.querySelector("style");
+      this._card = this.shadowRoot.querySelector("ha-card");
+    }
+    if (css !== this._css) {
+      this._style.textContent = css;
+      this._css = css;
+    }
+    if (html !== this._html) {
+      this._card.innerHTML = html;
+      this._html = html;
+    }
   }
 
   extraSignature() {
