@@ -29,7 +29,7 @@ Tap any value to open its entity's details.
 ![A heat pump view built only from the bundled cards](../images/cards/board-light.jpg#only-light){ loading=lazy }
 ![A heat pump view built only from the bundled cards](../images/cards/board-dark.jpg#only-dark){ loading=lazy }
 
-*A view made only of the bundled cards, on a Yutaki S with two circuits (test instance, two days of history).*
+*A view made only of the bundled cards, on a Yutaki S with two circuits, a three-phase electricity meter and a month of history.*
 
 ## The cards
 

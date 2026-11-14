@@ -194,17 +194,18 @@ function sSetup(t, d, cues) {
 function sLive(t, d, cues) {
   kicker(S.k3, seg(t, 0.1, 0.6));
   fitHeadline(S.h3, seg(t, 0.2, 0.9), 132, 42);
-  const x = 140, y = 168, w = 1000;
-  const h = drawShot("water", x, y, w, seg(t, 0.3, 1.0)) || 464;
+  // the screenshot is 1200 × 680: drawn 860 wide so it stays above the subtitles
+  const w = 860, x = (1280 - w) / 2, y = 158;
+  const h = drawShot("water", x, y, w, seg(t, 0.3, 1.0)) || 487;
   const box = (fx0, fy0, fx1, fy1) => [x + fx0 * w, y + fy0 * h, (fx1 - fx0) * w, (fy1 - fy0) * h];
   const a1 = at(cues, 1, 3), a2 = at(cues, 2, 5.5);
   if (t > a1 && t < a2 + 0.2) {
-    highlight(...box(0.03, 0.26, 0.26, 0.66), seg(t, a1, a1 + 0.5), HEAT);
-    highlight(...box(0.71, 0.14, 0.98, 0.73), seg(t, a1 + 1.2, a1 + 1.7), AMBER);
+    highlight(...box(0.03, 0.24, 0.27, 0.57), seg(t, a1, a1 + 0.5), HEAT);
+    highlight(...box(0.7, 0.14, 0.97, 0.63), seg(t, a1 + 1.2, a1 + 1.7), AMBER);
   }
   if (t > a2) {
-    highlight(...box(0.56, 0.48, 0.68, 0.68), seg(t, a2, a2 + 0.5), GREEN);
-    highlight(...box(0.01, 0.78, 0.94, 0.9), seg(t, a2 + 0.8, a2 + 1.3), ICE);
+    highlight(...box(0.57, 0.44, 0.67, 0.61), seg(t, a2, a2 + 0.5), GREEN);
+    highlight(...box(0.02, 0.68, 0.96, 0.88), seg(t, a2 + 0.8, a2 + 1.3), ICE);
   }
   text(S.real, x, y + h + 26, { size: 13, font: MONO, color: "rgba(255,238,214,.6)", alpha: seg(t, 1, 1.5) });
 }
