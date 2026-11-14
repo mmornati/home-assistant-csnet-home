@@ -81,13 +81,9 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
         self._zone_key = zone_key(sensor_data)
         self.entry = entry
         # Temperature limits will be computed dynamically based on mode
-        # Expose all modes supported by the API
-        self._attr_hvac_modes = [
-            HVACMode.OFF,
-            HVACMode.HEAT,
-            HVACMode.COOL,
-            HVACMode.HEAT_COOL,
-        ]
+        # The modes, presets and fan modes offered are set from what the unit
+        # reports, in _update_capabilities()
+        self._silent_mode_available = True
         # Room setpoints move in half degrees, water setpoints in whole degrees
         self._attr_target_temperature_step = 1.0 if sensor_data.get("zone_id") in (5, 6) else 0.5
         self._attr_preset_modes = ["comfort", "eco"]
@@ -117,25 +113,48 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
             # If it's Standard, then API detection is used
             self._is_fan_coil = cloud_api.is_fan_coil_compatible(installation_devices_data, self._sensor_data.get("parent_id"))
 
-        if self._is_fan_coil:
-            # Fan coil systems use fan speed control
-            self._attr_fan_modes = list(self._fan_speed_map.keys())
-        else:
-            # Non-fan coil systems use silent mode (auto = normal, on = silent)
-            self._attr_fan_modes = [FAN_AUTO, FAN_ON]
+        self._update_capabilities()
 
         self._assumed_fan_mode = self._get_fan_mode_from_data()
 
-        self._attr_supported_features = (
-            ClimateEntityFeature.PRESET_MODE
-            | ClimateEntityFeature.TARGET_TEMPERATURE
-            | ClimateEntityFeature.TURN_ON
-            | ClimateEntityFeature.TURN_OFF
-            | ClimateEntityFeature.FAN_MODE
-        )
-
         # cache for dynamically computed limits
         self._cached_limits: tuple[float | None, float | None] | None = None
+
+    def _update_capabilities(self) -> None:
+        """Offer what the unit reports it can do, as the CSNet web app does.
+
+        A capability the unit does not report at all (older data, a request
+        that failed) is kept: only an explicit "no" removes an option. The
+        mode the zone is in right now is always offered.
+        """
+        data = self._sensor_data
+        modes = [HVACMode.OFF, HVACMode.HEAT]
+        if data.get("has_cooling") is not False or data.get("mode") == 0:
+            modes.append(HVACMode.COOL)
+        if data.get("has_auto") is not False or data.get("mode") == 2:
+            modes.append(HVACMode.HEAT_COOL)
+        self._attr_hvac_modes = modes
+
+        features = ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.TURN_ON | ClimateEntityFeature.TURN_OFF
+        # ecocomfort is -1 where the circuit has no eco/comfort choice
+        if data.get("ecocomfort") != -1:
+            features |= ClimateEntityFeature.PRESET_MODE
+
+        if self._is_fan_coil:
+            # Fan coil systems use fan speed control
+            self._attr_fan_modes = list(self._fan_speed_map.keys())
+            features |= ClimateEntityFeature.FAN_MODE
+        else:
+            # Other systems use the fan mode for silent mode (auto = normal, on = silent), when they have one
+            installation_devices_data = self.coordinator.get_installation_devices_data()
+            if installation_devices_data:
+                self._silent_mode_available = self.entry.runtime_data.api.has_silent_mode(installation_devices_data, data.get("parent_id"))
+            if self._silent_mode_available:
+                self._attr_fan_modes = [FAN_AUTO, FAN_ON]
+                features |= ClimateEntityFeature.FAN_MODE
+            else:
+                self._attr_fan_modes = None
+        self._attr_supported_features = features
 
     def _fan_circuit(self):
         """Return the fan circuit: C1 for zone 1 and C1 water (5), C2 otherwise."""
@@ -323,6 +342,8 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
 
         attrs = {
             "real_mode": self._sensor_data.get("real_mode"),
+            # True when the circuit is switched off in the mode the unit runs in
+            "deactivated_in_current_mode": self._sensor_data.get("deactivated_in_current_mode"),
             "operation_status": operation_status,
             "operation_status_text": operation_status_text,
             "timer_running": self._sensor_data.get("timer_running"),
@@ -592,6 +613,7 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
             self._assumed_fan_mode = api_fan_mode
 
         self._common_data = self.coordinator.get_common_data()
+        self._update_capabilities()
         # reset cached limits after data refresh
         self._cached_limits = None
         self.async_write_ha_state()

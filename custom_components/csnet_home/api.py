@@ -25,6 +25,7 @@ from custom_components.csnet_home.const import (
     LOGIN_BACKOFF_MAX,
     LOGIN_PATH,
     MAX_AUTH_REJECTIONS,
+    POWER_INDOORS_PATH,
     WATER_CIRCUIT_MAX_COOL,
     WATER_CIRCUIT_MAX_HEAT,
     WATER_CIRCUIT_MIN_COOL,
@@ -471,8 +472,13 @@ class CSNetHomeAPI:
             except Exception as e:
                 _LOGGER.debug("Error closing validation session: %s", e)
 
-    async def _async_get_json(self, url, headers, description):
+    async def _async_get_json(self, url, headers, description, renew_session=True):
         """GET a JSON document, signing in again once if the session has expired.
+
+        With ``renew_session=False`` an answer that is not JSON only fails
+        this request. That is for requests the readings do not depend on: an
+        endpoint that answers with a page for some accounts must not sign in
+        again, let alone count as a failed login.
 
         CSNet Manager answers an expired session with its login page (HTTP 200
         after a redirect) instead of JSON. When that happens the session is
@@ -505,6 +511,10 @@ class CSNetHomeAPI:
                 return None
             except (asyncio.TimeoutError, aiohttp.ClientError) as err:
                 _LOGGER.warning("CSNet Manager did not answer the %s request: %s", description, err or type(err).__name__)
+                return None
+
+            if not renew_session:
+                _LOGGER.debug("CSNet Manager answered the %s request with a page instead of data", description)
                 return None
 
             if attempt == 2:
@@ -587,6 +597,11 @@ class CSNetHomeAPI:
                         "ecocomfort": element.get("ecocomfort"),  # 0 = Eco, 1 = Comfort, -1 = No available mode
                         "doingBoost": element.get("doingBoost"),
                         "silent_mode": element.get("silentMode"),  # 0 = Off, 1 = On
+                        # What the unit can do, as the web app reads it (None when not reported)
+                        "has_cooling": element.get("hasCooling"),
+                        "has_auto": element.get("hasAuto"),
+                        "has_boost": element.get("hasBoost"),
+                        "deactivated_in_current_mode": element.get("deactivatedInCurrentMode"),
                         "current_temperature": element.get("currentTemperature"),
                         "setting_temperature": self.get_current_temperature(element),
                         "zone_id": element.get("elementType"),
@@ -666,6 +681,35 @@ class CSNetHomeAPI:
         except Exception as e:
             _LOGGER.error("Error during installation alarms data retrieval: %s", e)
             return None
+
+    async def async_get_power_data(self):
+        """Return the energy records CSNet keeps per indoor unit, or None.
+
+        One entry per indoor unit with ``hourly``, ``daily`` and ``monthly``
+        lists; each record has a ``time`` and, per use (space heating, space
+        cooling, hot water, pool), the electricity taken (``input``) and the
+        heat produced (``capacity``) in kWh. This is what the web app's
+        consumption page shows.
+        """
+        installation_id = self.installation_id if self.installation_id else -1
+        url = f"{self.base_url}{POWER_INDOORS_PATH}?installationId={installation_id}&_csrf={self.xsrf_token}"
+
+        if not await self._async_ensure_session():
+            return None
+
+        headers = COMMON_API_HEADERS | {
+            "accept": "*/*",
+            "x-requested-with": "XMLHttpRequest",
+        }
+
+        try:
+            # not worth a new login: the next poll of the readings renews an expired session
+            answer = await self._async_get_json(url, headers, "energy records", renew_session=False)
+        except Exception as e:  # pylint: disable=broad-except
+            _LOGGER.debug("Error during energy records retrieval: %s", e)
+            return None
+        data = answer.get("data") if isinstance(answer, dict) else None
+        return data if isinstance(data, list) else None
 
     async def async_delete_alarm(self, installation_id, alarm_id):
         """Delete an installation alarm."""

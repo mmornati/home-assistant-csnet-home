@@ -580,7 +580,7 @@ def test_every_form_field_and_error_has_a_text_in_each_language():
     base = Path(__file__).parent.parent / "custom_components" / "csnet_home"
     reference = json.loads((base / "strings.json").read_text(encoding="utf-8"))["config"]
     fields = {CONF_USERNAME, CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_LANGUAGE, CONF_MAX_TEMP_OVERRIDE, CONF_FAN_COIL_MODEL}
-    fields |= {CONF_ENABLE_ALARM_NOTIFICATIONS, CONF_FILTERED_ALARM_CODES, "power_supply"}
+    fields |= {CONF_ENABLE_ALARM_NOTIFICATIONS, CONF_FILTERED_ALARM_CODES, "power_supply", "energy_meter"}
     for step in ("user", "reconfigure"):
         assert set(reference["step"][step]["data"]) == fields
         assert set(reference["step"][step]["data_description"]) == fields
@@ -636,3 +636,32 @@ async def test_reconfigure_keeps_typed_values_after_an_error(hass: HomeAssistant
     assert not _schema_key(result, CONF_PASSWORD).description
     assert "typed-password" not in repr(result["data_schema"].schema)
     assert TEST_PASSWORD not in repr(result["data_schema"].schema)
+
+
+async def test_energy_meter_is_optional_and_any_energy_sensor(hass: HomeAssistant):
+    """No meter by default; any sensor entity id is stored as given; emptying the field removes it."""
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+    key = _schema_key(result, "energy_meter")
+    assert isinstance(key, vol.Optional) and key.default is vol.UNDEFINED and not key.description
+    selector = result["data_schema"].schema[key]
+    assert selector.config["domain"] == ["sensor"] and selector.config["device_class"] == ["energy"]
+
+    with patch(VALIDATE, return_value=True):
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=TEST_CONFIG)
+    assert result["data"]["energy_meter"] is None
+
+
+async def test_energy_meter_can_be_set_and_removed_on_reconfigure(hass: HomeAssistant):
+    """The chosen sensor is suggested back, and leaving the field empty removes it."""
+    entry, result = await _start_reconfigure(hass)
+    settings = {k: v for k, v in TEST_CONFIG.items() if k != CONF_PASSWORD}
+
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=settings | {"energy_meter": "sensor.any_brand_energy"})
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data["energy_meter"] == "sensor.any_brand_energy"
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_RECONFIGURE, "entry_id": entry.entry_id})
+    assert _schema_key(result, "energy_meter").description == {"suggested_value": "sensor.any_brand_energy"}
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=settings)
+    assert entry.data["energy_meter"] is None

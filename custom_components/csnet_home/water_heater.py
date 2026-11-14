@@ -84,7 +84,7 @@ class CSNetHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
         if self._is_swimming_pool:
             self._attr_operation_list = ["off", "on"]
         else:
-            self._attr_operation_list = ["off", "eco", "performance"]
+            self._attr_operation_list = self._operations()
 
         # Initialize operation mode based on sensor data
         if self._is_swimming_pool:
@@ -123,8 +123,16 @@ class CSNetHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
         _LOGGER.debug("Water heater entity initialized: %s", self._attr_name)
         _LOGGER.debug("Water heater doingBoost: %s", self._sensor_data.get("doingBoost", False))
 
+    def _operations(self) -> list[str]:
+        """Return the modes of a hot water tank: boost ("performance") only where the unit offers it."""
+        if self._sensor_data.get("has_boost") is False and not self._sensor_data.get("doingBoost"):
+            return ["off", "eco"]
+        return ["off", "eco", "performance"]
+
     def _update_attributes(self):
         """Update the entity attributes from sensor data."""
+        if not self._is_swimming_pool:
+            self._attr_operation_list = self._operations()
         _LOGGER.debug("_attr_current_operation: %s", self._sensor_data.get("on_off"))
 
         if self._is_swimming_pool:

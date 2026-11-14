@@ -534,6 +534,7 @@ def test_dynamic_temperature_limits_zone2(hass):
         set_preset_modes=AsyncMock(return_value=True),
         async_set_silent_mode=AsyncMock(return_value=True),
         is_fan_coil_compatible=lambda data, indoor_id=None: False,
+        has_silent_mode=lambda data, indoor_id=None: True,
         get_fan_control_availability=lambda circuit, mode, data, indoor_id=None: False,
     )
     mock_coordinator = SimpleNamespace(
@@ -596,6 +597,7 @@ def test_max_temp_override_in_config(hass):
         set_preset_modes=AsyncMock(return_value=True),
         async_set_silent_mode=AsyncMock(return_value=True),
         is_fan_coil_compatible=lambda data, indoor_id=None: False,
+        has_silent_mode=lambda data, indoor_id=None: True,
         get_fan_control_availability=lambda circuit, mode, data, indoor_id=None: False,
     )
     mock_coordinator = SimpleNamespace(
@@ -658,6 +660,7 @@ def test_max_temp_no_override(hass):
         set_preset_modes=AsyncMock(return_value=True),
         async_set_silent_mode=AsyncMock(return_value=True),
         is_fan_coil_compatible=lambda data, indoor_id=None: False,
+        has_silent_mode=lambda data, indoor_id=None: True,
         get_fan_control_availability=lambda circuit, mode, data, indoor_id=None: False,
     )
     mock_coordinator = SimpleNamespace(
@@ -1020,6 +1023,7 @@ def test_otc_attributes_zone1_heating_fix(hass):
         async_set_silent_mode=AsyncMock(return_value=True),
         async_set_fan_speed=AsyncMock(return_value=True),
         is_fan_coil_compatible=lambda data, indoor_id=None: False,
+        has_silent_mode=lambda data, indoor_id=None: True,
         get_fan_control_availability=lambda circuit, mode, data, indoor_id=None: False,
         get_temperature_limits=lambda zone_id, mode, data, indoor_id=None: (None, None),
     )
@@ -1092,6 +1096,7 @@ def test_otc_attributes_zone2_heating_gradient(hass):
         async_set_silent_mode=AsyncMock(return_value=True),
         async_set_fan_speed=AsyncMock(return_value=True),
         is_fan_coil_compatible=lambda data, indoor_id=None: False,
+        has_silent_mode=lambda data, indoor_id=None: True,
         get_fan_control_availability=lambda circuit, mode, data, indoor_id=None: False,
         get_temperature_limits=lambda zone_id, mode, data, indoor_id=None: (None, None),
     )
@@ -1164,6 +1169,7 @@ def test_otc_attributes_zone5_water_circuit(hass):
         async_set_silent_mode=AsyncMock(return_value=True),
         async_set_fan_speed=AsyncMock(return_value=True),
         is_fan_coil_compatible=lambda data, indoor_id=None: False,
+        has_silent_mode=lambda data, indoor_id=None: True,
         get_fan_control_availability=lambda circuit, mode, data, indoor_id=None: False,
         get_temperature_limits=lambda zone_id, mode, data, indoor_id=None: (None, None),
     )
@@ -1226,6 +1232,7 @@ def test_otc_attributes_no_installation_data(hass):
         async_set_silent_mode=AsyncMock(return_value=True),
         async_set_fan_speed=AsyncMock(return_value=True),
         is_fan_coil_compatible=lambda data, indoor_id=None: False,
+        has_silent_mode=lambda data, indoor_id=None: True,
         get_fan_control_availability=lambda circuit, mode, data, indoor_id=None: False,
         get_temperature_limits=lambda zone_id, mode, data, indoor_id=None: (None, None),
     )
@@ -1294,6 +1301,7 @@ def test_otc_attributes_zone3_dhw_no_otc(hass):
         async_set_silent_mode=AsyncMock(return_value=True),
         async_set_fan_speed=AsyncMock(return_value=True),
         is_fan_coil_compatible=lambda data, indoor_id=None: False,
+        has_silent_mode=lambda data, indoor_id=None: True,
         get_fan_control_availability=lambda circuit, mode, data, indoor_id=None: False,
         get_temperature_limits=lambda zone_id, mode, data, indoor_id=None: (None, None),
     )
@@ -1366,6 +1374,7 @@ def test_device_info_with_missing_firmware(hass):
         async_set_silent_mode=AsyncMock(return_value=True),
         async_set_fan_speed=AsyncMock(return_value=True),
         is_fan_coil_compatible=lambda data, indoor_id=None: False,
+        has_silent_mode=lambda data, indoor_id=None: True,
         get_fan_control_availability=lambda circuit, mode, data, indoor_id=None: False,
         get_temperature_limits=lambda zone_id, mode, data, indoor_id=None: (None, None),
     )
@@ -1433,6 +1442,7 @@ def test_device_info_with_missing_sensor_data_keys(hass):
         async_set_silent_mode=AsyncMock(return_value=True),
         async_set_fan_speed=AsyncMock(return_value=True),
         is_fan_coil_compatible=lambda data, indoor_id=None: False,
+        has_silent_mode=lambda data, indoor_id=None: True,
         get_fan_control_availability=lambda circuit, mode, data, indoor_id=None: False,
         get_temperature_limits=lambda zone_id, mode, data, indoor_id=None: (None, None),
     )
@@ -1637,3 +1647,77 @@ async def test_silent_mode_is_not_sent_to_a_unit_without_one(hass):
     assert asked == [1706]
     api.async_set_silent_mode.assert_not_awaited()
     assert entity.fan_mode == FAN_AUTO
+
+
+def _capable(hass, **fields):
+    """Build a climate entity whose zone data carries these capability fields."""
+    entity = build_entity(hass, mode=fields.pop("mode", 1), ecocomfort=fields.pop("ecocomfort", 1))
+    entity._sensor_data.update(fields)
+    entity._update_capabilities()
+    return entity
+
+
+@pytest.mark.parametrize(
+    ("fields", "expected"),
+    [
+        ({}, [HVACMode.OFF, HVACMode.HEAT, HVACMode.COOL, HVACMode.HEAT_COOL]),  # not reported: as before
+        ({"has_cooling": None, "has_auto": None}, [HVACMode.OFF, HVACMode.HEAT, HVACMode.COOL, HVACMode.HEAT_COOL]),
+        ({"has_cooling": False, "has_auto": False}, [HVACMode.OFF, HVACMode.HEAT]),  # heating-only unit
+        ({"has_cooling": True, "has_auto": False}, [HVACMode.OFF, HVACMode.HEAT, HVACMode.COOL]),
+        ({"has_cooling": True, "has_auto": True}, [HVACMode.OFF, HVACMode.HEAT, HVACMode.COOL, HVACMode.HEAT_COOL]),
+        # the mode the zone is in is always offered, whatever the unit says
+        ({"has_cooling": False, "has_auto": False, "mode": 0}, [HVACMode.OFF, HVACMode.HEAT, HVACMode.COOL]),
+        ({"has_cooling": False, "has_auto": False, "mode": 2}, [HVACMode.OFF, HVACMode.HEAT, HVACMode.HEAT_COOL]),
+    ],
+)
+def test_modes_offered_follow_what_the_unit_can_do(hass, fields, expected):
+    """Only an explicit "no" from the unit removes cool or auto."""
+    assert _capable(hass, **fields).hvac_modes == expected
+
+
+def test_silent_mode_is_offered_only_on_units_that_have_one(hass):
+    """Without silent mode there is no fan mode at all on a unit without fan coils."""
+    entity = build_entity(hass)
+    entity.coordinator.get_installation_devices_data = lambda: {"heatingStatus": {}}
+    api = entity.entry.runtime_data.api
+
+    api.has_silent_mode = lambda data, indoor_id=None: True
+    entity._update_capabilities()
+    assert entity.fan_modes == [FAN_AUTO, FAN_ON]
+    assert entity.supported_features & ClimateEntityFeature.FAN_MODE
+
+    api.has_silent_mode = lambda data, indoor_id=None: False
+    entity._update_capabilities()
+    assert entity.fan_modes is None
+    assert not entity.supported_features & ClimateEntityFeature.FAN_MODE
+
+    # a poll without unit data keeps what was known instead of flipping the control
+    entity.coordinator.get_installation_devices_data = lambda: {}
+    api.has_silent_mode = lambda data, indoor_id=None: True
+    entity._update_capabilities()
+    assert entity.fan_modes is None
+
+
+def test_fan_coil_units_keep_their_fan_speeds(hass):
+    """Fan speed control does not depend on silent mode."""
+    entity = build_entity(hass, is_fan_coil=True, fan1_speed=1)
+    entity.entry.runtime_data.api.has_silent_mode = lambda data, indoor_id=None: False
+    entity._update_capabilities()
+    assert entity.supported_features & ClimateEntityFeature.FAN_MODE
+    assert "low" in entity.fan_modes
+
+
+@pytest.mark.parametrize(("ecocomfort", "offered"), [(1, True), (0, True), (None, True), (-1, False)])
+def test_presets_are_offered_only_where_the_circuit_has_them(hass, ecocomfort, offered):
+    """-1 is CSNet's "no eco/comfort choice" for this circuit."""
+    entity = _capable(hass, ecocomfort=ecocomfort)
+    assert bool(entity.supported_features & ClimateEntityFeature.PRESET_MODE) is offered
+
+
+def test_capabilities_follow_the_polls(hass):
+    """What is offered is recomputed with each poll's data."""
+    entity = build_entity(hass)
+    assert HVACMode.COOL in entity.hvac_modes
+    entity.coordinator.get_sensors_data()[0].update({"has_cooling": False, "has_auto": False})
+    entity._handle_coordinator_update()
+    assert entity.hvac_modes == [HVACMode.OFF, HVACMode.HEAT]

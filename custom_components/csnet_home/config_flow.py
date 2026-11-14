@@ -5,10 +5,11 @@ import logging
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_USERNAME
-from homeassistant.helpers.selector import TextSelector, TextSelectorConfig, TextSelectorType
+from homeassistant.helpers.selector import EntitySelector, EntitySelectorConfig, TextSelector, TextSelectorConfig, TextSelectorType
 
 from .const import (
     CONF_ENABLE_ALARM_NOTIFICATIONS,
+    CONF_ENERGY_METER,
     CONF_FAN_COIL_MODEL,
     CONF_FILTERED_ALARM_CODES,
     CONF_LANGUAGE,
@@ -31,6 +32,8 @@ _LOGGER = logging.getLogger(__name__)
 
 SCAN_INTERVAL_SCHEMA = vol.All(vol.Coerce(int), vol.Range(min=MIN_SCAN_INTERVAL))
 # Masked in the browser, and never pre-filled: the stored password is not sent to the frontend
+# Any energy sensor, from any integration: the integration only reads its state
+ENERGY_METER_SELECTOR = EntitySelector(EntitySelectorConfig(domain="sensor", device_class="energy"))
 PASSWORD_SELECTOR = TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD, autocomplete="current-password"))
 
 
@@ -40,6 +43,9 @@ def _settings_schema(current: dict) -> dict:
     if current.get(CONF_MAX_TEMP_OVERRIDE) is not None:
         # a suggestion, not a default: emptying the field removes the override
         max_temp_key = vol.Optional(CONF_MAX_TEMP_OVERRIDE, description={"suggested_value": current[CONF_MAX_TEMP_OVERRIDE]})
+    energy_meter_key = vol.Optional(CONF_ENERGY_METER)
+    if current.get(CONF_ENERGY_METER):
+        energy_meter_key = vol.Optional(CONF_ENERGY_METER, description={"suggested_value": current[CONF_ENERGY_METER]})
     return {
         vol.Optional(
             CONF_SCAN_INTERVAL,
@@ -60,6 +66,8 @@ def _settings_schema(current: dict) -> dict:
             description={"suggested_value": current.get(CONF_FILTERED_ALARM_CODES, DEFAULT_FILTERED_ALARM_CODES)},
         ): str,
         vol.Optional(CONF_POWER_SUPPLY, default=current.get(CONF_POWER_SUPPLY, DEFAULT_POWER_SUPPLY)): vol.In(POWER_SUPPLY_OPTIONS),
+        # optional, and a suggestion so it can be emptied again
+        energy_meter_key: ENERGY_METER_SELECTOR,
     }
 
 
@@ -74,6 +82,8 @@ def _settings_from_input(user_input: dict) -> dict:
         # the frontend leaves an emptied field out of what it sends
         CONF_FILTERED_ALARM_CODES: user_input.get(CONF_FILTERED_ALARM_CODES, ""),
         CONF_POWER_SUPPLY: user_input.get(CONF_POWER_SUPPLY, DEFAULT_POWER_SUPPLY),
+        # any energy sensor of Home Assistant that measures the heat pump; none by default
+        CONF_ENERGY_METER: user_input.get(CONF_ENERGY_METER) or None,
     }
 
 

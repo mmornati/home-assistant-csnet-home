@@ -13,7 +13,8 @@
                     "fan_coil_model": "Modèle de contrôle du ventilo-convecteur",
                     "power_supply": "Alimentation de l'unité extérieure",
                     "enable_alarm_notifications": "Activer les notifications d'alarme",
-                    "filtered_alarm_codes": "Codes d'alarme filtrés"
+                    "filtered_alarm_codes": "Codes d'alarme filtrés",
+                    "energy_meter": "Compteur électrique de la pompe à chaleur (facultatif)"
                 },
                 "data_description": {
                     "username": "Votre nom d'utilisateur CSNet Manager",
@@ -24,7 +25,8 @@
                     "fan_coil_model": "Sélectionnez le type de contrôle du ventilo-convecteur (standard ou legacy)",
                     "power_supply": "Utilisée pour estimer la puissance instantanée et le COP. Auto détecte les unités 8/10 CV comme triphasées, les autres comme monophasées.",
                     "enable_alarm_notifications": "Créer une notification Home Assistant quand l'unité signale une alarme",
-                    "filtered_alarm_codes": "Codes d'alarme, séparés par des virgules, qui ne notifient jamais (par défaut : -1, erreurs de communication). Laisser vide pour tout notifier."
+                    "filtered_alarm_codes": "Codes d'alarme, séparés par des virgules, qui ne notifient jamais (par défaut : -1, erreurs de communication). Laisser vide pour tout notifier.",
+                    "energy_meter": "N'importe quel capteur d'énergie (kWh) mesurant l'électricité de la pompe à chaleur, quel que soit l'appareil. Sert à calculer le COP à partir de la chaleur enregistrée par CSNet. Laisser vide pour ne garder que l'estimation."
                 }
             },
             "reconfigure": {
@@ -39,7 +41,8 @@
                     "fan_coil_model": "Modèle de contrôle du ventilo-convecteur",
                     "power_supply": "Alimentation de l'unité extérieure",
                     "enable_alarm_notifications": "Activer les notifications d'alarme",
-                    "filtered_alarm_codes": "Codes d'alarme filtrés"
+                    "filtered_alarm_codes": "Codes d'alarme filtrés",
+                    "energy_meter": "Compteur électrique de la pompe à chaleur (facultatif)"
                 },
                 "data_description": {
                     "username": "Votre nom d'utilisateur CSNet Manager",
@@ -50,7 +53,8 @@
                     "fan_coil_model": "Sélectionnez le type de contrôle du ventilo-convecteur",
                     "power_supply": "Utilisée pour estimer la puissance instantanée et le COP. Auto détecte les unités 8/10 CV comme triphasées, les autres comme monophasées.",
                     "enable_alarm_notifications": "Créer une notification Home Assistant quand l'unité signale une alarme",
-                    "filtered_alarm_codes": "Codes d'alarme, séparés par des virgules, qui ne notifient jamais (par défaut : -1, erreurs de communication). Laisser vide pour tout notifier."
+                    "filtered_alarm_codes": "Codes d'alarme, séparés par des virgules, qui ne notifient jamais (par défaut : -1, erreurs de communication). Laisser vide pour tout notifier.",
+                    "energy_meter": "N'importe quel capteur d'énergie (kWh) mesurant l'électricité de la pompe à chaleur, quel que soit l'appareil. Sert à calculer le COP à partir de la chaleur enregistrée par CSNet. Laisser vide pour ne garder que l'estimation."
                 }
             },
             "reauth_confirm": {

@@ -187,6 +187,8 @@ class CSNetHomeFixedWaterTemperatureNumber(CoordinatorEntity, NumberEntity):
             self._attr_native_min_value = WATER_CIRCUIT_MIN_COOL
             self._attr_native_max_value = WATER_CIRCUIT_MAX_COOL
 
+        self._default_limits = (self._attr_native_min_value, self._attr_native_max_value)
+
         # Determine name based on mode
         mode_name = "Heating" if mode == 1 else "Cooling"
         circuit_name = f"C{circuit}"
@@ -201,6 +203,30 @@ class CSNetHomeFixedWaterTemperatureNumber(CoordinatorEntity, NumberEntity):
             circuit,
             mode,
         )
+
+    def _unit_limits(self) -> tuple[float, float]:
+        """Return the limits the unit reports for this circuit and mode, or the usual ones."""
+        data = self._coordinator.get_installation_devices_data()
+        if data:
+            low, high = self.entry.runtime_data.api.get_temperature_limits(5 if self._circuit == 1 else 6, self._mode, data, self._sensor_data.get("parent_id"))
+            numbers = all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in (low, high))
+            if numbers:
+                # like the climate entity: a value above 200 is in tenths of a degree
+                low, high = (round(v / 10, 1) if v > 200 else float(v) for v in (low, high))
+                # 0 means "not reported"; anything outside what water can be is not a limit
+                if 0 < low < high <= 100:
+                    return low, high
+        return self._default_limits
+
+    @property
+    def native_min_value(self) -> float:
+        """Return the lowest water temperature the unit accepts."""
+        return self._unit_limits()[0]
+
+    @property
+    def native_max_value(self) -> float:
+        """Return the highest water temperature the unit accepts."""
+        return self._unit_limits()[1]
 
     def _heating_setting(self):
         """Return the heatingSetting of the indoor unit this circuit belongs to, or None."""

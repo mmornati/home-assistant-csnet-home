@@ -21,6 +21,7 @@ from custom_components.csnet_home.const import (
 from custom_components.csnet_home.coordinator import ALARM_STORAGE_VERSION, CSNetHomeConfigEntry, CSNetHomeCoordinator, CSNetHomeData, alarm_storage_key
 from custom_components.csnet_home.migration import async_migrate_zone_identifiers
 from custom_components.csnet_home.sensor import DEVICE_SENSOR_DESCRIPTIONS, ZONE_SENSOR_DESCRIPTIONS
+from custom_components.csnet_home.server_energy import METER_STORAGE_VERSION, meter_storage_key
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -28,6 +29,7 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 SCAN_INTERVAL = 60
 PLATFORMS: list[Platform] = [
+    Platform.BINARY_SENSOR,
     Platform.SENSOR,
     Platform.CLIMATE,
     Platform.WATER_HEATER,
@@ -146,6 +148,7 @@ async def async_remove_config_entry_device(hass: HomeAssistant, config_entry: Co
 async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Delete what the removed entry kept in storage."""
     await Store(hass, ALARM_STORAGE_VERSION, alarm_storage_key(entry.entry_id)).async_remove()
+    await Store(hass, METER_STORAGE_VERSION, meter_storage_key(entry.entry_id)).async_remove()
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: CSNetHomeConfigEntry) -> bool:
