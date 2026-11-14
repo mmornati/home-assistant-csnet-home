@@ -103,9 +103,19 @@ This custom integration solves that problem by connecting directly to the CSNet 
 
 ### Sensors
 - Temperature sensors (current and target)
-- State and status sensors
+- State and status sensors, and binary sensors for what runs (compressor, defrost, pumps, demands)
+- Heat produced as CSNet records it, and a real COP from your own electricity meter
 - Alarm monitoring with persistent notifications
 - Extended device information
+
+### Heating curves
+- Copy each circuit's heating curve (water law) from the unit controller into the integration options
+- Get a sensor with the water temperature the curve asks for, with the whole curve in its attributes
+
+### Dashboard cards
+- Eleven cards in the **Add card** picker, nothing else to install: overview, live water circuit, heating curve, COP, system health, refrigerant circuit, temperatures, what ran, energy per day, power today, energy signature
+- They find their entities, use your electricity meter and the Energy dashboard price, follow light and dark themes, and speak English, French and Spanish
+- See [Dashboard Cards](https://mmornati.github.io/home-assistant-csnet-home/wiki/Dashboard-Cards/) and the [release notes](https://mmornati.github.io/home-assistant-csnet-home/release-notes/)
 
 > **Note:** Mode and preset mappings are being refined based on community feedback in [Discussion #21](https://github.com/mmornati/home-assistant-csnet-home/discussions/21).
 

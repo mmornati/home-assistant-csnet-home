@@ -1,0 +1,132 @@
+{
+  "_doc": "Scenes and narration of the CSNet Home presentation video. One entry per scene; each language is a list of sentences (cues). Write numbers in words. Then run narrate.py on this folder.",
+  "langs": [
+    "en",
+    "fr"
+  ],
+  "engine": "kokoro",
+  "scenes": [
+    {
+      "id": "intro",
+      "min": 6,
+      "lead": 0.8,
+      "chapter": {
+        "en": "The integration",
+        "fr": "L'intégration"
+      },
+      "en": [
+        "Hitachi heat pumps with the ATW-IOT-01 module talk only to the CSNet Manager cloud.",
+        "This free integration brings them into Home Assistant."
+      ],
+      "fr": [
+        "Les pompes à chaleur Hitachi équipées du module ATW-IOT-01 ne parlent qu'au cloud CSNet Manager.",
+        "Cette intégration gratuite les fait entrer dans Home Assistant."
+      ]
+    },
+    {
+      "id": "setup",
+      "min": 6,
+      "chapter": {
+        "en": "Set up",
+        "fr": "Installation"
+      },
+      "en": [
+        "Install it from HACS and sign in with your CSNet account.",
+        "Every zone, the hot water tank and dozens of readings appear as entities."
+      ],
+      "fr": [
+        "Installez-la avec HACS, et connectez-vous avec votre compte CSNet.",
+        "Chaque zone, le ballon d'eau chaude et des dizaines de mesures apparaissent comme entités."
+      ]
+    },
+    {
+      "id": "live",
+      "min": 8,
+      "chapter": {
+        "en": "Live water circuit",
+        "fr": "Circuit d'eau en direct"
+      },
+      "en": [
+        "The new dashboard cards show the unit at work.",
+        "The outdoor unit, the water going to each circuit,",
+        "the mixing valve and the pumps, live."
+      ],
+      "fr": [
+        "Les nouvelles cartes de tableau de bord montrent l'unité en marche.",
+        "L'unité extérieure, l'eau qui part vers chaque circuit,",
+        "la vanne trois voies et les pompes, en direct."
+      ]
+    },
+    {
+      "id": "curve",
+      "min": 9,
+      "chapter": {
+        "en": "Heating curves",
+        "fr": "Lois d'eau"
+      },
+      "en": [
+        "CSNet tells which heating curve each circuit uses, but not its values.",
+        "Copy them once in the options.",
+        "Home Assistant draws each curve, and the water it asks for right now."
+      ],
+      "fr": [
+        "CSNet indique quelle loi d'eau chaque circuit utilise, mais pas ses valeurs.",
+        "Recopiez-les une fois dans les options.",
+        "Home Assistant trace chaque courbe, et l'eau qu'elle demande en ce moment."
+      ]
+    },
+    {
+      "id": "energy",
+      "min": 10,
+      "chapter": {
+        "en": "Real COP",
+        "fr": "Vrai COP"
+      },
+      "en": [
+        "Choose your own electricity meter, and you get a real COP.",
+        "On this house, ninety-nine kilowatt hours of heat for forty point seven of electricity: two point four three.",
+        "Plus the cost of each day, and tomorrow's use from the weather forecast."
+      ],
+      "fr": [
+        "Choisissez votre propre compteur d'électricité, et vous obtenez un vrai COP.",
+        "Dans cette maison, quatre-vingt-dix-neuf kilowattheures de chaleur pour quarante virgule sept d'électricité : deux virgule quarante-trois.",
+        "Avec le coût de chaque jour, et la consommation de demain d'après la météo."
+      ]
+    },
+    {
+      "id": "cards",
+      "min": 8,
+      "chapter": {
+        "en": "Eleven cards",
+        "fr": "Onze cartes"
+      },
+      "en": [
+        "Eleven cards, nothing else to install.",
+        "Search for CSNet in the card picker.",
+        "They find their entities, follow your theme, and speak English, French and Spanish."
+      ],
+      "fr": [
+        "Il y a onze cartes, et rien d'autre à installer.",
+        "Dans le choix des cartes, cherchez CSNet.",
+        "Elles trouvent leurs entités, suivent votre thème, et parlent français, anglais et espagnol."
+      ]
+    },
+    {
+      "id": "outro",
+      "min": 6,
+      "tail": 1.6,
+      "chapter": {
+        "en": "Open source",
+        "fr": "Open source"
+      },
+      "en": [
+        "An independent, open source project, not affiliated with Hitachi.",
+        "The documentation and the release notes are on the project site."
+      ],
+      "fr": [
+        "Un projet indépendant et open source, sans lien avec Hitachi.",
+        "La documentation et les notes de version sont sur le site du projet."
+      ]
+    }
+  ]
+}

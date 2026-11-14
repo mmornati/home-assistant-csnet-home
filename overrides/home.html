@@ -136,8 +136,23 @@
             <td><code>sensor</code></td>
             <td><strong>Alarms you actually see.</strong> Code, origin and description, a persistent notification when one fires, a filter for codes you choose to ignore, and a service to clear them.</td>
           </tr>
+          <tr>
+            <td class="tx-report__sp" style="--t:.9">Sp9</td>
+            <td><code>binary_sensor</code></td>
+            <td><strong>What runs, right now.</strong> Compressor, defrost, the three water pumps, each circuit's demand, hot water heater and recirculation. Backup heater and boiler too, where an installer fitted them.</td>
+          </tr>
+          <tr>
+            <td class="tx-report__sp" style="--t:.66">Sp10</td>
+            <td><code>sensor</code></td>
+            <td><strong>Heating curves.</strong> Copy the water law of each circuit into the options and get the water temperature it asks for, with the whole curve to draw.</td>
+          </tr>
+          <tr>
+            <td class="tx-report__sp" style="--t:.82">Sp11</td>
+            <td><code>sensor</code></td>
+            <td><strong>Heat as CSNet records it.</strong> Heat produced today, yesterday and this month, and a real COP when you pick your own electricity meter.</td>
+          </tr>
           <tr class="is-ghost">
-            <td class="tx-report__sp">Sp9</td>
+            <td class="tx-report__sp">Sp12</td>
             <td><code>sensor</code></td>
             <td><strong>Link health.</strong> Wi-Fi signal of the ATW-IOT-01, connectivity and last communication, so you know when the cloud is the problem.</td>
           </tr>
@@ -164,6 +179,40 @@
           <figcaption>Compact card for a dashboard row.</figcaption>
         </figure>
       </div>
+    </div>
+  </section>
+
+  <section class="tx-band tx-cards" id="cards" aria-labelledby="cards-title">
+    <div class="tx-wrap">
+      <h2 id="cards-title" class="tx-h2 tx-h2--narrow">A heat pump view, ready to add.</h2>
+      <p class="tx-cards__lede">Eleven dashboard cards come with the integration. Search for “CSNet” in the card picker: they find their entities, follow your theme, and speak English, French and Spanish. Nothing else to install.</p>
+      <div class="tx-video">
+        <iframe src="{{ 'videos/csnet-home-tour/' | url }}?embed=1&amp;lang=en" title="A one-minute narrated tour of the integration" loading="lazy" allow="fullscreen; autoplay" allowfullscreen></iframe>
+        <p class="tx-video__alt"><a href="{{ 'videos/csnet-home-tour/' | url }}?lang=fr">Version française</a> · <a href="{{ 'videos/csnet-home-tour/' | url }}?lang=en">Full page</a></p>
+      </div>
+      <div class="tx-cards__grid">
+        <figure class="tx-cardshot tx-cardshot--wide">
+          <img src="{{ 'images/cards/card-water-circuit-dark.jpg' | url }}" alt="Water circuit card: outdoor unit at 7 °C, indoor unit with 41 °C flow and 41 °C return, two circuits at 20.5 °C with their setpoints and demand, a mixing valve at 66 %, and chips for compressor, defrost, pumps and demands." width="1200" height="557" loading="lazy">
+          <figcaption>Water circuit, live: outdoor unit, flow and return, each circuit, the mixing valve.</figcaption>
+        </figure>
+        <figure class="tx-cardshot tx-cardshot--wide">
+          <img src="{{ 'images/cards/card-heating-curve-dark.jpg' | url }}" alt="Heating curve card: water asked now 40 °C for 3 °C outside, the two circuits' curves drawn against outdoor temperature, the unit's hourly water target as dots, and markers for the actual flow and the water after the mixing valve." width="1200" height="618" loading="lazy">
+          <figcaption>Heating curves you describe once, and where the unit is on them.</figcaption>
+        </figure>
+        <figure class="tx-cardshot">
+          <img src="{{ 'images/cards/card-heat-pump-dark.jpg' | url }}" alt="Heat pump card: power gauge with a fan, heating status, compressor frequency, outdoor temperature, water ΔT, today's electricity, heat and COP." width="760" height="978" loading="lazy">
+          <figcaption>The unit at a glance.</figcaption>
+        </figure>
+        <figure class="tx-cardshot">
+          <img src="{{ 'images/cards/card-system-health-dark.jpg' | url }}" alt="System health card: all good, with alarms, gateway, central control, defrost and water pressure." width="760" height="862" loading="lazy">
+          <figcaption>Alarms, gateway, pressure.</figcaption>
+        </figure>
+        <figure class="tx-cardshot tx-cardshot--wide">
+          <img src="{{ 'images/cards/card-activity-dark.jpg' | url }}" alt="What ran card: a 24-hour timeline for the compressor, defrost, each circuit's demand and the three pumps, with the time each one ran." width="1200" height="386" loading="lazy">
+          <figcaption>What ran over the last day.</figcaption>
+        </figure>
+      </div>
+      <a class="tx-link" href="{{ 'wiki/Dashboard-Cards/' | url }}">All eleven cards and their options</a>
     </div>
   </section>
 
@@ -251,11 +300,13 @@
         <li><a href="{{ 'wiki/Water-Heater-Control/' | url }}"><span class="tx-index__n">05</span><b>Hot water</b><span>DHW modes and boost</span></a></li>
         <li><a href="{{ 'wiki/Sensors-Reference/' | url }}"><span class="tx-index__n">06</span><b>Sensors</b><span>Every reading, explained</span></a></li>
         <li><a href="{{ 'COMPRESSOR_SENSORS/' | url }}"><span class="tx-index__n">07</span><b>Compressor</b><span>Outdoor unit internals</span></a></li>
-        <li><a href="{{ 'wiki/Advanced-Features/' | url }}"><span class="tx-index__n">08</span><b>Advanced</b><span>Silent mode, fans, OTC, alarms</span></a></li>
+        <li><a href="{{ 'wiki/Advanced-Features/' | url }}"><span class="tx-index__n">08</span><b>Advanced</b><span>Silent mode, fans, heating curves, alarms</span></a></li>
         <li><a href="{{ 'wiki/How-It-Works/' | url }}"><span class="tx-index__n">09</span><b>How it works</b><span>The API, privacy, disclaimer</span></a></li>
         <li><a href="{{ 'wiki/Troubleshooting/' | url }}"><span class="tx-index__n">10</span><b>Troubleshooting</b><span>When a reading goes missing</span></a></li>
         <li><a href="{{ 'wiki/FAQ/' | url }}"><span class="tx-index__n">11</span><b>FAQ</b><span>Short answers</span></a></li>
-        <li><a href="{{ 'SUPPORTED_DEVICES/' | url }}"><span class="tx-index__n">12</span><b>Supported devices</b><span>Tested by owners</span></a></li>
+        <li><a href="{{ 'wiki/Dashboard-Cards/' | url }}"><span class="tx-index__n">12</span><b>Dashboard cards</b><span>Eleven cards, no extra install</span></a></li>
+        <li><a href="{{ 'SUPPORTED_DEVICES/' | url }}"><span class="tx-index__n">13</span><b>Supported devices</b><span>Tested by owners</span></a></li>
+        <li><a href="{{ 'release-notes/' | url }}"><span class="tx-index__n">14</span><b>Release notes</b><span>Every version since 1.0</span></a></li>
       </ol>
     </div>
   </section>

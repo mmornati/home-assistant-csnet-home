@@ -157,6 +157,14 @@ Yes! Each zone/thermostat gets its own climate entity that can be controlled ind
 
 Yes, through Home Assistant. If you've connected Home Assistant to Alexa or Google Home, you can expose these climate entities and control them via voice.
 
+### Is there a ready-made dashboard?
+
+Yes. The integration ships eleven dashboard cards (overview, live water circuit, heating curve, COP, health, energy charts and more). Search for **CSNet** in the **Add card** picker, or paste the example view from [Dashboard Cards](Dashboard-Cards.md). No other card has to be installed.
+
+### Can I see my heating curve (water law)?
+
+CSNet does not report the curve values, only which kind of curve each circuit uses. Copy the values from the unit controller into the integration options (**Configure**) and you get a sensor with the water temperature the curve asks for, and the **Heating curve** card draws it. See [Heating Curve Values](Advanced-Features.md#heating-curve-values-water-law).
+
 ### Can I create automations?
 
 Absolutely! All entities can be used in Home Assistant automations, scripts, and scenes. Check the automation examples in [Climate Control](Climate-Control.md) and [Water Heater Control](Water-Heater-Control.md) pages.

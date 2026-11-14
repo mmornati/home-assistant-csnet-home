@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="CSNet Home">
+  <defs>
+    <radialGradient id="h" cx="50%" cy="58%" r="55%">
+      <stop offset="0" stop-color="#fff6d6"/>
+      <stop offset=".28" stop-color="#ffd24a"/>
+      <stop offset=".55" stop-color="#f2742b"/>
+      <stop offset=".8" stop-color="#b5367a"/>
+      <stop offset="1" stop-color="#3b0f70"/>
+    </radialGradient>
+  </defs>
+  <rect width="48" height="48" rx="9" fill="#0b0712"/>
+  <path d="M24 11 37 21.5V37H11V21.5Z" fill="url(#h)"/>
+  <g fill="none" stroke="#fff6d6" stroke-width="2.4" stroke-linecap="square">
+    <path d="M6 13V6h7M35 6h7v7M42 35v7h-7M13 42H6v-7"/>
+  </g>
+  <g stroke="#0b0712" stroke-width="2" stroke-linecap="round">
+    <path d="M24 23v4M24 31v4M18 29h4M26 29h4"/>
+  </g>
+</svg>

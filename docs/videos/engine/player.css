@@ -1,0 +1,58 @@
+/* Player for static/videos/engine/engine.js.
+   Fonts served from this folder (SIL OFL, see fonts/OFL-*.txt): no third-party requests. */
+@font-face { font-family: "Inter"; src: url("fonts/inter-latin.woff2") format("woff2"); font-weight: 100 900; font-display: block; }
+@font-face { font-family: "Sora"; src: url("fonts/sora-latin.woff2") format("woff2"); font-weight: 100 800; font-display: block; }
+@font-face { font-family: "JetBrains Mono"; src: url("fonts/jetbrains-mono-latin.woff2") format("woff2"); font-weight: 100 800; font-display: block; }
+
+:root {
+  --bg: #0b0f17; --panel: #151c2b; --line: #2a3550;
+  --ink: #e8ecf4; --soft: #b4bdd0; --faint: #7a849a; --accent: #38bdf8; --deep: #0a2233;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 Inter, system-ui, sans-serif; }
+main { max-width: 1280px; margin: 0 auto; padding: 24px 16px 48px; }
+a { color: var(--accent); }
+header { margin-bottom: 14px; }
+.kicker { font: 600 0.78rem/1.2 "JetBrains Mono", monospace; letter-spacing: 0.12em; color: var(--accent); text-transform: uppercase; margin: 0 0 4px; }
+h1 { font: 700 1.35rem/1.2 Sora, Inter, sans-serif; letter-spacing: -0.02em; margin: 0; }
+.stage { position: relative; aspect-ratio: 16 / 9; width: 100%; background: #000; border-radius: 14px; overflow: hidden; box-shadow: 0 18px 50px rgba(0,0,0,.45); }
+canvas { display: block; width: 100%; height: 100%; cursor: pointer; }
+
+.bar { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+button, select { font: 600 0.88rem Inter, sans-serif; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; cursor: pointer; }
+button:hover, select:hover { border-color: var(--accent); }
+button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#seek { flex: 1 1 160px; accent-color: var(--accent); min-width: 120px; }
+.time { font: 0.84rem "JetBrains Mono", monospace; color: var(--soft); min-width: 92px; text-align: right; }
+
+.chapters { list-style: none; margin: 18px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+.chapters button { width: 100%; text-align: left; border-radius: 12px; padding: 9px 12px; display: flex; gap: 10px; align-items: baseline; font-weight: 500; }
+.chapters button .t { font: 0.78rem "JetBrains Mono", monospace; color: var(--faint); }
+.chapters button.on { border-color: var(--accent); background: rgba(56,189,248,0.08); }
+.chapters-title { font: 600 0.78rem "JetBrains Mono", monospace; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); margin: 22px 0 0; }
+.note { margin-top: 18px; font-size: 0.85rem; color: var(--soft); max-width: 78ch; }
+.note code { font-family: "JetBrains Mono", monospace; color: var(--accent); font-size: 0.8rem; }
+
+/* ?embed=1 — just the stage and the control bar, for an <iframe> */
+body.embed main { padding: 0; max-width: none; }
+body.embed header, body.embed .chapters, body.embed .chapters-title, body.embed .note { display: none; }
+body.embed .stage { border-radius: 8px; box-shadow: none; }
+body.embed .bar { margin-top: 8px; gap: 6px; flex-wrap: nowrap; height: 32px; }
+body.embed button, body.embed select { padding: 5px 11px; font-size: 0.8rem; }
+
+/* ?capture=1 — frame-by-frame export (scripts/render.py) */
+body.capture { background: #000; }
+body.capture main { max-width: none; padding: 0; }
+body.capture header, body.capture .bar, body.capture .chapters,
+body.capture .chapters-title, body.capture .note { display: none; }
+body.capture .stage { border-radius: 0; box-shadow: none; }
+
+/* one row of controls in an iframe, whatever its width */
+@media (max-width: 620px) { body.embed .time, body.embed #sound { display: none; } }
+@media (max-width: 420px) { body.embed #subs, body.embed #full { display: none; } }
+
+@media (max-width: 640px) {
+  main { padding: 16px 16px 32px; }
+  .time { min-width: 0; }
+}
