@@ -133,6 +133,7 @@ const TEXTS = {
     hours: "Hours shown",
     weather_entity: "Weather entity (optional)",
     demand_of: "Demand {name}",
+    needs_meter: "Needs an electricity figure: choose your heat pump's electricity meter in the integration settings (Reconfigure).",
   },
   fr: {
     heat_pump: "Pompe à chaleur",
@@ -248,6 +249,7 @@ const TEXTS = {
     hours: "Heures affichées",
     weather_entity: "Entité météo (facultatif)",
     demand_of: "Demande {name}",
+    needs_meter: "Il faut une mesure d'électricité : choisissez le compteur d'électricité de la pompe à chaleur dans les réglages de l'intégration (Reconfigurer).",
   },
   es: {
     heat_pump: "Bomba de calor",
@@ -363,6 +365,7 @@ const TEXTS = {
     hours: "Horas mostradas",
     weather_entity: "Entidad meteorológica (opcional)",
     demand_of: "Demanda {name}",
+    needs_meter: "Se necesita una medida de electricidad: elija el contador de electricidad de la bomba de calor en los ajustes de la integración (Reconfigurar).",
   },
 };
 
@@ -1968,6 +1971,7 @@ class CsnetEnergySignatureCard extends CsnetBaseCard {
   }
 
   content(hass) {
+    if (!electricityEntity(this.unit) || !this.unit.outdoor) return `${this.title(hass, "energy_signature")}<div class="message">${escapeHtml(t(hass, "needs_meter"))}</div>`;
     const d = this._data;
     if (!d || d.error) return `${this.title(hass, "energy_signature")}<div class="message">${escapeHtml(d?.error ? t(hass, "not_enough_history") : t(hass, "loading"))}</div>`;
     const price = this.price(hass);
