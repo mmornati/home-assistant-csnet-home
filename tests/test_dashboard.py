@@ -5,9 +5,11 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.csnet_home.const import DOMAIN
+from custom_components.csnet_home.const import CONF_ENERGY_METER, DOMAIN
 from custom_components.csnet_home.dashboard import CARDS_FILE, FRONTEND_DIR, FRONTEND_URL, async_register_dashboard, dashboard_entities
 
 FRONTEND_FILE = FRONTEND_DIR / CARDS_FILE
@@ -93,7 +95,7 @@ async def test_no_frontend_no_files(hass: HomeAssistant):
 
 
 def test_card_file_ships_every_card_and_language():
-    """Six cards, each listed for the picker, and the same texts in English, French and Spanish."""
+    """Every card listed for the picker, and the same texts in English, French and Spanish."""
     source = FRONTEND_FILE.read_text(encoding="utf-8")
     for tag in (
         "csnet-heat-pump-card",
@@ -102,6 +104,11 @@ def test_card_file_ships_every_card_and_language():
         "csnet-performance-card",
         "csnet-system-health-card",
         "csnet-refrigerant-card",
+        "csnet-temperatures-card",
+        "csnet-activity-card",
+        "csnet-daily-energy-card",
+        "csnet-power-profile-card",
+        "csnet-energy-signature-card",
     ):
         assert f'"{tag}"' in source
     texts = source[source.index("const TEXTS = {") : source.index("function lang(")]
@@ -118,3 +125,50 @@ def test_manifest_loads_after_the_frontend():
     manifest = json.loads((FRONTEND_DIR.parent / "manifest.json").read_text(encoding="utf-8"))
     assert {"frontend", "http"} <= set(manifest["after_dependencies"])
     assert manifest["dependencies"] == []
+
+
+async def test_meter_and_its_power_sensor(hass: HomeAssistant):
+    """The meter chosen in the settings, and the power sensor beside it on the same device, become roles."""
+    other_entry = MockConfigEntry(domain="shelly")
+    other_entry.add_to_hass(hass)
+    device = dr.async_get(hass).async_get_or_create(config_entry_id=other_entry.entry_id, identifiers={("shelly", "meter")})
+    registry = er.async_get(hass)
+
+    def meter_entity(object_id, device_class):
+        return registry.async_get_or_create(
+            "sensor", "shelly", object_id, suggested_object_id=object_id, device_id=device.id, original_device_class=device_class
+        ).entity_id
+
+    energy = meter_entity("shelly_total_active_energy", "energy")
+    meter_entity("shelly_phase_a_active_power", "power")
+    power = meter_entity("shelly_total_active_power", "power")
+    MockConfigEntry(domain=DOMAIN, data={CONF_ENERGY_METER: energy}).add_to_hass(hass)
+
+    unit = dashboard_entities(hass)["unit"]
+    assert unit["meter_energy"] == energy
+    assert unit["meter_power"] == power
+
+
+async def test_meter_power_is_chosen_by_shared_words(hass: HomeAssistant):
+    """Same start for every sensor: the one sharing a word with the meter wins, not the last alphabetically."""
+    other_entry = MockConfigEntry(domain="other")
+    other_entry.add_to_hass(hass)
+    device = dr.async_get(hass).async_get_or_create(config_entry_id=other_entry.entry_id, identifiers={("other", "unit")})
+    registry = er.async_get(hass)
+    for object_id, device_class in (("unit_daily_consumption", "energy"), ("unit_instant_consumption", "power"), ("unit_output_power", "power")):
+        registry.async_get_or_create("sensor", "other", object_id, suggested_object_id=object_id, device_id=device.id, original_device_class=device_class)
+    MockConfigEntry(domain=DOMAIN, data={CONF_ENERGY_METER: "sensor.unit_daily_consumption"}).add_to_hass(hass)
+    assert dashboard_entities(hass)["unit"]["meter_power"] == "sensor.unit_instant_consumption"
+
+
+async def test_meter_without_device_or_power_sensor(hass: HomeAssistant):
+    """A meter alone (a template sensor, for example) gives only the energy role."""
+    MockConfigEntry(domain=DOMAIN, data={CONF_ENERGY_METER: "sensor.template_energy"}).add_to_hass(hass)
+    unit = dashboard_entities(hass)["unit"]
+    assert unit == {"meter_energy": "sensor.template_energy"}
+
+
+async def test_no_meter_no_meter_roles(hass: HomeAssistant):
+    """Without a meter in the settings nothing is added."""
+    MockConfigEntry(domain=DOMAIN, data={}).add_to_hass(hass)
+    assert dashboard_entities(hass)["unit"] == {}

@@ -12,7 +12,7 @@
  * power meter.
  */
 
-const CARD_VERSION = "1.0.0";
+const CARD_VERSION = "1.1.0";
 
 // ---------------------------------------------------------------------------
 // Texts
@@ -67,7 +67,7 @@ const TEXTS = {
     for_outdoor: "for {v} outside (average)",
     curve_of: "{name} curve",
     actual_flow: "Actual flow",
-    history_note: "Dots: the unit's water target, hourly, over the last {d} days (darker: last 24 h).",
+    history_note: "Dots: the unit's water target, hourly, over the last {d} days (coloured: last 3 days).",
     curve_note: "Lines: the curves entered in the integration options. The unit can run warmer (room compensation) or cooler (eco).",
     no_curve: "Enter your heating curve values in Settings → Devices & services → CSNet Home → Configure to draw the curves.",
     unit_target: "unit target",
@@ -99,6 +99,40 @@ const TEXTS = {
     power_entity: "Power sensor (optional)",
     pressure_min: "Lowest normal water pressure (bar, optional)",
     pressure_max: "Highest normal water pressure (bar, optional)",
+    temperatures: "Water, target, outdoor and compressor",
+    activity: "What ran",
+    daily_energy: "Energy per day",
+    power_profile: "Power today vs the usual day",
+    energy_signature: "Forecast · energy signature",
+    after_valve: "After the mixing valve",
+    last_3_days: "last 3 days",
+    before_days: "before ({d} days)",
+    mixing_note: "The unit makes water for the warmer curve; the mixing valve cools it for the other circuit.",
+    outdoor_mean: "Outdoor average",
+    electricity_source_server: "Electricity as CSNet records it. Choose your heat pump's electricity meter in the integration settings for measured values.",
+    now: "Now",
+    usual_at_this_hour: "Usual at this hour ({d} days)",
+    average_profile: "average day ({d} days)",
+    tomorrow_weather: "Tomorrow (forecast)",
+    mean_outdoor: "~{v} °C average",
+    no_forecast: "no forecast available",
+    no_weather: "no weather entity",
+    average_7_days: "7-day average",
+    per_day: "per day",
+    per_degree: "Per degree colder",
+    fit_quality: "per day (fit {r} %, {n} days)",
+    not_enough_history: "needs at least 7 days of history",
+    base_load: "Base load (14 days)",
+    base_load_detail: "lowest power: pumps and electronics",
+    signature_note: "Daily kWh = a + b × average outdoor temperature, over the last {d} days. An estimate, not a promise.",
+    cost_today: "Cost today",
+    cost_month: "Cost this month",
+    price_used: "price {v} {c}/kWh",
+    price: "Electricity price per kWh (optional)",
+    price_entity: "Electricity price entity (optional)",
+    hours: "Hours shown",
+    weather_entity: "Weather entity (optional)",
+    demand_of: "Demand {name}",
   },
   fr: {
     heat_pump: "Pompe à chaleur",
@@ -148,7 +182,7 @@ const TEXTS = {
     for_outdoor: "pour {v} dehors (moyenne)",
     curve_of: "Loi {name}",
     actual_flow: "Départ réel",
-    history_note: "Points : consigne d'eau de l'unité, par heure, sur les {d} derniers jours (plus foncés : dernières 24 h).",
+    history_note: "Points : consigne d'eau de l'unité, par heure, sur les {d} derniers jours (en couleur : 3 derniers jours).",
     curve_note: "Lignes : les lois d'eau saisies dans les options de l'intégration. L'unité peut chauffer plus (compensation d'ambiance) ou moins (éco).",
     no_curve: "Saisissez vos lois d'eau dans Paramètres → Appareils et services → CSNet Home → Configurer pour tracer les courbes.",
     unit_target: "consigne de l'unité",
@@ -180,6 +214,40 @@ const TEXTS = {
     power_entity: "Capteur de puissance (facultatif)",
     pressure_min: "Pression d'eau normale minimale (bar, facultatif)",
     pressure_max: "Pression d'eau normale maximale (bar, facultatif)",
+    temperatures: "Eau, consigne, extérieur et compresseur",
+    activity: "Ce qui a tourné",
+    daily_energy: "Énergie par jour",
+    power_profile: "Puissance du jour vs journée habituelle",
+    energy_signature: "Prévision · signature énergétique",
+    after_valve: "Après la vanne 3 voies",
+    last_3_days: "3 derniers jours",
+    before_days: "avant ({d} jours)",
+    mixing_note: "L'unité produit l'eau de la loi la plus chaude ; la vanne 3 voies la refroidit pour l'autre circuit.",
+    outdoor_mean: "Extérieur moyen",
+    electricity_source_server: "Électricité telle que CSNet l'enregistre. Choisissez le compteur d'électricité de la pompe à chaleur dans les réglages de l'intégration pour des valeurs mesurées.",
+    now: "Maintenant",
+    usual_at_this_hour: "Habituel à cette heure ({d} jours)",
+    average_profile: "journée moyenne ({d} jours)",
+    tomorrow_weather: "Demain (météo)",
+    mean_outdoor: "~{v} °C en moyenne",
+    no_forecast: "prévision indisponible",
+    no_weather: "aucune entité météo",
+    average_7_days: "Moyenne 7 jours",
+    per_day: "par jour",
+    per_degree: "Par degré en moins",
+    fit_quality: "par jour (corrélation {r} %, {n} jours)",
+    not_enough_history: "il faut au moins 7 jours d'historique",
+    base_load: "Plancher (14 jours)",
+    base_load_detail: "puissance la plus basse : pompes et électronique",
+    signature_note: "kWh par jour = a + b × température extérieure moyenne, sur les {d} derniers jours. Une estimation, pas une promesse.",
+    cost_today: "Coût du jour",
+    cost_month: "Coût du mois",
+    price_used: "prix {v} {c}/kWh",
+    price: "Prix de l'électricité par kWh (facultatif)",
+    price_entity: "Entité du prix de l'électricité (facultatif)",
+    hours: "Heures affichées",
+    weather_entity: "Entité météo (facultatif)",
+    demand_of: "Demande {name}",
   },
   es: {
     heat_pump: "Bomba de calor",
@@ -229,7 +297,7 @@ const TEXTS = {
     for_outdoor: "para {v} fuera (media)",
     curve_of: "Curva {name}",
     actual_flow: "Impulsión real",
-    history_note: "Puntos: consigna de agua de la unidad, por hora, en los últimos {d} días (más oscuros: últimas 24 h).",
+    history_note: "Puntos: consigna de agua de la unidad, por hora, en los últimos {d} días (en color: últimos 3 días).",
     curve_note: "Líneas: las curvas introducidas en las opciones de la integración. La unidad puede calentar más (compensación de ambiente) o menos (eco).",
     no_curve: "Introduzca sus curvas en Ajustes → Dispositivos y servicios → CSNet Home → Configurar para dibujarlas.",
     unit_target: "consigna de la unidad",
@@ -261,6 +329,40 @@ const TEXTS = {
     power_entity: "Sensor de potencia (opcional)",
     pressure_min: "Presión de agua normal mínima (bar, opcional)",
     pressure_max: "Presión de agua normal máxima (bar, opcional)",
+    temperatures: "Agua, consigna, exterior y compresor",
+    activity: "Qué funcionó",
+    daily_energy: "Energía por día",
+    power_profile: "Potencia de hoy vs el día habitual",
+    energy_signature: "Previsión · firma energética",
+    after_valve: "Tras la válvula mezcladora",
+    last_3_days: "últimos 3 días",
+    before_days: "antes ({d} días)",
+    mixing_note: "La unidad produce el agua de la curva más caliente; la válvula mezcladora la enfría para el otro circuito.",
+    outdoor_mean: "Exterior medio",
+    electricity_source_server: "Electricidad según la registra CSNet. Elija el contador de electricidad de la bomba de calor en los ajustes de la integración para valores medidos.",
+    now: "Ahora",
+    usual_at_this_hour: "Habitual a esta hora ({d} días)",
+    average_profile: "día medio ({d} días)",
+    tomorrow_weather: "Mañana (previsión)",
+    mean_outdoor: "~{v} °C de media",
+    no_forecast: "previsión no disponible",
+    no_weather: "ninguna entidad meteorológica",
+    average_7_days: "Media 7 días",
+    per_day: "por día",
+    per_degree: "Por grado menos",
+    fit_quality: "por día (ajuste {r} %, {n} días)",
+    not_enough_history: "hacen falta al menos 7 días de historial",
+    base_load: "Consumo base (14 días)",
+    base_load_detail: "potencia más baja: bombas y electrónica",
+    signature_note: "kWh por día = a + b × temperatura exterior media, en los últimos {d} días. Una estimación, no una promesa.",
+    cost_today: "Coste de hoy",
+    cost_month: "Coste del mes",
+    price_used: "precio {v} {c}/kWh",
+    price: "Precio de la electricidad por kWh (opcional)",
+    price_entity: "Entidad del precio de la electricidad (opcional)",
+    hours: "Horas mostradas",
+    weather_entity: "Entidad meteorológica (opcional)",
+    demand_of: "Demanda {name}",
   },
 };
 
@@ -359,6 +461,11 @@ const BASE_CSS = `
     --csnet-c2: var(--success-color, #43a047);
     --csnet-muted: var(--secondary-text-color);
     --csnet-line: var(--divider-color, rgba(127,127,127,.25));
+    --csnet-flow: var(--csnet-heat);
+    --csnet-return: color-mix(in srgb, var(--csnet-heat) 55%, var(--primary-text-color));
+    --csnet-recent: var(--csnet-heat);
+    --csnet-elec: #8e6bd8;
+    --csnet-compressor: #e0b100;
   }
   ha-card { padding: 16px; overflow: hidden; }
   .title {
@@ -408,6 +515,221 @@ function fanSvg(x, y, size, spinning, color) {
 }
 
 // ---------------------------------------------------------------------------
+// History and statistics
+// ---------------------------------------------------------------------------
+
+const toMs = (value) => (typeof value === "number" ? value : Date.parse(value));
+
+/** Long-term statistics of some entities: { entity_id: [{ start (ms), mean, min, max, change, ... }] }. */
+async function statistics(hass, ids, startMs, period, types, endMs = Date.now()) {
+  const wanted = [...new Set(ids.filter(Boolean))];
+  if (!wanted.length) return {};
+  const result = await hass.callWS({
+    type: "recorder/statistics_during_period",
+    start_time: new Date(startMs).toISOString(),
+    end_time: new Date(endMs).toISOString(),
+    statistic_ids: wanted,
+    period,
+    types,
+  });
+  const out = {};
+  for (const [id, rows] of Object.entries(result || {})) out[id] = rows.map((row) => ({ ...row, start: toMs(row.start) }));
+  return out;
+}
+
+/** On/off history of some entities: { entity_id: [[from ms, to ms], ...] } for the "on" periods. */
+async function onPeriods(hass, ids, startMs, endMs = Date.now()) {
+  const wanted = [...new Set(ids.filter(Boolean))];
+  if (!wanted.length) return {};
+  const result = await hass.callWS({
+    type: "history/history_during_period",
+    start_time: new Date(startMs).toISOString(),
+    end_time: new Date(endMs).toISOString(),
+    entity_ids: wanted,
+    minimal_response: true,
+    no_attributes: true,
+    significant_changes_only: false,
+  });
+  const out = {};
+  for (const id of wanted) {
+    const rows = result?.[id] || [];
+    const periods = [];
+    let from = null;
+    for (const row of rows) {
+      const at = Math.max(startMs, row.lu !== undefined ? row.lu * 1000 : toMs(row.last_updated || row.last_changed));
+      const on = (row.s ?? row.state) === "on";
+      if (on && from === null) from = at;
+      if (!on && from !== null) {
+        periods.push([from, at]);
+        from = null;
+      }
+    }
+    if (from !== null) periods.push([from, endMs]);
+    out[id] = periods;
+  }
+  return out;
+}
+
+const PRICE_CACHE = new WeakMap();
+
+/** The electricity price set in the Energy dashboard: { entity } or { number }, or null. */
+function loadEnergyPrice(hass) {
+  const key = hass.connection || hass;
+  if (!PRICE_CACHE.has(key)) {
+    PRICE_CACHE.set(
+      key,
+      hass
+        .callWS({ type: "energy/get_prefs" })
+        .then((prefs) => {
+          for (const source of prefs?.energy_sources || []) {
+            if (source.type !== "grid") continue;
+            for (const flow of source.flow_from || [source]) {
+              if (flow.entity_energy_price) return { entity: flow.entity_energy_price };
+              if (Number.isFinite(flow.number_energy_price)) return { number: flow.number_energy_price };
+            }
+          }
+          return null;
+        })
+        .catch(() => null),
+    );
+  }
+  return PRICE_CACHE.get(key);
+}
+
+/** The daily forecast of a weather entity (first answer of the subscription), or null. */
+function loadForecast(hass, entityId) {
+  return new Promise((resolve) => {
+    if (!entityId || !hass.connection?.subscribeMessage) {
+      resolve(null);
+      return;
+    }
+    let done = false;
+    let unsubscribe = null;
+    const finish = (value) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      if (unsubscribe) unsubscribe();
+      resolve(value);
+    };
+    const timer = setTimeout(() => finish(null), 6000);
+    hass.connection
+      .subscribeMessage((event) => finish(event?.forecast || null), { type: "weather/subscribe_forecast", entity_id: entityId, forecast_type: "daily" })
+      .then((unsub) => {
+        unsubscribe = unsub;
+        if (done) unsub();
+      })
+      .catch(() => finish(null));
+  });
+}
+
+function startOfDay(ms = Date.now()) {
+  const d = new Date(ms);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+/** Least squares y = a + b x, with r². */
+function regression(points) {
+  const n = points.length;
+  if (n < 3) return null;
+  const mx = points.reduce((s, p) => s + p[0], 0) / n;
+  const my = points.reduce((s, p) => s + p[1], 0) / n;
+  let sxy = 0;
+  let sxx = 0;
+  let syy = 0;
+  for (const [x, y] of points) {
+    sxy += (x - mx) * (y - my);
+    sxx += (x - mx) ** 2;
+    syy += (y - my) ** 2;
+  }
+  if (!sxx) return null;
+  const b = sxy / sxx;
+  return { a: my - b * mx, b, r2: syy ? (sxy * sxy) / (sxx * syy) : 0, n };
+}
+
+// ---------------------------------------------------------------------------
+// Charts (plain SVG)
+// ---------------------------------------------------------------------------
+
+function niceRange(values, step, pad = 0) {
+  const finite = values.filter(Number.isFinite);
+  if (!finite.length) return [0, step];
+  let min = Math.floor((Math.min(...finite) - pad) / step) * step;
+  let max = Math.ceil((Math.max(...finite) + pad) / step) * step;
+  if (min === max) max = min + step;
+  return [min, max];
+}
+
+/** A round step (1, 2, 2.5 or 5 × 10^k) splitting [0, max] in about `parts` parts. */
+function niceStep(max, parts = 4) {
+  const raw = Math.max(max, 1e-9) / parts;
+  const power = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 2.5, 5, 10].find((m) => m * power >= raw) * power;
+  return step;
+}
+
+function hourLabel(hass, ms) {
+  return new Date(ms).toLocaleTimeString(hass.locale?.language || undefined, { hour: "2-digit", minute: "2-digit" });
+}
+
+function dayLabel(hass, ms) {
+  return new Date(ms).toLocaleDateString(hass.locale?.language || undefined, { day: "numeric", month: "short" });
+}
+
+/**
+ * A time chart: lines (optionally filled) on a left axis and an optional right axis.
+ * series: [{ points: [[ms, value]], color, width, dash, fill, axis: "right" }]
+ */
+function timeChart(hass, { x0, x1, series, left, right, ticks, W = 600, H = 220 }) {
+  const pad = { l: 36, r: right ? 36 : 10, t: 10, b: 22 };
+  const sx = (v) => pad.l + ((v - x0) / (x1 - x0 || 1)) * (W - pad.l - pad.r);
+  const scale = (axis) => (v) => H - pad.b - ((v - axis.min) / (axis.max - axis.min || 1)) * (H - pad.t - pad.b);
+  const syL = scale(left);
+  const syR = right ? scale(right) : syL;
+  let svg = "";
+  for (let v = left.min; v <= left.max + 1e-9; v += left.step) {
+    svg += `<line x1="${pad.l}" x2="${W - pad.r}" y1="${syL(v)}" y2="${syL(v)}" stroke="var(--csnet-line)" stroke-width=".6"/>
+      <text x="${pad.l - 5}" y="${syL(v) + 3}" text-anchor="end" font-size="10" fill="var(--secondary-text-color)">${fmt(hass, v, left.digits ?? 0)}${left.suffix || ""}</text>`;
+  }
+  if (right) {
+    for (let v = right.min; v <= right.max + 1e-9; v += right.step) {
+      svg += `<text x="${W - pad.r + 5}" y="${syR(v) + 3}" font-size="10" fill="var(--secondary-text-color)">${fmt(hass, v, right.digits ?? 0)}${right.suffix || ""}</text>`;
+    }
+  }
+  for (const [at, label] of ticks) {
+    svg += `<line x1="${sx(at)}" x2="${sx(at)}" y1="${pad.t}" y2="${H - pad.b}" stroke="var(--csnet-line)" stroke-width=".5"/>
+      <text x="${sx(at)}" y="${H - 6}" text-anchor="middle" font-size="10" fill="var(--secondary-text-color)">${escapeHtml(label)}</text>`;
+  }
+  for (const s of series) {
+    const sy = s.axis === "right" ? syR : syL;
+    const pts = s.points.filter((p) => Number.isFinite(p[1]) && p[0] >= x0 && p[0] <= x1);
+    if (!pts.length) continue;
+    const d = pts.map((p, i) => `${i ? "L" : "M"}${sx(p[0]).toFixed(1)} ${sy(p[1]).toFixed(1)}`).join(" ");
+    if (s.fill) {
+      const base = sy(s.axis === "right" ? right.min : left.min);
+      svg += `<path d="${d} L${sx(pts[pts.length - 1][0]).toFixed(1)} ${base} L${sx(pts[0][0]).toFixed(1)} ${base} Z" fill="${s.color}" opacity="${s.fillOpacity ?? 0.18}"/>`;
+    }
+    svg += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="${s.width || 2}" ${s.dash ? `stroke-dasharray="${s.dash}"` : ""} stroke-linejoin="round" opacity="${s.opacity ?? 1}"/>`;
+  }
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block">${svg}</svg>`;
+}
+
+function legend(items) {
+  return `<div class="legend">${items
+    .map(([color, label, dash]) => `<span><i style="background:${dash ? "transparent" : color};border-top:${dash ? `2px dashed ${color}` : "none"}"></i>${escapeHtml(label)}</span>`)
+    .join("")}</div>`;
+}
+
+const CHART_CSS = `
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 11px; color: var(--csnet-muted); margin: 4px 0 6px; }
+  .legend i { display: inline-block; width: 12px; height: 3px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+  .headline-row { display: flex; flex-wrap: wrap; gap: 6px 22px; margin-bottom: 4px; }
+  .headline-row .k { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--csnet-muted); }
+  .headline-row .v { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+`;
+
+// ---------------------------------------------------------------------------
 // Base card
 // ---------------------------------------------------------------------------
 
@@ -450,6 +772,11 @@ class CsnetBaseCard extends HTMLElement {
   /** The roles, with the entities the card configuration replaces (`<role>_entity`). */
   get unit() {
     const unit = { ...(this._roles?.unit || {}) };
+    // a real power meter on the heat pump beats the estimate
+    if (unit.meter_power) {
+      unit.power_estimate = unit.power;
+      unit.power = unit.meter_power;
+    }
     for (const [key, value] of Object.entries(this._config || {})) {
       if (key.endsWith("_entity") && value) unit[key.slice(0, -"_entity".length)] = value;
     }
@@ -480,7 +807,8 @@ class CsnetBaseCard extends HTMLElement {
     const signature = JSON.stringify([lang(hass), hass.themes?.darkMode, ids.map((id) => {
       const s = hass.states[id];
       return s ? [s.state, s.last_updated] : null;
-    }), this.extraSignature()]);
+    }), this.extraSignature(), this._dataAt || 0]);
+    this._ensureData();
     if (signature === this._signature) return;
     this._signature = signature;
     this.shadowRoot.innerHTML = `<style>${BASE_CSS}${this.css()}</style><ha-card>${this.content(hass)}</ha-card>`;
@@ -488,6 +816,41 @@ class CsnetBaseCard extends HTMLElement {
 
   extraSignature() {
     return null;
+  }
+
+  /** Cards that read history: what to load (null: nothing), how, and how often. */
+  dataKey() {
+    return null;
+  }
+
+  async fetchData() {
+    return null;
+  }
+
+  refreshMs() {
+    return 10 * 60000;
+  }
+
+  _ensureData() {
+    const key = this.dataKey();
+    if (!key || this._dataLoading) return;
+    if (this._dataKey === key && Date.now() - (this._dataAt || 0) < this.refreshMs()) return;
+    this._dataKey = key;
+    this._dataLoading = true;
+    this.fetchData(this._hass)
+      .then(
+        (data) => {
+          this._data = data;
+        },
+        (err) => {
+          this._data = { error: err?.message || String(err) };
+        },
+      )
+      .finally(() => {
+        this._dataLoading = false;
+        this._dataAt = Date.now();
+        this._render();
+      });
   }
 
   css() {
@@ -537,7 +900,35 @@ class CsnetHeatPumpCard extends CsnetBaseCard {
       { name: "title", selector: { text: {} } },
       { name: "power_entity", selector: { entity: { domain: "sensor", device_class: "power" } } },
       { name: "max_power", selector: { number: { min: 500, max: 30000, step: 100, mode: "box" } } },
+      { name: "price", selector: { number: { min: 0, max: 5, step: 0.001, mode: "box" } } },
+      { name: "price_entity", selector: { entity: {} } },
     ];
+  }
+
+  // the electricity price of the Energy dashboard, unless the card sets one
+  dataKey() {
+    return this._config.price || this._config.price_entity ? null : "energy-price";
+  }
+
+  refreshMs() {
+    return 60 * 60000;
+  }
+
+  fetchData(hass) {
+    return loadEnergyPrice(hass);
+  }
+
+  price(hass) {
+    if (this._config.price !== undefined && this._config.price !== "" && Number.isFinite(Number(this._config.price))) return Number(this._config.price);
+    if (this._config.price_entity) return num(hass, this._config.price_entity);
+    const p = this._data;
+    if (p?.number !== undefined) return p.number;
+    if (p?.entity) return num(hass, p.entity);
+    return null;
+  }
+
+  watched() {
+    return [...super.watched(), this._config.price_entity, this._data?.entity];
   }
 
   css() {
@@ -563,13 +954,26 @@ class CsnetHeatPumpCard extends CsnetBaseCard {
     const shown = power === null ? "–" : kw ? fmt(hass, power / 1000, 1) : fmt(hass, power, 0);
     const waterTemps = [num(hass, unit.water_out), num(hass, unit.water_in)];
     const delta = waterTemps[0] !== null && waterTemps[1] !== null ? waterTemps[0] - waterTemps[1] : null;
-    const energy = num(hass, unit.energy_today) ?? num(hass, unit.server_electricity_today);
-    const energyEntity = unit.energy_today || unit.server_electricity_today;
+    // electricity: the user's meter (through the metered COP), else the estimate, else CSNet's record
+    const metered = (role) => {
+      const v = Number(stateOf(hass, unit[role])?.attributes?.electricity_kwh);
+      return Number.isFinite(v) ? v : null;
+    };
+    const energy = metered("cop_today") ?? num(hass, unit.energy_today) ?? num(hass, unit.server_electricity_today);
+    const energyEntity = metered("cop_today") !== null ? unit.cop_today : unit.energy_today || unit.server_electricity_today;
+    const month = metered("cop_month") ?? num(hass, unit.server_electricity_month);
+    const monthEntity = metered("cop_month") !== null ? unit.cop_month : unit.server_electricity_month;
+    const price = this.price(hass);
+    const currency = escapeHtml(hass.config?.currency || "€");
     const heat = num(hass, unit.server_heat_today) ?? num(hass, unit.heat_today);
     const heatEntity = unit.server_heat_today || unit.heat_today;
     const copEntity = num(hass, unit.cop_today) !== null ? unit.cop_today : unit.cop_today_estimated;
     const status = stateOf(hass, unit.operation_status)?.state;
-    const overridden = this._config.power_entity;
+    const overridden = this._config.power_entity || (unit.meter_power && unit.power === unit.meter_power ? unit.meter_power : null);
+    const extra = [];
+    if (price !== null && energy !== null) extra.push([energyEntity, t(hass, "cost_today"), `${fmt(hass, energy * price, 2)}<span class="unit">${currency}</span>`, "var(--csnet-heat)"]);
+    if (month > 0) extra.push([monthEntity, t(hass, "this_month"), `${fmt(hass, month, 0)}<span class="unit">kWh</span>`, ""]);
+    if (price !== null && month > 0) extra.push([monthEntity, t(hass, "cost_month"), `${fmt(hass, month * price, 2)}<span class="unit">${currency}</span>`, "var(--csnet-heat)"]);
     return `
       ${this.title(hass, "heat_pump")}
       <svg class="gauge" viewBox="0 0 200 200" data-entity="${escapeHtml(unit.power || "")}">
@@ -588,8 +992,9 @@ class CsnetHeatPumpCard extends CsnetBaseCard {
         <div class="stat" data-entity="${escapeHtml(energyEntity || "")}"><div class="label">${t(hass, "electricity")}</div><div class="value">${fmt(hass, energy)}<span class="unit">kWh</span></div></div>
         <div class="stat" data-entity="${escapeHtml(heatEntity || "")}"><div class="label">${t(hass, "heat")}</div><div class="value" style="color:var(--csnet-heat)">${fmt(hass, heat)}<span class="unit">kWh</span></div></div>
         <div class="stat" data-entity="${escapeHtml(copEntity || "")}"><div class="label">${t(hass, "cop")}</div><div class="value" style="color:var(--csnet-ok)">${fmt(hass, num(hass, copEntity), 2)}</div></div>
+        ${extra.map(([id, label, value, color]) => `<div class="stat" data-entity="${escapeHtml(id || "")}"><div class="label">${escapeHtml(label)}</div><div class="value" style="${color ? `color:${color}` : ""}">${value}</div></div>`).join("")}
       </div>
-      <div class="source">${overridden ? escapeHtml(t(hass, "power_from", { name: friendly(hass, overridden, overridden) })) : t(hass, "power_estimated")} · ${t(hass, "today").toLowerCase()}</div>
+      <div class="source">${overridden ? escapeHtml(t(hass, "power_from", { name: friendly(hass, overridden, overridden) })) : t(hass, "power_estimated")}${price !== null ? ` · ${escapeHtml(t(hass, "price_used", { v: fmt(hass, price, 3), c: hass.config?.currency || "€" }))}` : ""}</div>
     `;
   }
 }
@@ -755,36 +1160,6 @@ class CsnetWaterCircuitCard extends CsnetBaseCard {
 // Heating curve
 // ---------------------------------------------------------------------------
 
-const HISTORY_CACHE = new Map();
-
-async function loadHistory(hass, waterId, outdoorId, days) {
-  const key = `${waterId}|${outdoorId}|${days}`;
-  const cached = HISTORY_CACHE.get(key);
-  if (cached && Date.now() - cached.at < 30 * 60000) return cached.promise;
-  const end = new Date();
-  const start = new Date(end.getTime() - days * 86400000);
-  const promise = hass
-    .callWS({
-      type: "recorder/statistics_during_period",
-      start_time: start.toISOString(),
-      end_time: end.toISOString(),
-      statistic_ids: [waterId, outdoorId],
-      period: "hour",
-      types: ["mean"],
-    })
-    .then((result) => {
-      const byStart = new Map();
-      const toMs = (v) => (typeof v === "number" ? v : Date.parse(v));
-      for (const row of result[outdoorId] || []) if (row.mean !== null && row.mean !== undefined) byStart.set(toMs(row.start), row.mean);
-      return (result[waterId] || [])
-        .filter((row) => row.mean !== null && row.mean !== undefined && byStart.has(toMs(row.start)))
-        .map((row) => ({ at: toMs(row.start), outdoor: byStart.get(toMs(row.start)), water: row.mean }));
-    })
-    .catch(() => []);
-  HISTORY_CACHE.set(key, { at: Date.now(), promise });
-  return promise;
-}
-
 class CsnetHeatingCurveCard extends CsnetBaseCard {
   static get minColumns() {
     return 6;
@@ -793,7 +1168,7 @@ class CsnetHeatingCurveCard extends CsnetBaseCard {
   static editorSchema() {
     return [
       { name: "title", selector: { text: {} } },
-      { name: "days", selector: { number: { min: 0, max: 60, step: 1, mode: "box" } } },
+      { name: "days", selector: { number: { min: 0, max: 365, step: 1, mode: "box" } } },
     ];
   }
 
@@ -803,29 +1178,33 @@ class CsnetHeatingCurveCard extends CsnetBaseCard {
     return ids;
   }
 
-  extraSignature() {
-    return this._history ? this._history.length : -1;
+  get days() {
+    return Number(this._config.days ?? 30);
   }
 
-  _render() {
-    super._render();
+  dataKey() {
     const unit = this.unit;
-    const days = this._config ? Number(this._config.days ?? 7) : 7;
-    if (!this._hass || !this._roles || this._roles.error || !days || !unit.water_target || !(unit.outdoor_average || unit.outdoor)) return;
-    const key = `${unit.water_target}|${unit.outdoor_average || unit.outdoor}|${days}`;
-    if (this._historyKey === key && (this._history || this._historyLoading)) return;
-    this._historyKey = key;
-    this._historyLoading = true;
-    loadHistory(this._hass, unit.water_target, unit.outdoor_average || unit.outdoor, days).then((points) => {
-      this._history = points;
-      this._historyLoading = false;
-      this._signature = null;
-      super._render();
-    });
+    const outdoor = unit.outdoor_average || unit.outdoor;
+    return this.days > 0 && unit.water_target && outdoor ? `${unit.water_target}|${outdoor}|${this.days}` : null;
+  }
+
+  refreshMs() {
+    return 30 * 60000;
+  }
+
+  /** The unit's water target against the average outdoor temperature, hourly. */
+  async fetchData(hass) {
+    const unit = this.unit;
+    const outdoorId = unit.outdoor_average || unit.outdoor;
+    const stats = await statistics(hass, [unit.water_target, outdoorId], Date.now() - this.days * 86400000, "hour", ["mean"]);
+    const outdoorByHour = new Map((stats[outdoorId] || []).filter((r) => Number.isFinite(r.mean)).map((r) => [r.start, r.mean]));
+    return (stats[unit.water_target] || [])
+      .filter((r) => Number.isFinite(r.mean) && outdoorByHour.has(r.start))
+      .map((r) => ({ at: r.start, outdoor: outdoorByHour.get(r.start), water: r.mean }));
   }
 
   css() {
-    return `
+    return `${CHART_CSS}
       .layout { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: stretch; }
       .side { flex: 1 1 150px; min-width: 150px; }
       .chart { flex: 3 1 300px; min-width: 260px; }
@@ -841,6 +1220,8 @@ class CsnetHeatingCurveCard extends CsnetBaseCard {
     const outdoorId = unit.outdoor_average || unit.outdoor;
     const outdoor = num(hass, outdoorId);
     const target = num(hass, unit.water_target);
+    const flow = num(hass, unit.water_out);
+    const afterValve = unit.mix_valve ? num(hass, unit.water_c2) : null;
     const curves = this.circuits
       .filter((c) => c.curve && stateOf(hass, c.curve))
       .map((c) => {
@@ -856,12 +1237,12 @@ class CsnetHeatingCurveCard extends CsnetBaseCard {
           at: s.attributes.outdoor_temperature,
         };
       });
-    const history = this._history || [];
-    const days = Number(this._config.days ?? 7);
+    const history = Array.isArray(this._data) ? this._data : [];
+    const days = this.days;
 
     // axes
     const xs = [-20, 25, ...history.map((p) => p.outdoor), ...(outdoor !== null ? [outdoor] : [])];
-    const ys = [15, 60, ...history.map((p) => p.water), ...curves.flatMap((c) => c.points.map((p) => p[1])), ...(target !== null ? [target] : [])];
+    const ys = [15, 60, ...history.map((p) => p.water), ...curves.flatMap((c) => c.points.map((p) => p[1])), target, flow, afterValve].filter(Number.isFinite);
     const x0 = Math.floor(Math.min(...xs) / 5) * 5;
     const x1 = Math.ceil(Math.max(...xs) / 5) * 5;
     const y0 = Math.floor(Math.min(...ys) / 10) * 10;
@@ -880,10 +1261,13 @@ class CsnetHeatingCurveCard extends CsnetBaseCard {
       grid += `<line x1="${pad.l}" x2="${W - pad.r}" y1="${sy(y)}" y2="${sy(y)}" stroke="var(--csnet-line)" stroke-width=".6"/>
         <text x="${pad.l - 6}" y="${sy(y) + 3}" text-anchor="end" font-size="10" fill="var(--secondary-text-color)">${y}°</text>`;
     }
-    const recent = Date.now() - 86400000;
-    const dots = history
-      .map((p) => `<circle cx="${sx(p.outdoor).toFixed(1)}" cy="${sy(p.water).toFixed(1)}" r="${p.at >= recent ? 3 : 2.4}" fill="${p.at >= recent ? "var(--primary-text-color)" : "var(--secondary-text-color)"}" opacity="${p.at >= recent ? 0.55 : 0.22}"/>`)
-      .join("");
+    // last 3 days darker and warmer than the older points
+    const recent = Date.now() - 3 * 86400000;
+    const older = history.filter((p) => p.at < recent);
+    const latest = history.filter((p) => p.at >= recent);
+    const dots =
+      older.map((p) => `<circle cx="${sx(p.outdoor).toFixed(1)}" cy="${sy(p.water).toFixed(1)}" r="2.3" fill="var(--secondary-text-color)" opacity=".22"/>`).join("") +
+      latest.map((p) => `<circle cx="${sx(p.outdoor).toFixed(1)}" cy="${sy(p.water).toFixed(1)}" r="3" fill="var(--csnet-recent)" opacity=".6"/>`).join("");
     const lines = curves
       .map((c) => {
         if (!c.points.length) return "";
@@ -896,15 +1280,29 @@ class CsnetHeatingCurveCard extends CsnetBaseCard {
           <text x="${sx(anchor[0]) + 4}" y="${Math.max(pad.t + 10, sy(anchor[1]) - 9)}" font-size="11" font-weight="600" fill="${c.color}">C${c.circuit} · ${escapeHtml(shorten(c.name, 28))}</text>${now}</g>`;
       })
       .join("");
-    const unitMarker = outdoor !== null && target !== null
-      ? `<g data-entity="${escapeHtml(unit.water_target)}"><circle cx="${sx(outdoor)}" cy="${sy(target)}" r="8" fill="none" stroke="var(--primary-text-color)" stroke-width="2"/>
-        <text x="${sx(outdoor) + 10}" y="${sy(target) + 20}" font-size="10" fill="var(--primary-text-color)">${t(hass, "unit_target")}</text></g>`
-      : "";
-    const chart = `<svg viewBox="0 0 ${W} ${H}">${grid}${dots}${lines}${unitMarker}</svg>`;
+    let markers = "";
+    if (outdoor !== null && flow !== null) {
+      markers += `<g data-entity="${escapeHtml(unit.water_out)}"><rect x="${sx(outdoor) - 4}" y="${sy(flow) - 4}" width="8" height="8" fill="var(--csnet-flow)" transform="rotate(45 ${sx(outdoor)} ${sy(flow)})"/></g>`;
+    }
+    if (outdoor !== null && afterValve !== null) {
+      markers += `<g data-entity="${escapeHtml(unit.water_c2)}"><circle cx="${sx(outdoor)}" cy="${sy(afterValve)}" r="5" fill="var(--csnet-c2)" stroke="var(--card-background-color, #fff)" stroke-width="1.5"/></g>`;
+    }
+    if (outdoor !== null && target !== null) {
+      markers += `<g data-entity="${escapeHtml(unit.water_target)}"><circle cx="${sx(outdoor)}" cy="${sy(target)}" r="8" fill="none" stroke="var(--primary-text-color)" stroke-width="2"/>
+        <text x="${sx(outdoor) + 10}" y="${sy(target) + 20}" font-size="10" fill="var(--primary-text-color)">${t(hass, "unit_target")}</text></g>`;
+    }
+    const chart = `<svg viewBox="0 0 ${W} ${H}">${grid}${dots}${lines}${markers}</svg>`;
+
+    const legendItems = [["var(--primary-text-color)", t(hass, "unit_target")]];
+    if (flow !== null) legendItems.push(["var(--csnet-flow)", t(hass, "actual_flow")]);
+    if (afterValve !== null) legendItems.push(["var(--csnet-c2)", t(hass, "after_valve")]);
+    if (latest.length) legendItems.push(["var(--csnet-recent)", t(hass, "last_3_days")]);
+    if (older.length) legendItems.push(["var(--secondary-text-color)", t(hass, "before_days", { d: days })]);
 
     const rows = [
-      [t(hass, "actual_flow"), num(hass, unit.water_out), unit.water_out],
+      [t(hass, "actual_flow"), flow, unit.water_out],
       [t(hass, "return"), num(hass, unit.water_in), unit.water_in],
+      ...(afterValve !== null ? [[t(hass, "after_valve"), afterValve, unit.water_c2, "var(--csnet-c2)"]] : []),
       ...curves.map((c) => [t(hass, "curve_of", { name: `C${c.circuit}` }), c.value, c.entity, c.color]),
     ]
       .filter((r) => r[2])
@@ -914,6 +1312,7 @@ class CsnetHeatingCurveCard extends CsnetBaseCard {
     const notes = [];
     if (curves.length) notes.push(t(hass, "curve_note"));
     else notes.push(t(hass, "no_curve"));
+    if (curves.length > 1 && unit.mix_valve) notes.push(t(hass, "mixing_note"));
     if (history.length) notes.push(t(hass, "history_note", { d: days }));
 
     return `${this.title(hass, "heating_curve")}
@@ -924,7 +1323,7 @@ class CsnetHeatingCurveCard extends CsnetBaseCard {
           <div class="muted" style="font-size:12px;margin:2px 0 10px">${escapeHtml(t(hass, "for_outdoor", { v: `${fmt(hass, outdoor)} °C` }))}</div>
           ${rows}
         </div>
-        <div class="chart">${chart}</div>
+        <div class="chart">${chart}${legend(legendItems)}</div>
       </div>
       <div class="note">${notes.map(escapeHtml).join("<br>")}</div>`;
   }
@@ -1131,6 +1530,472 @@ class CsnetRefrigerantCard extends CsnetBaseCard {
 }
 
 // ---------------------------------------------------------------------------
+// Temperatures over the last hours
+// ---------------------------------------------------------------------------
+
+class CsnetTemperaturesCard extends CsnetBaseCard {
+  static get minColumns() {
+    return 6;
+  }
+
+  static editorSchema() {
+    return [
+      { name: "title", selector: { text: {} } },
+      { name: "hours", selector: { number: { min: 3, max: 240, step: 1, mode: "box" } } },
+    ];
+  }
+
+  get hours() {
+    return Number(this._config.hours ?? 24);
+  }
+
+  lines() {
+    const unit = this.unit;
+    return [
+      ["water_out", "flow", "var(--csnet-flow)", 2.4],
+      ["water_in", "return", "var(--csnet-return)", 1.6],
+      ["water_c2", "after_valve", "var(--csnet-c2)", 1.6],
+      ["water_target", "target", "var(--primary-text-color)", 1.4, "5 4"],
+      ["outdoor", "outdoor", "var(--csnet-cool)", 1.8],
+    ].filter(([role]) => unit[role] && (role !== "water_c2" || unit.mix_valve));
+  }
+
+  dataKey() {
+    const unit = this.unit;
+    const ids = [...this.lines().map(([role]) => unit[role]), unit.compressor_frequency].filter(Boolean);
+    return ids.length ? `${ids.join("|")}|${this.hours}` : null;
+  }
+
+  refreshMs() {
+    return 5 * 60000;
+  }
+
+  async fetchData(hass) {
+    const unit = this.unit;
+    const start = Date.now() - this.hours * 3600000;
+    const ids = [...this.lines().map(([role]) => unit[role]), unit.compressor_frequency];
+    return { start, stats: await statistics(hass, ids, start, this.hours > 48 ? "hour" : "5minute", ["mean"]) };
+  }
+
+  css() {
+    return CHART_CSS;
+  }
+
+  content(hass) {
+    const unit = this.unit;
+    const data = this._data && !this._data.error ? this._data : { start: Date.now() - this.hours * 3600000, stats: {} };
+    const x1 = Date.now();
+    const x0 = data.start;
+    const points = (id) => (data.stats[id] || []).map((r) => [r.start, r.mean]);
+    const series = this.lines().map(([role, , color, width, dash]) => ({ points: points(unit[role]), color, width, dash }));
+    const temps = series.flatMap((s) => s.points.map((p) => p[1]));
+    const [lmin, lmax] = niceRange(temps.length ? temps : [0, 50], 10);
+    const hz = points(unit.compressor_frequency);
+    const right = hz.length ? { min: 0, max: Math.max(60, niceRange(hz.map((p) => p[1]), 20)[1]), step: 20, suffix: "" } : null;
+    if (hz.length) series.unshift({ points: hz, color: "var(--csnet-compressor)", width: 1, fill: true, fillOpacity: 0.25, axis: "right", opacity: 0.6 });
+    const ticks = [];
+    const tickStep = this.hours > 48 ? 24 * 3600000 : this.hours > 12 ? 6 * 3600000 : 3600000 * 2;
+    for (let at = Math.ceil(x0 / tickStep) * tickStep; at <= x1; at += tickStep) ticks.push([at, this.hours > 48 ? dayLabel(hass, at) : hourLabel(hass, at)]);
+    const chart = timeChart(hass, { x0, x1, series, left: { min: lmin, max: lmax, step: 10, suffix: "°" }, right, ticks });
+    const items = this.lines().map(([role, label, color, , dash]) => [color, `${t(hass, label)}: ${fmt(hass, num(hass, unit[role]))} °C`, dash]);
+    if (hz.length) items.push(["var(--csnet-compressor)", `${t(hass, "compressor")}: ${fmt(hass, num(hass, unit.compressor_frequency), 0)} Hz`]);
+    return `${this.title(hass, "temperatures")}${legend(items)}${chart}`;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// What ran over the last hours
+// ---------------------------------------------------------------------------
+
+class CsnetActivityCard extends CsnetBaseCard {
+  static get minColumns() {
+    return 6;
+  }
+
+  static editorSchema() {
+    return [
+      { name: "title", selector: { text: {} } },
+      { name: "hours", selector: { number: { min: 1, max: 168, step: 1, mode: "box" } } },
+    ];
+  }
+
+  get hours() {
+    return Number(this._config.hours ?? 24);
+  }
+
+  rows() {
+    const hass = this._hass;
+    const unit = this.unit;
+    const rows = [
+      [unit.compressor, t(hass, "compressor"), "var(--csnet-heat)"],
+      [unit.defrost, t(hass, "defrost"), "var(--csnet-cool)"],
+      ...this.circuits.map((c) => [c.demand, t(hass, "demand_of", { name: friendly(hass, c.climate, `C${c.circuit}`) }), c.circuit === 1 ? "var(--csnet-c1)" : "var(--csnet-c2)"]),
+      [this._roles?.dhw?.heating, t(hass, "hot_water"), "var(--csnet-bad)"],
+      [unit.pump_1, t(hass, "pump", { n: 1 }), "var(--csnet-ok)"],
+      [unit.pump_2, t(hass, "pump", { n: 2 }), "var(--csnet-ok)"],
+      [unit.pump_3, t(hass, "pump", { n: 3 }), "var(--csnet-ok)"],
+      [unit.backup_heater, t(hass, "backup_heater"), "var(--csnet-bad)"],
+      [unit.boiler, t(hass, "boiler"), "var(--csnet-bad)"],
+    ];
+    return rows.filter(([id]) => id && stateOf(hass, id));
+  }
+
+  dataKey() {
+    const ids = this.rows().map(([id]) => id);
+    return ids.length ? `${ids.join("|")}|${this.hours}` : null;
+  }
+
+  refreshMs() {
+    return 5 * 60000;
+  }
+
+  async fetchData(hass) {
+    const start = Date.now() - this.hours * 3600000;
+    return { start, periods: await onPeriods(hass, this.rows().map(([id]) => id), start) };
+  }
+
+  css() {
+    return `
+      .tl { display: grid; grid-template-columns: minmax(90px, 28%) 1fr auto; gap: 6px 10px; align-items: center; font-size: 12px; }
+      .tl .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+      .tl .bar { position: relative; height: 14px; border-radius: 4px; background: var(--csnet-line); overflow: hidden; cursor: pointer; }
+      .tl .bar span { position: absolute; top: 0; bottom: 0; border-radius: 2px; }
+      .tl .total { font-variant-numeric: tabular-nums; color: var(--csnet-muted); text-align: right; }
+      .axis { display: flex; justify-content: space-between; font-size: 10px; color: var(--csnet-muted); margin: 4px 0 0 calc(28% + 10px); padding-right: 60px; }
+    `;
+  }
+
+  content(hass) {
+    const data = this._data && !this._data.error ? this._data : null;
+    const x1 = Date.now();
+    const x0 = data ? data.start : x1 - this.hours * 3600000;
+    const span = x1 - x0;
+    const duration = (ms) => {
+      const minutes = Math.round(ms / 60000);
+      return minutes >= 60 ? `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, "0")}` : `${minutes} min`;
+    };
+    const rows = this.rows()
+      .map(([id, label, color]) => {
+        const periods = data?.periods?.[id] || [];
+        const total = periods.reduce((sum, [a, b]) => sum + (b - a), 0);
+        const spans = periods
+          .map(([a, b]) => `<span style="left:${(((a - x0) / span) * 100).toFixed(2)}%;width:${Math.max(0.3, ((b - a) / span) * 100).toFixed(2)}%;background:${color}"></span>`)
+          .join("");
+        return `<div class="name" data-entity="${escapeHtml(id)}" title="${escapeHtml(label)}">${escapeHtml(label)}</div>
+          <div class="bar" data-entity="${escapeHtml(id)}">${spans}</div><div class="total">${data ? duration(total) : "…"}</div>`;
+      })
+      .join("");
+    const marks = [0, 0.25, 0.5, 0.75, 1].map((f) => `<span>${escapeHtml(hourLabel(hass, x0 + f * span))}</span>`).join("");
+    return `${this.title(hass, "activity")}<div class="tl">${rows}</div><div class="axis">${marks}</div>`;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Energy per day
+// ---------------------------------------------------------------------------
+
+/** The electricity entity with long-term statistics: the user's meter, else what CSNet records. */
+function electricityEntity(unit) {
+  return unit.meter_energy || unit.server_electricity_today;
+}
+
+class CsnetDailyEnergyCard extends CsnetBaseCard {
+  static get minColumns() {
+    return 6;
+  }
+
+  static editorSchema() {
+    return [
+      { name: "title", selector: { text: {} } },
+      { name: "days", selector: { number: { min: 3, max: 90, step: 1, mode: "box" } } },
+    ];
+  }
+
+  get days() {
+    return Number(this._config.days ?? 14);
+  }
+
+  dataKey() {
+    const unit = this.unit;
+    const ids = [electricityEntity(unit), unit.server_heat_today, unit.outdoor].filter(Boolean);
+    return ids.length ? `${ids.join("|")}|${this.days}` : null;
+  }
+
+  refreshMs() {
+    return 30 * 60000;
+  }
+
+  async fetchData(hass) {
+    const unit = this.unit;
+    const start = startOfDay(Date.now() - (this.days - 1) * 86400000);
+    const stats = await statistics(hass, [electricityEntity(unit), unit.server_heat_today, unit.outdoor], start, "day", ["change", "mean"]);
+    const byDay = new Map();
+    const day = (ms) => startOfDay(ms);
+    const put = (id, key, field) => {
+      for (const row of stats[id] || []) {
+        if (!Number.isFinite(row[field])) continue;
+        const entry = byDay.get(day(row.start)) || { at: day(row.start) };
+        entry[key] = row[field];
+        byDay.set(entry.at, entry);
+      }
+    };
+    put(electricityEntity(unit), "electricity", "change");
+    put(unit.server_heat_today, "heat", "change");
+    put(unit.outdoor, "outdoor", "mean");
+    return [...byDay.values()].sort((a, b) => a.at - b.at);
+  }
+
+  css() {
+    return CHART_CSS;
+  }
+
+  content(hass) {
+    const days = Array.isArray(this._data) ? this._data : [];
+    const W = 600;
+    const H = 230;
+    const pad = { l: 36, r: 34, t: 18, b: 22 };
+    const energies = days.flatMap((d) => [d.electricity, d.heat]).filter(Number.isFinite);
+    const estep = niceStep(Math.max(...(energies.length ? energies : [10])));
+    const emax = Math.max(estep, Math.ceil(Math.max(...(energies.length ? energies : [10])) / estep) * estep);
+    const temps = days.map((d) => d.outdoor).filter(Number.isFinite);
+    const [tmin, tmax] = niceRange(temps.length ? temps : [0, 10], 5, 1);
+    const n = Math.max(days.length, 1);
+    const slot = (W - pad.l - pad.r) / n;
+    const bar = Math.min(16, slot / 2.6);
+    const sy = (v) => H - pad.b - (v / emax) * (H - pad.t - pad.b);
+    const st = (v) => H - pad.b - ((v - tmin) / (tmax - tmin || 1)) * (H - pad.t - pad.b);
+    let svg = "";
+    for (let v = 0; v <= emax + 1e-9; v += estep) {
+      svg += `<line x1="${pad.l}" x2="${W - pad.r}" y1="${sy(v)}" y2="${sy(v)}" stroke="var(--csnet-line)" stroke-width=".6"/>
+        <text x="${pad.l - 5}" y="${sy(v) + 3}" text-anchor="end" font-size="10" fill="var(--secondary-text-color)">${fmt(hass, v, 0)}</text>`;
+    }
+    for (let v = tmin; v <= tmax + 1e-9; v += 5) svg += `<text x="${W - pad.r + 5}" y="${st(v) + 3}" font-size="10" fill="var(--csnet-cool)">${fmt(hass, v, 0)}°</text>`;
+    const outdoorPts = [];
+    days.forEach((d, i) => {
+      const cx = pad.l + slot * (i + 0.5);
+      if (Number.isFinite(d.electricity)) svg += `<rect x="${cx - bar - 1}" y="${sy(d.electricity)}" width="${bar}" height="${Math.max(0, sy(0) - sy(d.electricity))}" rx="2" fill="var(--csnet-elec)"/>`;
+      if (Number.isFinite(d.heat)) svg += `<rect x="${cx + 1}" y="${sy(d.heat)}" width="${bar}" height="${Math.max(0, sy(0) - sy(d.heat))}" rx="2" fill="var(--csnet-heat)" opacity=".85"/>`;
+      if (d.heat > 0 && d.electricity > 0) {
+        svg += `<text x="${cx}" y="${Math.min(sy(d.heat), sy(d.electricity)) - 4}" text-anchor="middle" font-size="9" fill="var(--csnet-ok)">${fmt(hass, d.heat / d.electricity, 1)}</text>`;
+      }
+      if (Number.isFinite(d.outdoor)) outdoorPts.push([cx, st(d.outdoor)]);
+      if (n <= 16 || i % Math.ceil(n / 12) === 0) svg += `<text x="${cx}" y="${H - 6}" text-anchor="middle" font-size="10" fill="var(--secondary-text-color)">${escapeHtml(dayLabel(hass, d.at))}</text>`;
+    });
+    if (outdoorPts.length) {
+      svg += `<path d="${outdoorPts.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ")}" fill="none" stroke="var(--csnet-cool)" stroke-width="2"/>`;
+      svg += outdoorPts.map((p) => `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.5" fill="var(--csnet-cool)"/>`).join("");
+    }
+    const unit = this.unit;
+    const items = [
+      ["var(--csnet-elec)", `${t(hass, "electricity")} (kWh)`],
+      ["var(--csnet-heat)", `${t(hass, "heat")} (kWh)`],
+      ["var(--csnet-cool)", `${t(hass, "outdoor_mean")} (°C)`],
+      ["var(--csnet-ok)", t(hass, "cop")],
+    ];
+    const note = unit.meter_energy ? "" : `<div class="note">${escapeHtml(t(hass, "electricity_source_server"))}</div>`;
+    return `${this.title(hass, "daily_energy")}${legend(items)}<svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block">${svg}</svg>${note}`;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Power today against the usual day
+// ---------------------------------------------------------------------------
+
+class CsnetPowerProfileCard extends CsnetBaseCard {
+  static get minColumns() {
+    return 6;
+  }
+
+  static editorSchema() {
+    return [
+      { name: "title", selector: { text: {} } },
+      { name: "days", selector: { number: { min: 3, max: 60, step: 1, mode: "box" } } },
+      { name: "power_entity", selector: { entity: { domain: "sensor", device_class: "power" } } },
+    ];
+  }
+
+  get days() {
+    return Number(this._config.days ?? 14);
+  }
+
+  dataKey() {
+    return this.unit.power ? `${this.unit.power}|${this.days}` : null;
+  }
+
+  refreshMs() {
+    return 5 * 60000;
+  }
+
+  async fetchData(hass) {
+    const id = this.unit.power;
+    const today = startOfDay();
+    const [recent, past] = await Promise.all([
+      statistics(hass, [id], today, "5minute", ["mean"]),
+      statistics(hass, [id], today - this.days * 86400000, "hour", ["mean"], today),
+    ]);
+    const sums = new Array(24).fill(0);
+    const counts = new Array(24).fill(0);
+    for (const row of past[id] || []) {
+      if (!Number.isFinite(row.mean)) continue;
+      const hour = new Date(row.start).getHours();
+      sums[hour] += row.mean;
+      counts[hour] += 1;
+    }
+    return {
+      today: (recent[id] || []).filter((r) => Number.isFinite(r.mean)).map((r) => [r.start, r.mean]),
+      profile: sums.map((s, h) => (counts[h] ? s / counts[h] : null)),
+    };
+  }
+
+  css() {
+    return CHART_CSS;
+  }
+
+  content(hass) {
+    const unit = this.unit;
+    const data = this._data && !this._data.error ? this._data : { today: [], profile: [] };
+    const x0 = startOfDay();
+    const x1 = x0 + 86400000;
+    const profile = data.profile
+      .map((v, h) => [x0 + (h + 0.5) * 3600000, v])
+      .filter((p) => Number.isFinite(p[1]));
+    const values = [...data.today.map((p) => p[1]), ...profile.map((p) => p[1])];
+    const pstep = niceStep(Math.max(...(values.length ? values : [1000])));
+    const max = Math.max(pstep, Math.ceil(Math.max(...(values.length ? values : [1000])) / pstep) * pstep);
+    const ticks = [0, 6, 12, 18, 24].map((h) => [x0 + h * 3600000, `${String(h).padStart(2, "0")}h`]);
+    const chart = timeChart(hass, {
+      x0,
+      x1,
+      series: [
+        { points: profile, color: "var(--secondary-text-color)", width: 1.6, dash: "5 4" },
+        { points: data.today, color: "var(--csnet-heat)", width: 1.8, fill: true },
+      ],
+      left: { min: 0, max, step: pstep, digits: 0 },
+      ticks,
+    });
+    const hour = new Date().getHours();
+    const usual = data.profile[hour];
+    const now = num(hass, unit.power);
+    const head = `<div class="headline-row">
+      <div data-entity="${escapeHtml(unit.power)}"><div class="k">${t(hass, "now")}</div><div class="v" style="color:var(--csnet-heat)">${fmt(hass, now, 0)} W</div></div>
+      <div><div class="k">${escapeHtml(t(hass, "usual_at_this_hour", { d: this.days }))}</div><div class="v">${fmt(hass, usual, 0)} W</div></div></div>`;
+    const items = [
+      ["var(--csnet-heat)", t(hass, "today")],
+      ["var(--secondary-text-color)", t(hass, "average_profile", { d: this.days }), true],
+    ];
+    const source = unit.meter_power && unit.power === unit.meter_power ? friendly(hass, unit.power, unit.power) : null;
+    const note = source ? t(hass, "power_from", { name: source }) : t(hass, "power_estimated");
+    return `${this.title(hass, "power_profile")}${head}${legend(items)}${chart}<div class="note">${escapeHtml(note)}</div>`;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Energy signature and forecast
+// ---------------------------------------------------------------------------
+
+class CsnetEnergySignatureCard extends CsnetBaseCard {
+  static editorSchema() {
+    return [
+      { name: "title", selector: { text: {} } },
+      { name: "days", selector: { number: { min: 7, max: 365, step: 1, mode: "box" } } },
+      { name: "weather_entity", selector: { entity: { domain: "weather" } } },
+      { name: "price", selector: { number: { min: 0, max: 5, step: 0.001, mode: "box" } } },
+    ];
+  }
+
+  get days() {
+    return Number(this._config.days ?? 60);
+  }
+
+  get weather() {
+    return this._config.weather_entity || Object.keys(this._hass?.states || {}).find((id) => id.startsWith("weather."));
+  }
+
+  dataKey() {
+    const unit = this.unit;
+    const energy = electricityEntity(unit);
+    return energy && unit.outdoor ? `${energy}|${unit.outdoor}|${unit.power || ""}|${this.weather || ""}|${this.days}` : null;
+  }
+
+  refreshMs() {
+    return 60 * 60000;
+  }
+
+  async fetchData(hass) {
+    const unit = this.unit;
+    const energy = electricityEntity(unit);
+    const today = startOfDay();
+    const [daily, hourly, forecast, price] = await Promise.all([
+      statistics(hass, [energy, unit.outdoor], today - this.days * 86400000, "day", ["change", "mean"], today),
+      unit.power ? statistics(hass, [unit.power], today - 14 * 86400000, "hour", ["min"]) : Promise.resolve({}),
+      loadForecast(hass, this.weather),
+      loadEnergyPrice(hass),
+    ]);
+    const outdoorByDay = new Map((daily[unit.outdoor] || []).filter((r) => Number.isFinite(r.mean)).map((r) => [startOfDay(r.start), r.mean]));
+    const points = (daily[energy] || [])
+      .filter((r) => Number.isFinite(r.change) && r.change > 0 && outdoorByDay.has(startOfDay(r.start)))
+      .map((r) => [outdoorByDay.get(startOfDay(r.start)), r.change, r.start]);
+    const last7 = points.filter((p) => p[2] >= today - 7 * 86400000).map((p) => p[1]);
+    const floors = (hourly[unit.power] || []).map((r) => r.min).filter((v) => Number.isFinite(v) && v > 0);
+    const tomorrow = startOfDay(today + 36 * 3600000);
+    const entry = (forecast || []).find((f) => startOfDay(toMs(f.datetime)) === tomorrow);
+    const tomorrowMean = entry && Number.isFinite(entry.temperature) ? (entry.temperature + (Number.isFinite(entry.templow) ? entry.templow : entry.temperature)) / 2 : null;
+    return {
+      fit: regression(points.map((p) => [p[0], p[1]])),
+      points,
+      avg7: last7.length ? last7.reduce((a, b) => a + b, 0) / last7.length : null,
+      floor: floors.length ? Math.min(...floors) : null,
+      tomorrowMean,
+      price,
+    };
+  }
+
+  css() {
+    return `
+      .grid4 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 12px; }
+      .k { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--csnet-muted); }
+      .v { font-size: 28px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+      .s { font-size: 11px; color: var(--csnet-muted); }
+    `;
+  }
+
+  price(hass) {
+    if (Number.isFinite(Number(this._config.price)) && this._config.price !== undefined && this._config.price !== "") return Number(this._config.price);
+    const p = this._data?.price;
+    if (p?.number !== undefined) return p.number;
+    if (p?.entity) return num(hass, p.entity);
+    return null;
+  }
+
+  content(hass) {
+    const d = this._data;
+    if (!d || d.error) return `${this.title(hass, "energy_signature")}<div class="message">${escapeHtml(d?.error ? t(hass, "not_enough_history") : t(hass, "loading"))}</div>`;
+    const price = this.price(hass);
+    const money = (kwh) => (price !== null && Number.isFinite(kwh) ? ` · ≈ ${fmt(hass, kwh * price, 2)} ${escapeHtml(hass.config?.currency || "€")}` : "");
+    const fit = d.fit && d.fit.n >= 7 ? d.fit : null;
+    const predicted = fit && d.tomorrowMean !== null ? Math.max(0, fit.a + fit.b * d.tomorrowMean) : null;
+    const cell = (k, v, s, color) => `<div><div class="k">${escapeHtml(k)}</div><div class="v" style="${color ? `color:${color}` : ""}">${v}</div><div class="s">${s}</div></div>`;
+    const cells = [
+      cell(
+        t(hass, "tomorrow_weather"),
+        predicted !== null ? `≈ ${fmt(hass, predicted, 1)} kWh` : "–",
+        predicted !== null ? `${escapeHtml(t(hass, "mean_outdoor", { v: fmt(hass, d.tomorrowMean, 1) }))}${money(predicted)}` : escapeHtml(t(hass, this.weather ? "no_forecast" : "no_weather")),
+        "var(--csnet-heat)",
+      ),
+      cell(t(hass, "average_7_days"), d.avg7 !== null ? `${fmt(hass, d.avg7, 1)} kWh` : "–", `${escapeHtml(t(hass, "per_day"))}${money(d.avg7)}`),
+      cell(
+        t(hass, "per_degree"),
+        fit ? `+${fmt(hass, Math.abs(fit.b), 1)} kWh` : "–",
+        fit ? escapeHtml(t(hass, "fit_quality", { r: fmt(hass, fit.r2 * 100, 0), n: fit.n })) : escapeHtml(t(hass, "not_enough_history")),
+        "var(--csnet-cool)",
+      ),
+      cell(t(hass, "base_load"), d.floor !== null ? `${fmt(hass, d.floor, 0)} W` : "–", escapeHtml(t(hass, "base_load_detail"))),
+    ];
+    return `${this.title(hass, "energy_signature")}<div class="grid4">${cells.join("")}</div><div class="note">${escapeHtml(t(hass, "signature_note", { d: this.days }))}</div>`;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Editor (shared): Home Assistant's own form element
 // ---------------------------------------------------------------------------
 
@@ -1174,6 +2039,11 @@ const CARDS = [
   ["csnet-heating-curve-card", CsnetHeatingCurveCard, "CSNet · Heating curve", "The heating curves you entered, where the unit is on them now, and its water target over the last days."],
   ["csnet-performance-card", CsnetPerformanceCard, "CSNet · Performance", "COP now, today, yesterday and per month, with the share of heat taken from the air."],
   ["csnet-system-health-card", CsnetSystemHealthCard, "CSNet · System health", "Alarms, gateway, central control, defrost and water pressure at a glance."],
+  ["csnet-temperatures-card", CsnetTemperaturesCard, "CSNet · Temperatures", "Flow, return, target, outdoor temperature and compressor frequency over the last hours."],
+  ["csnet-activity-card", CsnetActivityCard, "CSNet · Activity", "What ran over the last hours: compressor, defrost, circuit demands, hot water, pumps, backup heater."],
+  ["csnet-daily-energy-card", CsnetDailyEnergyCard, "CSNet · Energy per day", "Electricity and heat per day with the COP and the average outdoor temperature."],
+  ["csnet-power-profile-card", CsnetPowerProfileCard, "CSNet · Power today", "Today's power against the average day of the last two weeks."],
+  ["csnet-energy-signature-card", CsnetEnergySignatureCard, "CSNet · Energy signature", "Tomorrow's electricity from the weather forecast, kWh per degree, 7-day average and base load."],
   ["csnet-refrigerant-card", CsnetRefrigerantCard, "CSNet · Refrigerant circuit", "Compressor, temperatures, pressures and expansion valve of the outdoor unit."],
 ];
 

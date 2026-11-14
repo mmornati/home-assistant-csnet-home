@@ -18,7 +18,7 @@ import voluptuous as vol
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 
-from .const import DOMAIN
+from .const import CONF_ENERGY_METER, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -121,6 +121,47 @@ def _zone_of(unique_id: str, prefix: str) -> tuple[str, int] | None:
         return None
 
 
+def _meter_roles(hass: HomeAssistant, registry: er.EntityRegistry) -> dict[str, str]:
+    """Return the electricity meter the user chose in the settings, and the power sensor of the same device.
+
+    Meters (a smart plug, a DIN-rail meter) report energy and power side by side:
+    the power sensor whose entity id shares the most words with the meter's
+    ("total_active_energy" / "total_active_power") measures the same thing.
+    """
+    entries = hass.config_entries.async_entries(DOMAIN)
+    meter = entries[0].data.get(CONF_ENERGY_METER) if entries else None
+    if not meter:
+        return {}
+    roles = {"meter_energy": meter}
+    meter_entry = registry.async_get(meter)
+    if not meter_entry or not meter_entry.device_id:
+        return roles
+
+    meter_words = set(meter.split(".", 1)[-1].split("_"))
+
+    def likeness(entity_id: str) -> tuple[int, int]:
+        """Words shared with the meter's entity id, then the length of the shared start."""
+        words = set(entity_id.split(".", 1)[-1].split("_"))
+        start = 0
+        for a, b in zip(entity_id, meter):
+            if a != b:
+                break
+            start += 1
+        return len(words & meter_words), start
+
+    candidates = [
+        entry.entity_id
+        for entry in registry.entities.values()
+        if entry.device_id == meter_entry.device_id
+        and entry.domain == "sensor"
+        and entry.disabled_by is None
+        and (entry.device_class or entry.original_device_class) == "power"
+    ]
+    if candidates:
+        roles["meter_power"] = max(candidates, key=lambda entity_id: (*likeness(entity_id), entity_id))
+    return roles
+
+
 @callback
 def dashboard_entities(hass: HomeAssistant) -> dict:
     """Return which entity plays which role, for the cards. Disabled entities are left out."""
@@ -178,7 +219,7 @@ def dashboard_entities(hass: HomeAssistant) -> dict:
         dhw = {"water_heater": water_heaters[DHW_ZONE], **found(DHW_ROLES)}
 
     return {
-        "unit": found(UNIT_ROLES),
+        "unit": {**found(UNIT_ROLES), **_meter_roles(hass, registry)},
         "circuits": circuits,
         "dhw": dhw,
         "pool": {"water_heater": water_heaters[POOL_ZONE]} if POOL_ZONE in water_heaters else None,
