@@ -202,3 +202,16 @@ def test_statistics_stop_at_the_end_asked():
     source = FRONTEND_FILE.read_text(encoding="utf-8")
     helper = source[source.index("async function statistics(") : source.index("async function onPeriods(")]
     assert ".filter((row) => row.start < endMs)" in helper
+
+
+def test_numbers_and_dates_follow_the_card_language():
+    """Numbers use the card's language unless the profile chose a number format; dates and times follow the card's language."""
+    source = FRONTEND_FILE.read_text(encoding="utf-8")
+    fmt = source[source.index("function fmt(") : source.index("function maybeNumber(")]
+    assert "numberLocale(hass)" in fmt
+    locale = source[source.index("function numberLocale(") : source.index("function fmt(")]
+    assert 'format === "system"' in locale and "NUMBER_FORMATS[format]" in locale and "textLocale(hass)" in locale
+    for helper in ("function hourLabel(", "function dayLabel("):
+        body = source[source.index(helper) : source.index("}", source.index(helper))]
+        assert "textLocale(hass)" in body
+    assert "hass.locale?.language || undefined" not in source
