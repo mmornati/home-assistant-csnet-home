@@ -129,6 +129,10 @@ OPERATION_STATUS_MAP = {
 # Localization
 CONF_LANGUAGE = "language"
 DEFAULT_LANGUAGE = "en"
+# Language of the dashboard cards: "auto" follows each user's Home Assistant profile
+CONF_CARD_LANGUAGE = "card_language"
+DEFAULT_CARD_LANGUAGE = "auto"
+CARD_LANGUAGES = ["auto", "en", "fr", "es"]
 LANGUAGE_FILES = {
     "en": "english.json",
     "fr": "french.json",

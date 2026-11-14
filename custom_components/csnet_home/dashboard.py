@@ -18,7 +18,7 @@ import voluptuous as vol
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 
-from .const import CONF_ENERGY_METER, DOMAIN
+from .const import CARD_LANGUAGES, CONF_CARD_LANGUAGE, CONF_ENERGY_METER, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -224,7 +224,15 @@ def dashboard_entities(hass: HomeAssistant) -> dict:
         "dhw": dhw,
         "pool": {"water_heater": water_heaters[POOL_ZONE]} if POOL_ZONE in water_heaters else None,
         "gateway": gateway,
+        **_card_language(hass),
     }
+
+
+def _card_language(hass: HomeAssistant) -> dict[str, str]:
+    """Return the language chosen for the cards in the settings, unless they follow each user's profile."""
+    entries = hass.config_entries.async_entries(DOMAIN)
+    language = entries[0].data.get(CONF_CARD_LANGUAGE) if entries else None
+    return {"language": language} if language in CARD_LANGUAGES and language != "auto" else {}
 
 
 async def async_register_dashboard(hass: HomeAssistant, version: str) -> None:

@@ -2,7 +2,7 @@
 
 The integration ships eleven dashboard cards. You don't need to install anything else: no HACS frontend download and no third-party card. After the integration is set up (and the browser page is reloaded once), the cards appear in the dashboard **Add card** picker. Search for **CSNet**.
 
-The cards find their entities themselves, so a card works as soon as you add it, even if you renamed the entities or use Home Assistant in another language. They follow your theme (light and dark) and are translated to English, French and Spanish.
+The cards find their entities themselves, so a card works as soon as you add it, even if you renamed the entities or use Home Assistant in another language. They follow your theme (light and dark) and are translated to English, French and Spanish: by default in each user's profile language, or in the **Card language** chosen in the integration settings.
 
 | Card | Type | What it shows |
 |------|------|---------------|
@@ -136,7 +136,7 @@ sections:
 
 ## Options
 
-Every card accepts `title` (an empty title hides it). Some cards have more options, also available in the visual editor:
+Every card accepts `title` (an empty title hides it) and `language` (`auto`, `en`, `fr` or `es`; by default the **Card language** of the integration settings, else the user's profile language). Some cards have more options, also available in the visual editor:
 
 | Card | Option | Meaning |
 |------|--------|---------|

@@ -9,6 +9,7 @@
                     "password": "Mot de passe",
                     "scan_interval": "Intervalle de scan (secondes)",
                     "language": "Langue",
+                    "card_language": "Langue des cartes du tableau de bord",
                     "max_temp_override": "Température maximale (°C)",
                     "fan_coil_model": "Modèle de contrôle du ventilo-convecteur",
                     "power_supply": "Alimentation de l'unité extérieure",
@@ -21,6 +22,7 @@
                     "password": "Votre mot de passe CSNet Manager",
                     "scan_interval": "Fréquence de mise à jour des données (par défaut et minimum : 60 secondes)",
                     "language": "Langue préférée pour les noms d'appareils et les alarmes",
+                    "card_language": "Automatique suit le profil Home Assistant de chaque utilisateur. Une carte peut toujours choisir sa propre langue.",
                     "max_temp_override": "Remplacer la limite de température maximale (8-80°C). Laisser vide pour les valeurs par défaut.",
                     "fan_coil_model": "Sélectionnez le type de contrôle du ventilo-convecteur (standard ou legacy)",
                     "power_supply": "Utilisée pour estimer la puissance instantanée et le COP. Auto détecte les unités 8/10 CV comme triphasées, les autres comme monophasées.",
@@ -37,6 +39,7 @@
                     "password": "Mot de passe",
                     "scan_interval": "Intervalle de scan (secondes)",
                     "language": "Langue",
+                    "card_language": "Langue des cartes du tableau de bord",
                     "max_temp_override": "Température maximale (°C)",
                     "fan_coil_model": "Modèle de contrôle du ventilo-convecteur",
                     "power_supply": "Alimentation de l'unité extérieure",
@@ -49,6 +52,7 @@
                     "password": "Laisser vide pour conserver le mot de passe actuel",
                     "scan_interval": "Fréquence de mise à jour des données (minimum : 60 secondes)",
                     "language": "Langue préférée pour les noms d'appareils et les alarmes",
+                    "card_language": "Automatique suit le profil Home Assistant de chaque utilisateur. Une carte peut toujours choisir sa propre langue.",
                     "max_temp_override": "Remplacer la limite de température maximale (8-80°C)",
                     "fan_coil_model": "Sélectionnez le type de contrôle du ventilo-convecteur",
                     "power_supply": "Utilisée pour estimer la puissance instantanée et le COP. Auto détecte les unités 8/10 CV comme triphasées, les autres comme monophasées.",
@@ -143,6 +147,16 @@
         "abort": {
             "not_loaded": "L'intégration doit être chargée pour lire le type de loi d'eau utilisé. Réessayez une fois qu'elle a démarré.",
             "no_heating_curve": "Aucun circuit n'utilise une loi d'eau par points ou par pente : il n'y a rien à décrire. Une température d'eau fixe a déjà sa propre entité."
+        }
+    },
+    "selector": {
+        "card_language": {
+            "options": {
+                "auto": "Automatique (langue du profil)",
+                "en": "Anglais",
+                "fr": "Français",
+                "es": "Espagnol"
+            }
         }
     }
 }
