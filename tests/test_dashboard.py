@@ -9,7 +9,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.csnet_home.const import CONF_ENERGY_METER, DOMAIN
+from custom_components.csnet_home.const import CONF_CARD_LANGUAGE, CONF_ENERGY_METER, DOMAIN
 from custom_components.csnet_home.dashboard import CARDS_FILE, FRONTEND_DIR, FRONTEND_URL, async_register_dashboard, dashboard_entities
 
 FRONTEND_FILE = FRONTEND_DIR / CARDS_FILE
@@ -172,3 +172,23 @@ async def test_no_meter_no_meter_roles(hass: HomeAssistant):
     """Without a meter in the settings nothing is added."""
     MockConfigEntry(domain=DOMAIN, data={}).add_to_hass(hass)
     assert dashboard_entities(hass)["unit"] == {}
+
+
+async def test_card_language_from_the_settings(hass: HomeAssistant):
+    """A language chosen for the cards reaches them; "auto" (the default) leaves each user's profile language."""
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_CARD_LANGUAGE: "fr"})
+    entry.add_to_hass(hass)
+    assert dashboard_entities(hass)["language"] == "fr"
+    hass.config_entries.async_update_entry(entry, data={CONF_CARD_LANGUAGE: "auto"})
+    assert "language" not in dashboard_entities(hass)
+    hass.config_entries.async_update_entry(entry, data={})
+    assert "language" not in dashboard_entities(hass)
+
+
+def test_card_editor_offers_a_language():
+    """Every card editor ends with the language choice, in the languages the cards speak."""
+    source = FRONTEND_FILE.read_text(encoding="utf-8")
+    assert "editor.schema = [...this.editorSchema(), LANGUAGE_FIELD];" in source
+    field = source[source.index("const LANGUAGE_FIELD = {") : source.index("class CsnetCardEditor")]
+    for code in ("auto", "en", "fr", "es"):
+        assert f'value: "{code}"' in field

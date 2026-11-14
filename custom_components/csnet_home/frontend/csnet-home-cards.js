@@ -12,7 +12,7 @@
  * power meter.
  */
 
-const CARD_VERSION = "1.1.0";
+const CARD_VERSION = "1.1.1";
 
 // ---------------------------------------------------------------------------
 // Texts
@@ -41,6 +41,7 @@ const TEXTS = {
     cop_now: "Right now",
     compressor_off: "compressor stopped",
     heat_only: "Without an electricity figure the COP cannot be computed: choose your heat pump's electricity meter in the integration settings (Reconfigure).",
+    meter_no_history: "The meter has no history for this period yet: its COP appears once the meter has counted it.",
     heat_produced: "heat produced",
     from_air: "{p} % taken from the air",
     heat_electricity: "{h} kWh of heat · {e} kWh of electricity",
@@ -134,6 +135,7 @@ const TEXTS = {
     weather_entity: "Weather entity (optional)",
     demand_of: "Demand {name}",
     needs_meter: "Needs an electricity figure: choose your heat pump's electricity meter in the integration settings (Reconfigure).",
+    language: "Language (default: the integration setting)",
   },
   fr: {
     heat_pump: "Pompe à chaleur",
@@ -157,6 +159,7 @@ const TEXTS = {
     cop_now: "En ce moment",
     compressor_off: "compresseur à l'arrêt",
     heat_only: "Sans mesure d'électricité, le COP ne peut pas être calculé : choisissez le compteur d'électricité de la pompe à chaleur dans les réglages de l'intégration (Reconfigurer).",
+    meter_no_history: "Le compteur n'a pas encore d'historique pour cette période : son COP apparaîtra quand il l'aura mesurée.",
     heat_produced: "chaleur produite",
     from_air: "{p} % puisés dans l'air",
     heat_electricity: "{h} kWh de chaleur · {e} kWh d'électricité",
@@ -250,6 +253,7 @@ const TEXTS = {
     weather_entity: "Entité météo (facultatif)",
     demand_of: "Demande {name}",
     needs_meter: "Il faut une mesure d'électricité : choisissez le compteur d'électricité de la pompe à chaleur dans les réglages de l'intégration (Reconfigurer).",
+    language: "Langue (par défaut : le réglage de l'intégration)",
   },
   es: {
     heat_pump: "Bomba de calor",
@@ -273,6 +277,7 @@ const TEXTS = {
     cop_now: "Ahora",
     compressor_off: "compresor parado",
     heat_only: "Sin una medida de electricidad no se puede calcular el COP: elija el contador de electricidad de la bomba de calor en los ajustes de la integración (Reconfigurar).",
+    meter_no_history: "El contador aún no tiene historial para este periodo: su COP aparecerá cuando lo haya medido.",
     heat_produced: "calor producido",
     from_air: "{p} % tomado del aire",
     heat_electricity: "{h} kWh de calor · {e} kWh de electricidad",
@@ -366,10 +371,15 @@ const TEXTS = {
     weather_entity: "Entidad meteorológica (opcional)",
     demand_of: "Demanda {name}",
     needs_meter: "Se necesita una medida de electricidad: elija el contador de electricidad de la bomba de calor en los ajustes de la integración (Reconfigurar).",
+    language: "Idioma (por defecto: el ajuste de la integración)",
   },
 };
 
+// the cards' language: the card's own, else the integration setting, else the user's profile
+const CARD_LANGUAGE = Symbol("csnet card language");
+
 function lang(hass) {
+  if (hass && TEXTS[hass[CARD_LANGUAGE]]) return hass[CARD_LANGUAGE];
   const code = ((hass && (hass.locale?.language || hass.language)) || "en").slice(0, 2);
   return TEXTS[code] ? code : "en";
 }
@@ -582,8 +592,8 @@ async function onPeriods(hass, ids, startMs, endMs = Date.now()) {
 
 const PRICE_CACHE = new WeakMap();
 
-/** The electricity price set in the Energy dashboard: { entity } or { number }, or null. */
-function loadEnergyPrice(hass) {
+/** The priced grid sources of the Energy dashboard: [{ entity } or { number }, with the stat they price]. */
+function loadEnergyPrices(hass) {
   const key = hass.connection || hass;
   if (!PRICE_CACHE.has(key)) {
     PRICE_CACHE.set(
@@ -591,19 +601,104 @@ function loadEnergyPrice(hass) {
       hass
         .callWS({ type: "energy/get_prefs" })
         .then((prefs) => {
+          const sources = [];
           for (const source of prefs?.energy_sources || []) {
             if (source.type !== "grid") continue;
             for (const flow of source.flow_from || [source]) {
-              if (flow.entity_energy_price) return { entity: flow.entity_energy_price };
-              if (Number.isFinite(flow.number_energy_price)) return { number: flow.number_energy_price };
+              const stat = flow.stat_energy_from || null;
+              if (flow.entity_energy_price) sources.push({ entity: flow.entity_energy_price, stat });
+              else if (Number.isFinite(flow.number_energy_price)) sources.push({ number: flow.number_energy_price, stat });
             }
           }
-          return null;
+          return sources;
         })
-        .catch(() => null),
+        .catch(() => []),
     );
   }
   return PRICE_CACHE.get(key);
+}
+
+/**
+ * The electricity price of the Energy dashboard: { entity }, { number }, or null.
+ * With one grid source per tariff (peak and off-peak, for example), { mix }:
+ * each source with the kWh it counted today, so the price is today's average.
+ */
+async function loadEnergyPrice(hass) {
+  const sources = await loadEnergyPrices(hass);
+  if (!sources.length) return null;
+  if (sources.length === 1) return sources[0];
+  const used = await statistics(hass, sources.map((s) => s.stat), startOfDay(), "hour", ["change"]).catch(() => ({}));
+  return { mix: sources.map((s) => ({ ...s, kwh: sumChange(used[s.stat]) })) };
+}
+
+/** The price per kWh a loaded price stands for, or null. */
+function priceValue(hass, price) {
+  if (!price) return null;
+  if (price.number !== undefined) return price.number;
+  if (price.entity) return num(hass, price.entity);
+  if (!price.mix) return null;
+  const known = price.mix.map((m) => [m.number ?? num(hass, m.entity), m.kwh || 0]).filter(([v]) => Number.isFinite(v));
+  if (!known.length) return null;
+  const kwh = known.reduce((sum, [, k]) => sum + k, 0);
+  if (kwh > 0) return known.reduce((sum, [v, k]) => sum + v * k, 0) / kwh;
+  return known.reduce((sum, [v]) => sum + v, 0) / known.length;
+}
+
+/** The entities a loaded price depends on. */
+function priceEntities(price) {
+  if (!price) return [];
+  return price.mix ? price.mix.map((m) => m.entity).filter(Boolean) : [price.entity].filter(Boolean);
+}
+
+/** The sum of the "change" of statistics rows, or null without any. */
+function sumChange(rows) {
+  const values = (rows || []).map((r) => r.change).filter(Number.isFinite);
+  return values.length ? values.reduce((a, b) => a + b, 0) : null;
+}
+
+/**
+ * What an energy meter counted, from its long-term statistics:
+ * { now: today up to now, hours: today's closed hours, yesterday, monthBefore: this month before today }.
+ * The closed hours go with CSNet's heat, which is also recorded by full hours.
+ */
+async function meterPeriods(hass, meter) {
+  if (!meter) return null;
+  const today = startOfDay();
+  const monthStart = new Date(today);
+  monthStart.setDate(1);
+  const yesterday = startOfDay(today - 1);
+  const from = Math.min(monthStart.getTime(), yesterday);
+  const [days, hours, recent] = await Promise.all([
+    statistics(hass, [meter], from, "day", ["change"], today).catch(() => ({})),
+    statistics(hass, [meter], today, "hour", ["change"]).catch(() => ({})),
+    statistics(hass, [meter], today, "5minute", ["change"]).catch(() => ({})),
+  ]);
+  const dayRows = (days[meter] || []).filter((r) => Number.isFinite(r.change));
+  // a month counts only when the meter has every day of it so far (not added in the middle of it)
+  const monthRows = dayRows.filter((r) => r.start >= monthStart.getTime());
+  const daysBefore = new Date(today).getDate() - 1;
+  return {
+    now: sumChange(recent[meter]),
+    hours: sumChange(hours[meter]),
+    yesterday: sumChange(dayRows.filter((r) => r.start >= yesterday)),
+    monthBefore: daysBefore === 0 ? 0 : monthRows.length >= daysBefore ? sumChange(monthRows) : null,
+  };
+}
+
+/** The meter's kWh of a period of the performance rows, or null. */
+function meterKwh(periods, key) {
+  if (!periods) return null;
+  if (key === "today") return periods.hours;
+  if (key === "yesterday") return periods.yesterday;
+  if (key === "this_month") return periods.monthBefore !== null && periods.hours !== null ? periods.monthBefore + periods.hours : null;
+  return null;
+}
+
+/** A price set on the card: a number, or an entity. Undefined when the card sets none. */
+function configuredPrice(hass, config) {
+  if (config.price !== undefined && config.price !== null && config.price !== "" && Number.isFinite(Number(config.price))) return Number(config.price);
+  if (config.price_entity) return num(hass, config.price_entity);
+  return undefined;
 }
 
 /** The daily forecast of a weather entity (first answer of the subscription), or null. */
@@ -802,9 +897,22 @@ class CsnetBaseCard extends HTMLElement {
     return Object.values(this.unit);
   }
 
+  /** The language this card speaks: its `language` option, else the integration's card language, else the profile's. */
+  get language() {
+    const own = this._config?.language;
+    if (own && own !== "auto" && TEXTS[own]) return own;
+    return TEXTS[this._roles?.language] ? this._roles.language : null;
+  }
+
+  /** hass, seen through the card's language. */
+  _localHass(hass) {
+    const code = this.language;
+    return code ? Object.create(hass, { [CARD_LANGUAGE]: { value: code } }) : hass;
+  }
+
   _render() {
     if (!this._config || !this._hass) return;
-    const hass = this._hass;
+    const hass = this._localHass(this._hass);
     if (!this._roles || this._roles.error) {
       const text = this._roles?.error ? t(hass, "no_integration") : t(hass, "loading");
       if (this._signature !== text) {
@@ -895,7 +1003,7 @@ class CsnetBaseCard extends HTMLElement {
 
   static getConfigElement() {
     const editor = document.createElement("csnet-home-card-editor");
-    editor.schema = this.editorSchema();
+    editor.schema = [...this.editorSchema(), LANGUAGE_FIELD];
     return editor;
   }
 }
@@ -915,30 +1023,35 @@ class CsnetHeatPumpCard extends CsnetBaseCard {
     ];
   }
 
-  // the electricity price of the Energy dashboard, unless the card sets one
+  // the meter's kWh of today and of this month, and the Energy dashboard's price unless the card sets one
   dataKey() {
-    return this._config.price || this._config.price_entity ? null : "energy-price";
+    const ownPrice = this._config.price || this._config.price_entity;
+    const meter = this.unit.meter_energy;
+    return ownPrice && !meter ? null : `${meter || ""}|${ownPrice ? "" : "energy-price"}`;
   }
 
   refreshMs() {
-    return 60 * 60000;
+    return 10 * 60000;
   }
 
-  fetchData(hass) {
-    return loadEnergyPrice(hass);
+  async fetchData(hass) {
+    const ownPrice = this._config.price || this._config.price_entity;
+    const [price, meter] = await Promise.all([ownPrice ? null : loadEnergyPrice(hass), meterPeriods(hass, this.unit.meter_energy)]);
+    return {
+      price,
+      meter,
+      meterToday: meter?.now ?? null,
+      meterMonth: meter && meter.now !== null && meter.monthBefore !== null ? meter.monthBefore + meter.now : null,
+    };
   }
 
   price(hass) {
-    if (this._config.price !== undefined && this._config.price !== "" && Number.isFinite(Number(this._config.price))) return Number(this._config.price);
-    if (this._config.price_entity) return num(hass, this._config.price_entity);
-    const p = this._data;
-    if (p?.number !== undefined) return p.number;
-    if (p?.entity) return num(hass, p.entity);
-    return null;
+    const own = configuredPrice(hass, this._config);
+    return own !== undefined ? own : priceValue(hass, this._data?.price);
   }
 
   watched() {
-    return [...super.watched(), this._config.price_entity, this._data?.entity];
+    return [...super.watched(), this._config.price_entity, ...priceEntities(this._data?.price)];
   }
 
   css() {
@@ -964,20 +1077,28 @@ class CsnetHeatPumpCard extends CsnetBaseCard {
     const shown = power === null ? "–" : kw ? fmt(hass, power / 1000, 1) : fmt(hass, power, 0);
     const waterTemps = [num(hass, unit.water_out), num(hass, unit.water_in)];
     const delta = waterTemps[0] !== null && waterTemps[1] !== null ? waterTemps[0] - waterTemps[1] : null;
-    // electricity: the user's meter (through the metered COP), else the estimate, else CSNet's record
+    // electricity: the user's meter, else the estimate, else CSNet's record
     const metered = (role) => {
-      const v = Number(stateOf(hass, unit[role])?.attributes?.electricity_kwh);
+      const raw = stateOf(hass, unit[role])?.attributes?.electricity_kwh;
+      const v = raw === null || raw === undefined || raw === "" ? NaN : Number(raw);
       return Number.isFinite(v) ? v : null;
     };
-    const energy = metered("cop_today") ?? num(hass, unit.energy_today) ?? num(hass, unit.server_electricity_today);
-    const energyEntity = metered("cop_today") !== null ? unit.cop_today : unit.energy_today || unit.server_electricity_today;
-    const month = metered("cop_month") ?? num(hass, unit.server_electricity_month);
-    const monthEntity = metered("cop_month") !== null ? unit.cop_month : unit.server_electricity_month;
+    const meterToday = Number.isFinite(this._data?.meterToday) ? this._data.meterToday : null;
+    const meterMonth = Number.isFinite(this._data?.meterMonth) ? this._data.meterMonth : null;
+    const energy = meterToday ?? metered("cop_today") ?? num(hass, unit.energy_today) ?? num(hass, unit.server_electricity_today);
+    const energyEntity = meterToday !== null ? unit.meter_energy : metered("cop_today") !== null ? unit.cop_today : unit.energy_today || unit.server_electricity_today;
+    const month = meterMonth ?? metered("cop_month") ?? num(hass, unit.server_electricity_month);
+    const monthEntity = meterMonth !== null ? unit.meter_energy : metered("cop_month") !== null ? unit.cop_month : unit.server_electricity_month;
     const price = this.price(hass);
     const currency = escapeHtml(hass.config?.currency || "€");
     const heat = num(hass, unit.server_heat_today) ?? num(hass, unit.heat_today);
     const heatEntity = unit.server_heat_today || unit.heat_today;
-    const copEntity = num(hass, unit.cop_today) !== null ? unit.cop_today : unit.cop_today_estimated;
+    // COP: the metered sensor, else heat over the meter's closed hours, else the estimate
+    const meterHours = meterKwh(this._data?.meter, "today");
+    const heatHours = num(hass, unit.server_heat_today);
+    const copFromMeter = num(hass, unit.cop_today) === null && heatHours !== null && meterHours > 0 ? heatHours / meterHours : null;
+    const copEntity = num(hass, unit.cop_today) !== null ? unit.cop_today : copFromMeter !== null ? unit.meter_energy : unit.cop_today_estimated;
+    const copValue = copFromMeter ?? num(hass, copEntity);
     const status = stateOf(hass, unit.operation_status)?.state;
     const overridden = this._config.power_entity || (unit.meter_power && unit.power === unit.meter_power ? unit.meter_power : null);
     const extra = [];
@@ -1001,7 +1122,7 @@ class CsnetHeatPumpCard extends CsnetBaseCard {
         <div class="stat" data-entity="${escapeHtml(unit.water_out || "")}"><div class="label">${t(hass, "water_delta")}</div><div class="value">${fmt(hass, delta)}<span class="unit">K</span></div></div>
         <div class="stat" data-entity="${escapeHtml(energyEntity || "")}"><div class="label">${t(hass, "electricity")}</div><div class="value">${fmt(hass, energy)}<span class="unit">kWh</span></div></div>
         <div class="stat" data-entity="${escapeHtml(heatEntity || "")}"><div class="label">${t(hass, "heat")}</div><div class="value" style="color:var(--csnet-heat)">${fmt(hass, heat)}<span class="unit">kWh</span></div></div>
-        <div class="stat" data-entity="${escapeHtml(copEntity || "")}"><div class="label">${t(hass, "cop")}</div><div class="value" style="color:var(--csnet-ok)">${fmt(hass, num(hass, copEntity), 2)}</div></div>
+        <div class="stat" data-entity="${escapeHtml(copEntity || "")}"><div class="label">${t(hass, "cop")}</div><div class="value" style="color:var(--csnet-ok)">${fmt(hass, copValue, 2)}</div></div>
         ${extra.map(([id, label, value, color]) => `<div class="stat" data-entity="${escapeHtml(id || "")}"><div class="label">${escapeHtml(label)}</div><div class="value" style="${color ? `color:${color}` : ""}">${value}</div></div>`).join("")}
       </div>
       <div class="source">${overridden ? escapeHtml(t(hass, "power_from", { name: friendly(hass, overridden, overridden) })) : t(hass, "power_estimated")}${price !== null ? ` · ${escapeHtml(t(hass, "price_used", { v: fmt(hass, price, 3), c: hass.config?.currency || "€" }))}` : ""}</div>
@@ -1363,14 +1484,25 @@ class CsnetPerformanceCard extends CsnetBaseCard {
     `;
   }
 
-  /** COP of a period: from the metered sensor when there is one, else from the server's heat and electricity. */
-  period(hass, copRole, heatRole, electricityRole) {
+  // the meter's history, for the periods its COP sensors have not measured from their start
+  dataKey() {
+    return this.unit.meter_energy || null;
+  }
+
+  async fetchData(hass) {
+    return meterPeriods(hass, this.unit.meter_energy);
+  }
+
+  /** COP of a period: the metered sensor, else heat over the meter's history, else the server's heat and electricity. */
+  period(hass, copRole, heatRole, electricityRole, key) {
     const unit = this.unit;
     const cop = stateOf(hass, unit[copRole]);
     if (cop && num(hass, unit[copRole]) !== null) {
       return { entity: unit[copRole], cop: num(hass, unit[copRole]), heat: cop.attributes.heat_kwh, electricity: cop.attributes.electricity_kwh };
     }
     const heat = num(hass, unit[heatRole]);
+    const metered = meterKwh(this._data, key);
+    if (heat !== null && metered > 0) return { entity: unit.meter_energy, cop: heat / metered, heat, electricity: metered };
     const electricity = num(hass, unit[electricityRole]);
     if (heat !== null && electricity) return { entity: unit[heatRole], cop: heat / electricity, heat, electricity };
     // no electricity figure (no meter, no pulse meter): the heat alone
@@ -1385,10 +1517,10 @@ class CsnetPerformanceCard extends CsnetBaseCard {
     const share = Math.max(0, Math.min(1, (copNow || 0) / 6));
     const arc = Math.PI * 45;
     const periods = [
-      ["today", this.period(hass, "cop_today", "server_heat_today", "server_electricity_today") || (num(hass, unit.cop_today_estimated) !== null ? { entity: unit.cop_today_estimated, cop: num(hass, unit.cop_today_estimated) } : null)],
-      ["yesterday", this.period(hass, "cop_yesterday", "server_heat_yesterday", "server_electricity_yesterday")],
-      ["this_month", this.period(hass, "cop_month", "server_heat_month", "server_electricity_month")],
-      ["last_month", this.period(hass, "cop_last_month", "", "")],
+      ["today", this.period(hass, "cop_today", "server_heat_today", "server_electricity_today", "today") || (num(hass, unit.cop_today_estimated) !== null ? { entity: unit.cop_today_estimated, cop: num(hass, unit.cop_today_estimated) } : null)],
+      ["yesterday", this.period(hass, "cop_yesterday", "server_heat_yesterday", "server_electricity_yesterday", "yesterday")],
+      ["this_month", this.period(hass, "cop_month", "server_heat_month", "server_electricity_month", "this_month")],
+      ["last_month", this.period(hass, "cop_last_month", "", "", "last_month")],
     ].filter(([, p]) => p && (Number.isFinite(p.cop) || Number.isFinite(p.heat)));
     const rows = periods
       .map(([key, p]) => {
@@ -1418,7 +1550,7 @@ class CsnetPerformanceCard extends CsnetBaseCard {
         <div>${running ? `${fmt(hass, num(hass, unit.heat_power), 0)} W ${t(hass, "heat").toLowerCase()}` : t(hass, "compressor_off")}</div></div>
       </div>
       ${rows}
-      ${periods.some(([, p]) => !Number.isFinite(p.cop)) ? `<div class="note">${escapeHtml(t(hass, "heat_only"))}</div>` : ""}`;
+      ${periods.some(([, p]) => !Number.isFinite(p.cop)) ? `<div class="note">${escapeHtml(t(hass, unit.meter_energy ? "meter_no_history" : "heat_only"))}</div>` : ""}`;
   }
 }
 
@@ -1910,11 +2042,16 @@ class CsnetEnergySignatureCard extends CsnetBaseCard {
       { name: "days", selector: { number: { min: 7, max: 365, step: 1, mode: "box" } } },
       { name: "weather_entity", selector: { entity: { domain: "weather" } } },
       { name: "price", selector: { number: { min: 0, max: 5, step: 0.001, mode: "box" } } },
+      { name: "price_entity", selector: { entity: {} } },
     ];
   }
 
   get days() {
     return Number(this._config.days ?? 60);
+  }
+
+  watched() {
+    return [...super.watched(), this._config.price_entity, ...priceEntities(this._data?.price)];
   }
 
   get weather() {
@@ -1970,11 +2107,8 @@ class CsnetEnergySignatureCard extends CsnetBaseCard {
   }
 
   price(hass) {
-    if (Number.isFinite(Number(this._config.price)) && this._config.price !== undefined && this._config.price !== "") return Number(this._config.price);
-    const p = this._data?.price;
-    if (p?.number !== undefined) return p.number;
-    if (p?.entity) return num(hass, p.entity);
-    return null;
+    const own = configuredPrice(hass, this._config);
+    return own !== undefined ? own : priceValue(hass, this._data?.price);
   }
 
   content(hass) {
@@ -2009,6 +2143,21 @@ class CsnetEnergySignatureCard extends CsnetBaseCard {
 // ---------------------------------------------------------------------------
 // Editor (shared): Home Assistant's own form element
 // ---------------------------------------------------------------------------
+
+const LANGUAGE_FIELD = {
+  name: "language",
+  selector: {
+    select: {
+      mode: "dropdown",
+      options: [
+        { value: "auto", label: "Auto" },
+        { value: "en", label: "English" },
+        { value: "fr", label: "Français" },
+        { value: "es", label: "Español" },
+      ],
+    },
+  },
+};
 
 class CsnetCardEditor extends HTMLElement {
   setConfig(config) {

@@ -12,12 +12,17 @@ from homeassistant.helpers.selector import (
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
     TextSelector,
     TextSelectorConfig,
     TextSelectorType,
 )
 
 from .const import (
+    CARD_LANGUAGES,
+    CONF_CARD_LANGUAGE,
     CONF_ENABLE_ALARM_NOTIFICATIONS,
     CONF_ENERGY_METER,
     CONF_FAN_COIL_MODEL,
@@ -25,6 +30,7 @@ from .const import (
     CONF_LANGUAGE,
     CONF_MAX_TEMP_OVERRIDE,
     CONF_POWER_SUPPLY,
+    DEFAULT_CARD_LANGUAGE,
     DEFAULT_ENABLE_ALARM_NOTIFICATIONS,
     DEFAULT_FAN_COIL_MODEL,
     DEFAULT_FILTERED_ALARM_CODES,
@@ -44,6 +50,7 @@ SCAN_INTERVAL_SCHEMA = vol.All(vol.Coerce(int), vol.Range(min=MIN_SCAN_INTERVAL)
 # Masked in the browser, and never pre-filled: the stored password is not sent to the frontend
 # Any energy sensor, from any integration: the integration only reads its state
 ENERGY_METER_SELECTOR = EntitySelector(EntitySelectorConfig(domain="sensor", device_class="energy"))
+CARD_LANGUAGE_SELECTOR = SelectSelector(SelectSelectorConfig(options=CARD_LANGUAGES, mode=SelectSelectorMode.DROPDOWN, translation_key=CONF_CARD_LANGUAGE))
 PASSWORD_SELECTOR = TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD, autocomplete="current-password"))
 
 
@@ -62,6 +69,7 @@ def _settings_schema(current: dict) -> dict:
             default=max(current.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL), MIN_SCAN_INTERVAL),
         ): SCAN_INTERVAL_SCHEMA,
         vol.Optional(CONF_LANGUAGE, default=current.get(CONF_LANGUAGE, DEFAULT_LANGUAGE)): vol.In(["en", "fr", "es"]),
+        vol.Optional(CONF_CARD_LANGUAGE, default=current.get(CONF_CARD_LANGUAGE, DEFAULT_CARD_LANGUAGE)): CARD_LANGUAGE_SELECTOR,
         max_temp_key: vol.All(vol.Coerce(int), vol.Range(min=8, max=80)),
         vol.Optional(CONF_FAN_COIL_MODEL, default=current.get(CONF_FAN_COIL_MODEL, DEFAULT_FAN_COIL_MODEL)): vol.In(
             [FAN_COIL_MODEL_STANDARD, FAN_COIL_MODEL_LEGACY]
@@ -86,6 +94,7 @@ def _settings_from_input(user_input: dict) -> dict:
     return {
         CONF_SCAN_INTERVAL: user_input[CONF_SCAN_INTERVAL],
         CONF_LANGUAGE: user_input.get(CONF_LANGUAGE, DEFAULT_LANGUAGE),
+        CONF_CARD_LANGUAGE: user_input.get(CONF_CARD_LANGUAGE, DEFAULT_CARD_LANGUAGE),
         CONF_MAX_TEMP_OVERRIDE: user_input.get(CONF_MAX_TEMP_OVERRIDE),
         CONF_FAN_COIL_MODEL: user_input.get(CONF_FAN_COIL_MODEL, DEFAULT_FAN_COIL_MODEL),
         CONF_ENABLE_ALARM_NOTIFICATIONS: user_input.get(CONF_ENABLE_ALARM_NOTIFICATIONS, DEFAULT_ENABLE_ALARM_NOTIFICATIONS),

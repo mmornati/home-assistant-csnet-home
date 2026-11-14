@@ -9,6 +9,7 @@
                     "password": "Contraseña",
                     "scan_interval": "Intervalo de escaneo (segundos)",
                     "language": "Idioma",
+                    "card_language": "Idioma de las tarjetas del panel",
                     "max_temp_override": "Anulación de temperatura máxima (°C)",
                     "fan_coil_model": "Modelo de control del Fan Coil",
                     "power_supply": "Alimentación de la unidad exterior",
@@ -21,6 +22,7 @@
                     "password": "Su contraseña de CSNet Manager",
                     "scan_interval": "Con qué frecuencia buscar actualizaciones (predeterminado y mínimo: 60 segundos)",
                     "language": "Idioma preferido para los nombres de los dispositivos y las alarmas",
+                    "card_language": "Automático sigue el perfil de Home Assistant de cada usuario. Una tarjeta puede elegir su propio idioma.",
                     "max_temp_override": "Anule el límite máximo de temperatura (8-80°C). Déjelo vacío para los valores predeterminados.",
                     "fan_coil_model": "Seleccione el tipo de control del fan coil (estándar o heredado)",
                     "power_supply": "Se usa para estimar la potencia instantánea y el COP. Auto detecta las unidades de 8/10 CV como trifásicas y las demás como monofásicas.",
@@ -37,6 +39,7 @@
                     "password": "Contraseña",
                     "scan_interval": "Intervalo de escaneo (segundos)",
                     "language": "Idioma",
+                    "card_language": "Idioma de las tarjetas del panel",
                     "max_temp_override": "Anulación de temperatura máxima (°C)",
                     "fan_coil_model": "Modelo de control del Fan Coil",
                     "power_supply": "Alimentación de la unidad exterior",
@@ -49,6 +52,7 @@
                     "password": "Dejar vacío para conservar la contraseña actual",
                     "scan_interval": "Con qué frecuencia buscar actualizaciones (mínimo: 60 segundos)",
                     "language": "Idioma preferido para los nombres de los dispositivos y las alarmas",
+                    "card_language": "Automático sigue el perfil de Home Assistant de cada usuario. Una tarjeta puede elegir su propio idioma.",
                     "max_temp_override": "Anule el límite máximo de temperatura (8-80°C)",
                     "fan_coil_model": "Seleccione el tipo de control del fan coil",
                     "power_supply": "Se usa para estimar la potencia instantánea y el COP. Auto detecta las unidades de 8/10 CV como trifásicas y las demás como monofásicas.",
@@ -143,6 +147,16 @@
         "abort": {
             "not_loaded": "La integración debe estar cargada para leer qué curvas usa la unidad. Inténtelo de nuevo cuando haya arrancado.",
             "no_heating_curve": "Ningún circuito usa una curva por puntos o por pendiente: no hay nada que describir. Una temperatura de agua fija ya tiene su propia entidad."
+        }
+    },
+    "selector": {
+        "card_language": {
+            "options": {
+                "auto": "Automático (idioma del perfil)",
+                "en": "Inglés",
+                "fr": "Francés",
+                "es": "Español"
+            }
         }
     }
 }

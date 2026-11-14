@@ -2,7 +2,7 @@
 
 The integration ships eleven dashboard cards. You don't need to install anything else: no HACS frontend download and no third-party card. After the integration is set up (and the browser page is reloaded once), the cards appear in the dashboard **Add card** picker. Search for **CSNet**.
 
-The cards find their entities themselves, so a card works as soon as you add it, even if you renamed the entities or use Home Assistant in another language. They follow your theme (light and dark) and are translated to English, French and Spanish.
+The cards find their entities themselves, so a card works as soon as you add it, even if you renamed the entities or use Home Assistant in another language. They follow your theme (light and dark) and are translated to English, French and Spanish: by default in each user's profile language, or in the **Card language** chosen in the integration settings.
 
 | Card | Type | What it shows |
 |------|------|---------------|
@@ -97,7 +97,8 @@ It needs an electricity figure (your meter, or the electricity CSNet records wit
 The cards take what the integration already knows:
 
 - **Your electricity meter.** When you chose the heat pump's electricity meter in the integration settings (Reconfigure → Electricity meter of the heat pump), the cards use it for the electricity per day and the energy signature. They also find the meter's **power sensor** on the same device (for example `…_total_active_power` next to `…_total_active_energy`) and use it instead of the estimated power.
-- **The electricity price** set in the Energy dashboard (grid consumption → price), to show the cost of today and of this month. A card can set its own with `price` or `price_entity`.
+- **The electricity price** set in the Energy dashboard (grid consumption → price), to show the cost of today and of this month. With one grid source per tariff (peak and off-peak, for example), the cards use today's average: each tariff's price weighted by what it counted today. A card can set its own with `price` or `price_entity`.
+- **The electricity meter's own statistics** for today and this month, when you chose a meter in the integration settings, so the overview shows what the meter counted from midnight even before the metered COP has a full day.
 - **The weather forecast** of your first weather entity, for the energy signature. A card can choose another with `weather_entity`.
 
 ## A ready-made view
@@ -135,7 +136,7 @@ sections:
 
 ## Options
 
-Every card accepts `title` (an empty title hides it). Some cards have more options, also available in the visual editor:
+Every card accepts `title` (an empty title hides it) and `language` (`auto`, `en`, `fr` or `es`; by default the **Card language** of the integration settings, else the user's profile language). Some cards have more options, also available in the visual editor:
 
 | Card | Option | Meaning |
 |------|--------|---------|

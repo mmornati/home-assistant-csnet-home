@@ -9,6 +9,7 @@
                     "password": "Password",
                     "scan_interval": "Scan Interval (seconds)",
                     "language": "Language",
+                    "card_language": "Language of the dashboard cards",
                     "max_temp_override": "Maximum Temperature Override (°C)",
                     "fan_coil_model": "Fan Coil Control Model",
                     "power_supply": "Outdoor Unit Power Supply",
@@ -21,6 +22,7 @@
                     "password": "Your CSNet Manager password",
                     "scan_interval": "How often to poll for updates (default and minimum: 60 seconds)",
                     "language": "Preferred language for device names and alarms",
+                    "card_language": "Automatic follows each user's Home Assistant profile. A card can still set its own language.",
                     "max_temp_override": "Override the maximum temperature limit (8-80°C). Leave empty for defaults.",
                     "fan_coil_model": "Select the fan coil control type (standard or legacy)",
                     "power_supply": "Used to estimate instant power and COP. Auto detects 8/10 HP units as three phase, others as single phase.",
@@ -37,6 +39,7 @@
                     "password": "Password",
                     "scan_interval": "Scan Interval (seconds)",
                     "language": "Language",
+                    "card_language": "Language of the dashboard cards",
                     "max_temp_override": "Maximum Temperature Override (°C)",
                     "fan_coil_model": "Fan Coil Control Model",
                     "power_supply": "Outdoor Unit Power Supply",
@@ -49,6 +52,7 @@
                     "password": "Leave empty to keep the current password",
                     "scan_interval": "How often to poll for updates (minimum: 60 seconds)",
                     "language": "Preferred language for device names and alarms",
+                    "card_language": "Automatic follows each user's Home Assistant profile. A card can still set its own language.",
                     "max_temp_override": "Override the maximum temperature limit (8-80°C)",
                     "fan_coil_model": "Select the fan coil control type",
                     "power_supply": "Used to estimate instant power and COP. Auto detects 8/10 HP units as three phase, others as single phase.",
@@ -143,6 +147,16 @@
         "abort": {
             "not_loaded": "The integration must be loaded to read which heating curves the unit uses. Try again once it has started.",
             "no_heating_curve": "None of the circuits uses a points or gradient heating curve, so there is nothing to describe. A fixed water temperature already has its own entity."
+        }
+    },
+    "selector": {
+        "card_language": {
+            "options": {
+                "auto": "Automatic (profile language)",
+                "en": "English",
+                "fr": "French",
+                "es": "Spanish"
+            }
         }
     }
 }

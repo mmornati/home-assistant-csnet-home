@@ -35,6 +35,7 @@ You'll see a configuration dialog with the following fields:
 | **Password** | Your CSNet Manager password | – |
 | **Scan Interval** | Update frequency in seconds | `60` |
 | **Language** | Language for device names and alarm messages | `en` |
+| **Card language** | Language of the dashboard cards | Automatic |
 | **Maximum Temperature Override** | Optional maximum temperature (8-80°C) | empty (device limits) |
 | **Fan Coil Control Model** | `standard` or `legacy` fan speed mapping | `standard` |
 | **Enable Alarm Notifications** | Create persistent notifications for new alarms | enabled |
@@ -64,6 +65,12 @@ You'll see a configuration dialog with the following fields:
 - **Options**: `en` (English), `fr` (French), `es` (Spanish)
 - **Default**: `en`
 - The reconfigure form currently offers only `en` and `fr`
+
+**Card language** (Optional)
+- Language of the [dashboard cards](Dashboard-Cards.md)
+- **Options**: Automatic (each user's Home Assistant profile language), English, French, Spanish
+- **Default**: Automatic
+- A card can still choose its own language with its `language` option. After changing this setting, reload the dashboard page
 
 **Maximum Temperature Override** (Optional, Advanced)
 - Replaces the maximum temperature of **every climate entity** (all zones, all modes, including cooling) and of the **DHW water heater**
