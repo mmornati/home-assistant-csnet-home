@@ -39,7 +39,7 @@ from .const import (
     POWER_SUPPLY_THREE_PHASE,
 )
 from .coordinator import CSNetHomeCoordinator
-from .helpers import zone_device_identifier, zone_key
+from .helpers import find_indoor_unit, zone_device_identifier, zone_key
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -828,12 +828,12 @@ def _unit_sensors(coordinator) -> list:
     """Return the extra unit sensors this unit reports values for."""
     from .unit_sensors import CSNetHomeUnitSensor, unit_sensor_descriptions  # pylint: disable=import-outside-toplevel
 
-    def read_status():
-        return _get_heating_status_from_installation_data(coordinator.get_installation_devices_data())
+    def read_unit():
+        return find_indoor_unit(coordinator.get_installation_devices_data())
 
     zone_ids = {sensor.get("zone_id") for sensor in coordinator.get_sensors_data()}
     device_info = unit_device_info(coordinator)
-    return [CSNetHomeUnitSensor(coordinator, description, device_info, read_status) for description in unit_sensor_descriptions(read_status(), zone_ids)]
+    return [CSNetHomeUnitSensor(coordinator, description, device_info, read_unit) for description in unit_sensor_descriptions(read_unit(), zone_ids)]
 
 
 def _server_energy_sensors(hass, entry, coordinator) -> list:
@@ -1049,20 +1049,21 @@ async def async_setup_entry(hass, entry, async_add_entities):
     # request failed during setup, or the unit starts reporting something
     # later, they are added then instead of waiting for a reload.
     known = {sensor.unique_id for sensor in sensors if sensor.unique_id}
-    seen: list = [None]
+    seen: list = [id(coordinator.get_server_energy())]
 
     @callback
     def _add_when_reported() -> None:
-        signature = (id(coordinator.get_server_energy()), bool(_get_heating_status_from_installation_data(coordinator.get_installation_devices_data())))
-        if signature == seen[0]:
-            return
-        seen[0] = signature
-        new = [s for s in (*_server_energy_sensors(hass, entry, coordinator), *_unit_sensors(coordinator)) if s.unique_id not in known]
+        # the unit sensors are a handful of readings: looked at after every poll
+        candidates = _unit_sensors(coordinator)
+        # the energy sensors are only looked at again when the records were read again
+        if id(coordinator.get_server_energy()) != seen[0]:
+            seen[0] = id(coordinator.get_server_energy())
+            candidates = [*_server_energy_sensors(hass, entry, coordinator), *candidates]
+        new = [s for s in candidates if s.unique_id not in known]
         if new:
             known.update(s.unique_id for s in new)
             async_add_entities(new)
 
-    seen[0] = (id(coordinator.get_server_energy()), bool(_get_heating_status_from_installation_data(coordinator.get_installation_devices_data())))
     entry.async_on_unload(coordinator.async_add_listener(_add_when_reported))
 
 

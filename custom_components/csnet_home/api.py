@@ -20,6 +20,7 @@ from custom_components.csnet_home.const import (
     HEATING_MIN_TEMPERATURE,
     INSTALLATION_ALARMS_PATH,
     INSTALLATION_DEVICES_PATH,
+    INSTALLATIONS_PATH,
     LANGUAGE_FILES,
     LOGIN_BACKOFF_BASE,
     LOGIN_BACKOFF_MAX,
@@ -707,6 +708,27 @@ class CSNetHomeAPI:
             answer = await self._async_get_json(url, headers, "energy records", renew_session=False)
         except Exception as e:  # pylint: disable=broad-except
             _LOGGER.debug("Error during energy records retrieval: %s", e)
+            return None
+        data = answer.get("data") if isinstance(answer, dict) else None
+        return data if isinstance(data, list) else None
+
+    async def async_get_installations(self):
+        """Return the installations of the account (a list), or None.
+
+        The integration shows the account's default installation. This list
+        is only used to tell when there are others.
+        """
+        if not await self._async_ensure_session():
+            return None
+        headers = COMMON_API_HEADERS | {
+            "accept": "*/*",
+            "x-requested-with": "XMLHttpRequest",
+        }
+        try:
+            # not worth a new login: the readings do not depend on it
+            answer = await self._async_get_json(f"{self.base_url}{INSTALLATIONS_PATH}", headers, "installations", renew_session=False)
+        except Exception as e:  # pylint: disable=broad-except
+            _LOGGER.debug("Error during installations retrieval: %s", e)
             return None
         data = answer.get("data") if isinstance(answer, dict) else None
         return data if isinstance(data, list) else None

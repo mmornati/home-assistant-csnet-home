@@ -81,5 +81,24 @@
             "reauth_successful": "Ré-authentification réussie ! Vos identifiants ont été mis à jour.",
             "reconfigure_successful": "Reconfiguration réussie ! Vos paramètres ont été mis à jour."
         }
+    },
+    "entity": {
+        "sensor": {
+            "dhw_mode": {
+                "state": {
+                    "economic": "Économique",
+                    "standard": "Standard",
+                    "high_demand": "Forte demande"
+                }
+            },
+            "fan_speed_actual": {
+                "state": {
+                    "off": "Arrêt",
+                    "low": "Basse",
+                    "medium": "Moyenne",
+                    "high": "Haute"
+                }
+            }
+        }
     }
 }
