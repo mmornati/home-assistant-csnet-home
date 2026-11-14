@@ -81,5 +81,49 @@
             "reauth_successful": "¡Reautenticación exitosa! Sus credenciales han sido actualizadas.",
             "reconfigure_successful": "¡Reconfiguración exitosa! Sus ajustes han sido actualizados."
         }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Curvas de calefacción",
+                "description": "CSNet indica el tipo de curva de calefacción de cada circuito ({circuits}) pero no sus valores. Copie los valores que su instalador configuró en el controlador (Calefacción > Modo de cálculo del agua). Solo se usan para calcular los sensores de temperatura del agua de la curva: no se envía nada a la unidad. Deje un circuito vacío para no tener sensor.",
+                "data": {
+                    "c1_low_ambient_temperature": "Circuito 1 – Temperatura exterior baja",
+                    "c1_water_at_low_ambient": "Circuito 1 – Consigna de agua a temperatura exterior baja",
+                    "c1_high_ambient_temperature": "Circuito 1 – Temperatura exterior alta",
+                    "c1_water_at_high_ambient": "Circuito 1 – Consigna de agua a temperatura exterior alta",
+                    "c1_gradient": "Circuito 1 – Pendiente",
+                    "c1_vertex_offset": "Circuito 1 – Desplazamiento del vértice",
+                    "c2_low_ambient_temperature": "Circuito 2 – Temperatura exterior baja",
+                    "c2_water_at_low_ambient": "Circuito 2 – Consigna de agua a temperatura exterior baja",
+                    "c2_high_ambient_temperature": "Circuito 2 – Temperatura exterior alta",
+                    "c2_water_at_high_ambient": "Circuito 2 – Consigna de agua a temperatura exterior alta",
+                    "c2_gradient": "Circuito 2 – Pendiente",
+                    "c2_vertex_offset": "Circuito 2 – Desplazamiento del vértice"
+                },
+                "data_description": {
+                    "c1_low_ambient_temperature": "Temperatura exterior del punto frío de la curva",
+                    "c1_water_at_low_ambient": "Temperatura del agua en el punto frío",
+                    "c1_high_ambient_temperature": "Temperatura exterior del punto templado de la curva",
+                    "c1_water_at_high_ambient": "Temperatura del agua en el punto templado",
+                    "c1_gradient": "Valor de curva configurado en la unidad (0,2 a 2,2). La curva parte de 20 °C de agua para 20 °C exteriores",
+                    "c1_vertex_offset": "Desplazamiento de toda la curva (-10 a +10 °C). Dejar vacío para ninguno",
+                    "c2_low_ambient_temperature": "Temperatura exterior del punto frío de la curva",
+                    "c2_water_at_low_ambient": "Temperatura del agua en el punto frío",
+                    "c2_high_ambient_temperature": "Temperatura exterior del punto templado de la curva",
+                    "c2_water_at_high_ambient": "Temperatura del agua en el punto templado",
+                    "c2_gradient": "Valor de curva configurado en la unidad (0,2 a 2,2). La curva parte de 20 °C de agua para 20 °C exteriores",
+                    "c2_vertex_offset": "Desplazamiento de toda la curva (-10 a +10 °C). Dejar vacío para ninguno"
+                }
+            }
+        },
+        "error": {
+            "incomplete_curve": "Rellene todos los valores de la curva de este circuito, o ninguno.",
+            "high_ambient_not_above_low": "La temperatura exterior alta debe ser superior a la temperatura exterior baja."
+        },
+        "abort": {
+            "not_loaded": "La integración debe estar cargada para leer qué curvas usa la unidad. Inténtelo de nuevo cuando haya arrancado.",
+            "no_heating_curve": "Ningún circuito usa una curva por puntos o por pendiente: no hay nada que describir. Una temperatura de agua fija ya tiene su propia entidad."
+        }
     }
 }

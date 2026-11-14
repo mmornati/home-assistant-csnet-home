@@ -836,6 +836,41 @@ def _unit_sensors(coordinator) -> list:
     return [CSNetHomeUnitSensor(coordinator, description, device_info, read_status) for description in unit_sensor_descriptions(read_status(), zone_ids)]
 
 
+def _heating_curve_sensors(hass, entry, coordinator) -> list:
+    """Return a sensor per circuit whose heating curve the user entered in the options."""
+    # imported here: that module is only needed by this platform's setup
+    from .heating_curve import (  # pylint: disable=import-outside-toplevel
+        CIRCUIT_ZONES,
+        CSNetHomeHeatingCurveSensor,
+        curve_circuits,
+        curve_from_options,
+        unique_id,
+    )
+
+    def read_status():
+        return _get_heating_status_from_installation_data(coordinator.get_installation_devices_data())
+
+    status = read_status()
+    zone_ids = {sensor.get("zone_id") for sensor in coordinator.get_sensors_data()}
+    circuits = curve_circuits(status, zone_ids)
+    sensors = [
+        CSNetHomeHeatingCurveSensor(coordinator, circuit, entry.options, unit_device_info(coordinator), read_status)
+        for circuit, curve_type in circuits.items()
+        if curve_from_options(entry.options, circuit, curve_type) is not None
+    ]
+    if isinstance(status, dict):
+        # a curve removed from the options, or a circuit that no longer uses one: its sensor goes
+        kept = {sensor.unique_id for sensor in sensors}
+        entity_registry = er.async_get(hass)
+        for circuit in CIRCUIT_ZONES:
+            if unique_id(circuit) in kept:
+                continue
+            entity_id = entity_registry.async_get_entity_id("sensor", DOMAIN, unique_id(circuit))
+            if entity_id:
+                entity_registry.async_remove(entity_id)
+    return sensors
+
+
 def _server_energy_sensors(hass, entry, coordinator) -> list:
     """Return the sensors for the server's energy records, and for the COP when a meter is configured."""
     # imported here: that module is only needed by this platform's setup
@@ -991,6 +1026,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
     # More readings of the unit, where the unit reports them
     sensors.extend(_unit_sensors(coordinator))
 
+    # Water temperature of each heating curve the user entered in the options
+    sensors.extend(_heating_curve_sensors(hass, entry, coordinator))
+
     # Add alarm history sensor (shows recent alarms from installation alarms API)
     sensors.append(CSNetHomeAlarmHistorySensor(coordinator, coordinator.get_common_data()))
 
@@ -1057,7 +1095,11 @@ async def async_setup_entry(hass, entry, async_add_entities):
         if signature == seen[0]:
             return
         seen[0] = signature
-        new = [s for s in (*_server_energy_sensors(hass, entry, coordinator), *_unit_sensors(coordinator)) if s.unique_id not in known]
+        new = [
+            s
+            for s in (*_server_energy_sensors(hass, entry, coordinator), *_unit_sensors(coordinator), *_heating_curve_sensors(hass, entry, coordinator))
+            if s.unique_id not in known
+        ]
         if new:
             known.update(s.unique_id for s in new)
             async_add_entities(new)

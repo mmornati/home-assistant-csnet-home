@@ -81,5 +81,49 @@
             "reauth_successful": "Reauthentication successful! Your credentials have been updated.",
             "reconfigure_successful": "Reconfiguration successful! Your settings have been updated."
         }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Heating curves",
+                "description": "CSNet reports the kind of heating curve (water law) each circuit uses ({circuits}) but not its values. Copy the values your installer set on the unit controller (Space heating > Water calculation mode). They are only used to compute the heating curve water temperature sensors: nothing is sent to the unit. Leave a circuit empty to have no sensor for it.",
+                "data": {
+                    "c1_low_ambient_temperature": "Circuit 1 – Low ambient temperature",
+                    "c1_water_at_low_ambient": "Circuit 1 – Water set point at low ambient temperature",
+                    "c1_high_ambient_temperature": "Circuit 1 – High ambient temperature",
+                    "c1_water_at_high_ambient": "Circuit 1 – Water set point at high ambient temperature",
+                    "c1_gradient": "Circuit 1 – Gradient",
+                    "c1_vertex_offset": "Circuit 1 – Vertex offset",
+                    "c2_low_ambient_temperature": "Circuit 2 – Low ambient temperature",
+                    "c2_water_at_low_ambient": "Circuit 2 – Water set point at low ambient temperature",
+                    "c2_high_ambient_temperature": "Circuit 2 – High ambient temperature",
+                    "c2_water_at_high_ambient": "Circuit 2 – Water set point at high ambient temperature",
+                    "c2_gradient": "Circuit 2 – Gradient",
+                    "c2_vertex_offset": "Circuit 2 – Vertex offset"
+                },
+                "data_description": {
+                    "c1_low_ambient_temperature": "Outdoor temperature of the cold point of the curve",
+                    "c1_water_at_low_ambient": "Water temperature at the cold point",
+                    "c1_high_ambient_temperature": "Outdoor temperature of the mild point of the curve",
+                    "c1_water_at_high_ambient": "Water temperature at the mild point",
+                    "c1_gradient": "Curve value set on the unit (0.2 to 2.2). The curve starts at 20 °C water for 20 °C outside",
+                    "c1_vertex_offset": "Shift of the whole curve (-10 to +10 °C). Leave empty for none",
+                    "c2_low_ambient_temperature": "Outdoor temperature of the cold point of the curve",
+                    "c2_water_at_low_ambient": "Water temperature at the cold point",
+                    "c2_high_ambient_temperature": "Outdoor temperature of the mild point of the curve",
+                    "c2_water_at_high_ambient": "Water temperature at the mild point",
+                    "c2_gradient": "Curve value set on the unit (0.2 to 2.2). The curve starts at 20 °C water for 20 °C outside",
+                    "c2_vertex_offset": "Shift of the whole curve (-10 to +10 °C). Leave empty for none"
+                }
+            }
+        },
+        "error": {
+            "incomplete_curve": "Fill in every value of this circuit's curve, or none of them.",
+            "high_ambient_not_above_low": "The high ambient temperature must be above the low ambient temperature."
+        },
+        "abort": {
+            "not_loaded": "The integration must be loaded to read which heating curves the unit uses. Try again once it has started.",
+            "no_heating_curve": "None of the circuits uses a points or gradient heating curve, so there is nothing to describe. A fixed water temperature already has its own entity."
+        }
     }
 }

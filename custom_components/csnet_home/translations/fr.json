@@ -81,5 +81,49 @@
             "reauth_successful": "Ré-authentification réussie ! Vos identifiants ont été mis à jour.",
             "reconfigure_successful": "Reconfiguration réussie ! Vos paramètres ont été mis à jour."
         }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Lois d'eau",
+                "description": "CSNet indique le type de loi d'eau de chaque circuit ({circuits}) mais pas ses valeurs. Recopiez les valeurs réglées par votre installateur sur le contrôleur (Chauffage > Mode de calcul de l'eau). Elles servent uniquement à calculer les capteurs de température d'eau de la loi d'eau : rien n'est envoyé à la pompe à chaleur. Laissez un circuit vide pour ne pas avoir de capteur.",
+                "data": {
+                    "c1_low_ambient_temperature": "Circuit 1 – Température extérieure basse",
+                    "c1_water_at_low_ambient": "Circuit 1 – Consigne d'eau à température extérieure basse",
+                    "c1_high_ambient_temperature": "Circuit 1 – Température extérieure haute",
+                    "c1_water_at_high_ambient": "Circuit 1 – Consigne d'eau à température extérieure haute",
+                    "c1_gradient": "Circuit 1 – Pente",
+                    "c1_vertex_offset": "Circuit 1 – Décalage du sommet",
+                    "c2_low_ambient_temperature": "Circuit 2 – Température extérieure basse",
+                    "c2_water_at_low_ambient": "Circuit 2 – Consigne d'eau à température extérieure basse",
+                    "c2_high_ambient_temperature": "Circuit 2 – Température extérieure haute",
+                    "c2_water_at_high_ambient": "Circuit 2 – Consigne d'eau à température extérieure haute",
+                    "c2_gradient": "Circuit 2 – Pente",
+                    "c2_vertex_offset": "Circuit 2 – Décalage du sommet"
+                },
+                "data_description": {
+                    "c1_low_ambient_temperature": "Température extérieure du point froid de la courbe",
+                    "c1_water_at_low_ambient": "Température d'eau au point froid",
+                    "c1_high_ambient_temperature": "Température extérieure du point doux de la courbe",
+                    "c1_water_at_high_ambient": "Température d'eau au point doux",
+                    "c1_gradient": "Valeur de courbe réglée sur l'unité (0,2 à 2,2). La courbe part de 20 °C d'eau pour 20 °C dehors",
+                    "c1_vertex_offset": "Décalage de toute la courbe (-10 à +10 °C). Laisser vide pour aucun",
+                    "c2_low_ambient_temperature": "Température extérieure du point froid de la courbe",
+                    "c2_water_at_low_ambient": "Température d'eau au point froid",
+                    "c2_high_ambient_temperature": "Température extérieure du point doux de la courbe",
+                    "c2_water_at_high_ambient": "Température d'eau au point doux",
+                    "c2_gradient": "Valeur de courbe réglée sur l'unité (0,2 à 2,2). La courbe part de 20 °C d'eau pour 20 °C dehors",
+                    "c2_vertex_offset": "Décalage de toute la courbe (-10 à +10 °C). Laisser vide pour aucun"
+                }
+            }
+        },
+        "error": {
+            "incomplete_curve": "Renseignez toutes les valeurs de la courbe de ce circuit, ou aucune.",
+            "high_ambient_not_above_low": "La température extérieure haute doit être supérieure à la température extérieure basse."
+        },
+        "abort": {
+            "not_loaded": "L'intégration doit être chargée pour lire le type de loi d'eau utilisé. Réessayez une fois qu'elle a démarré.",
+            "no_heating_curve": "Aucun circuit n'utilise une loi d'eau par points ou par pente : il n'y a rien à décrire. Une température d'eau fixe a déjà sa propre entité."
+        }
     }
 }
