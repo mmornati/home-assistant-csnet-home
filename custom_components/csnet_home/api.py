@@ -472,8 +472,13 @@ class CSNetHomeAPI:
             except Exception as e:
                 _LOGGER.debug("Error closing validation session: %s", e)
 
-    async def _async_get_json(self, url, headers, description):
+    async def _async_get_json(self, url, headers, description, renew_session=True):
         """GET a JSON document, signing in again once if the session has expired.
+
+        With ``renew_session=False`` an answer that is not JSON only fails
+        this request. That is for requests the readings do not depend on: an
+        endpoint that answers with a page for some accounts must not sign in
+        again, let alone count as a failed login.
 
         CSNet Manager answers an expired session with its login page (HTTP 200
         after a redirect) instead of JSON. When that happens the session is
@@ -506,6 +511,10 @@ class CSNetHomeAPI:
                 return None
             except (asyncio.TimeoutError, aiohttp.ClientError) as err:
                 _LOGGER.warning("CSNet Manager did not answer the %s request: %s", description, err or type(err).__name__)
+                return None
+
+            if not renew_session:
+                _LOGGER.debug("CSNet Manager answered the %s request with a page instead of data", description)
                 return None
 
             if attempt == 2:
@@ -694,7 +703,8 @@ class CSNetHomeAPI:
         }
 
         try:
-            answer = await self._async_get_json(url, headers, "energy records")
+            # not worth a new login: the next poll of the readings renews an expired session
+            answer = await self._async_get_json(url, headers, "energy records", renew_session=False)
         except Exception as e:  # pylint: disable=broad-except
             _LOGGER.debug("Error during energy records retrieval: %s", e)
             return None

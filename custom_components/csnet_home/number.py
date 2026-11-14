@@ -210,9 +210,12 @@ class CSNetHomeFixedWaterTemperatureNumber(CoordinatorEntity, NumberEntity):
         if data:
             low, high = self.entry.runtime_data.api.get_temperature_limits(5 if self._circuit == 1 else 6, self._mode, data, self._sensor_data.get("parent_id"))
             numbers = all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in (low, high))
-            # 0 means "not reported"
-            if numbers and 0 < low < high:
-                return float(low), float(high)
+            if numbers:
+                # like the climate entity: a value above 200 is in tenths of a degree
+                low, high = (round(v / 10, 1) if v > 200 else float(v) for v in (low, high))
+                # 0 means "not reported"; anything outside what water can be is not a limit
+                if 0 < low < high <= 100:
+                    return low, high
         return self._default_limits
 
     @property

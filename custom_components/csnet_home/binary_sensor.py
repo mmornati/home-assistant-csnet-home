@@ -11,7 +11,7 @@ import logging
 from dataclasses import dataclass
 
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass, BinarySensorEntity, BinarySensorEntityDescription
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -110,21 +110,37 @@ def _read(heating_status, description: CSNetHomeBinarySensorDescription) -> bool
 async def async_setup_entry(hass: HomeAssistant, entry: CSNetHomeConfigEntry, async_add_entities) -> None:
     """Set up the binary sensors of the unit."""
     coordinator = entry.runtime_data.coordinator
-    heating_status = _get_heating_status_from_installation_data(coordinator.get_installation_devices_data())
-    if not isinstance(heating_status, dict):
-        _LOGGER.debug("No unit status available: no binary sensors created")
-        return
+    created: set[str] = set()
 
-    zone_ids = {sensor.get("zone_id") for sensor in coordinator.get_sensors_data()}
-    entities = []
-    for description in BINARY_SENSOR_DESCRIPTIONS:
-        if description.needs_zone is not None and not zone_ids & description.needs_zone:
-            continue
-        # a unit that does not report the value gets no entity instead of an unknown one
-        if _read(heating_status, description) is None:
-            continue
-        entities.append(CSNetHomeBinarySensor(coordinator, description))
-    async_add_entities(entities)
+    @callback
+    def _add_reported() -> None:
+        """Add the sensors the unit reports a value for and that do not exist yet.
+
+        Runs at setup and after every poll, so a unit status that was missing
+        at setup (a failed request) does not leave the sensors out until a reload.
+        """
+        if len(created) == len(BINARY_SENSOR_DESCRIPTIONS):
+            return
+        heating_status = _get_heating_status_from_installation_data(coordinator.get_installation_devices_data())
+        if not isinstance(heating_status, dict):
+            return
+        zone_ids = {sensor.get("zone_id") for sensor in coordinator.get_sensors_data()}
+        entities = []
+        for description in BINARY_SENSOR_DESCRIPTIONS:
+            if description.key in created:
+                continue
+            if description.needs_zone is not None and not zone_ids & description.needs_zone:
+                continue
+            # a unit that does not report the value gets no entity instead of an unknown one
+            if _read(heating_status, description) is None:
+                continue
+            created.add(description.key)
+            entities.append(CSNetHomeBinarySensor(coordinator, description))
+        if entities:
+            async_add_entities(entities)
+
+    _add_reported()
+    entry.async_on_unload(coordinator.async_add_listener(_add_reported))
 
 
 class CSNetHomeBinarySensor(CoordinatorEntity, BinarySensorEntity):

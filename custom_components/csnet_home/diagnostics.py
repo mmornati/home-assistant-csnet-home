@@ -66,6 +66,23 @@ def redact(data: Any) -> Any:
     return data
 
 
+def _server_energy_summary(energy) -> Any:
+    """Return what the server's energy records cover: how many, and the last of each kind."""
+    if not isinstance(energy, list):
+        return None
+    summary = []
+    for unit in energy:
+        if not isinstance(unit, dict):
+            continue
+        entry: dict[str, Any] = {}
+        for period in ("hourly", "daily", "monthly"):
+            records = [r for r in unit.get(period) or [] if isinstance(r, dict) and isinstance(r.get("time"), dict)]
+            latest = max(records, key=lambda r: tuple(r["time"].get(part) or 0 for part in ("year", "month", "day", "hour")), default=None)
+            entry[period] = {"count": len(records), "latest": latest}
+        summary.append(entry)
+    return summary
+
+
 async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]:
     """Return diagnostics for a config entry."""
     coordinator = entry.runtime_data.coordinator
@@ -81,5 +98,6 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: ConfigE
             "update_interval_seconds": coordinator.update_interval.total_seconds() if coordinator.update_interval else None,
         },
         "sensors": redact(coordinator.get_sensors_data() or []),
+        "server_energy": _server_energy_summary(coordinator.get_server_energy()),
         "common_data": redact(common_data),
     }

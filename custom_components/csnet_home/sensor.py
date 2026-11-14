@@ -1045,6 +1045,26 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     async_add_entities(sensors)
 
+    # The energy and unit sensors exist only for what the unit reports. When a
+    # request failed during setup, or the unit starts reporting something
+    # later, they are added then instead of waiting for a reload.
+    known = {sensor.unique_id for sensor in sensors if sensor.unique_id}
+    seen: list = [None]
+
+    @callback
+    def _add_when_reported() -> None:
+        signature = (id(coordinator.get_server_energy()), bool(_get_heating_status_from_installation_data(coordinator.get_installation_devices_data())))
+        if signature == seen[0]:
+            return
+        seen[0] = signature
+        new = [s for s in (*_server_energy_sensors(hass, entry, coordinator), *_unit_sensors(coordinator)) if s.unique_id not in known]
+        if new:
+            known.update(s.unique_id for s in new)
+            async_add_entities(new)
+
+    seen[0] = (id(coordinator.get_server_energy()), bool(_get_heating_status_from_installation_data(coordinator.get_installation_devices_data())))
+    entry.async_on_unload(coordinator.async_add_listener(_add_when_reported))
+
 
 class CSNetHomeSensor(CoordinatorEntity, SensorEntity):
     """Representation of a per-zone sensor from the CSNet Home integration."""

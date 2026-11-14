@@ -29,6 +29,8 @@ ALARM_POLL_SECONDS = 300
 ALARM_STORAGE_VERSION = 1
 # The server adds to its energy records once an hour
 SERVER_ENERGY_POLL_SECONDS = 900
+# After a request for them failed, they are asked for again this much later
+SERVER_ENERGY_RETRY_SECONDS = 300
 # CSNet needs a moment to apply an order: a read sent right after a write can
 # still return the old value
 WRITE_REFRESH_DELAY_SECONDS = 2.0
@@ -160,9 +162,11 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         # Run independent fetch operations in parallel
         # 1. Elements chain (translations -> elements -> alarms)
         # 2. Installation devices data (independent)
+        # 3. The server's energy records (cached; never fails the poll)
         results = await asyncio.gather(
             fetch_elements_chain(),
             cloud_api.async_get_installation_devices_data(),
+            self._async_update_server_energy(cloud_api),
         )
 
         elements_data, installation_alarms_data = results[0]
@@ -180,8 +184,6 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
 
         # Enrich sensor data
         self._enrich_sensor_data(cloud_api, installation_devices_data)
-
-        await self._async_update_server_energy(cloud_api)
 
         await self._async_load_alarm_state()
 
@@ -255,9 +257,10 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
             data = await cloud_api.async_get_power_data()
         except Exception as exc:  # pylint: disable=broad-except
             _LOGGER.debug("Could not read the energy records: %s", exc)
-            return
+            data = None
         if not isinstance(data, list):
-            # asked again on the next poll
+            # not on every poll: an account this request never works for must not pay for it each minute
+            self._server_energy_fetched_at = now - (SERVER_ENERGY_POLL_SECONDS - SERVER_ENERGY_RETRY_SECONDS)
             return
         self._server_energy = data
         self._server_energy_fetched_at = now

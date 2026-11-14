@@ -29,11 +29,15 @@ def _coordinator(heating_status, zone_ids=(1, 2)):
     )
 
 
-async def _setup(coordinator):
+async def _setup(coordinator, listeners=None):
     """Run the platform setup and return the entities it creates, by key."""
     created = []
-    entry = SimpleNamespace(runtime_data=SimpleNamespace(coordinator=coordinator))
+    if listeners is not None:
+        coordinator.async_add_listener = lambda listener, *args: listeners.append(listener) or (lambda: None)
+    entry = SimpleNamespace(runtime_data=SimpleNamespace(coordinator=coordinator), async_on_unload=lambda unsubscribe: None)
     await async_setup_entry(None, entry, created.extend)
+    if listeners is not None:
+        listeners.append(created)
     return {entity.entity_description.key: entity for entity in created}
 
 
@@ -155,3 +159,21 @@ async def test_entities_follow_the_polls_and_share_the_units_device(hass):
             entity.async_write_ha_state()
     assert hass.states.get("binary_sensor.system_controller_compressor").state == "off"
     assert hass.states.get("binary_sensor.system_controller_defrost").state == "on"
+
+
+async def test_sensors_appear_when_the_unit_status_arrives_after_setup():
+    """A request that failed during setup does not leave the sensors out until a reload."""
+    coordinator = _coordinator(None)
+    listeners = []
+    assert await _setup(coordinator, listeners) == {}
+    listener, created = listeners
+
+    coordinator.data["status"] = {"systemStatus2Flags": LIVE_FLAGS, "defrosting": 0}
+    listener()
+    assert {entity.entity_description.key for entity in created} >= {"compressor", "defrost", "circuit_1_demand"}
+
+    # later polls add nothing twice
+    count = len(created)
+    listener()
+    listener()
+    assert len(created) == count

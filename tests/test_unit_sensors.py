@@ -84,10 +84,10 @@ def test_pool_modes_are_unchanged(hass):
 
 @pytest.mark.parametrize(
     ("limits", "expected"),
-    [((25, 55), (25.0, 55.0)), ((0, 0), None), ((None, None), None), ((60, 20), None), (("a", 55), None)],
+    [((25, 55), (25.0, 55.0)), ((250, 550), (25.0, 55.0)), ((0, 0), None), ((None, None), None), ((60, 20), None), (("a", 55), None), ((20, 150), None)],
 )
 def test_fixed_water_temperature_limits_come_from_the_unit(limits, expected):
-    """The unit's limits when it reports sensible ones, the usual ones otherwise."""
+    """The unit's limits when it reports sensible ones (also in tenths, like the climate entity), the usual ones otherwise."""
     from custom_components.csnet_home.number import CSNetHomeFixedWaterTemperatureNumber
 
     coordinator = MagicMock()

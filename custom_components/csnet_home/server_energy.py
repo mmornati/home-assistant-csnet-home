@@ -44,6 +44,7 @@ PERIOD_START_TOLERANCE = timedelta(minutes=20)
 MIN_ELECTRICITY_FOR_COP_KWH = 0.5
 # Electricity recorded by the server counts as metered from this share of the recorded heat
 MIN_ELECTRICITY_SHARE = 0.05
+RECENT_MONTHS = 3
 
 
 def meter_storage_key(entry_id: str) -> str:
@@ -81,19 +82,32 @@ def _records(energy, period: str):
             yield from records
 
 
-def energy_on_day(energy, day: date, kind: str, use: str | None = None) -> float | None:
+def _units(energy):
+    """Yield the indoor units of the records."""
+    if isinstance(energy, list):
+        for unit in energy:
+            if isinstance(unit, dict):
+                yield unit
+
+
+def energy_on_day(energy, day: date, kind: str, use: str | None = None, before_hour: int | None = None) -> float | None:
     """Return the kWh of one day, or None when the server's records were never read.
 
-    The hours of the day are added up when there are any, so a day in
-    progress is counted up to the last full hour; otherwise the day's own
-    record is used.
+    For each indoor unit the hours of the day are added up when it has any,
+    so a day in progress is counted up to the last full hour; a unit without
+    hours for that day contributes the day's own record. With ``before_hour``
+    only the hours before it count (the hours that are complete).
     """
     if not isinstance(energy, list):
         return None
-    hours = [r for r in _records(energy, "hourly") if _matches(r, year=day.year, month=day.month, day=day.day)]
-    if hours:
-        return sum(_amount(r, kind, use) for r in hours)
-    return sum(_amount(r, kind, use) for r in _records(energy, "daily") if _matches(r, year=day.year, month=day.month, day=day.day))
+    total = 0.0
+    for unit in _units(energy):
+        hours = [r for r in unit.get("hourly") or [] if _matches(r, year=day.year, month=day.month, day=day.day)]
+        if hours or before_hour is not None:
+            total += sum(_amount(r, kind, use) for r in hours if before_hour is None or (r["time"].get("hour") or 0) < before_hour)
+        else:
+            total += sum(_amount(r, kind, use) for r in unit.get("daily") or [] if _matches(r, year=day.year, month=day.month, day=day.day))
+    return total
 
 
 def energy_in_month(energy, day: date, kind: str, use: str | None = None) -> float | None:
@@ -116,10 +130,17 @@ def has_pulse_meter(energy) -> bool:
 
     A unit without a pulse meter still gets a stray kWh now and then in the
     server's records. A real meter records electricity in proportion to the
-    heat: at least MIN_ELECTRICITY_SHARE of it (a COP of 20 at the very most).
+    heat: at least MIN_ELECTRICITY_SHARE of it (a COP of 20 at the very most),
+    over the last RECENT_MONTHS months on record.
     """
-    heat = sum(_amount(r, HEAT, None) for r in _records(energy, "monthly"))
-    electricity = sum(_amount(r, ELECTRICITY, None) for r in _records(energy, "monthly"))
+    months = sorted(
+        (r for r in _records(energy, "monthly") if isinstance(r, dict) and isinstance(r.get("time"), dict)),
+        key=lambda r: (r["time"].get("year") or 0, r["time"].get("month") or 0),
+    )
+    # the last months only: a meter fitted recently must not be judged against years without one
+    recent = months[-RECENT_MONTHS:]
+    heat = sum(_amount(r, HEAT, None) for r in recent)
+    electricity = sum(_amount(r, ELECTRICITY, None) for r in recent)
     return electricity > 0 and electricity >= heat * MIN_ELECTRICITY_SHARE
 
 
@@ -139,7 +160,9 @@ def server_energy_descriptions(energy) -> list[ServerEnergyDescription]:
         "native_unit_of_measurement": UnitOfEnergy.KILO_WATT_HOUR,
         "suggested_display_precision": 0,
     }
-    increasing = {**common, "state_class": SensorStateClass.TOTAL_INCREASING}
+    # TOTAL with a reset time, not TOTAL_INCREASING: the server may correct a
+    # figure downwards, which must not be taken for a meter reset
+    increasing = {**common, "state_class": SensorStateClass.TOTAL}
     descriptions: list[ServerEnergyDescription] = []
     if has_energy(energy, HEAT):
         descriptions += [
@@ -189,6 +212,14 @@ class CSNetHomeServerEnergySensor(CoordinatorEntity, SensorEntity):
         """Return the kWh of the sensor's span."""
         description = self.entity_description
         return read_span(self.coordinator.get_server_energy(), description.span, description.kind, description.use, dt_util.now())
+
+    @property
+    def last_reset(self) -> datetime | None:
+        """Return when the counter started: the start of the day or of the month."""
+        if self.entity_description.state_class != SensorStateClass.TOTAL:
+            return None
+        start = dt_util.start_of_local_day()
+        return start.replace(day=1) if self.entity_description.span == "month" else start
 
 
 def meter_reading_kwh(hass: HomeAssistant, entity_id: str) -> float | None:
@@ -256,6 +287,14 @@ class MeterTracker:
         if reading is None:
             return
         changed = False
+        # the reading at the start of the hour: what was used up to the last full hour
+        hour_id = now.strftime("%Y-%m-%dT%H")
+        if (self._state.get("hour") or {}).get("period") != hour_id:
+            if now - now.replace(minute=0, second=0, microsecond=0) <= PERIOD_START_TOLERANCE:
+                self._state["hour"] = {"period": hour_id, "reading": reading}
+            else:
+                self._state.pop("hour", None)
+            changed = True
         for scope, (period, began) in _period_ids(now).items():
             current = self._state.get(scope)
             read_at_start = now - began <= PERIOD_START_TOLERANCE
@@ -292,13 +331,35 @@ class MeterTracker:
             return None
         return reading - current["start"]
 
-    def electricity_yesterday(self, now: datetime) -> float | None:
-        """Return the kWh the meter counted over the whole of yesterday, or None when not measured."""
-        last = self._state.get("last_day")
-        yesterday = (now - timedelta(days=1)).strftime("%Y-%m-%d")
-        if not isinstance(last, dict) or last.get("period") != yesterday:
+    def electricity_until_this_hour(self, now: datetime) -> float | None:
+        """Return the kWh counted from midnight to the start of the current hour, or None when not measured.
+
+        The server counts heat by full hours, so this is the electricity that
+        goes with the heat of the hours already complete.
+        """
+        day = self._state.get("day")
+        hour = self._state.get("hour")
+        if not isinstance(day, dict) or day.get("period") != now.strftime("%Y-%m-%d") or not day.get("from_start"):
+            return None
+        if not isinstance(hour, dict) or hour.get("period") != now.strftime("%Y-%m-%dT%H"):
+            return None
+        used = hour["reading"] - day["start"]
+        return used if used >= 0 else None
+
+    def _closed(self, scope: str, period: str) -> float | None:
+        """Return the kWh of the previous day or month when it was measured from start to end."""
+        last = self._state.get(f"last_{scope}")
+        if not isinstance(last, dict) or last.get("period") != period:
             return None
         return last.get("energy")
+
+    def electricity_yesterday(self, now: datetime) -> float | None:
+        """Return the kWh the meter counted over the whole of yesterday, or None when not measured."""
+        return self._closed("day", (now - timedelta(days=1)).strftime("%Y-%m-%d"))
+
+    def electricity_last_month(self, now: datetime) -> float | None:
+        """Return the kWh the meter counted over the whole of last month, or None when not measured."""
+        return self._closed("month", (now.replace(day=1) - timedelta(days=1)).strftime("%Y-%m"))
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -312,6 +373,7 @@ METERED_COP_DESCRIPTIONS = (
     MeteredCopDescription(key="metered_cop_today", name="COP today (metered)"),
     MeteredCopDescription(key="metered_cop_yesterday", name="COP yesterday (metered)", span="yesterday"),
     MeteredCopDescription(key="metered_cop_month", name="COP this month (metered)", span="month"),
+    MeteredCopDescription(key="metered_cop_last_month", name="COP last month (metered)", span="last_month"),
 )
 
 
@@ -347,10 +409,15 @@ class CSNetHomeMeteredCopSensor(CoordinatorEntity, SensorEntity):
         """Return (heat, electricity) in kWh for the sensor's span."""
         now = dt_util.now()
         span = self.entity_description.span
-        heat = read_span(self.coordinator.get_server_energy(), span, HEAT, None, now)
+        energy = self.coordinator.get_server_energy()
+        if span == "today":
+            # both up to the last full hour: the server counts heat by the hour
+            return energy_on_day(energy, now.date(), HEAT, before_hour=now.hour), self._tracker.electricity_until_this_hour(now)
         if span == "yesterday":
-            return heat, self._tracker.electricity_yesterday(now)
-        return heat, self._tracker.electricity("month" if span == "month" else "day", now)
+            return read_span(energy, span, HEAT, None, now), self._tracker.electricity_yesterday(now)
+        if span == "last_month":
+            return energy_in_month(energy, now.date().replace(day=1) - timedelta(days=1), HEAT), self._tracker.electricity_last_month(now)
+        return read_span(energy, span, HEAT, None, now), self._tracker.electricity("month", now)
 
     @property
     def native_value(self) -> float | None:

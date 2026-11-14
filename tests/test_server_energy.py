@@ -8,7 +8,7 @@ import pytest
 from homeassistant.util import dt as dt_util
 
 from custom_components.csnet_home.api import CSNetHomeAPI
-from custom_components.csnet_home.coordinator import SERVER_ENERGY_POLL_SECONDS, CSNetHomeCoordinator
+from custom_components.csnet_home.coordinator import SERVER_ENERGY_POLL_SECONDS, SERVER_ENERGY_RETRY_SECONDS, CSNetHomeCoordinator
 from custom_components.csnet_home.server_energy import (
     ELECTRICITY,
     HEAT,
@@ -147,12 +147,18 @@ async def test_coordinator_reads_the_records_every_15_minutes_and_keeps_them_on_
     clock[0] += SERVER_ENERGY_POLL_SECONDS
     api.async_get_power_data.side_effect = RuntimeError("boom")
     await coordinator._async_update_data()
+    assert api.async_get_power_data.await_count == 2
+    # a failed request is not repeated on every poll, only after the retry delay
     api.async_get_power_data.side_effect = None
     api.async_get_power_data.return_value = None
-    clock[0] += 60
+    for _ in range(3):
+        clock[0] += 60
+        await coordinator._async_update_data()
+    assert api.async_get_power_data.await_count == 2
+    clock[0] += SERVER_ENERGY_RETRY_SECONDS
     await coordinator._async_update_data()
-    assert coordinator.get_server_energy() is ENERGY
     assert api.async_get_power_data.await_count == 3
+    assert coordinator.get_server_energy() is ENERGY
 
 
 def _set_meter(hass, value, unit="kWh"):
@@ -248,7 +254,7 @@ async def test_meter_reset_and_another_meter_start_over(hass, hass_storage):
 
 
 async def test_metered_cop_is_heat_over_measured_electricity(hass, hass_storage, monkeypatch):
-    """Server heat divided by what the meter counted; unknown while the period is not measured."""
+    """Heat and electricity both up to the last full hour; unknown while the period is not measured."""
     monkeypatch.setattr(dt_util, "now", lambda: at(13, 0, 1))
     coordinator = SimpleNamespace(get_server_energy=lambda: ENERGY, async_add_listener=lambda *a, **k: lambda: None, last_update_success=True)
     tracker = MeterTracker(hass, "entry", "sensor.any_meter")
@@ -259,19 +265,63 @@ async def test_metered_cop_is_heat_over_measured_electricity(hass, hass_storage,
     tracker.async_update(dt_util.now())
     assert sensors["today"].native_value is None  # nothing used yet
 
-    monkeypatch.setattr(dt_util, "now", lambda: at(13, 8, 30))
+    # 08:01: the meter is read at the start of the hour; eight full hours have 40 kWh of heat
+    monkeypatch.setattr(dt_util, "now", lambda: at(13, 8, 1))
     _set_meter(hass, "510.0")
-    assert sensors["today"].native_value == 4.0  # 40 kWh of heat for 10 kWh
+    tracker.async_update(dt_util.now())
+    assert sensors["today"].native_value == 4.0
     assert sensors["today"].extra_state_attributes == {"heat_kwh": 40, "electricity_kwh": 10.0, "meter": "sensor.any_meter"}
+
+    # 08:55: more electricity was used, but the hour is not complete: the COP does not sag
+    monkeypatch.setattr(dt_util, "now", lambda: at(13, 8, 55))
+    _set_meter(hass, "511.2")
+    tracker.async_update(dt_util.now())
+    assert sensors["today"].native_value == 4.0
+
     assert sensors["yesterday"].native_value is None  # the 12th was not measured
     assert sensors["month"].native_value is None  # nor November from its first day
-
-    _set_meter(hass, "510.2")
-    monkeypatch.setattr(dt_util, "now", lambda: at(13, 8, 31))
-    assert sensors["today"].native_value == pytest.approx(3.92)
+    assert sensors["last_month"].native_value is None
 
     _set_meter(hass, "unavailable")
-    assert sensors["today"].native_value is None
+    assert sensors["today"].native_value == 4.0  # the hour's reading was already taken
+    assert sensors["month"].native_value is None
+
+
+async def test_cop_today_is_unknown_when_the_hour_was_not_read_at_its_start(hass, hass_storage, monkeypatch):
+    """Home Assistant started in the middle of an hour: no figure until the next hour begins."""
+    coordinator = SimpleNamespace(get_server_energy=lambda: ENERGY, async_add_listener=lambda *a, **k: lambda: None, last_update_success=True)
+    tracker = MeterTracker(hass, "entry", "sensor.any_meter")
+    await tracker.async_load()
+    today = CSNetHomeMeteredCopSensor(coordinator, METERED_COP_DESCRIPTIONS[0], None, tracker)
+
+    _set_meter(hass, "500.0")
+    tracker.async_update(at(13, 0, 1))
+    monkeypatch.setattr(dt_util, "now", lambda: at(13, 8, 40))
+    _set_meter(hass, "510.0")
+    tracker.async_update(dt_util.now())
+    assert today.native_value is None
+
+    monkeypatch.setattr(dt_util, "now", lambda: at(13, 9, 0))
+    _set_meter(hass, "512.0")
+    tracker.async_update(dt_util.now())
+    # ENERGY has hours 0 to 7 only: 40 kWh of heat for 12 kWh
+    assert today.native_value == pytest.approx(3.33, abs=0.01)
+
+
+async def test_cop_last_month_needs_a_month_measured_from_start_to_end(hass, hass_storage, monkeypatch):
+    """October is closed at the first poll of November, if it was measured from its first minutes."""
+    coordinator = SimpleNamespace(get_server_energy=lambda: ENERGY, async_add_listener=lambda *a, **k: lambda: None, last_update_success=True)
+    tracker = MeterTracker(hass, "entry", "sensor.any_meter")
+    await tracker.async_load()
+    last_month = next(CSNetHomeMeteredCopSensor(coordinator, d, None, tracker) for d in METERED_COP_DESCRIPTIONS if d.span == "last_month")
+
+    _set_meter(hass, "1000.0")
+    tracker.async_update(at(1, 0, 2, month=10))
+    _set_meter(hass, "1300.0")
+    tracker.async_update(at(1, 0, 3, month=11))
+    monkeypatch.setattr(dt_util, "now", lambda: at(13, 9, 0))
+    assert tracker.electricity_last_month(dt_util.now()) == pytest.approx(300.0)
+    assert last_month.native_value == 3.0  # 900 kWh of heat in October
 
 
 async def test_cop_sensors_exist_only_while_a_meter_is_configured(hass, hass_storage):
@@ -290,7 +340,7 @@ async def test_cop_sensors_exist_only_while_a_meter_is_configured(hass, hass_sto
     )
     with_meter = SimpleNamespace(entry_id="entry", data={"energy_meter": "sensor.any_meter"})
     keys = [s.entity_description.key for s in _server_energy_sensors(hass, with_meter, coordinator)]
-    assert keys[-3:] == ["metered_cop_today", "metered_cop_yesterday", "metered_cop_month"]
+    assert keys[-4:] == ["metered_cop_today", "metered_cop_yesterday", "metered_cop_month", "metered_cop_last_month"]
 
     registry = er.async_get(hass)
     registry.async_get_or_create("sensor", DOMAIN, f"{DOMAIN}-metered_cop_today")
@@ -298,3 +348,104 @@ async def test_cop_sensors_exist_only_while_a_meter_is_configured(hass, hass_sto
     keys = [s.entity_description.key for s in _server_energy_sensors(hass, without_meter, coordinator)]
     assert not [key for key in keys if key.startswith("metered_cop")]
     assert registry.async_get_entity_id("sensor", DOMAIN, f"{DOMAIN}-metered_cop_today") is None
+
+
+def test_each_unit_uses_its_hours_or_its_day_record():
+    """One unit with hours for the day and one with only the day's record are both counted."""
+    two = [
+        {"hourly": [rec(5, year=2026, month=11, day=13, hour=h) for h in range(8)], "daily": []},
+        {"hourly": [], "daily": [rec(30, year=2026, month=11, day=13)]},
+    ]
+    assert energy_on_day(two, date(2026, 11, 13), HEAT) == 70
+    # up to a given hour only complete hours count, and day records cannot be split
+    assert energy_on_day(two, date(2026, 11, 13), HEAT, before_hour=4) == 20
+
+
+def test_a_meter_fitted_recently_is_recognised():
+    """Years of records without electricity do not hide a meter that counts now."""
+    old = [rec(1000, year=2025, month=m) for m in range(1, 13)]
+    recent = [rec(900, 250, year=2026, month=9), rec(950, 260, year=2026, month=10), rec(1000, 280, year=2026, month=11)]
+    assert has_pulse_meter([{"monthly": old + recent}]) is True
+    assert has_pulse_meter([{"monthly": old + [rec(900, 1, year=2026, month=11)]}]) is False
+
+
+def test_heat_counters_carry_a_reset_time_instead_of_being_ever_increasing(monkeypatch):
+    """A figure the server corrects downwards must not look like a meter reset to the recorder."""
+    from homeassistant.components.sensor import SensorStateClass
+
+    monkeypatch.setattr(dt_util, "now", lambda: NOW)
+    coordinator = SimpleNamespace(get_server_energy=lambda: ENERGY, async_add_listener=lambda *a, **k: lambda: None, last_update_success=True)
+    sensors = {d.key: CSNetHomeServerEnergySensor(coordinator, d, None) for d in server_energy_descriptions(ENERGY)}
+
+    assert sensors["server_heat_today"].state_class is SensorStateClass.TOTAL
+    assert sensors["server_heat_today"].last_reset == dt_util.start_of_local_day()
+    assert sensors["server_heat_month"].last_reset == dt_util.start_of_local_day().replace(day=1)
+    assert sensors["server_heat_yesterday"].state_class is None
+    assert sensors["server_heat_yesterday"].last_reset is None
+
+
+async def test_energy_request_never_signs_in_again(hass):
+    """A page instead of data fails that request only: no new login, no failed-login count."""
+    import aiohttp
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.logged_in = True
+    api.xsrf_token = "token"
+    api.async_login = AsyncMock(return_value=True)
+    api._register_login_failure = MagicMock()
+    response = MagicMock()
+    response.status = 200
+    response.url = "https://www.csnetmanager.com/data/power/indoors"
+    response.json = AsyncMock(side_effect=aiohttp.ContentTypeError(MagicMock(), ()))
+    manager = MagicMock()
+    manager.__aenter__ = AsyncMock(return_value=response)
+    manager.__aexit__ = AsyncMock(return_value=False)
+    api.session = MagicMock()
+    api.session.closed = False
+    api.session.get = MagicMock(return_value=manager)
+
+    assert await api.async_get_power_data() is None
+    assert api.session.get.call_count == 1
+    api.async_login.assert_not_awaited()
+    api._register_login_failure.assert_not_called()
+    assert api.logged_in is True
+
+
+async def test_energy_sensors_through_home_assistant_and_added_when_data_arrives_late(hass, hass_storage):
+    """Real setup: no records at start, records on a later poll; the sensors appear and validate."""
+    from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    from custom_components.csnet_home.const import DOMAIN
+
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_USERNAME: "user", CONF_PASSWORD: "pass", "energy_meter": "sensor.any_meter"})
+    entry.add_to_hass(hass)
+    _set_meter(hass, "100.0")
+    from unittest.mock import patch
+
+    update = AsyncMock(return_value={"sensors": [], "common_data": {}})
+    with (
+        patch("custom_components.csnet_home.coordinator.CSNetHomeCoordinator._async_update_data", update),
+        patch("custom_components.csnet_home.CSNetHomeAPI.close", AsyncMock()),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        assert hass.states.get("sensor.system_controller_heat_produced_today") is None
+
+        coordinator = entry.runtime_data.coordinator
+        coordinator._server_energy = ENERGY
+        coordinator.async_set_updated_data({"sensors": [], "common_data": {}})
+        await hass.async_block_till_done()
+
+        state = hass.states.get("sensor.system_controller_heat_produced_this_month")
+        assert state is not None and float(state.state) == 1200
+        assert state.attributes["state_class"] == "total"
+        assert state.attributes["last_reset"]
+        assert hass.states.get("sensor.system_controller_heat_produced_yesterday") is not None
+        assert hass.states.get("sensor.system_controller_cop_today_metered") is not None
+        assert hass.states.get("sensor.system_controller_cop_last_month_metered").state == "unknown"
+
+        # further polls add nothing twice
+        coordinator.async_set_updated_data({"sensors": [], "common_data": {}})
+        await hass.async_block_till_done()
+        assert await hass.config_entries.async_unload(entry.entry_id)
