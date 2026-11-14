@@ -20,6 +20,78 @@ The cards find their entities themselves, so a card works as soon as you add it,
 
 Tap any value to open its entity's details.
 
+<div class="csnet-video" markdown>
+<iframe src="../../videos/csnet-home-tour/?embed=1&lang=en" title="A one-minute narrated tour of the integration" loading="lazy" allow="fullscreen; autoplay" allowfullscreen></iframe>
+</div>
+
+*A one-minute narrated tour ([version française](../../videos/csnet-home-tour/?lang=fr)).*
+
+![A heat pump view built only from the bundled cards](../images/cards/board-light.jpg#only-light){ loading=lazy }
+![A heat pump view built only from the bundled cards](../images/cards/board-dark.jpg#only-dark){ loading=lazy }
+
+*A view made only of the bundled cards, on a Yutaki S with two circuits (test instance, two days of history).*
+
+## The cards
+
+### Heat pump
+
+![Heat pump card](../images/cards/card-heat-pump-light.jpg#only-light){ loading=lazy width="560" }
+![Heat pump card](../images/cards/card-heat-pump-dark.jpg#only-dark){ loading=lazy width="560" }
+
+### Water circuit
+
+![Water circuit card](../images/cards/card-water-circuit-light.jpg#only-light){ loading=lazy width="560" }
+![Water circuit card](../images/cards/card-water-circuit-dark.jpg#only-dark){ loading=lazy width="560" }
+
+### Heating curve
+
+![Heating curve card](../images/cards/card-heating-curve-light.jpg#only-light){ loading=lazy width="560" }
+![Heating curve card](../images/cards/card-heating-curve-dark.jpg#only-dark){ loading=lazy width="560" }
+
+### Performance
+
+![Performance card](../images/cards/card-performance-light.jpg#only-light){ loading=lazy width="560" }
+![Performance card](../images/cards/card-performance-dark.jpg#only-dark){ loading=lazy width="560" }
+
+### System health
+
+![System health card](../images/cards/card-system-health-light.jpg#only-light){ loading=lazy width="560" }
+![System health card](../images/cards/card-system-health-dark.jpg#only-dark){ loading=lazy width="560" }
+
+### Refrigerant circuit
+
+![Refrigerant circuit card](../images/cards/card-refrigerant-light.jpg#only-light){ loading=lazy width="560" }
+![Refrigerant circuit card](../images/cards/card-refrigerant-dark.jpg#only-dark){ loading=lazy width="560" }
+
+### Temperatures
+
+![Temperatures card](../images/cards/card-temperatures-light.jpg#only-light){ loading=lazy width="560" }
+![Temperatures card](../images/cards/card-temperatures-dark.jpg#only-dark){ loading=lazy width="560" }
+
+### Activity
+
+![Activity card](../images/cards/card-activity-light.jpg#only-light){ loading=lazy width="560" }
+![Activity card](../images/cards/card-activity-dark.jpg#only-dark){ loading=lazy width="560" }
+
+### Energy per day
+
+![Energy per day card](../images/cards/card-daily-energy-light.jpg#only-light){ loading=lazy width="560" }
+![Energy per day card](../images/cards/card-daily-energy-dark.jpg#only-dark){ loading=lazy width="560" }
+
+With a few days of history only, as here, the chart has few bars; it fills up as Home Assistant keeps statistics.
+
+### Power today
+
+![Power today card](../images/cards/card-power-profile-light.jpg#only-light){ loading=lazy width="560" }
+![Power today card](../images/cards/card-power-profile-dark.jpg#only-dark){ loading=lazy width="560" }
+
+### Energy signature
+
+![Energy signature card](../images/cards/card-energy-signature-light.jpg#only-light){ loading=lazy width="560" }
+![Energy signature card](../images/cards/card-energy-signature-dark.jpg#only-dark){ loading=lazy width="560" }
+
+It needs an electricity figure (your meter, or the electricity CSNet records with a pulse meter) and at least 7 days of history for the fit.
+
 ## Less to configure
 
 The cards take what the integration already knows:

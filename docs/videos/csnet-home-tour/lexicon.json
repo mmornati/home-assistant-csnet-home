@@ -1,0 +1,16 @@
+{
+  "_doc": "Pronunciation fixes, applied to the spoken text only (subtitles keep the original). Keys are whole words, case-sensitive. A [[…]] value is raw IPA (Kokoro, Azure). '<lang>@<engine>' entries override '<lang>' for one engine. Use the narration-lexicon skill to find and verify entries. French: Kokoro reads 'Home Assistant' as 'hommes assistants', hence the respelling; ATW-IOT-01 needs a pause between letters.",
+  "en": {
+    "ATW-IOT-01": "A T W, I O T, zero one",
+    "CSNet": "C S Net",
+    "HACS": "hacks",
+    "COP": "C O P"
+  },
+  "fr": {
+    "ATW-IOT-01": "A, T, W, I, O, T, zéro un,",
+    "CSNet": "C S Nette",
+    "HACS": "H A C S",
+    "COP": "C O P",
+    "Home Assistant": "Hôme Assistannte"
+  }
+}

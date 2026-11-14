@@ -379,6 +379,9 @@ The unit can still run warmer water than the curve when a room is far below its 
 
 The **Heating curve** dashboard card shipped with the integration draws these curves, see [Dashboard Cards](Dashboard-Cards.md).
 
+![Heating curve card with a Points curve on circuit 1 and a Gradient curve on circuit 2](../images/cards/card-heating-curve-light.jpg#only-light){ loading=lazy }
+![Heating curve card with a Points curve on circuit 1 and a Gradient curve on circuit 2](../images/cards/card-heating-curve-dark.jpg#only-dark){ loading=lazy }
+
 **Attributes**, for cards and templates:
 
 | Attribute | Content |

@@ -469,6 +469,14 @@ When a circuit's OTC type is `Fixed`, a fixed water temperature number entity is
 **What is OTC?**
 Outdoor Temperature Compensation automatically adjusts water temperature based on outdoor conditions for optimal efficiency and comfort.
 
+### Heating Curve Water Temperature C1 / C2
+**Entity**: `sensor.system_controller_circuit_1_heating_curve_water_temperature` (and `circuit_2`)  
+**Unit**: °C  
+**Device Class**: `temperature`  
+**Description**: Water temperature the circuit's heating curve asks for at the unit's average outdoor temperature, computed from the curve values you enter in the integration options (**Configure**). Created only for circuits on a Points or Gradient curve whose values you entered; unavailable when the unit's curve type changes.
+
+**Attributes**: `curve_type`, `outdoor_temperature`, `curve` (`[outdoor, water]` pairs to draw it), `vertex_offset`, the minimum and maximum water temperature when the unit reports them, and the values you entered. See [Heating Curve Values](Advanced-Features.md#heating-curve-values-water-law).
+
 ---
 
 ## Energy and Performance Sensors

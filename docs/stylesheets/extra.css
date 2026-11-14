@@ -108,3 +108,7 @@
   -webkit-mask-image: var(--md-admonition-icon--warning);
   mask-image: var(--md-admonition-icon--warning);
 }
+
+/* Narrated video embedded in a page (docs/videos) */
+.csnet-video { container-type: inline-size; margin: 1.5rem 0 0.5rem; }
+.csnet-video iframe { display: block; width: 100%; height: calc(56.25cqw + 40px); border: 0; border-radius: 4px; }

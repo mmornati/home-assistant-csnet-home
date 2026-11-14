@@ -23,6 +23,8 @@ repos:
           - --skip="./.*,*.csv,*.json"
           - --quiet-level=2
         exclude_types: [csv, json]
+        # the video folder holds a vendored player and French narration; release notes are history
+        exclude: '^(docs/videos/|docs/release-notes\.md$)'
   - repo: https://github.com/pycqa/flake8
     rev: 7.0.0
     hooks:
