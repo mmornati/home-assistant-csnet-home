@@ -20,6 +20,7 @@ from custom_components.csnet_home.server_energy import (
     energy_on_day,
     has_energy,
     has_pulse_meter,
+    hours_complete_on_day,
     meter_reading_kwh,
     meter_storage_key,
     server_energy_descriptions,
@@ -254,7 +255,7 @@ async def test_meter_reset_and_another_meter_start_over(hass, hass_storage):
 
 
 async def test_metered_cop_is_heat_over_measured_electricity(hass, hass_storage, monkeypatch):
-    """Heat and electricity both up to the last full hour; unknown while the period is not measured."""
+    """Heat and electricity both up to the last hour the server has recorded; unknown while not measured."""
     monkeypatch.setattr(dt_util, "now", lambda: at(13, 0, 1))
     coordinator = SimpleNamespace(get_server_energy=lambda: ENERGY, async_add_listener=lambda *a, **k: lambda: None, last_update_success=True)
     tracker = MeterTracker(hass, "entry", "sensor.any_meter")
@@ -263,18 +264,24 @@ async def test_metered_cop_is_heat_over_measured_electricity(hass, hass_storage,
 
     _set_meter(hass, "500.0")
     tracker.async_update(dt_util.now())
-    assert sensors["today"].native_value is None  # nothing used yet
+    assert sensors["today"].native_value is None  # ENERGY has hours 0 to 7, but 08:00 was not reached yet
 
-    # 08:01: the meter is read at the start of the hour; eight full hours have 40 kWh of heat
+    # 08:01: the meter is read at the start of the hour; the eight recorded hours have 40 kWh of heat
     monkeypatch.setattr(dt_util, "now", lambda: at(13, 8, 1))
     _set_meter(hass, "510.0")
     tracker.async_update(dt_util.now())
     assert sensors["today"].native_value == 4.0
     assert sensors["today"].extra_state_attributes == {"heat_kwh": 40, "electricity_kwh": 10.0, "meter": "sensor.any_meter"}
 
-    # 08:55: more electricity was used, but the hour is not complete: the COP does not sag
+    # 08:55: more electricity was used, but the hour is not recorded yet: the COP does not sag
     monkeypatch.setattr(dt_util, "now", lambda: at(13, 8, 55))
     _set_meter(hass, "511.2")
+    tracker.async_update(dt_util.now())
+    assert sensors["today"].native_value == 4.0
+
+    # 09:01: a new hour began, but the server has not delivered the 08:00 hour yet: still 4.0, no dip
+    monkeypatch.setattr(dt_util, "now", lambda: at(13, 9, 1))
+    _set_meter(hass, "512.0")
     tracker.async_update(dt_util.now())
     assert sensors["today"].native_value == 4.0
 
@@ -283,12 +290,12 @@ async def test_metered_cop_is_heat_over_measured_electricity(hass, hass_storage,
     assert sensors["last_month"].native_value is None
 
     _set_meter(hass, "unavailable")
-    assert sensors["today"].native_value == 4.0  # the hour's reading was already taken
+    assert sensors["today"].native_value == 4.0  # the readings it needs were already taken
     assert sensors["month"].native_value is None
 
 
 async def test_cop_today_is_unknown_when_the_hour_was_not_read_at_its_start(hass, hass_storage, monkeypatch):
-    """Home Assistant started in the middle of an hour: no figure until the next hour begins."""
+    """No reading at 08:00 (Home Assistant was off then): no figure while the server's last hour ends at 08:00."""
     coordinator = SimpleNamespace(get_server_energy=lambda: ENERGY, async_add_listener=lambda *a, **k: lambda: None, last_update_success=True)
     tracker = MeterTracker(hass, "entry", "sensor.any_meter")
     await tracker.async_load()
@@ -301,11 +308,19 @@ async def test_cop_today_is_unknown_when_the_hour_was_not_read_at_its_start(hass
     tracker.async_update(dt_util.now())
     assert today.native_value is None
 
-    monkeypatch.setattr(dt_util, "now", lambda: at(13, 9, 0))
-    _set_meter(hass, "512.0")
-    tracker.async_update(dt_util.now())
-    # ENERGY has hours 0 to 7 only: 40 kWh of heat for 12 kWh
-    assert today.native_value == pytest.approx(3.33, abs=0.01)
+    # the readings are kept across a restart
+    await hass.async_block_till_done()
+    restarted = MeterTracker(hass, "entry", "sensor.any_meter")
+    await restarted.async_load()
+    assert restarted._state["hours"] == {"period": "2026-11-13", "marks": {"0": 500.0}}
+
+
+def test_hours_recorded_so_far():
+    """The hour after the last record of the day, or None without records for it."""
+    assert hours_complete_on_day(ENERGY, date(2026, 11, 13)) == 8
+    assert hours_complete_on_day(ENERGY, date(2026, 11, 12)) == 24
+    assert hours_complete_on_day(ENERGY, date(2026, 11, 1)) is None
+    assert hours_complete_on_day(None, date(2026, 11, 13)) is None
 
 
 async def test_cop_last_month_needs_a_month_measured_from_start_to_end(hass, hass_storage, monkeypatch):

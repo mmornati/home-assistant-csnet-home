@@ -110,6 +110,20 @@ def energy_on_day(energy, day: date, kind: str, use: str | None = None, before_h
     return total
 
 
+def hours_complete_on_day(energy, day: date) -> int | None:
+    """Return how many hours of the day the server has recorded (the hour after the last record), or None.
+
+    The record stamped with hour h holds the energy of h:00 to h+1:00 and
+    appears a few minutes after that hour has ended.
+    """
+    hours = [
+        r["time"].get("hour")
+        for r in _records(energy, "hourly")
+        if _matches(r, year=day.year, month=day.month, day=day.day) and isinstance(r["time"].get("hour"), int)
+    ]
+    return max(hours) + 1 if hours else None
+
+
 def energy_in_month(energy, day: date, kind: str, use: str | None = None) -> float | None:
     """Return the kWh of the month the day is in, or None when the records were never read."""
     if not isinstance(energy, list):
@@ -287,13 +301,14 @@ class MeterTracker:
         if reading is None:
             return
         changed = False
-        # the reading at the start of the hour: what was used up to the last full hour
-        hour_id = now.strftime("%Y-%m-%dT%H")
-        if (self._state.get("hour") or {}).get("period") != hour_id:
-            if now - now.replace(minute=0, second=0, microsecond=0) <= PERIOD_START_TOLERANCE:
-                self._state["hour"] = {"period": hour_id, "reading": reading}
-            else:
-                self._state.pop("hour", None)
+        # the reading at the start of each hour of today: what was used up to that hour
+        day_id = now.strftime("%Y-%m-%d")
+        hours = self._state.get("hours")
+        if not isinstance(hours, dict) or hours.get("period") != day_id or not isinstance(hours.get("marks"), dict):
+            hours = self._state["hours"] = {"period": day_id, "marks": {}}
+            changed = True
+        if str(now.hour) not in hours["marks"] and now - now.replace(minute=0, second=0, microsecond=0) <= PERIOD_START_TOLERANCE:
+            hours["marks"][str(now.hour)] = reading
             changed = True
         for scope, (period, began) in _period_ids(now).items():
             current = self._state.get(scope)
@@ -331,20 +346,24 @@ class MeterTracker:
             return None
         return reading - current["start"]
 
-    def electricity_until_this_hour(self, now: datetime) -> float | None:
-        """Return the kWh counted from midnight to the start of the current hour, or None when not measured.
+    def electricity_until_hour(self, now: datetime, hour: int) -> float | None:
+        """Return the kWh counted today from midnight to the start of the given hour, or None when not measured.
 
-        The server counts heat by full hours, so this is the electricity that
-        goes with the heat of the hours already complete.
+        The server counts heat by full hours, and an hour's record arrives a
+        few minutes after it ended. This is the electricity that goes with
+        the heat of the hours the server has recorded.
         """
+        day_id = now.strftime("%Y-%m-%d")
         day = self._state.get("day")
-        hour = self._state.get("hour")
-        if not isinstance(day, dict) or day.get("period") != now.strftime("%Y-%m-%d") or not day.get("from_start"):
+        hours = self._state.get("hours")
+        if not isinstance(day, dict) or day.get("period") != day_id or not day.get("from_start"):
             return None
-        if not isinstance(hour, dict) or hour.get("period") != now.strftime("%Y-%m-%dT%H"):
+        if not isinstance(hours, dict) or hours.get("period") != day_id:
             return None
-        used = hour["reading"] - day["start"]
-        return used if used >= 0 else None
+        reading = (hours.get("marks") or {}).get(str(hour))
+        if not isinstance(reading, (int, float)) or reading < day["start"]:
+            return None
+        return reading - day["start"]
 
     def _closed(self, scope: str, period: str) -> float | None:
         """Return the kWh of the previous day or month when it was measured from start to end."""
@@ -411,8 +430,11 @@ class CSNetHomeMeteredCopSensor(CoordinatorEntity, SensorEntity):
         span = self.entity_description.span
         energy = self.coordinator.get_server_energy()
         if span == "today":
-            # both up to the last full hour: the server counts heat by the hour
-            return energy_on_day(energy, now.date(), HEAT, before_hour=now.hour), self._tracker.electricity_until_this_hour(now)
+            # both up to the last hour the server has recorded: it counts heat by the hour
+            complete = hours_complete_on_day(energy, now.date())
+            if complete is None:
+                return None, None
+            return energy_on_day(energy, now.date(), HEAT, before_hour=complete), self._tracker.electricity_until_hour(now, complete)
         if span == "yesterday":
             return read_span(energy, span, HEAT, None, now), self._tracker.electricity_yesterday(now)
         if span == "last_month":
