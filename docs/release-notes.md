@@ -7,21 +7,65 @@ description: What changed in each version of the Hitachi CSNet Home integration,
 
 Every version of the integration, newest first. Install or update from HACS; each version is also on the [GitHub releases page](https://github.com/mmornati/home-assistant-csnet-home/releases).
 
-## Next release (not released yet)
+## 2.14.2
 
-These changes are merged or waiting for review and will ship in the next version.
+*14 November 2026* · [GitHub release](https://github.com/mmornati/home-assistant-csnet-home/releases/tag/2.14.2)
 
-### Heating curves you can describe
+A fix to the dashboard cards of 2.14.1. Nothing changes in the entities or in what is sent to the unit.
 
-CSNet reports which kind of heating curve (water law, "loi d'eau") each circuit uses, but not its values. The new **Configure** form of the integration lets you copy them from the unit controller: two points for a **Points** curve, the gradient for a **Gradient** curve, and the vertex offset. Each described circuit gets a sensor with the water temperature its curve asks for at the unit's average outdoor temperature, with the whole curve in its attributes. Nothing is sent to the unit. See [Heating Curve Values](wiki/Advanced-Features.md#heating-curve-values-water-law). ([#246](https://github.com/mmornati/home-assistant-csnet-home/pull/246))
+#### Fixed
 
-### Dashboard cards shipped with the integration
+- **Yesterday's electricity also counted today** on the performance card, so yesterday's COP was too low (for example 1.20 instead of 2.43). Home Assistant answers a request for daily figures up to midnight with today's partial day too; the cards now leave it out. The same fix stops this month from counting today twice, and keeps today's partial day out of the energy signature's fit and 7-day average. ([#250](https://github.com/mmornati/home-assistant-csnet-home/pull/250))
 
-Eleven cards appear in the dashboard **Add card** picker, with nothing else to install: heat pump overview, live water circuit, heating curve, performance (COP), system health, refrigerant circuit, temperatures, what ran, energy per day, power today against the usual day, and the energy signature with tomorrow's forecast. They find their entities by themselves, use your electricity meter and its power sensor when you chose one in the settings, show the cost with the price of the Energy dashboard, follow light and dark themes, and speak English, French and Spanish. See [Dashboard Cards](wiki/Dashboard-Cards.md). ([#247](https://github.com/mmornati/home-assistant-csnet-home/pull/247))
+After updating, reload the dashboard page (or clear the app cache on phones) so the browser loads the new cards.
 
-### More equipment
+## 2.14.1
 
-Sensors for hot water tanks (mode, anti-legionella), fan coils (actual fan speed), R290 units (primary flow) and cascades (units enabled, working, required), created only when the unit reports them; accounts with several installations are reported in the diagnostics. ([#245](https://github.com/mmornati/home-assistant-csnet-home/pull/245))
+*14 November 2026* · [GitHub release](https://github.com/mmornati/home-assistant-csnet-home/releases/tag/2.14.1)
+
+Fixes to the dashboard cards found on a real installation with an electricity meter and peak/off-peak tariffs, and a language setting for the cards. Nothing changes in the entities or in what is sent to the unit.
+
+#### Please read before updating
+
+- After updating, reload the dashboard page (or clear the app cache on phones) so the browser loads the new cards.
+
+#### Added
+
+- **Card language.** A new setting in the integration settings (Reconfigure): Automatic (each user's Home Assistant profile language, as before, and the default), English, French or Spanish. Each card can also set its own `language` in its editor.
+
+#### Fixed
+
+- **Electricity today showed 0.0 kWh** on the heat pump card when a meter is chosen but its first full day is not over. The card now reads today's and this month's electricity from the meter's own history.
+- **COP from the meter right away.** The performance and heat pump cards no longer wait a full day or month after choosing a meter: until the metered COP sensors have a full period, they compute the COP from the meter's history (yesterday, this month when the meter has every day of it, today over the hours CSNet has recorded). The performance card no longer asks to choose a meter that is already chosen, and the heat pump card no longer shows an estimated COP of 0.
+- **Cost with peak and off-peak tariffs.** With one Energy dashboard grid source per tariff, the cards used only the first price. They now use today's average, each tariff weighted by what it counted today.
+- **The energy signature card ignored `price_entity`.** It is now used, and offered in its editor.
+
+([#249](https://github.com/mmornati/home-assistant-csnet-home/pull/249))
+
+## 2.14.0
+
+*14 November 2026* · [GitHub release](https://github.com/mmornati/home-assistant-csnet-home/releases/tag/2.14.0)
+
+Heating curves you can describe, eleven dashboard cards shipped with the integration, and sensors for more kinds of equipment. No existing entity is renamed or removed, and nothing new is sent to the unit.
+
+#### Please read before updating
+
+- **The integration now loads after the frontend** and serves its own dashboard cards from `/csnet_home_frontend/`. After updating, reload the browser page (or clear the app cache on phones) so the card picker sees them.
+- **A Configure button** appears on the integration when the unit reports a heating curve type. It is optional: without values, no curve sensor is created.
+
+#### Added
+
+- **Heating curve values (water law, "loi d'eau").** CSNet reports which kind of curve each circuit uses, but not its values. Copy them once from the unit controller into **Settings → Devices & services → Hitachi CSNet Home → Configure**: two points for a Points curve, the gradient for a Gradient curve, and the vertex offset. Each described circuit gets `sensor.…_circuit_N_heating_curve_water_temperature`, the water temperature its curve asks for at the unit's average outdoor temperature, with the whole curve in its attributes. ([#246](https://github.com/mmornati/home-assistant-csnet-home/pull/246))
+- **Eleven dashboard cards, nothing else to install.** Search for "CSNet" in the **Add card** picker: heat pump overview, live water circuit, heating curve, performance (COP), system health, refrigerant circuit, temperatures, what ran, energy per day, power today against the usual day, and the energy signature with tomorrow's forecast. They find their entities by themselves (renamed entities too), use the electricity meter chosen in the settings and the power sensor next to it, show the cost with the price of the Energy dashboard, follow light and dark themes, and speak English, French and Spanish. ([#247](https://github.com/mmornati/home-assistant-csnet-home/pull/247))
+- **More equipment.** Hot water tank mode and anti-legionella, actual fan coil speed, R290 primary water flow, and cascade unit counts, each created only when the unit reports it. Accounts with several installations are reported in the diagnostics. ([#245](https://github.com/mmornati/home-assistant-csnet-home/pull/245))
+
+#### Documentation
+
+New [Dashboard Cards](https://mmornati.github.io/home-assistant-csnet-home/wiki/Dashboard-Cards/) page, a short narrated tour video in English and French on the home page, and a [Release notes](https://mmornati.github.io/home-assistant-csnet-home/release-notes/) page with every version since 1.0.0. ([#248](https://github.com/mmornati/home-assistant-csnet-home/pull/248))
+
+#### Tested on
+
+A Yutaki S with two circuits (a Points curve and a Gradient curve), no hot water tank, no cooling and no pulse meter, on Home Assistant 2026.11. The cards were checked in the card picker, the editor and more-info dialogs, in light and dark themes, in English and French. The equipment sensors of #245 could not be checked live: that unit has none of that equipment.
 
 ## 2.13.0
 
