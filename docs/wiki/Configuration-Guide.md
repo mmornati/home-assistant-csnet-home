@@ -198,6 +198,7 @@ Additional sensors for overall system monitoring:
 - `sensor.system_controller_otc_cooling_type_c1`
 - `sensor.system_controller_otc_heating_type_c2`
 - `sensor.system_controller_otc_cooling_type_c2`
+- `sensor.system_controller_circuit_1_heating_curve_water_temperature` and `..._circuit_2_...`: only once you enter the curve values in the options, see [Heating Curve Values](Advanced-Features.md#heating-curve-values-water-law)
 
 #### Energy and Performance Sensors (estimated)
 - `sensor.system_controller_instant_consumption`
@@ -312,7 +313,7 @@ group:
 
 ### Adjusting Scan Interval, Language and Other Options
 
-All settings, including credentials, are changed through the **reconfigure** flow (there is no separate options dialog). See [Reconfiguring](#reconfiguring).
+All settings, including credentials, are changed through the **reconfigure** flow. See [Reconfiguring](#reconfiguring). The **Configure** button only holds the heating curve values, which CSNet does not report; see [Heating Curve Values](Advanced-Features.md#heating-curve-values-water-law).
 
 **Scan interval recommendations**:
 - **Normal use**: 60-120 seconds

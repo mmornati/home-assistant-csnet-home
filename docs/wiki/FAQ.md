@@ -346,7 +346,7 @@ OTC sensors show your configuration:
 - Separate for heating and cooling
 - Separate for C1 and C2 circuits
 
-The OTC type is configured in CSNet Manager, not via HA. When the type is Fixed, you can set the fixed water temperature from HA through number entities; see [Fixed Water Temperature Control](Climate-Control.md#fixed-water-temperature-control-water-circuits-only).
+The OTC type is configured in CSNet Manager, not via HA. CSNet does not report the curve values themselves; you can copy them into the integration options to get a sensor with the water temperature the curve asks for, see [Heating Curve Values](Advanced-Features.md#heating-curve-values-water-law). When the type is Fixed, you can set the fixed water temperature from HA through number entities; see [Fixed Water Temperature Control](Climate-Control.md#fixed-water-temperature-control-water-circuits-only).
 
 ---
 

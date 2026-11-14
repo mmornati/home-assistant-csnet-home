@@ -5,7 +5,17 @@ import logging
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_USERNAME
-from homeassistant.helpers.selector import EntitySelector, EntitySelectorConfig, TextSelector, TextSelectorConfig, TextSelectorType
+from homeassistant.core import callback
+from homeassistant.helpers.selector import (
+    EntitySelector,
+    EntitySelectorConfig,
+    NumberSelector,
+    NumberSelectorConfig,
+    NumberSelectorMode,
+    TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
+)
 
 from .const import (
     CONF_ENABLE_ALARM_NOTIFICATIONS,
@@ -101,6 +111,12 @@ def _settings_errors(user_input: dict) -> dict[str, str]:
 
 class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for CSNet Home."""
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry):
+        """Return the options flow: the heating curves of the circuits."""
+        return CsnetHomeOptionsFlow()
 
     async def async_step_user(self, user_input=None):
         """Handle user input for login credentials."""
@@ -239,4 +255,114 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 }
             ),
             errors=errors,
+        )
+
+
+def _number_selector(value_range: tuple[float, float], step: float, unit: str | None = "°C") -> NumberSelector:
+    config = NumberSelectorConfig(min=value_range[0], max=value_range[1], step=step, mode=NumberSelectorMode.BOX)
+    if unit:
+        config["unit_of_measurement"] = unit
+    return NumberSelector(config)
+
+
+def _curve_field_selectors() -> dict:
+    """Return the selector of each heating curve field."""
+    # imported here: the curve module is only needed by the options flow
+    from .heating_curve import (  # pylint: disable=import-outside-toplevel
+        AMBIENT_RANGE,
+        GRADIENT,
+        GRADIENT_RANGE,
+        HIGH_AMBIENT,
+        LOW_AMBIENT,
+        VERTEX_OFFSET,
+        VERTEX_OFFSET_RANGE,
+        WATER_AT_HIGH_AMBIENT,
+        WATER_AT_LOW_AMBIENT,
+        WATER_RANGE,
+    )
+
+    return {
+        LOW_AMBIENT: _number_selector(AMBIENT_RANGE, 1),
+        WATER_AT_LOW_AMBIENT: _number_selector(WATER_RANGE, 1),
+        HIGH_AMBIENT: _number_selector(AMBIENT_RANGE, 1),
+        WATER_AT_HIGH_AMBIENT: _number_selector(WATER_RANGE, 1),
+        GRADIENT: _number_selector(GRADIENT_RANGE, 0.1, None),
+        VERTEX_OFFSET: _number_selector(VERTEX_OFFSET_RANGE, 1),
+    }
+
+
+def _curve_errors(user_input: dict, circuits: dict[int, int]) -> dict[str, str]:
+    """Return the errors in the submitted curves, by field: a curve is complete or empty."""
+    from .const import OTC_HEATING_TYPE_POINTS  # pylint: disable=import-outside-toplevel
+    from .heating_curve import FIELDS_BY_TYPE, HIGH_AMBIENT, LOW_AMBIENT, option_key  # pylint: disable=import-outside-toplevel
+
+    errors = {}
+    for circuit, curve_type in circuits.items():
+        keys = [option_key(circuit, field) for field in FIELDS_BY_TYPE[curve_type]]
+        missing = [key for key in keys if user_input.get(key) is None]
+        if missing and len(missing) < len(keys):
+            errors[missing[0]] = "incomplete_curve"
+        elif not missing and curve_type == OTC_HEATING_TYPE_POINTS:
+            low, high = user_input[option_key(circuit, LOW_AMBIENT)], user_input[option_key(circuit, HIGH_AMBIENT)]
+            if low >= high:
+                errors[option_key(circuit, HIGH_AMBIENT)] = "high_ambient_not_above_low"
+    return errors
+
+
+# Home Assistant 2025.8 and later reload the entry when the options change; older ones need a manual reload
+_OptionsFlowBase = getattr(config_entries, "OptionsFlowWithReload", config_entries.OptionsFlow)
+
+
+class CsnetHomeOptionsFlow(_OptionsFlowBase):
+    """Let the user copy the installer's heating curves, which CSNet does not report.
+
+    Nothing entered here is sent to the unit: it only feeds the heating curve sensors.
+    """
+
+    async def async_step_init(self, user_input=None):
+        """Ask for the curve of each circuit that uses one, with the fields of the kind of curve it uses."""
+        # imported here: the curve module is only needed by the options flow
+        from .const import OTC_HEATING_TYPE_NAMES  # pylint: disable=import-outside-toplevel
+        from .heating_curve import FIELDS_BY_TYPE, VERTEX_OFFSET, curve_circuits, option_key  # pylint: disable=import-outside-toplevel
+        from .sensor import _get_heating_status_from_installation_data  # pylint: disable=import-outside-toplevel
+
+        runtime_data = getattr(self.config_entry, "runtime_data", None)
+        coordinator = getattr(runtime_data, "coordinator", None)
+        if coordinator is None:
+            return self.async_abort(reason="not_loaded")
+        status = _get_heating_status_from_installation_data(coordinator.get_installation_devices_data())
+        zone_ids = {sensor.get("zone_id") for sensor in coordinator.get_sensors_data()}
+        circuits = curve_circuits(status, zone_ids)
+        if not circuits:
+            return self.async_abort(reason="no_heating_curve")
+
+        current = dict(self.config_entry.options)
+        errors = {}
+        if user_input is not None:
+            errors = _curve_errors(user_input, circuits)
+            if not errors:
+                options = dict(current)
+                for circuit, curve_type in circuits.items():
+                    for field in (*FIELDS_BY_TYPE[curve_type], VERTEX_OFFSET):
+                        key = option_key(circuit, field)
+                        # the frontend leaves an emptied field out of what it sends
+                        if user_input.get(key) is None:
+                            options.pop(key, None)
+                        else:
+                            options[key] = float(user_input[key])
+                return self.async_create_entry(data=options)
+
+        selectors = _curve_field_selectors()
+        fields = {}
+        for circuit, curve_type in circuits.items():
+            for field in (*FIELDS_BY_TYPE[curve_type], VERTEX_OFFSET):
+                fields[vol.Optional(option_key(circuit, field))] = selectors[field]
+        schema = self.add_suggested_values_to_schema(vol.Schema(fields), user_input if user_input is not None else current)
+        return self.async_show_form(
+            step_id="init",
+            data_schema=schema,
+            errors=errors,
+            description_placeholders={
+                "circuits": ", ".join(f"C{circuit}: {OTC_HEATING_TYPE_NAMES[curve_type]}" for circuit, curve_type in circuits.items()),
+            },
         )

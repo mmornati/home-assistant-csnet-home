@@ -355,6 +355,39 @@ To configure OTC:
 3. Find OTC/curve settings
 4. Adjust according to your preference
 
+### Heating Curve Values (Water Law)
+
+CSNet reports **which kind** of heating curve each circuit uses, but not the curve itself. You can copy the values your installer set into the integration, and Home Assistant then computes the water temperature the curve asks for. **Nothing is sent to the unit**: these values only feed a sensor.
+
+1. Go to **Settings** → **Devices & Services** → **CSNet Home** → **Configure**.
+2. The form shows only the circuits whose heating curve is **Points** or **Gradient**, with the fields of that kind of curve. Copy the values from the unit controller (Space heating → Water calculation mode):
+   - **Points**: low ambient temperature, water set point at low ambient temperature, high ambient temperature, water set point at high ambient temperature.
+   - **Gradient**: the gradient value (0.2 to 2.2).
+   - Both: the vertex offset, if the installer set one (-10 to +10 °C).
+3. Save. The integration reloads and creates one sensor per described circuit, for example `sensor.system_controller_circuit_1_heating_curve_water_temperature`.
+
+Leave every field of a circuit empty to remove its sensor. A circuit with a **Fixed** water temperature already has its own number entity, so it is not asked for.
+
+**How the value is computed** (from the Hitachi unit controller manual):
+- **Points**: a straight line between the two points, flat below the low point and above the high point.
+- **Gradient**: the line starts at 20 °C of water for 20 °C outside and rises by the gradient for every degree the outside drops below 20 °C. For example, a gradient of 1.2 gives 44 °C of water at 0 °C outside.
+- The vertex offset moves the whole curve up or down.
+- The unit uses the **average** outdoor temperature (averaged over a period the installer sets), so the sensor does too.
+- The result stays within the circuit's water temperature limits when the unit reports them.
+
+The unit can still run warmer water than the curve when a room is far below its setpoint (room compensation), or cooler water in eco mode. Compare the sensor with `sensor.system_controller_set_water_temperature` to see this. When the unit's curve type changes (for example from Points to Gradient), the sensor becomes unavailable until you enter the values of the new curve.
+
+**Attributes**, for cards and templates:
+
+| Attribute | Content |
+|-----------|---------|
+| `curve_type` | Points or Gradient, as the unit reports it |
+| `outdoor_temperature` | Average outdoor temperature used |
+| `curve` | `[outdoor, water]` pairs every 5 °C and at the curve's bends, limits applied, to draw the curve |
+| `vertex_offset` | Offset applied |
+| `minimum_water_temperature` / `maximum_water_temperature` | Limits the unit reports, or empty |
+| `gradient`, or `low_ambient_temperature`, `water_at_low_ambient`, `high_ambient_temperature`, `water_at_high_ambient` | The values you entered |
+
 ### Dashboard Example
 
 Display OTC status:
