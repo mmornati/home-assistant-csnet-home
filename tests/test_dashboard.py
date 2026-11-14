@@ -192,3 +192,13 @@ def test_card_editor_offers_a_language():
     field = source[source.index("const LANGUAGE_FIELD = {") : source.index("class CsnetCardEditor")]
     for code in ("auto", "en", "fr", "es"):
         assert f'value: "{code}"' in field
+
+
+def test_statistics_stop_at_the_end_asked():
+    """Home Assistant also answers the row that starts at the end time; the cards drop it.
+
+    Without this, "yesterday" (days up to midnight) also counted today.
+    """
+    source = FRONTEND_FILE.read_text(encoding="utf-8")
+    helper = source[source.index("async function statistics(") : source.index("async function onPeriods(")]
+    assert ".filter((row) => row.start < endMs)" in helper

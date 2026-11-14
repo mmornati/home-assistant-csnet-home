@@ -12,7 +12,7 @@
  * power meter.
  */
 
-const CARD_VERSION = "1.1.1";
+const CARD_VERSION = "1.1.2";
 
 // ---------------------------------------------------------------------------
 // Texts
@@ -552,8 +552,9 @@ async function statistics(hass, ids, startMs, period, types, endMs = Date.now())
     period,
     types,
   });
+  // Home Assistant also returns the row that starts at the end time (today's, for days up to midnight): leave it out
   const out = {};
-  for (const [id, rows] of Object.entries(result || {})) out[id] = rows.map((row) => ({ ...row, start: toMs(row.start) }));
+  for (const [id, rows] of Object.entries(result || {})) out[id] = rows.map((row) => ({ ...row, start: toMs(row.start) })).filter((row) => row.start < endMs);
   return out;
 }
 
