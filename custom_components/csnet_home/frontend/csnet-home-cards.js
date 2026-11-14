@@ -12,7 +12,7 @@
  * power meter.
  */
 
-const CARD_VERSION = "1.1.2";
+const CARD_VERSION = "1.1.4";
 
 // ---------------------------------------------------------------------------
 // Texts
@@ -428,9 +428,29 @@ function isOn(hass, entityId) {
   return stateOf(hass, entityId)?.state === "on";
 }
 
+/** The locale of texts, dates and times: the card's language when one is set, else the user's. */
+function textLocale(hass) {
+  return (hass && TEXTS[hass[CARD_LANGUAGE]] ? hass[CARD_LANGUAGE] : hass?.locale?.language) || undefined;
+}
+
+// the number formats of the user profile ("Number format"), as locales
+const NUMBER_FORMATS = { comma_decimal: "en-US", decimal_comma: "de", space_comma: "fr" };
+
+/**
+ * The locale of numbers. The profile's number format wins when the user chose one;
+ * with "use the language" (the default) numbers follow the card's language, like its texts.
+ */
+function numberLocale(hass) {
+  const format = hass?.locale?.number_format;
+  if (format === "system") return undefined;
+  if (NUMBER_FORMATS[format]) return NUMBER_FORMATS[format];
+  return textLocale(hass);
+}
+
 function fmt(hass, value, digits = 1) {
   if (value === null || value === undefined || !Number.isFinite(value)) return "–";
-  return value.toLocaleString(hass.locale?.language || undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  const grouping = hass?.locale?.number_format !== "none";
+  return value.toLocaleString(numberLocale(hass), { minimumFractionDigits: digits, maximumFractionDigits: digits, useGrouping: grouping });
 }
 
 /** A number from an attribute, or null when there is none (Number(null) would be 0). */
@@ -459,7 +479,7 @@ function relativeTime(hass, value) {
     ["minute", 60],
     ["second", 1],
   ];
-  const rtf = new Intl.RelativeTimeFormat(hass.locale?.language || undefined, { numeric: "auto" });
+  const rtf = new Intl.RelativeTimeFormat(textLocale(hass), { numeric: "auto" });
   for (const [unit, size] of units) {
     if (Math.abs(seconds) >= size || unit === "second") return rtf.format(Math.round(seconds / size), unit);
   }
@@ -776,11 +796,11 @@ function niceStep(max, parts = 4) {
 }
 
 function hourLabel(hass, ms) {
-  return new Date(ms).toLocaleTimeString(hass.locale?.language || undefined, { hour: "2-digit", minute: "2-digit" });
+  return new Date(ms).toLocaleTimeString(textLocale(hass), { hour: "2-digit", minute: "2-digit" });
 }
 
 function dayLabel(hass, ms) {
-  return new Date(ms).toLocaleDateString(hass.locale?.language || undefined, { day: "numeric", month: "short" });
+  return new Date(ms).toLocaleDateString(textLocale(hass), { day: "numeric", month: "short" });
 }
 
 /**
@@ -918,7 +938,7 @@ class CsnetBaseCard extends HTMLElement {
       const text = this._roles?.error ? t(hass, "no_integration") : t(hass, "loading");
       if (this._signature !== text) {
         this._signature = text;
-        this.shadowRoot.innerHTML = `<style>${BASE_CSS}</style><ha-card><div class="message">${escapeHtml(text)}</div></ha-card>`;
+        this._show(BASE_CSS, `<div class="message">${escapeHtml(text)}</div>`);
       }
       return;
     }
@@ -930,7 +950,28 @@ class CsnetBaseCard extends HTMLElement {
     this._ensureData();
     if (signature === this._signature) return;
     this._signature = signature;
-    this.shadowRoot.innerHTML = `<style>${BASE_CSS}${this.css()}</style><ha-card>${this.content(hass)}</ha-card>`;
+    this._show(BASE_CSS + this.css(), this.content(hass));
+  }
+
+  /**
+   * Put the content in the card. The style and the ha-card stay in place, and the
+   * content is only replaced when it changed: rebuilding the whole card on every
+   * state change made phones (iOS) lose their scroll position.
+   */
+  _show(css, html) {
+    if (!this._card) {
+      this.shadowRoot.innerHTML = "<style></style><ha-card></ha-card>";
+      this._style = this.shadowRoot.querySelector("style");
+      this._card = this.shadowRoot.querySelector("ha-card");
+    }
+    if (css !== this._css) {
+      this._style.textContent = css;
+      this._css = css;
+    }
+    if (html !== this._html) {
+      this._card.innerHTML = html;
+      this._html = html;
+    }
   }
 
   extraSignature() {
@@ -1767,7 +1808,7 @@ class CsnetActivityCard extends CsnetBaseCard {
   }
 
   rows() {
-    const hass = this._hass;
+    const hass = this._localHass(this._hass);
     const unit = this.unit;
     const rows = [
       [unit.compressor, t(hass, "compressor"), "var(--csnet-heat)"],
