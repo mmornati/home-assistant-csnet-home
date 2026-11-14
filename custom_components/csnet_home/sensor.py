@@ -39,7 +39,7 @@ from .const import (
     POWER_SUPPLY_THREE_PHASE,
 )
 from .coordinator import CSNetHomeCoordinator
-from .helpers import zone_device_identifier, zone_key
+from .helpers import find_indoor_unit, zone_device_identifier, zone_key
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -828,12 +828,12 @@ def _unit_sensors(coordinator) -> list:
     """Return the extra unit sensors this unit reports values for."""
     from .unit_sensors import CSNetHomeUnitSensor, unit_sensor_descriptions  # pylint: disable=import-outside-toplevel
 
-    def read_status():
-        return _get_heating_status_from_installation_data(coordinator.get_installation_devices_data())
+    def read_unit():
+        return find_indoor_unit(coordinator.get_installation_devices_data())
 
     zone_ids = {sensor.get("zone_id") for sensor in coordinator.get_sensors_data()}
     device_info = unit_device_info(coordinator)
-    return [CSNetHomeUnitSensor(coordinator, description, device_info, read_status) for description in unit_sensor_descriptions(read_status(), zone_ids)]
+    return [CSNetHomeUnitSensor(coordinator, description, device_info, read_unit) for description in unit_sensor_descriptions(read_unit(), zone_ids)]
 
 
 def _server_energy_sensors(hass, entry, coordinator) -> list:

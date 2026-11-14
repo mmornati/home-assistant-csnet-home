@@ -150,3 +150,22 @@ async def test_diagnostics_with_no_data_yet(hass):
     assert result["sensors"] == []
     assert result["common_data"] == {}
     assert result["coordinator"]["update_interval_seconds"] is None
+
+
+def test_installations_summary_carries_no_values():
+    """Ids and field names only: an installation holds names, addresses and people."""
+    from custom_components.csnet_home.diagnostics import _installations_summary
+
+    installations = [
+        {"id": 4529, "name": "My House", "address": "1 Secret Street", "privileges": [{"username": "someone@example.com"}]},
+        {"id": 5000, "name": "Holiday home", "city": "Somewhere"},
+        "junk",
+    ]
+    summary = _installations_summary(installations)
+    assert summary == {
+        "count": 3,
+        "entries": [{"id": 4529, "fields": ["address", "id", "name", "privileges"]}, {"id": 5000, "fields": ["city", "id", "name"]}],
+    }
+    for secret in ("My House", "Secret Street", "someone@example.com", "Holiday home", "Somewhere"):
+        assert secret not in repr(summary)
+    assert _installations_summary(None) is None

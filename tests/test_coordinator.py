@@ -649,3 +649,27 @@ async def test_coordinator_installation_alarm_not_filtered(hass: HomeAssistant):
         assert args[0] == "persistent_notification"
         assert args[1] == "create"
         assert "123" in args[2]["notification_id"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("installations", "warns"), [([{"id": 1}], False), ([{"id": 1}, {"id": 2}], True), (None, False)])
+async def test_installations_are_read_once_and_several_are_reported(hass, hass_storage, caplog, installations, warns):
+    """One request for the life of the coordinator; a warning when the account has more than one installation."""
+    api = MagicMock()
+    api.logged_in = True
+    api.async_get_elements_data = AsyncMock(side_effect=lambda: {"sensors": [], "common_data": {"name": "Home"}})
+    api.async_get_installation_devices_data = AsyncMock(return_value={})
+    api.async_get_installation_alarms = AsyncMock(return_value={"data": []})
+    api.async_get_power_data = AsyncMock(return_value=None)
+    api.async_get_installations = AsyncMock(return_value=installations)
+    api.load_translations = AsyncMock()
+    hass.services = MagicMock()
+    hass.services.async_call = AsyncMock()
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=60, entry_id="test", api=api)
+
+    for _ in range(3):
+        await coordinator._async_update_data()
+
+    assert api.async_get_installations.await_count == 1
+    assert coordinator.get_installations() == installations
+    assert ("installations" in caplog.text and "default one only" in caplog.text) is warns

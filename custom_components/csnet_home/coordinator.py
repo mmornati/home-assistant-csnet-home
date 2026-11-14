@@ -113,6 +113,9 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         self._alarm_state_loaded = False
         # Energy records of the server: last good answer and when it was asked for
         self._server_energy = None
+        # The account's installations: asked for once, to tell when there are several
+        self._installations = None
+        self._installations_asked = False
         self._server_energy_fetched_at: float | None = None
         self._cancel_refresh_after_write: CALLBACK_TYPE | None = None
         self._saved_alarm_state: dict | None = None
@@ -167,6 +170,7 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
             fetch_elements_chain(),
             cloud_api.async_get_installation_devices_data(),
             self._async_update_server_energy(cloud_api),
+            self._async_read_installations(cloud_api),
         )
 
         elements_data, installation_alarms_data = results[0]
@@ -264,6 +268,30 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
             return
         self._server_energy = data
         self._server_energy_fetched_at = now
+
+    async def _async_read_installations(self, cloud_api) -> None:
+        """Read the account's installations once; never fails the poll."""
+        if self._installations_asked:
+            return
+        self._installations_asked = True
+        try:
+            installations = await cloud_api.async_get_installations()
+        except Exception as exc:  # pylint: disable=broad-except
+            _LOGGER.debug("Could not read the installations: %s", exc)
+            return
+        if not isinstance(installations, list):
+            return
+        self._installations = installations
+        if len(installations) > 1:
+            _LOGGER.warning(
+                "This CSNet Manager account has %s installations. The integration shows the account's default one only; "
+                "the diagnostics download of the integration helps adding support for the others",
+                len(installations),
+            )
+
+    def get_installations(self):
+        """Return the account's installations (a list), or None if they could not be read."""
+        return self._installations
 
     def get_server_energy(self):
         """Return the server's energy records (a list per indoor unit), or None if never read."""

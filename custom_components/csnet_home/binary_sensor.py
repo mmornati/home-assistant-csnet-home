@@ -66,6 +66,13 @@ BINARY_SENSOR_DESCRIPTIONS: tuple[CSNetHomeBinarySensorDescription, ...] = (
         flag="dhw_recirculation",
         needs_zone=DHW_ZONES,
     ),
+    CSNetHomeBinarySensorDescription(
+        key="dhw_anti_legionella",
+        name="DHW anti-legionella",
+        device_class=BinarySensorDeviceClass.RUNNING,
+        status_key="antiLegionellaStatusDHW",
+        needs_zone=DHW_ZONES,
+    ),
     # Equipment an installer may or may not have fitted, which the unit does
     # not announce: there for who has it, not shown to everyone
     CSNetHomeBinarySensorDescription(
@@ -104,7 +111,7 @@ def _read(heating_status, description: CSNetHomeBinarySensorDescription) -> bool
     value = heating_status.get(description.status_key)
     if not isinstance(value, int) or isinstance(value, bool) or value < 0:
         return None
-    return value == 1
+    return value >= 1
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: CSNetHomeConfigEntry, async_add_entities) -> None:

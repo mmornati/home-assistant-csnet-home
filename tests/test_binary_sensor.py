@@ -123,7 +123,7 @@ async def test_circuit_and_hot_water_sensors_follow_the_zones(zone_ids, present,
 async def test_nothing_is_created_for_values_the_unit_does_not_report(status):
     """No unit status: nothing. No flags: only what is reported."""
     entities = await _setup(_coordinator(status))
-    assert set(entities) == ({"defrost"} if status == {"defrosting": 0} else set())
+    assert set(entities) == ({"defrost"} if status == {"defrosting": 0} else set())  # no hot water zone: no anti-legionella
 
 
 async def test_entities_follow_the_polls_and_share_the_units_device(hass):
@@ -177,3 +177,16 @@ async def test_sensors_appear_when_the_unit_status_arrives_after_setup():
     listener()
     listener()
     assert len(created) == count
+
+
+@pytest.mark.parametrize(("value", "expected"), [(1, True), (2, True), (0, False), (-1, None), (None, None)])
+def test_anti_legionella_follows_the_units_status(value, expected):
+    """The tank's anti-legionella cycle is running when the unit says so."""
+    assert _read({"antiLegionellaStatusDHW": value}, BY_KEY["dhw_anti_legionella"]) is expected
+
+
+async def test_anti_legionella_only_on_units_with_a_tank():
+    """A unit without a hot water zone reports the field too, and gets no entity for it."""
+    status = {"systemStatus2Flags": 0, "defrosting": 0, "antiLegionellaStatusDHW": 0}
+    assert "dhw_anti_legionella" not in await _setup(_coordinator(status, (1, 2)))
+    assert "dhw_anti_legionella" in await _setup(_coordinator(status, (1, 3)))
