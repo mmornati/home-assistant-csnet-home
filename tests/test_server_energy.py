@@ -464,3 +464,29 @@ async def test_energy_sensors_through_home_assistant_and_added_when_data_arrives
         coordinator.async_set_updated_data({"sensors": [], "common_data": {}})
         await hass.async_block_till_done()
         assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_cop_yesterday_waits_for_the_last_hour_of_yesterday(hass, hass_storage, monkeypatch):
+    """Just after midnight the 23:00 hour is not delivered yet: no COP from a day one hour short."""
+    yesterday_23_missing = [{"hourly": [rec(4, year=2026, month=11, day=12, hour=h) for h in range(23)], "daily": [], "monthly": []}]
+    complete = [{"hourly": [rec(4, year=2026, month=11, day=12, hour=h) for h in range(24)], "daily": [], "monthly": []}]
+    energy = [yesterday_23_missing]
+    coordinator = SimpleNamespace(get_server_energy=lambda: energy[0], async_add_listener=lambda *a, **k: lambda: None, last_update_success=True)
+    tracker = MeterTracker(hass, "entry", "sensor.any_meter")
+    await tracker.async_load()
+    yesterday = next(CSNetHomeMeteredCopSensor(coordinator, d, None, tracker) for d in METERED_COP_DESCRIPTIONS if d.span == "yesterday")
+
+    _set_meter(hass, "100.0")
+    tracker.async_update(at(12, 0, 1))
+    _set_meter(hass, "132.0")
+    monkeypatch.setattr(dt_util, "now", lambda: at(13, 0, 1))
+    tracker.async_update(dt_util.now())
+    assert yesterday.native_value is None
+
+    energy[0] = complete
+    monkeypatch.setattr(dt_util, "now", lambda: at(13, 0, 6))
+    assert yesterday.native_value == 3.0  # 96 kWh of heat for 32 kWh
+
+    # days whose hours the server no longer keeps use the day's own record
+    energy[0] = [{"hourly": [], "daily": [rec(96, year=2026, month=11, day=12)], "monthly": []}]
+    assert yesterday.native_value == 3.0

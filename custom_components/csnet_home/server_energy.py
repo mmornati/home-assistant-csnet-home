@@ -436,6 +436,10 @@ class CSNetHomeMeteredCopSensor(CoordinatorEntity, SensorEntity):
                 return None, None
             return energy_on_day(energy, now.date(), HEAT, before_hour=complete), self._tracker.electricity_until_hour(now, complete)
         if span == "yesterday":
+            # the last hour of yesterday is delivered a few minutes after midnight: no figure before that
+            complete = hours_complete_on_day(energy, now.date() - timedelta(days=1))
+            if complete is not None and complete < 24:
+                return None, self._tracker.electricity_yesterday(now)
             return read_span(energy, span, HEAT, None, now), self._tracker.electricity_yesterday(now)
         if span == "last_month":
             return energy_in_month(energy, now.date().replace(day=1) - timedelta(days=1), HEAT), self._tracker.electricity_last_month(now)

@@ -66,8 +66,11 @@ def redact(data: Any) -> Any:
     return data
 
 
+_RECENT_RECORDS = {"hourly": 72, "daily": 7, "monthly": 3}
+
+
 def _server_energy_summary(energy) -> Any:
-    """Return what the server's energy records cover: how many, and the last of each kind."""
+    """Return what the server's energy records cover: how many, and the most recent of each kind."""
     if not isinstance(energy, list):
         return None
     summary = []
@@ -77,8 +80,9 @@ def _server_energy_summary(energy) -> Any:
         entry: dict[str, Any] = {}
         for period in ("hourly", "daily", "monthly"):
             records = [r for r in unit.get(period) or [] if isinstance(r, dict) and isinstance(r.get("time"), dict)]
-            latest = max(records, key=lambda r: tuple(r["time"].get(part) or 0 for part in ("year", "month", "day", "hour")), default=None)
-            entry[period] = {"count": len(records), "latest": latest}
+            records.sort(key=lambda r: tuple(r["time"].get(part) or 0 for part in ("year", "month", "day", "hour")))
+            # the most recent ones are what a question about today's or yesterday's figures needs
+            entry[period] = {"count": len(records), "recent": records[-_RECENT_RECORDS[period] :]}
         summary.append(entry)
     return summary
 
