@@ -423,6 +423,13 @@ function fmt(hass, value, digits = 1) {
   return value.toLocaleString(hass.locale?.language || undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits });
 }
 
+/** A number from an attribute, or null when there is none (Number(null) would be 0). */
+function maybeNumber(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const v = Number(value);
+  return Number.isFinite(v) ? v : null;
+}
+
 function friendly(hass, entityId, fallback) {
   return stateOf(hass, entityId)?.attributes?.friendly_name || fallback;
 }
@@ -1103,8 +1110,8 @@ class CsnetWaterCircuitCard extends CsnetBaseCard {
       boxes += `<g data-entity="${escapeHtml(target.entity)}">
         <rect x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" rx="12" fill="color-mix(in srgb, ${target.color} 10%, transparent)" stroke="${target.color}" stroke-width="${target.active ? 2.5 : 1.2}"/>
         <text x="${box.x + box.w / 2}" y="${box.y + 20}" text-anchor="middle" font-size="10" letter-spacing="1" fill="var(--secondary-text-color)">${escapeHtml(shorten(String(target.name).toUpperCase(), 20))}</text>
-        <text x="${box.x + box.w / 2}" y="${box.y + 50}" text-anchor="middle" font-size="28" font-weight="700" fill="var(--primary-text-color)">${fmt(hass, Number(target.value))}°</text>
-        <text x="${box.x + box.w / 2}" y="${box.y + 68}" text-anchor="middle" font-size="10" fill="${target.color}">${target.tag} · ${escapeHtml(t(hass, "setpoint", { v: `${fmt(hass, Number(target.setpoint))}°` }))}${target.active ? ` · ${t(hass, "demand")}` : ""}</text>
+        <text x="${box.x + box.w / 2}" y="${box.y + 50}" text-anchor="middle" font-size="28" font-weight="700" fill="var(--primary-text-color)">${fmt(hass, maybeNumber(target.value))}°</text>
+        <text x="${box.x + box.w / 2}" y="${box.y + 68}" text-anchor="middle" font-size="10" fill="${target.color}">${target.tag} · ${escapeHtml(t(hass, "setpoint", { v: `${fmt(hass, maybeNumber(target.setpoint))}°` }))}${target.active ? ` · ${t(hass, "demand")}` : ""}</text>
       </g>`;
     });
 
