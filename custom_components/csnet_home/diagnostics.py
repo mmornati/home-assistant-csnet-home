@@ -66,6 +66,21 @@ def redact(data: Any) -> Any:
     return data
 
 
+def _installations_summary(installations) -> Any:
+    """Return how many installations the account has and which fields each carries, without their values.
+
+    An installation holds names, addresses and the people who may use it:
+    only its id and the names of its fields are needed to add support for
+    accounts with several.
+    """
+    if not isinstance(installations, list):
+        return None
+    return {
+        "count": len(installations),
+        "entries": [{"id": item.get("id"), "fields": sorted(str(key) for key in item)} for item in installations if isinstance(item, dict)],
+    }
+
+
 _RECENT_RECORDS = {"hourly": 72, "daily": 7, "monthly": 3}
 
 
@@ -103,5 +118,6 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: ConfigE
         },
         "sensors": redact(coordinator.get_sensors_data() or []),
         "server_energy": _server_energy_summary(coordinator.get_server_energy()),
+        "installations": _installations_summary(coordinator.get_installations()),
         "common_data": redact(common_data),
     }

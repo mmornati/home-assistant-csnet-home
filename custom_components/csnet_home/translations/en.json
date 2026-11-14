@@ -82,6 +82,25 @@
             "reconfigure_successful": "Reconfiguration successful! Your settings have been updated."
         }
     },
+    "entity": {
+        "sensor": {
+            "dhw_mode": {
+                "state": {
+                    "economic": "Economic",
+                    "standard": "Standard",
+                    "high_demand": "High demand"
+                }
+            },
+            "fan_speed_actual": {
+                "state": {
+                    "off": "Off",
+                    "low": "Low",
+                    "medium": "Medium",
+                    "high": "High"
+                }
+            }
+        }
+    },
     "options": {
         "step": {
             "init": {
