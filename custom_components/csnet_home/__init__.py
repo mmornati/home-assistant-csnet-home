@@ -8,6 +8,7 @@ from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.device_registry import DeviceEntry
 from homeassistant.helpers.storage import Store
+from homeassistant.loader import async_get_integration
 
 from custom_components.csnet_home.api import CSNetHomeAPI
 from custom_components.csnet_home.const import (
@@ -19,6 +20,7 @@ from custom_components.csnet_home.const import (
     DOMAIN,
 )
 from custom_components.csnet_home.coordinator import ALARM_STORAGE_VERSION, CSNetHomeConfigEntry, CSNetHomeCoordinator, CSNetHomeData, alarm_storage_key
+from custom_components.csnet_home.dashboard import async_register_dashboard
 from custom_components.csnet_home.migration import async_migrate_zone_identifiers
 from custom_components.csnet_home.sensor import DEVICE_SENSOR_DESCRIPTIONS, ZONE_SENSOR_DESCRIPTIONS
 from custom_components.csnet_home.server_energy import METER_STORAGE_VERSION, meter_storage_key
@@ -41,6 +43,9 @@ async def async_setup(hass: HomeAssistant, config: dict):
     """Set up the CSNet Home component."""
     _LOGGER.debug("Initializing CSNet Home Service integration")
 
+    # the dashboard cards: served and listed in the card picker, whatever the entries
+    integration = await async_get_integration(hass, DOMAIN)
+    await async_register_dashboard(hass, str(integration.version))
     return True
 
 
