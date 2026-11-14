@@ -23,7 +23,7 @@ Paste this into a new view (dashboard → edit → ⋮ → Raw configuration edi
 title: Heat pump
 path: heat-pump
 type: sections
-max_columns: 3
+max_columns: 4
 sections:
   - type: grid
     cards:

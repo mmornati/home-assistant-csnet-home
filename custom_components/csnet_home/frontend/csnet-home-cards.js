@@ -503,6 +503,15 @@ class CsnetBaseCard extends HTMLElement {
     return 4;
   }
 
+  /** Sections dashboards: the whole width of the section, never narrower than a third of a column. */
+  getGridOptions() {
+    return { columns: "full", rows: "auto", min_columns: this.constructor.minColumns };
+  }
+
+  static get minColumns() {
+    return 4;
+  }
+
   static getStubConfig() {
     return {};
   }
@@ -590,6 +599,10 @@ class CsnetHeatPumpCard extends CsnetBaseCard {
 // ---------------------------------------------------------------------------
 
 class CsnetWaterCircuitCard extends CsnetBaseCard {
+  static get minColumns() {
+    return 6;
+  }
+
   watched() {
     const ids = [...super.watched()];
     for (const c of this.circuits) ids.push(c.climate, c.demand, c.current_temperature);
@@ -773,6 +786,10 @@ async function loadHistory(hass, waterId, outdoorId, days) {
 }
 
 class CsnetHeatingCurveCard extends CsnetBaseCard {
+  static get minColumns() {
+    return 6;
+  }
+
   static editorSchema() {
     return [
       { name: "title", selector: { text: {} } },
