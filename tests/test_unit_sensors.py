@@ -143,10 +143,17 @@ def test_fan_coil_sensors_need_the_fan_coil_bit_and_the_circuit():
     assert "c1_fan_speed_actual" not in _values(LIVE | {"realFan1Speed": 3}, {1})
 
 
-@pytest.mark.parametrize(("raw", "expected"), [(152, 1.52), (5, 0.05), (0, None), (-1, None), (None, None)])
+@pytest.mark.parametrize(("raw", "expected"), [(152, 1.52), (5, 0.05), (0, 0.0), (-1, None), (None, None)])
 def test_primary_water_flow_is_in_hundredths(raw, expected):
-    """R290 units report the primary circuit's flow in hundredths of m3/h; other units report -1."""
-    assert _values(LIVE | {"primaryFlowR290": raw}, {1}).get("primary_water_flow") == expected
+    """R290 units report the primary circuit's flow in hundredths of m3/h; a stopped pump is 0, not "unknown"."""
+    assert _values(LIVE | {"ouCode": 8, "primaryFlowR290": raw}, {1}).get("primary_water_flow") == expected
+
+
+@pytest.mark.parametrize("ou_code", [0, 9, None])
+def test_primary_water_flow_only_on_r290_units(ou_code):
+    """Other units get no flow sensor, whatever the field holds."""
+    assert "primary_water_flow" not in _values(LIVE | {"ouCode": ou_code, "primaryFlowR290": 0}, {1})
+    assert "primary_water_flow" not in _values(LIVE | {"ouCode": ou_code, "primaryFlowR290": 152}, {1})
 
 
 def test_cascade_sensors_only_on_a_cascade():
@@ -166,3 +173,57 @@ def test_enum_sensors_declare_their_options():
     assert by_key["dhw_mode"].options == list(DHW_MODES.values())
     assert by_key["c1_fan_speed_actual"].options == list(FAN_SPEEDS.values())
     assert len(by_key) == len(UNIT_SENSOR_DESCRIPTIONS)
+
+
+async def test_unit_sensor_is_added_when_its_value_arrives_on_a_later_poll(hass, hass_storage):
+    """A reading missing at setup gets its sensor on the poll that reports it, whatever the energy records do."""
+    from unittest.mock import AsyncMock, patch
+
+    from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    from custom_components.csnet_home.const import DOMAIN
+
+    def data(flow):
+        unit = _unit(LIVE | {"ouCode": 8, "primaryFlowR290": flow})
+        return {"sensors": [], "common_data": {"installation_devices": {"data": [{"indoors": [unit]}]}}}
+
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_USERNAME: "user", CONF_PASSWORD: "pass"})
+    entry.add_to_hass(hass)
+    with (
+        patch("custom_components.csnet_home.coordinator.CSNetHomeCoordinator._async_update_data", AsyncMock(return_value=data(-1))),
+        patch("custom_components.csnet_home.CSNetHomeAPI.close", AsyncMock()),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = entry.runtime_data.coordinator
+        coordinator._device_data = data(-1)
+        coordinator.async_set_updated_data(data(-1))
+        await hass.async_block_till_done()
+        assert not [s for s in hass.states.async_all("sensor") if s.entity_id.endswith("primary_water_flow")]
+
+        coordinator._device_data = data(150)
+        coordinator.async_set_updated_data(data(150))
+        await hass.async_block_till_done()
+        flow = [s for s in hass.states.async_all("sensor") if s.entity_id.endswith("primary_water_flow")]
+        assert len(flow) == 1 and float(flow[0].state) == 1.5
+
+        # further polls add nothing twice
+        coordinator.async_set_updated_data(data(150))
+        await hass.async_block_till_done()
+        assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+@pytest.mark.parametrize("language_file", ["strings.json", "translations/en.json", "translations/fr.json", "translations/es.json"])
+def test_enum_states_are_translated(language_file):
+    """Every state of an enum sensor has a label in each language."""
+    import json
+    from pathlib import Path
+
+    from custom_components.csnet_home.unit_sensors import UNIT_SENSOR_DESCRIPTIONS
+
+    root = Path(__file__).parent.parent / "custom_components" / "csnet_home"
+    states = json.loads((root / language_file).read_text(encoding="utf-8"))["entity"]["sensor"]
+    for description in UNIT_SENSOR_DESCRIPTIONS:
+        if description.options:
+            assert set(states[description.translation_key]["state"]) == set(description.options)

@@ -15,7 +15,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import CIRCUIT_1_ZONES, CIRCUIT_2_ZONES, DHW_ZONES, DOMAIN
 from .coordinator import CSNetHomeConfigEntry, CSNetHomeCoordinator
 from .sensor import SYSTEM_STATUS_FLAG_BITS, _get_heating_status_from_installation_data, unit_device_info
 
@@ -24,18 +24,13 @@ _LOGGER = logging.getLogger(__name__)
 # Binary sensors only read what the coordinator fetched
 PARALLEL_UPDATES = 0
 
-# Zone ids of the two circuits (room control, water control) and of the hot water tank
-CIRCUIT_1_ZONES = frozenset({1, 5})
-CIRCUIT_2_ZONES = frozenset({2, 6})
-DHW_ZONES = frozenset({3})
-
 
 @dataclass(frozen=True, kw_only=True)
 class CSNetHomeBinarySensorDescription(BinarySensorEntityDescription):
     """A binary sensor read from the unit status.
 
     ``flag`` names a bit of systemStatus2Flags; without it the sensor reads
-    ``status_key`` (1 means on). ``needs_zone`` limits the sensor to units
+    ``status_key`` (anything above 0 means on, as in the web app). ``needs_zone`` limits the sensor to units
     that have one of these zones.
     """
 

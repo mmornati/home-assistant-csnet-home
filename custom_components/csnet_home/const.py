@@ -8,6 +8,10 @@ INSTALLATION_DEVICES_PATH = "/data/installationdevices"
 INSTALLATION_ALARMS_PATH = "/data/installationalarms"
 POWER_INDOORS_PATH = "/data/power/indoors"
 INSTALLATIONS_PATH = "/data/installations"
+# Zone ids of the two circuits (room control, water control) and of the hot water tank
+CIRCUIT_1_ZONES = frozenset({1, 5})
+CIRCUIT_2_ZONES = frozenset({2, 6})
+DHW_ZONES = frozenset({3})
 DELETESPECIFICALARM_PATH = "/data/deletemyspecificalarm"
 HEAT_SETTINGS_PATH = "/data/indoor/heat_setting"
 CONF_MAX_TEMP_OVERRIDE = "max_temp_override"

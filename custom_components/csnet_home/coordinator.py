@@ -30,6 +30,7 @@ ALARM_STORAGE_VERSION = 1
 # The server adds to its energy records once an hour
 SERVER_ENERGY_POLL_SECONDS = 900
 # After a request for them failed, they are asked for again this much later
+INSTALLATIONS_MAX_ATTEMPTS = 3
 SERVER_ENERGY_RETRY_SECONDS = 300
 # CSNet needs a moment to apply an order: a read sent right after a write can
 # still return the old value
@@ -115,7 +116,7 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         self._server_energy = None
         # The account's installations: asked for once, to tell when there are several
         self._installations = None
-        self._installations_asked = False
+        self._installations_attempts = 0
         self._server_energy_fetched_at: float | None = None
         self._cancel_refresh_after_write: CALLBACK_TYPE | None = None
         self._saved_alarm_state: dict | None = None
@@ -270,10 +271,13 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         self._server_energy_fetched_at = now
 
     async def _async_read_installations(self, cloud_api) -> None:
-        """Read the account's installations once; never fails the poll."""
-        if self._installations_asked:
+        """Read the account's installations once; never fails the poll.
+
+        A request that fails is sent again on the next polls, a few times at most.
+        """
+        if self._installations is not None or self._installations_attempts >= INSTALLATIONS_MAX_ATTEMPTS:
             return
-        self._installations_asked = True
+        self._installations_attempts += 1
         try:
             installations = await cloud_api.async_get_installations()
         except Exception as exc:  # pylint: disable=broad-except

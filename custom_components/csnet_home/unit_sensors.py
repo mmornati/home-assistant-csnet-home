@@ -20,11 +20,10 @@ from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, Sen
 from homeassistant.const import EntityCategory, UnitOfTemperature, UnitOfVolumeFlowRate
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import CIRCUIT_1_ZONES, CIRCUIT_2_ZONES, DHW_ZONES, DOMAIN
 
-CIRCUIT_1_ZONES = frozenset({1, 5})
-CIRCUIT_2_ZONES = frozenset({2, 6})
-DHW_ZONES = frozenset({3})
+# Outdoor unit code of the R290 units, the only ones with a primary water flow
+OU_CODE_R290 = 8
 
 
 def _degrees_above_zero(value) -> float | None:
@@ -41,11 +40,17 @@ def _degrees(value) -> float | None:
     return float(value)
 
 
-def _positive_hundredths(value) -> float | None:
-    """Return a flow sent in hundredths of m3/h; zero and negative values are "not reported"."""
-    if not isinstance(value, (int, float)) or isinstance(value, bool) or value <= 0:
+def _hundredths(value) -> float | None:
+    """Return a flow sent in hundredths of m3/h; negative values are "not reported", zero is a stopped pump."""
+    if not isinstance(value, (int, float)) or isinstance(value, bool) or value < 0:
         return None
     return round(value / 100, 2)
+
+
+def _is_r290(status, cascade) -> bool:
+    """Return True on R290 units (the web app's test on the outdoor unit code)."""
+    code = status.get("ouCode")
+    return isinstance(code, int) and not isinstance(code, bool) and code == OU_CODE_R290
 
 
 def _count(value) -> int | None:
@@ -56,6 +61,8 @@ def _count(value) -> int | None:
 
 
 DHW_MODES = {0: "economic", 1: "standard", 2: "high_demand"}
+# The speed the fan really runs at, as the web app's history legend gives it.
+# Not the numbering of the speed asked for (0 low ... 3 auto) on the climate entity.
 FAN_SPEEDS = {0: "off", 1: "low", 2: "medium", 3: "high"}
 
 
@@ -141,6 +148,7 @@ UNIT_SENSOR_DESCRIPTIONS: tuple[UnitSensorDescription, ...] = (
         needs_zone=DHW_ZONES,
         device_class=SensorDeviceClass.ENUM,
         options=list(DHW_MODES.values()),
+        translation_key="dhw_mode",
     ),
     UnitSensorDescription(
         key="dhw_anti_legionella_temperature",
@@ -162,6 +170,7 @@ UNIT_SENSOR_DESCRIPTIONS: tuple[UnitSensorDescription, ...] = (
         applies=lambda status, cascade: _has_fan_coils(status),
         device_class=SensorDeviceClass.ENUM,
         options=list(FAN_SPEEDS.values()),
+        translation_key="fan_speed_actual",
     ),
     UnitSensorDescription(
         key="c2_fan_speed_actual",
@@ -172,13 +181,15 @@ UNIT_SENSOR_DESCRIPTIONS: tuple[UnitSensorDescription, ...] = (
         applies=lambda status, cascade: _has_fan_coils(status),
         device_class=SensorDeviceClass.ENUM,
         options=list(FAN_SPEEDS.values()),
+        translation_key="fan_speed_actual",
     ),
     # R290 units report the flow of the primary water circuit
     UnitSensorDescription(
         key="primary_water_flow",
         name="Primary water flow",
         status_key="primaryFlowR290",
-        convert=_positive_hundredths,
+        convert=_hundredths,
+        applies=_is_r290,
         device_class=SensorDeviceClass.VOLUME_FLOW_RATE,
         native_unit_of_measurement=UnitOfVolumeFlowRate.CUBIC_METERS_PER_HOUR,
         state_class=SensorStateClass.MEASUREMENT,

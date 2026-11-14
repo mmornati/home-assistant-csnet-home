@@ -68,9 +68,9 @@ def test_each_bit_turns_on_exactly_its_sensor(bit, key):
     assert {k for k, description in BY_KEY.items() if _read(status, description)} == {key}
 
 
-@pytest.mark.parametrize(("value", "expected"), [(1, True), (0, False), (None, None), (-1, None), ("1", None), (True, None)])
+@pytest.mark.parametrize(("value", "expected"), [(1, True), (2, True), (0, False), (None, None), (-1, None), ("1", None), (True, None)])
 def test_defrost_reads_the_defrosting_field(value, expected):
-    """1 is defrosting, 0 is not, anything else is not a reading."""
+    """Above 0 is defrosting (as the web app reads it), 0 is not, anything else is not a reading."""
     assert _read({"systemStatus2Flags": 0, "defrosting": value}, BY_KEY["defrost"]) is expected
 
 
