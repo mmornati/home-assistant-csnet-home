@@ -1,0 +1,120 @@
+"""Dashboard cards: the roles the websocket command gives, and how the card file is served."""
+
+import json
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
+
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
+
+from custom_components.csnet_home.const import DOMAIN
+from custom_components.csnet_home.dashboard import CARDS_FILE, FRONTEND_DIR, FRONTEND_URL, async_register_dashboard, dashboard_entities
+
+FRONTEND_FILE = FRONTEND_DIR / CARDS_FILE
+
+
+def _add(registry, domain, unique_id, entity_id, disabled=False):
+    """Register one integration entity under a chosen entity id."""
+    object_id = entity_id.split(".", 1)[1]
+    entry = registry.async_get_or_create(domain, DOMAIN, unique_id, suggested_object_id=object_id)
+    if disabled:
+        registry.async_update_entity(entry.entity_id, disabled_by=er.RegistryEntryDisabler.USER)
+    return entry.entity_id
+
+
+async def test_roles_follow_unique_ids_not_entity_ids(hass: HomeAssistant):
+    """Renamed entities are still found; disabled ones and other integrations are left out."""
+    registry = er.async_get(hass)
+    power = _add(registry, "sensor", f"{DOMAIN}-installation-instant_consumption", "sensor.my_renamed_power")
+    _add(registry, "sensor", f"{DOMAIN}-installation-out_water_temperature", "sensor.depart")
+    _add(registry, "binary_sensor", f"{DOMAIN}-binary-defrost", "binary_sensor.degivrage", disabled=True)
+    registry.async_get_or_create("sensor", "other_integration", f"{DOMAIN}-installation-water_flow")
+
+    roles = dashboard_entities(hass)
+    assert roles["unit"] == {"power": power, "water_out": "sensor.depart"}
+    assert roles["circuits"] == []
+    assert roles["dhw"] is None
+    assert roles["pool"] is None
+
+
+async def test_circuits_tank_and_gateway(hass: HomeAssistant):
+    """Each circuit gets its climate, demand, curve; zone 3 is the tank; the gateway sensors come from a zone."""
+    registry = er.async_get(hass)
+    c1 = _add(registry, "climate", f"{DOMAIN}-climate-11-21-1", "climate.etage")
+    c2 = _add(registry, "climate", f"{DOMAIN}-climate-11-22-6", "climate.plancher")
+    _add(registry, "sensor", f"{DOMAIN}-zone-11-21-1-current_temperature", "sensor.etage_temp")
+    _add(registry, "binary_sensor", f"{DOMAIN}-binary-circuit_1_demand", "binary_sensor.c1_demand")
+    _add(registry, "sensor", f"{DOMAIN}-unit-c2_heating_curve_water_temperature", "sensor.c2_curve")
+    _add(registry, "sensor", f"{DOMAIN}-zone-11-21-1-connectivity", "sensor.gw_conn")
+    tank = _add(registry, "water_heater", f"{DOMAIN}-water-heater-11-23-3", "water_heater.ecs")
+    _add(registry, "binary_sensor", f"{DOMAIN}-binary-dhw_heater", "binary_sensor.ecs_heating")
+
+    roles = dashboard_entities(hass)
+    assert roles["circuits"] == [
+        {"circuit": 1, "zone_id": 1, "water_control": False, "climate": c1, "current_temperature": "sensor.etage_temp", "demand": "binary_sensor.c1_demand"},
+        {"circuit": 2, "zone_id": 6, "water_control": True, "climate": c2, "current_temperature": None, "curve": "sensor.c2_curve"},
+    ]
+    assert roles["dhw"] == {"water_heater": tank, "heating": "binary_sensor.ecs_heating"}
+    assert roles["gateway"] == {"connectivity": "sensor.gw_conn"}
+
+
+async def test_websocket_command_answers_the_roles(hass: HomeAssistant, hass_ws_client):
+    """The cards ask ``csnet_home/dashboard``."""
+    await async_register_dashboard(hass, "9.9.9")
+    _add(er.async_get(hass), "sensor", f"{DOMAIN}-installation-set_water_temperature", "sensor.target")
+    client = await hass_ws_client(hass)
+    await client.send_json({"id": 1, "type": f"{DOMAIN}/dashboard"})
+    msg = await client.receive_json()
+    assert msg["success"]
+    assert msg["result"]["unit"] == {"water_target": "sensor.target"}
+
+
+async def test_card_file_is_served_and_loaded_with_the_version(hass: HomeAssistant):
+    """The file is served from the integration and loaded in every browser, once."""
+    hass.config.components.add("frontend")
+    hass.http = MagicMock(async_register_static_paths=AsyncMock())
+    with patch("homeassistant.components.frontend.add_extra_js_url") as add_js:
+        await async_register_dashboard(hass, "2.14.0")
+        await async_register_dashboard(hass, "2.14.0")
+    hass.http.async_register_static_paths.assert_awaited_once()
+    config = hass.http.async_register_static_paths.await_args.args[0][0]
+    assert config.url_path == FRONTEND_URL
+    assert Path(config.path) == FRONTEND_DIR
+    add_js.assert_called_once_with(hass, f"{FRONTEND_URL}/{CARDS_FILE}?v=2.14.0")
+
+
+async def test_no_frontend_no_files(hass: HomeAssistant):
+    """Without the frontend (tests, headless installs) only the websocket command is registered."""
+    hass.http = MagicMock(async_register_static_paths=AsyncMock())
+    with patch("homeassistant.components.frontend.add_extra_js_url") as add_js:
+        await async_register_dashboard(hass, "2.14.0")
+    hass.http.async_register_static_paths.assert_not_awaited()
+    add_js.assert_not_called()
+
+
+def test_card_file_ships_every_card_and_language():
+    """Six cards, each listed for the picker, and the same texts in English, French and Spanish."""
+    source = FRONTEND_FILE.read_text(encoding="utf-8")
+    for tag in (
+        "csnet-heat-pump-card",
+        "csnet-water-circuit-card",
+        "csnet-heating-curve-card",
+        "csnet-performance-card",
+        "csnet-system-health-card",
+        "csnet-refrigerant-card",
+    ):
+        assert f'"{tag}"' in source
+    texts = source[source.index("const TEXTS = {") : source.index("function lang(")]
+    blocks = {}
+    for language in ("en", "fr", "es"):
+        start = texts.index(f"  {language}: {{")
+        end = texts.index("\n  },", start)
+        blocks[language] = {line.strip().split(":", 1)[0] for line in texts[start:end].splitlines()[1:] if ":" in line}
+    assert blocks["en"] == blocks["fr"] == blocks["es"]
+
+
+def test_manifest_loads_after_the_frontend():
+    """The frontend is set up first when it is there, without being required."""
+    manifest = json.loads((FRONTEND_DIR.parent / "manifest.json").read_text(encoding="utf-8"))
+    assert {"frontend", "http"} <= set(manifest["after_dependencies"])
+    assert manifest["dependencies"] == []

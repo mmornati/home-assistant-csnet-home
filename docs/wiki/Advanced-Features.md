@@ -377,6 +377,8 @@ Leave every field of a circuit empty to remove its sensor. A circuit with a **Fi
 
 The unit can still run warmer water than the curve when a room is far below its setpoint (room compensation), or cooler water in eco mode. Compare the sensor with `sensor.system_controller_set_water_temperature` to see this. When the unit's curve type changes (for example from Points to Gradient), the sensor becomes unavailable until you enter the values of the new curve.
 
+The **Heating curve** dashboard card shipped with the integration draws these curves, see [Dashboard Cards](Dashboard-Cards.md).
+
 **Attributes**, for cards and templates:
 
 | Attribute | Content |

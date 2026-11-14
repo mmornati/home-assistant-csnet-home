@@ -2,6 +2,7 @@
     "domain": "csnet_home",
     "name": "Hitachi CSNet Home",
     "codeowners": ["@mmornati"],
+    "after_dependencies": ["frontend", "http", "websocket_api"],
     "config_flow": true,
     "dependencies": [],
     "documentation": "https://github.com/mmornati/home-assistant-csnet-home",
