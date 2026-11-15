@@ -41,6 +41,8 @@ The water heater supports three operation modes. They map to the unit's DHW run/
 
 The current mode is read back from the unit: `off` when DHW is stopped, `performance` while the unit reports a boost in progress (`doingBoost`), `eco` otherwise.
 
+`performance` is offered only where the unit reports a DHW boost (`hasBoost`). Some units report `hasBoost: false` although their boost works: choose the `legacy` control model in the integration's configuration and `performance` is always offered. Note that `legacy` also treats every climate entity as a fan coil (see [Climate Control](Climate-Control.md)).
+
 ### Off Mode
 
 **Description**: DHW heating is disabled

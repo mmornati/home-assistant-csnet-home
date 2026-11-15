@@ -398,3 +398,18 @@ def test_water_heater_follows_csnet_room_rename(hass):
     assert entity.current_temperature == 48.0
     assert entity.name == "Eau chaude"
     assert entity.unique_id == unique_id
+
+
+def test_water_heater_hides_boost_when_unit_lacks_it(hass):
+    """Standard control: no performance mode where the unit reports no boost."""
+    entity = build_water_heater_entity(hass, zone_id=3)
+    entity._sensor_data["has_boost"] = False
+    assert entity._operations() == ["off", "eco"]
+
+
+def test_water_heater_legacy_control_always_offers_boost(hass):
+    """Legacy control: performance mode even where the unit reports no boost."""
+    entity = build_water_heater_entity(hass, zone_id=3)
+    entity._sensor_data["has_boost"] = False
+    entity.entry.data["fan_coil_model"] = "legacy"
+    assert entity._operations() == ["off", "eco", "performance"]
