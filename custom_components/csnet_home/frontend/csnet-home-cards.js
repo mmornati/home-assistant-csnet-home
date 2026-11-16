@@ -370,7 +370,7 @@ const TEXTS = {
     hours: "Horas mostradas",
     weather_entity: "Entidad meteorológica (opcional)",
     demand_of: "Demanda {name}",
-    needs_meter: "Se necesita una medida de electricidad: elija el medidor de energía de la bomba de calor en los ajustes de la integración (Reconfigurar).",
+    needs_meter: "Se necesita un medidor de energía: elija el medidor de energía de la bomba de calor en los ajustes de la integración (Reconfigurar).",
     language: "Idioma (por defecto: el ajuste de la integración)",
   },
 };
