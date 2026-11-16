@@ -1,5 +1,5 @@
 /*
- * Dashboard cards of the Hitachi CSNet Home integration.
+ * Dashboard cards of the CSNet Home (unofficial, for Hitachi) integration.
  *
  * Plain web components: no build step, no third-party card. The integration
  * serves this file and Home Assistant loads it in every browser, so the cards

@@ -580,11 +580,12 @@ def test_every_form_field_and_error_has_a_text_in_each_language():
     base = Path(__file__).parent.parent / "custom_components" / "csnet_home"
     reference = json.loads((base / "strings.json").read_text(encoding="utf-8"))["config"]
     fields = {CONF_USERNAME, CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_LANGUAGE, CONF_MAX_TEMP_OVERRIDE, CONF_FAN_COIL_MODEL}
-    fields |= {CONF_ENABLE_ALARM_NOTIFICATIONS, CONF_FILTERED_ALARM_CODES, "power_supply", "energy_meter", "card_language"}
+    fields |= {CONF_ENABLE_ALARM_NOTIFICATIONS, CONF_FILTERED_ALARM_CODES, "power_supply", "energy_meter", "card_language", "user_agent"}
     for step in ("user", "reconfigure"):
         assert set(reference["step"][step]["data"]) == fields
         assert set(reference["step"][step]["data_description"]) == fields
     assert "invalid_alarm_codes" in reference["error"]
+    assert "invalid_user_agent" in reference["error"]
 
     def keys(node, prefix=""):
         if isinstance(node, dict):
@@ -678,3 +679,48 @@ async def test_reconfigure_sets_the_card_language(hass: HomeAssistant):
         result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input={**TEST_CONFIG, CONF_CARD_LANGUAGE: "fr"})
     assert result["reason"] == "reconfigure_successful"
     assert hass.config_entries.async_get_entry(entry.entry_id).data[CONF_CARD_LANGUAGE] == "fr"
+
+
+async def test_user_agent_is_suggested_and_the_default_is_not_stored(hass: HomeAssistant):
+    """The form shows the default User-Agent; keeping it stores nothing, so a release can change the default."""
+    from custom_components.csnet_home.const import CONF_USER_AGENT, DEFAULT_USER_AGENT
+
+    entry, result = await _start_reconfigure(hass)
+    assert _schema_key(result, CONF_USER_AGENT).description == {"suggested_value": DEFAULT_USER_AGENT}
+
+    new_config = {key: value for key, value in TEST_CONFIG.items() if key != CONF_PASSWORD} | {CONF_USER_AGENT: DEFAULT_USER_AGENT}
+    with patch(VALIDATE, return_value=True) as validate:
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=new_config)
+
+    assert result["reason"] == "reconfigure_successful"
+    validate.assert_not_called()
+    assert entry.data[CONF_USER_AGENT] is None
+
+
+async def test_custom_user_agent_is_stored_and_used_to_check_new_credentials(hass: HomeAssistant):
+    """A custom User-Agent is kept, and a sign-in check made in the same step uses it."""
+    from custom_components.csnet_home.const import CONF_USER_AGENT
+
+    entry, result = await _start_reconfigure(hass)
+    new_config = TEST_CONFIG | {CONF_PASSWORD: "new_password", CONF_USER_AGENT: "  my-client/1.0  "}
+    with patch(VALIDATE, return_value=True) as validate:
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=new_config)
+
+    assert result["reason"] == "reconfigure_successful"
+    validate.assert_called_once_with(hass, TEST_USERNAME, "new_password", user_agent="my-client/1.0")
+    assert entry.data[CONF_USER_AGENT] == "my-client/1.0"
+
+
+@pytest.mark.parametrize("value", ["two\nlines", "x\u00e9", "x" * 257])
+async def test_user_agent_that_is_not_a_valid_header_is_refused(hass: HomeAssistant, value):
+    """A User-Agent with a line break, a non-ASCII character or an absurd length never reaches a request."""
+    from custom_components.csnet_home.const import CONF_USER_AGENT
+
+    entry, result = await _start_reconfigure(hass)
+    new_config = {key: value_ for key, value_ in TEST_CONFIG.items() if key != CONF_PASSWORD} | {CONF_USER_AGENT: value}
+    with patch(VALIDATE, return_value=True):
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=new_config)
+
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["errors"] == {CONF_USER_AGENT: "invalid_user_agent"}
+    assert CONF_USER_AGENT not in entry.data

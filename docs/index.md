@@ -7,6 +7,6 @@ hide:
   - toc
 ---
 
-# Hitachi CSNet Home for Home Assistant
+# CSNet Home for Home Assistant: unofficial integration for Hitachi heat pumps
 
 Control Hitachi heat pumps fitted with the ATW-IOT-01 module from Home Assistant, through the CSNet Manager cloud.

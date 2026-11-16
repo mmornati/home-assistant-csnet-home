@@ -1,6 +1,6 @@
 # Frequently Asked Questions (FAQ)
 
-Quick answers to common questions about the Hitachi CSNet Home integration.
+Quick answers to common questions about the CSNet Home (unofficial, for Hitachi) integration.
 
 ---
 
@@ -8,7 +8,7 @@ Quick answers to common questions about the Hitachi CSNet Home integration.
 
 ### What is this integration?
 
-The Hitachi CSNet Home integration connects your Hitachi heat pump system to Home Assistant using the CSNet Manager cloud service. It allows you to control and monitor your heating/cooling system directly from Home Assistant.
+The CSNet Home (unofficial, for Hitachi) integration connects your Hitachi heat pump system to Home Assistant using the CSNet Manager cloud service. It allows you to control and monitor your heating/cooling system directly from Home Assistant.
 
 ### Which Hitachi systems are supported?
 
@@ -36,7 +36,7 @@ Yes. You need an active CSNet Manager account with your system registered. This 
 
 ### Is this official from Hitachi?
 
-No, this is a **community-developed integration**. It was created by reverse-engineering the CSNet Manager web interface since Hitachi doesn't provide an official API. Hitachi can change that interface at any time, which can break the integration until it is updated.
+No, this is a **community-developed integration**. It was built by observing how the CSNet Manager web application talks to its own service, since Hitachi doesn't provide an official API. Hitachi can change that interface at any time, which can break the integration until it is updated.
 
 ---
 
@@ -95,7 +95,7 @@ Each poll makes 3 requests to csnetmanager.com, so the integration does not acce
 
 ### Can I change settings after setup?
 
-Yes. Go to Settings → Devices & Services → Hitachi CSNet Home → ⋮ → **Reconfigure**.
+Yes. Go to Settings → Devices & Services → CSNet Home (unofficial, for Hitachi) → ⋮ → **Reconfigure**.
 
 You can change every setting from the initial setup: credentials, scan interval, language, maximum temperature override, fan coil control model and alarm notification options. The integration reloads automatically after saving.
 

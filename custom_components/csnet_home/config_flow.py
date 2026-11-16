@@ -30,6 +30,7 @@ from .const import (
     CONF_LANGUAGE,
     CONF_MAX_TEMP_OVERRIDE,
     CONF_POWER_SUPPLY,
+    CONF_USER_AGENT,
     DEFAULT_CARD_LANGUAGE,
     DEFAULT_ENABLE_ALARM_NOTIFICATIONS,
     DEFAULT_FAN_COIL_MODEL,
@@ -37,6 +38,7 @@ from .const import (
     DEFAULT_LANGUAGE,
     DEFAULT_POWER_SUPPLY,
     DEFAULT_SCAN_INTERVAL,
+    DEFAULT_USER_AGENT,
     DOMAIN,
     FAN_COIL_MODEL_LEGACY,
     FAN_COIL_MODEL_STANDARD,
@@ -86,6 +88,8 @@ def _settings_schema(current: dict) -> dict:
         vol.Optional(CONF_POWER_SUPPLY, default=current.get(CONF_POWER_SUPPLY, DEFAULT_POWER_SUPPLY)): vol.In(POWER_SUPPLY_OPTIONS),
         # optional, and a suggestion so it can be emptied again
         energy_meter_key: ENERGY_METER_SELECTOR,
+        # a suggestion, not a default: emptying the field goes back to the default
+        vol.Optional(CONF_USER_AGENT, description={"suggested_value": current.get(CONF_USER_AGENT) or DEFAULT_USER_AGENT}): str,
     }
 
 
@@ -103,7 +107,14 @@ def _settings_from_input(user_input: dict) -> dict:
         CONF_POWER_SUPPLY: user_input.get(CONF_POWER_SUPPLY, DEFAULT_POWER_SUPPLY),
         # any energy sensor of Home Assistant that measures the heat pump; none by default
         CONF_ENERGY_METER: user_input.get(CONF_ENERGY_METER) or None,
+        CONF_USER_AGENT: _user_agent(user_input),
     }
+
+
+def _user_agent(user_input: dict) -> str | None:
+    """Return the User-Agent to store: None for an empty field or the default, so the default can change with a release."""
+    value = (user_input.get(CONF_USER_AGENT) or "").strip()
+    return value if value and value != DEFAULT_USER_AGENT else None
 
 
 def _settings_errors(user_input: dict) -> dict[str, str]:
@@ -115,6 +126,10 @@ def _settings_errors(user_input: dict) -> dict[str, str]:
                 int(code.strip())
     except ValueError:
         return {CONF_FILTERED_ALARM_CODES: "invalid_alarm_codes"}
+    user_agent = user_input.get(CONF_USER_AGENT) or ""
+    # one line of printable ASCII: anything else is not a valid header value
+    if len(user_agent) > 256 or not all(" " <= char <= "~" for char in user_agent):
+        return {CONF_USER_AGENT: "invalid_user_agent"}
     return {}
 
 
@@ -135,7 +150,7 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors = _settings_errors(user_input)
             if not errors:
                 # Validate credentials before creating entry
-                errors = await self._validate_credentials(user_input[CONF_USERNAME], user_input[CONF_PASSWORD]) or {}
+                errors = await self._validate_credentials(user_input[CONF_USERNAME], user_input[CONF_PASSWORD], _user_agent(user_input)) or {}
 
             if not errors:
                 return self.async_create_entry(
@@ -161,12 +176,13 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    async def _validate_credentials(self, username: str, password: str) -> dict[str, str] | None:
+    async def _validate_credentials(self, username: str, password: str, user_agent: str | None = None) -> dict[str, str] | None:
         """Validate credentials with the CSNet API.
 
         Args:
             username: CSNet username
             password: CSNet password
+            user_agent: User-Agent to sign in with, None for the default
 
         Returns:
             dict with error key if validation failed, None if successful
@@ -176,7 +192,9 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         _LOGGER.debug("Config flow: Validating credentials")
         try:
             # Validate credentials using the API
-            is_valid = await CSNetHomeAPI.async_validate_credentials(self.hass, username, password)
+            # the default call stays as it was; a custom User-Agent is tried at sign-in
+            extra = {"user_agent": user_agent} if user_agent else {}
+            is_valid = await CSNetHomeAPI.async_validate_credentials(self.hass, username, password, **extra)
 
             if not is_valid:
                 _LOGGER.warning("Config flow: Credential validation returned False")
@@ -204,7 +222,7 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             credentials_changed = username != current.get(CONF_USERNAME) or password != current.get(CONF_PASSWORD)
             if not errors and credentials_changed:
                 # Unchanged credentials are in use already: no extra login for a settings change
-                errors = await self._validate_credentials(username, password) or {}
+                errors = await self._validate_credentials(username, password, _user_agent(user_input)) or {}
 
             if not errors:
                 # Update the config entry with new values and reload

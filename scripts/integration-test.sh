@@ -152,7 +152,7 @@ start_homeassistant() {
             echo "  1. Open http://localhost:8123 in your browser"
             echo "  2. Create an admin account (first time only)"
             echo "  3. Go to Configuration → Integrations"
-            echo "  4. Click 'Add Integration' and search for 'Hitachi CSNet Home'"
+            echo "  4. Click 'Add Integration' and search for 'CSNet Home (unofficial, for Hitachi)'"
             echo "  5. Configure the integration with your credentials"
             echo ""
             echo -e "${YELLOW}📝 Important: After making code changes, run:${NC}"

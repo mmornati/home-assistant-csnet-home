@@ -13,6 +13,7 @@ from custom_components.csnet_home.const import (
     API_URL,
     COMMON_API_HEADERS,
     DEFAULT_API_TIMEOUT,
+    DEFAULT_USER_AGENT,
     DELETESPECIFICALARM_PATH,
     ELEMENTS_PATH,
     HEAT_SETTINGS_PATH,
@@ -51,7 +52,7 @@ TRANSLATIONS_RETRY_SECONDS = 600
 class TemperatureLimitConfig:
     """Configuration for temperature limits for a zone.
 
-    Matches JavaScript getUnitMinimumSettingComplex / getUnitMaximumSettingComplex.
+    Follows the limits the CSNet web app applies to each zone.
     Each zone has separate defaults for heating vs cooling min/max.
     """
 
@@ -270,10 +271,12 @@ def redact_data(data):
 class CSNetHomeAPI:
     """Handles communication with the cloud service API."""
 
-    def __init__(self, hass: HomeAssistant, username: str, password: str, base_url=API_URL):
+    def __init__(self, hass: HomeAssistant, username: str, password: str, base_url=API_URL, user_agent: str | None = None):
         """Initialize the CloudServiceAPI class with username and password."""
         self.hass = hass
         self.base_url = base_url
+        # Sent with every request; an empty setting means the default
+        self._common_headers = COMMON_API_HEADERS | {"user-agent": (user_agent or "").strip() or DEFAULT_USER_AGENT}
         self.username = username
         self.password = password
         self.session = None
@@ -310,7 +313,7 @@ class CSNetHomeAPI:
         """Get the XSRF token from the cloud service."""
         login_url = f"{self.base_url}{LOGIN_PATH}"
 
-        headers = COMMON_API_HEADERS | {
+        headers = self._common_headers | {
             "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
             "content-type": "application/x-www-form-urlencoded",
         }
@@ -396,7 +399,7 @@ class CSNetHomeAPI:
 
         login_url = f"{self.base_url}{LOGIN_PATH}"
 
-        headers = COMMON_API_HEADERS | {
+        headers = self._common_headers | {
             "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
             "content-type": "application/x-www-form-urlencoded",
         }
@@ -406,7 +409,7 @@ class CSNetHomeAPI:
             "acceptedCookies": "yes",
         }
 
-        # CSNet API requires password field to replace % with # (as done in csnet.js)
+        # CSNet API requires password field to replace % with # (as the CSNet web app sends it)
         password_sanitized = self.password.replace("%", "#") if self.password else ""
 
         form_data = {
@@ -431,7 +434,7 @@ class CSNetHomeAPI:
             return False
 
     @staticmethod
-    async def async_validate_credentials(hass: HomeAssistant, username: str, password: str, base_url: str = API_URL) -> bool:
+    async def async_validate_credentials(hass: HomeAssistant, username: str, password: str, base_url: str = API_URL, user_agent: str | None = None) -> bool:
         """Validate credentials by attempting to login.
 
         This is a standalone method that creates a temporary API instance,
@@ -443,13 +446,14 @@ class CSNetHomeAPI:
             username: CSNet username
             password: CSNet password
             base_url: Base URL for the API (defaults to API_URL constant)
+            user_agent: User-Agent to sign in with (defaults to DEFAULT_USER_AGENT)
 
         Returns:
             bool: True if credentials are valid, False otherwise
         """
         _LOGGER.debug("Starting credential validation")
         # Create a temporary API instance for validation
-        temp_api = CSNetHomeAPI(hass, username, password, base_url)
+        temp_api = CSNetHomeAPI(hass, username, password, base_url, user_agent=user_agent)
         # Pre-create the session so it is always available for cleanup
         temp_api.session = aiohttp.ClientSession(cookie_jar=aiohttp.CookieJar())
 
@@ -543,7 +547,7 @@ class CSNetHomeAPI:
         if not await self._async_ensure_session():
             return None
 
-        headers = COMMON_API_HEADERS | {
+        headers = self._common_headers | {
             "accept": "application/json, text/javascript, */*; q=0.01",
             "x-requested-with": "XMLHttpRequest",
         }
@@ -638,7 +642,7 @@ class CSNetHomeAPI:
         if not await self._async_ensure_session():
             return None
 
-        headers = COMMON_API_HEADERS | {
+        headers = self._common_headers | {
             "accept": "application/json, text/javascript, */*; q=0.01",
             "x-requested-with": "XMLHttpRequest",
         }
@@ -666,7 +670,7 @@ class CSNetHomeAPI:
         if not await self._async_ensure_session():
             return None
 
-        headers = COMMON_API_HEADERS | {
+        headers = self._common_headers | {
             "accept": "*/*",
             "x-requested-with": "XMLHttpRequest",
         }
@@ -698,7 +702,7 @@ class CSNetHomeAPI:
         if not await self._async_ensure_session():
             return None
 
-        headers = COMMON_API_HEADERS | {
+        headers = self._common_headers | {
             "accept": "*/*",
             "x-requested-with": "XMLHttpRequest",
         }
@@ -720,7 +724,7 @@ class CSNetHomeAPI:
         """
         if not await self._async_ensure_session():
             return None
-        headers = COMMON_API_HEADERS | {
+        headers = self._common_headers | {
             "accept": "*/*",
             "x-requested-with": "XMLHttpRequest",
         }
@@ -794,7 +798,7 @@ class CSNetHomeAPI:
         return self._get_nested_data_from_installation_devices(installation_devices_data, "heatingSetting", indoor_id)
 
     def _validate_value(self, value, default):
-        """Validate temperature limit value matching JavaScript validateValue logic.
+        """Validate temperature limit value the way the CSNet web app does.
 
         Args:
             value: The value to validate (can be None, int, float)
@@ -802,13 +806,6 @@ class CSNetHomeAPI:
 
         Returns:
             The validated value or default if value is None, 0, or -1
-
-        This matches the JavaScript validateValue function:
-        function validateValue(v, def) {
-            if (v != null && v != undefined && v != 0 && v != -1)
-                return v;
-            return def;
-        }
         """
         if value is None:
             return default
@@ -832,7 +829,7 @@ class CSNetHomeAPI:
         Returns:
             Tuple of (min_temp, max_temp) or (None, None) if not available
 
-        Zone mapping based on JavaScript code:
+        Zone mapping, as observed in the CSNet web app:
         - zone_id 1 = C1_AIR (air circuit 1) - max 35°C (RTU_MAX)
         - zone_id 2 = C2_AIR (air circuit 2) - max 35°C (RTU_MAX)
         - zone_id 5 = C1_WATER (water circuit 1) - max 80°C (C1_MAX_HEAT)
@@ -901,7 +898,7 @@ class CSNetHomeAPI:
         """
         url = f"{self.base_url}{path}"
 
-        headers = COMMON_API_HEADERS | {
+        headers = self._common_headers | {
             "accept": "*/*",
             "x-requested-with": "XMLHttpRequest",
             "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
@@ -1405,7 +1402,7 @@ class CSNetHomeAPI:
         if preferred_file:
             endpoints.append(preferred_file)
 
-        headers = COMMON_API_HEADERS | {
+        headers = self._common_headers | {
             "accept": "*/*",
             "x-requested-with": "XMLHttpRequest",
         }
@@ -1502,7 +1499,7 @@ class CSNetHomeAPI:
         # Note: R290 and mirror unit detection would be done here if
         # installation_devices_data is expanded in the future
 
-        # Map alarm codes to origin keys based on JavaScript implementation
+        # Map alarm codes to origin keys as the CSNet web app displays them
         origin_key = None
 
         # BCD-specific origins (check raw value BEFORE reversing)

@@ -2013,14 +2013,14 @@ def test_reverse_bcd(hass):
     """Test reverse BCD conversion."""
     api = CSNetHomeAPI(hass, "user", "pass")
 
-    # Test BCD conversion examples from JavaScript
-    # reverseBCD(62) = (6-1)*16 + (2+10) = 5*16 + 12 = 80 + 12 = 92
+    # BCD conversion examples, as observed in the CSNet web app
+    # reverse_bcd(62) = (6-1)*16 + (2+10) = 5*16 + 12 = 80 + 12 = 92
     assert api.reverse_bcd(62) == 92
 
-    # reverseBCD(91) = (9-1)*16 + (1+10) = 8*16 + 11 = 128 + 11 = 139
+    # reverse_bcd(91) = (9-1)*16 + (1+10) = 8*16 + 11 = 128 + 11 = 139
     assert api.reverse_bcd(91) == 139
 
-    # reverseBCD(92) = (9-1)*16 + (2+10) = 8*16 + 12 = 128 + 12 = 140
+    # reverse_bcd(92) = (9-1)*16 + (2+10) = 8*16 + 12 = 128 + 12 = 140
     assert api.reverse_bcd(92) == 140
 
 
@@ -2829,3 +2829,12 @@ def test_has_silent_mode_is_false_without_unit_data(hass):
     api = CSNetHomeAPI(hass, "user", "pass")
     assert api.has_silent_mode(None) is False
     assert api.has_silent_mode({}) is False
+
+
+def test_user_agent_defaults_to_the_browser_one_and_can_be_set(hass):
+    """Every request carries the configured User-Agent; an empty setting means the default."""
+    from custom_components.csnet_home.const import DEFAULT_USER_AGENT
+
+    assert CSNetHomeAPI(hass, "user", "pass")._common_headers["user-agent"] == DEFAULT_USER_AGENT
+    assert CSNetHomeAPI(hass, "user", "pass", user_agent="  ")._common_headers["user-agent"] == DEFAULT_USER_AGENT
+    assert CSNetHomeAPI(hass, "user", "pass", user_agent="my-client/1.0")._common_headers["user-agent"] == "my-client/1.0"

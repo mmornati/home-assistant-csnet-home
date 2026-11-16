@@ -1,4 +1,4 @@
-# AGENTS.md - Hitachi CSNet Home Integration
+# AGENTS.md - CSNet Home (unofficial, for Hitachi) Integration
 
 > AI Assistant Instructions for the home-assistant-csnet-home project
 
@@ -24,7 +24,7 @@
 
 ## Project Overview
 
-**Hitachi CSNet Home Integration** is a custom Home Assistant integration that enables control of Hitachi heat pumps and air conditioning systems using the ATW-IOT-01 module through the CSNet Manager cloud service.
+**CSNet Home (unofficial, for Hitachi) Integration** is a custom Home Assistant integration that enables control of Hitachi heat pumps and air conditioning systems using the ATW-IOT-01 module through the CSNet Manager cloud service.
 
 **Key Features:**
 - Climate control entities per zone (HVAC modes: off, heat, cool)
@@ -398,7 +398,7 @@ Platforms are registered in `__init__.py`:
 
 ### Debugging API Issues
 1. Enable debug logging: `custom_components.csnet_home: debug`
-2. Capture `/data/elements` response from CSNet web app (browser DevTools)
+2. Get the data the integration received: the diagnostics download, or the debug log
 3. Add test fixture in `tests/fixtures/` with the response
 4. Test parsing in `tests/test_api.py`
 
