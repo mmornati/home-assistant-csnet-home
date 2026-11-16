@@ -361,7 +361,7 @@ const TEXTS = {
     not_enough_history: "hacen falta al menos 7 días de historial",
     base_load: "Consumo base (14 días)",
     base_load_detail: "potencia mínima: bombas y electrónica",
-    signature_note: "kWh por día = a + b × temperatura exterior media, en los últimos {d} días. Una estimación, no una promesa.",
+    signature_note: "kWh por día = a + b × temperatura exterior media, en los últimos {d} días. Valor estimado, puede variar.",
     cost_today: "Coste de hoy",
     cost_month: "Coste del mes",
     price_used: "precio {v} {c}/kWh",
