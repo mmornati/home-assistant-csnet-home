@@ -508,6 +508,14 @@ The sum of two parts:
 | Circulation pump | 10 W to 75 W with the square of Pump Speed; 75 % is assumed when the unit reports no speed |
 | Outdoor fan | Up to 90 W at 900 rpm, with the cube of Outdoor Fan RPM; 40 W when the unit reports no speed, 0 W during a defrost |
 
+#### Self-calibration
+
+The unit reports its current in whole Amps, truncated: 6 A means 6.0 to 6.99 A. Whenever the model's figure for the compressor falls outside that range, the model is wrong in a known direction, and a correction factor moves 5 % of the way towards the range. Over a few hours of running the model fits your unit, and the estimate lands inside the range instead of being cut to its edge.
+
+- One factor per 20 Hz band of compressor frequency, each starting at 1.0 and kept between 0.6 and 1.6.
+- The factors are kept across restarts and shown in the `power_calibration` attribute of Instant Consumption.
+- Nothing is learnt during a defrost, which uses a separate estimate (35 W + fan + 15 W per Hz). A defrost is taken from the unit's own defrost flag.
+
 With the compressor stopped the sensor shows 55 W (controllers and crankcase heater), or more while the pump runs. Backup and tank heaters are not counted. The crankcase heater is counted even on a unit set to switch it off while stopped (outdoor unit function F8).
 
 ### Output Power

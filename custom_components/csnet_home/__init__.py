@@ -23,6 +23,7 @@ from custom_components.csnet_home.const import (
 from custom_components.csnet_home.coordinator import ALARM_STORAGE_VERSION, CSNetHomeConfigEntry, CSNetHomeCoordinator, CSNetHomeData, alarm_storage_key
 from custom_components.csnet_home.dashboard import async_register_dashboard
 from custom_components.csnet_home.migration import async_migrate_zone_identifiers
+from custom_components.csnet_home.power_calibration import POWER_CALIBRATION_STORAGE_VERSION, power_calibration_storage_key
 from custom_components.csnet_home.sensor import DEVICE_SENSOR_DESCRIPTIONS, ZONE_SENSOR_DESCRIPTIONS
 from custom_components.csnet_home.server_energy import METER_STORAGE_VERSION, meter_storage_key
 
@@ -155,6 +156,7 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Delete what the removed entry kept in storage."""
     await Store(hass, ALARM_STORAGE_VERSION, alarm_storage_key(entry.entry_id)).async_remove()
     await Store(hass, METER_STORAGE_VERSION, meter_storage_key(entry.entry_id)).async_remove()
+    await Store(hass, POWER_CALIBRATION_STORAGE_VERSION, power_calibration_storage_key(entry.entry_id)).async_remove()
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: CSNetHomeConfigEntry) -> bool:

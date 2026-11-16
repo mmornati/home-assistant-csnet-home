@@ -40,6 +40,7 @@ from .const import (
 )
 from .coordinator import CSNetHomeCoordinator
 from .helpers import find_indoor_unit, zone_device_identifier, zone_key
+from .power_calibration import PowerCalibration
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -1002,6 +1003,10 @@ async def async_setup_entry(hass, entry, async_add_entities):
         }
         common_data = coordinator.get_common_data()
         power_supply = entry.data.get(CONF_POWER_SUPPLY, DEFAULT_POWER_SUPPLY)
+        # What the power model learnt about this unit, kept across restarts
+        calibration = PowerCalibration(hass, entry.entry_id)
+        await calibration.async_load()
+        coordinator.power_calibration = calibration
 
         for description in INSTALLATION_SENSOR_DESCRIPTIONS:
             sensors.append(
@@ -1515,6 +1520,24 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
             return WATTS_PER_AMP_THREE_PHASE
         return WATTS_PER_AMP_SINGLE_PHASE
 
+    def _power_calibration(self) -> PowerCalibration:
+        """Return the calibration shared by the sensors of this coordinator."""
+        calibration = getattr(self._coordinator, "power_calibration", None)
+        if not isinstance(calibration, PowerCalibration):
+            calibration = PowerCalibration()
+            try:
+                self._coordinator.power_calibration = calibration
+            except AttributeError:  # pragma: no cover - a coordinator that takes no attribute
+                pass
+        return calibration
+
+    @property
+    def extra_state_attributes(self):
+        """Show the learnt correction factors on the consumption sensor."""
+        if self._key != "instant_consumption":
+            return None
+        return {"power_calibration": self._power_calibration().as_attributes()}
+
     @staticmethod
     def _pump_power(heating_status, compressor_running: bool) -> float:
         """Return the Watts of the circulation pump, estimated from its speed.
@@ -1593,28 +1616,28 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
             excess_temp = t_discharge - 90
             factor_temp = 1.0 - (excess_temp * 0.025)
 
-        # 4. Preliminary Calculation
-        base_power = OUTDOOR_ELECTRONICS_POWER_W + self._fan_power(heating_status)
-
-        if p_high > p_low:
-            delta_p = p_high - p_low
-
-            # Base Calculation
-            raw_power = base_power + (k_dynamic * hz * delta_p)
-
-            # Apply correction factors
-            calculated_power = raw_power * factor_rpm * factor_temp
-        else:
-            # Fallback for defrost (pressures crossed)
-            calculated_power = base_power + (hz * 15)
-
-        # 5. Guardrail System (Protection)
-        # Lower limit: reported amps * W/A (e.g., 6A -> 1380W single phase)
+        # 4. Range the reported current allows. It is truncated to whole Amps:
+        # 6 A means 6.0 to 6.99 A (1380 to 1607 W single phase)
         min_watts = current_amps * watts_per_amp
-
-        # Upper limit: reported amps + 0.99 (next integer) (e.g., 6A means < 7A)
         max_watts = (current_amps + 0.99) * watts_per_amp
 
+        # 5. Preliminary Calculation
+        base_power = OUTDOOR_ELECTRONICS_POWER_W + self._fan_power(heating_status)
+        delta_p = p_high - p_low
+
+        if heating_status.get("defrosting") or delta_p <= 0:
+            # A defrost, by the unit's own flag, or pressures that give no
+            # usable difference (crossed, or no suction sensor)
+            calculated_power = base_power + (hz * 15)
+        else:
+            compressor_power = k_dynamic * hz * delta_p * factor_rpm * factor_temp
+            # The model corrects itself: outside the current's range it is
+            # wrong in a known direction, and its factor follows
+            calibration = self._power_calibration()
+            calibration.learn(heating_status, hz, compressor_power, min_watts - base_power, max_watts - base_power)
+            calculated_power = base_power + compressor_power * calibration.factor(hz)
+
+        # 6. Guardrail System (Protection)
         outdoor_power = calculated_power
 
         if calculated_power < min_watts:

@@ -9,6 +9,7 @@ from homeassistant.util import dt as dt_util
 
 from custom_components.csnet_home.coordinator import CSNetHomeCoordinator
 from custom_components.csnet_home.helpers import extract_heating_status
+from custom_components.csnet_home.power_calibration import MAX_FACTOR, PowerCalibration
 from custom_components.csnet_home.sensor import (
     CALCULATED_SENSOR_DESCRIPTIONS,
     COMPRESSOR_SENSOR_DESCRIPTIONS,
@@ -304,6 +305,121 @@ def test_fan_without_a_speed_reading_stops_during_a_defrost():
     auxiliary = STANDBY_POWER_W + PUMP_MAX_POWER_W
     assert _electric_power(defrost | {"ouCurrent": 4, "defrosting": 1}) == round(OUTDOOR_ELECTRONICS_POWER_W + 60 * 15 + auxiliary)
     assert _electric_power(defrost | {"ouCurrent": 4, "defrosting": 0}) == round(OUTDOOR_ELECTRONICS_POWER_W + FAN_DEFAULT_POWER_W + 60 * 15 + auxiliary)
+
+
+def test_defrost_is_taken_from_the_unit_flag():
+    """With the flag set the defrost estimate is used, whatever the pressures say."""
+    normal = {"ouHz": 60, "ouCurrent": 4, "ouDischargePress": 25, "ouSuctionPress": 8, "waterFlow": 20, "pumpSpeed": 100, "fanRPM": 0}
+    auxiliary = STANDBY_POWER_W + PUMP_MAX_POWER_W
+    assert _electric_power(normal | {"defrosting": 1}) == round(OUTDOOR_ELECTRONICS_POWER_W + 60 * 15 + auxiliary)
+    assert _electric_power(normal | {"defrosting": 0}) != _electric_power(normal | {"defrosting": 1})
+
+
+# --------------------------------------------------------------------------
+# Estimated electricity: self-calibration from the reported current
+# --------------------------------------------------------------------------
+
+# 31 Hz and 17 bar apart: the model says 669 W for the compressor, well under the 1380 W of 6 A
+LOW_MODEL = {"ouHz": 31, "ouCurrent": 6, "ouDischargePress": 25, "ouSuctionPress": 8, "waterFlow": 20, "pumpSpeed": 100, "fanRPM": 0}
+
+
+def _calibrated_sensor():
+    coordinator = _coordinator({})
+    return CSNetHomeCalculatedSensor(coordinator, DEVICE_DATA, {}, CALCULATED_SENSOR_DESCRIPTIONS["instant_consumption"]), coordinator
+
+
+def test_model_below_the_current_range_raises_its_factor():
+    """Each new reading under the range moves the factor of that frequency band up."""
+    sensor, coordinator = _calibrated_sensor()
+    sensor._calculate_complex_power(dict(LOW_MODEL))
+    first = coordinator.power_calibration.factor(31)
+    sensor._calculate_complex_power(dict(LOW_MODEL))
+    assert 1.0 < first < coordinator.power_calibration.factor(31)
+    assert coordinator.power_calibration.factor(80) == 1.0  # another band is left alone
+
+
+def test_model_above_the_current_range_lowers_its_factor():
+    """A model over the range of 1 A is brought down."""
+    sensor, coordinator = _calibrated_sensor()
+    sensor._calculate_complex_power(LOW_MODEL | {"ouCurrent": 1})
+    assert coordinator.power_calibration.factor(31) < 1.0
+
+
+def test_model_inside_the_current_range_keeps_its_factor():
+    """Nothing to learn while the model agrees with the current."""
+    sensor, coordinator = _calibrated_sensor()
+    sensor._calculate_complex_power(SIX_AMPS | {"pumpSpeed": 100, "fanRPM": 0})
+    assert coordinator.power_calibration.factors == {}
+
+
+def test_one_reading_is_learnt_from_once():
+    """Several sensors ask for the power of the same reading: it counts once."""
+    sensor, coordinator = _calibrated_sensor()
+    reading = dict(LOW_MODEL)
+    sensor._calculate_complex_power(reading)
+    first = coordinator.power_calibration.factor(31)
+    sensor._calculate_complex_power(reading)
+    assert coordinator.power_calibration.factor(31) == first
+
+
+def test_calibrated_model_reaches_the_current_range():
+    """After enough readings the model lands on the range instead of being cut to it."""
+    sensor, coordinator = _calibrated_sensor()
+    reading = LOW_MODEL | {"ouCurrent": 3}  # 690 to 918 W: the model's 704 W of outdoor power is inside
+    assert sensor._calculate_complex_power(dict(reading)) == round(35 + 1.27 * 31 * 17 + STANDBY_POWER_W + PUMP_MAX_POWER_W)
+    reading = LOW_MODEL | {"ouCurrent": 4}  # 920 to 1148 W: the model is under it
+    for _ in range(200):
+        sensor._calculate_complex_power(dict(reading))
+    factor = coordinator.power_calibration.factor(31)
+    assert 35 + 1.27 * 31 * 17 * factor == pytest.approx(920, abs=1)
+
+
+def test_factor_stays_within_its_limits():
+    """A model far from the range is not stretched without limit."""
+    sensor, coordinator = _calibrated_sensor()
+    for _ in range(500):
+        sensor._calculate_complex_power(LOW_MODEL | {"ouCurrent": 12})
+    assert coordinator.power_calibration.factor(31) == MAX_FACTOR
+
+
+def test_defrost_teaches_nothing():
+    """The defrost estimate is not the model: the current says nothing about the model then."""
+    sensor, coordinator = _calibrated_sensor()
+    sensor._calculate_complex_power(LOW_MODEL | {"defrosting": 1})
+    assert sensor._power_calibration().factors == {}
+
+
+def test_consumption_sensor_shows_the_learnt_factors():
+    """The factors are visible, by frequency band, on the consumption sensor only."""
+    sensor, coordinator = _calibrated_sensor()
+    sensor._calculate_complex_power(dict(LOW_MODEL))
+    attributes = sensor.extra_state_attributes["power_calibration"]
+    assert list(attributes) == ["20-39 Hz"]
+    assert attributes["20-39 Hz"] == round(coordinator.power_calibration.factor(31), 3)
+    cop = CSNetHomeCalculatedSensor(coordinator, DEVICE_DATA, {}, CALCULATED_SENSOR_DESCRIPTIONS["instant_cop"])
+    assert cop.extra_state_attributes is None
+
+
+async def test_learnt_factors_survive_a_restart():
+    """Stored factors are loaded; anything unusable in storage is dropped."""
+    calibration = PowerCalibration(MagicMock(), "entry")
+    calibration._store = MagicMock()
+    calibration._store.async_load = AsyncMock(return_value={"factors": {"1": 1.2, "3": 9.0, "x": 1.1, "9": 1.1}})
+    await calibration.async_load()
+    assert calibration.factors == {1: 1.2}
+    assert calibration.factor(31) == 1.2
+
+
+def test_learnt_factor_is_saved_once_it_has_moved_enough():
+    """Small steps do not write to storage at every poll."""
+    hass = MagicMock()
+    calibration = PowerCalibration(hass, "entry")
+    calibration._async_save = MagicMock()
+    calibration.learn(object(), 31, 669, 669 * 1.1, 2000)  # 5 % of the way to 1.1: 1.005
+    assert hass.async_create_task.call_count == 0
+    for _ in range(5):
+        calibration.learn(object(), 31, 669, 669 * 1.5, 2000)
+    assert hass.async_create_task.call_count >= 1
 
 
 # --------------------------------------------------------------------------
