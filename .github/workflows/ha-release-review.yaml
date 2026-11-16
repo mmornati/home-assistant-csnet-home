@@ -9,17 +9,15 @@
 # from a job with read-only permissions. A separate job with no LLM involved
 # opens the issue. Fixes are left to a human rather than pushed automatically.
 #
-# GitHub has no webhook for releases of another repository, so this polls PyPI.
-# Each monthly release (YYYY.M) is reviewed once, at its first beta when there
-# is one, otherwise at the stable release; the issue title is the dedupe key.
+# Started by angelia-ha-release.yaml when Angelia (https://angelia-dev.github.io/docs/)
+# reports a new Home Assistant release, or by hand. Each monthly release (YYYY.M)
+# is reviewed once; the issue title is the dedupe key.
 # Patch releases are covered by the deterministic nightly workflow.
 #
 # Requires the ANTHROPIC_API_KEY repository secret (API credit, about $0.50 a run).
 name: HA Release Review (Claude)
 
 'on':
-  schedule:
-    - cron: '17 */6 * * *'
   workflow_dispatch:
     inputs:
       version:
