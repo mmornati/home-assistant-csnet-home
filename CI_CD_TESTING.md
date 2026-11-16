@@ -377,7 +377,7 @@ def test_with_fixture():
 ### Creating New Fixtures
 
 See [`tests/fixtures/README.md`](../tests/fixtures/README.md) for detailed instructions on:
-- Recording API responses from browser DevTools
+- Building fixtures from the diagnostics download or debug logs
 - Sanitizing sensitive data
 - Naming conventions
 - Contributing fixtures

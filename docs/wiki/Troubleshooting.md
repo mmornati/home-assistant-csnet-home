@@ -1,6 +1,6 @@
 # Troubleshooting Guide
 
-Solutions to common issues with the Hitachi CSNet Home integration.
+Solutions to common issues with the CSNet Home (unofficial, for Hitachi) integration.
 
 ## Quick Diagnosis
 
@@ -42,7 +42,7 @@ See [How It Works](How-It-Works.md) for how the integration talks to CSNet Manag
 
 ### Integration Not Found in Search
 
-**Symptoms**: Can't find "Hitachi CSNet Home" when adding integration
+**Symptoms**: Can't find "CSNet Home (unofficial, for Hitachi)" when adding integration
 
 **Causes**:
 - Integration not properly installed
@@ -264,7 +264,7 @@ See [How It Works](How-It-Works.md) for how the integration talks to CSNet Manag
    - If site is down, wait for service restoration
 
 6. **Re-authenticate**:
-   - Settings → Devices & Services → Hitachi CSNet Home → ⋮ → **Reconfigure**
+   - Settings → Devices & Services → CSNet Home (unofficial, for Hitachi) → ⋮ → **Reconfigure**
    - Re-enter your credentials; they are validated before saving and the integration reloads
 
 ### Intermittent Unavailability
@@ -542,7 +542,7 @@ See [How It Works](How-It-Works.md) for how the integration talks to CSNet Manag
 **Solutions**:
 
 1. **Filter the code in the integration**:
-   - Settings → Devices & Services → Hitachi CSNet Home → ⋮ → **Reconfigure**
+   - Settings → Devices & Services → CSNet Home (unofficial, for Hitachi) → ⋮ → **Reconfigure**
    - Add the code to **Filtered Alarm Codes** (comma-separated, e.g. `-1,42`), or turn off **Enable Alarm Notifications**
    - Every entry must be an integer, otherwise the whole list is ignored
    - See [Built-in Alarm Notifications](Advanced-Features.md#built-in-alarm-notifications)
@@ -644,7 +644,7 @@ Restart Home Assistant, then:
 
 The quickest way to share what the integration sees:
 
-1. Go to **Settings → Devices & services → Hitachi CSNet Home**
+1. Go to **Settings → Devices & services → CSNet Home (unofficial, for Hitachi)**
 2. Open the **⋮** menu of the entry and choose **Download diagnostics**
 3. Attach the file to your GitHub issue
 
@@ -652,17 +652,6 @@ The file holds the data the integration last received from CSNet Manager. Your u
 installation name, location, owner and installation ids, and hardware serial numbers are replaced by
 `**REDACTED**`. Zone and device names are kept because they are needed to read the data, so look the
 file over before you post it.
-
-### Capture API Response
-
-1. Open browser Developer Tools (F12)
-2. Go to www.csnetmanager.com
-3. Navigate to Network tab
-4. Log in
-5. Find `/data/elements` request
-6. Copy response JSON
-
-This shows what data your system provides.
 
 ### Check Integration State
 
@@ -677,7 +666,7 @@ This shows what data your system provides.
 
 Without removing configuration:
 1. Go to Settings → Devices & Services
-2. Find Hitachi CSNet Home
+2. Find CSNet Home (unofficial, for Hitachi)
 3. Click ⋮ (three dots)
 4. Click Reload
 

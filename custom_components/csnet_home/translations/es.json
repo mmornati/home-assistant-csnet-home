@@ -15,7 +15,8 @@
                     "power_supply": "Alimentación de la unidad exterior",
                     "enable_alarm_notifications": "Activar las notificaciones de alarma",
                     "filtered_alarm_codes": "Códigos de alarma filtrados",
-                    "energy_meter": "Contador eléctrico de la bomba de calor (opcional)"
+                    "energy_meter": "Contador eléctrico de la bomba de calor (opcional)",
+                    "user_agent": "User-Agent (avanzado)"
                 },
                 "data_description": {
                     "username": "Su nombre de usuario de CSNet Manager",
@@ -28,7 +29,8 @@
                     "power_supply": "Se usa para estimar la potencia instantánea y el COP. Auto detecta las unidades de 8/10 CV como trifásicas y las demás como monofásicas.",
                     "enable_alarm_notifications": "Crear una notificación de Home Assistant cuando la unidad informa de una alarma",
                     "filtered_alarm_codes": "Códigos de alarma, separados por comas, que nunca notifican (por defecto: -1, errores de comunicación). Dejar vacío para notificar todos.",
-                    "energy_meter": "Cualquier sensor de energía (kWh) que mida la electricidad de la bomba de calor, de cualquier dispositivo. Se usa para calcular el COP con el calor que registra CSNet. Dejar vacío para mantener solo la estimación."
+                    "energy_meter": "Cualquier sensor de energía (kWh) que mida la electricidad de la bomba de calor, de cualquier dispositivo. Se usa para calcular el COP con el calor que registra CSNet. Dejar vacío para mantener solo la estimación.",
+                    "user_agent": "Cómo se presenta la integración ante CSNet Manager. Déjelo vacío para usar el valor por defecto (un navegador Chrome de escritorio). Cámbielo solo para probar otro valor."
                 }
             },
             "reconfigure": {
@@ -45,7 +47,8 @@
                     "power_supply": "Alimentación de la unidad exterior",
                     "enable_alarm_notifications": "Activar las notificaciones de alarma",
                     "filtered_alarm_codes": "Códigos de alarma filtrados",
-                    "energy_meter": "Contador eléctrico de la bomba de calor (opcional)"
+                    "energy_meter": "Contador eléctrico de la bomba de calor (opcional)",
+                    "user_agent": "User-Agent (avanzado)"
                 },
                 "data_description": {
                     "username": "Su nombre de usuario de CSNet Manager",
@@ -58,7 +61,8 @@
                     "power_supply": "Se usa para estimar la potencia instantánea y el COP. Auto detecta las unidades de 8/10 CV como trifásicas y las demás como monofásicas.",
                     "enable_alarm_notifications": "Crear una notificación de Home Assistant cuando la unidad informa de una alarma",
                     "filtered_alarm_codes": "Códigos de alarma, separados por comas, que nunca notifican (por defecto: -1, errores de comunicación). Dejar vacío para notificar todos.",
-                    "energy_meter": "Cualquier sensor de energía (kWh) que mida la electricidad de la bomba de calor, de cualquier dispositivo. Se usa para calcular el COP con el calor que registra CSNet. Dejar vacío para mantener solo la estimación."
+                    "energy_meter": "Cualquier sensor de energía (kWh) que mida la electricidad de la bomba de calor, de cualquier dispositivo. Se usa para calcular el COP con el calor que registra CSNet. Dejar vacío para mantener solo la estimación.",
+                    "user_agent": "Cómo se presenta la integración ante CSNet Manager. Déjelo vacío para usar el valor por defecto (un navegador Chrome de escritorio). Cámbielo solo para probar otro valor."
                 }
             },
             "reauth_confirm": {
@@ -78,7 +82,8 @@
             "cannot_connect": "No se pudo conectar a CSNet Manager. Compruebe su conexión a Internet e inténtelo de nuevo.",
             "invalid_auth": "Nombre de usuario o contraseña no válidos. Compruebe sus credenciales.",
             "unknown": "Se produjo un error inesperado. Por favor, inténtelo de nuevo.",
-            "invalid_alarm_codes": "Los códigos de alarma deben ser números enteros separados por comas, por ejemplo: -1, 62"
+            "invalid_alarm_codes": "Los códigos de alarma deben ser números enteros separados por comas, por ejemplo: -1, 62",
+            "invalid_user_agent": "El User-Agent debe ser una sola línea de caracteres ASCII simples, 256 como máximo."
         },
         "abort": {
             "already_configured": "Esta integración de CSNet Home ya está configurada.",

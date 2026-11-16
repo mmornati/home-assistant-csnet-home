@@ -1,4 +1,4 @@
-/* Presentation of the Hitachi CSNet Home integration (see ../engine/engine.js and the canvas-video skill).
+/* Presentation of the CSNet Home (unofficial, for Hitachi) integration (see ../engine/engine.js and the canvas-video skill).
  *
  * Each scene is fn(t, d, cues): t = local time in seconds, d = scene duration,
  * cues = the spoken sentences [{s, e, text}] from timing.js. Animations hang on
@@ -338,7 +338,7 @@ function sOutro(t, d, cues) {
 
 window.videoReady = imagesReady.then(() => {
   VIDEO.create({
-    title: { en: "Hitachi CSNet Home for Home Assistant", fr: "Hitachi CSNet Home pour Home Assistant" },
+    title: { en: "CSNet Home for Home Assistant (unofficial, for Hitachi)", fr: "CSNet Home pour Home Assistant (non officiel, pour Hitachi)" },
     kicker: { en: "A one-minute tour", fr: "La visite en une minute" },
     langs: ["en", "fr"],
     theme: {

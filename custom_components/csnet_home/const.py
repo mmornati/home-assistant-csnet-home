@@ -37,8 +37,11 @@ COMMON_API_HEADERS = {
     "cache-control": "no-cache",
     "origin": "null",
     "pragma": "no-cache",
-    "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
 }
+# How the integration presents itself to CSNet Manager. A setting, so another
+# value can be tried without a new release; empty means this default.
+CONF_USER_AGENT = "user_agent"
+DEFAULT_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 DEFAULT_API_TIMEOUT = 10
 # Polling floor: CSNet Manager is an unofficial API, keep the load low
 MIN_SCAN_INTERVAL = 60
@@ -56,14 +59,14 @@ SWIMMING_POOL_MAX_TEMPERATURE = 33
 SWIMMING_POOL_MIN_TEMPERATURE = 24
 
 # Air circuit (RTU) temperature limits - for zones 1, 2 (C1_AIR, C2_AIR)
-HEATING_MAX_TEMPERATURE = 35  # RTU_MAX from JavaScript
-HEATING_MIN_TEMPERATURE = 11  # RTU_MIN from JavaScript
+HEATING_MAX_TEMPERATURE = 35  # as enforced by the CSNet web app
+HEATING_MIN_TEMPERATURE = 11  # as enforced by the CSNet web app
 
 # Water circuit temperature limits - for zones 5, 6 (C1_WATER, C2_WATER)
-WATER_CIRCUIT_MAX_HEAT = 80  # C1_MAX_HEAT / C2_MAX_HEAT from JavaScript
-WATER_CIRCUIT_MIN_HEAT = 20  # C1_MIN_HEAT / C2_MIN_HEAT from JavaScript
-WATER_CIRCUIT_MAX_COOL = 22  # C1_MAX_COOL / C2_MAX_COOL from JavaScript
-WATER_CIRCUIT_MIN_COOL = 5  # C1_MIN_COOL / C2_MIN_COOL from JavaScript
+WATER_CIRCUIT_MAX_HEAT = 80  # as enforced by the CSNet web app
+WATER_CIRCUIT_MIN_HEAT = 20  # as enforced by the CSNet web app
+WATER_CIRCUIT_MAX_COOL = 22  # as enforced by the CSNet web app
+WATER_CIRCUIT_MIN_COOL = 5  # as enforced by the CSNet web app
 
 # Fan Speed Control (for fan coil systems)
 # Standard

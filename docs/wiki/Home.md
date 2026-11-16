@@ -1,10 +1,10 @@
 ---
-description: User documentation for the Hitachi CSNet Home integration for Home Assistant.
+description: User documentation for the CSNet Home (unofficial, for Hitachi) integration for Home Assistant.
 ---
 
 # Documentation
 
-The **Hitachi CSNet Home** integration connects Hitachi heat pumps fitted with the **ATW-IOT-01** module to Home Assistant, through the **CSNet Manager** cloud service. It creates climate entities for each zone, a water heater for domestic hot water (and the swimming pool, if you have one), and sensors for the water loop, the outdoor unit, energy use and alarms.
+The **CSNet Home (unofficial, for Hitachi)** integration connects Hitachi heat pumps fitted with the **ATW-IOT-01** module to Home Assistant, through the **CSNet Manager** cloud service. It creates climate entities for each zone, a water heater for domestic hot water (and the swimming pool, if you have one), and sensors for the water loop, the outdoor unit, energy use and alarms.
 
 !!! unofficial "Unofficial integration"
     Not affiliated with, endorsed by or supported by Hitachi. Hitachi offers no public API, so the integration works the way the CSNet Manager web app does, and it can break when Hitachi changes its website. Read [How it works & disclaimer](How-It-Works.md).

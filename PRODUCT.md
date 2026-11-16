@@ -37,7 +37,7 @@ The only way to get an ATW-IOT-01 Hitachi system into Home Assistant without ext
 
 ## Brand Commitments
 
-- Name: "Hitachi CSNet Home" integration; domain `csnet_home`. Hitachi, Yutaki, Yutampo, CSNet are Hitachi trademarks: never imply endorsement, never use Hitachi logos.
+- Name: "CSNet Home (unofficial, for Hitachi)" integration (the name always carries "unofficial" where it is shown as a product title); domain `csnet_home`. Hitachi, Yutaki, Yutampo, CSNet are Hitachi trademarks: never imply endorsement, never use Hitachi logos.
 - Existing project logo: `docs/images/logo.png`, `docs/images/logo@2x.png`.
 - Author: Marco Mornati (mmornati). Apache 2.0.
 

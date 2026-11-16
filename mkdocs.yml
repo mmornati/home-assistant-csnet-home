@@ -1,5 +1,5 @@
 ---
-site_name: Hitachi CSNet Home Integration
+site_name: CSNet Home (unofficial, for Hitachi)
 site_description: >-
   Unofficial Home Assistant integration for Hitachi Yutaki and Yutampo heat pumps
   with the ATW-IOT-01 module (CSNet Manager). Zones, hot water, pool, compressor

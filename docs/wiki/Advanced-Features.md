@@ -1,6 +1,6 @@
 # Advanced Features Guide
 
-Explore advanced capabilities of the Hitachi CSNet Home integration.
+Explore advanced capabilities of the CSNet Home (unofficial, for Hitachi) integration.
 
 ## Overview
 

@@ -11,7 +11,7 @@ Mode: Persuade (landing at `/`), Read (docs pages under `/wiki/`).
 Audience: HA users with a Hitachi heat pump on ATW-IOT-01 / CSNet Manager, deciding whether this works for their unit and how to install it.
 Action: install from HACS (My Home Assistant link) or open the docs.
 Proof: real HA screenshots in docs/images, live GitHub release/stars, verified facts (60 s polling, 3 requests, csnetmanager.com only), supported models list. No invented testimonials or counts.
-Constraint: visible unofficial-API disclaimer (unaffiliated, reverse-engineered, Hitachi contacted repeatedly without reply). No Hitachi logos.
+Constraint: visible unofficial-API disclaimer (unaffiliated, built by observing the web app, Hitachi contacted repeatedly without reply). No Hitachi logos.
 
 ## Direction contract
 

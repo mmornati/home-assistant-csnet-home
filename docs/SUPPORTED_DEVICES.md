@@ -335,17 +335,14 @@ logger:
     custom_components.csnet_home: debug
 ```
 
-2. **Capture the elements response** from CSNet Manager:
-   - Open browser Developer Tools (F12)
-   - Navigate to CSNet Manager website
-   - Go to Network tab
-   - Find the `elements` API call
-   - Copy the JSON response
+2. **Download the diagnostics file**:
+   - Go to **Settings → Devices & services → CSNet Home (unofficial, for Hitachi)**
+   - Open the **⋮** menu of the entry and choose **Download diagnostics**
 
 3. **Report the issue** on [GitHub Issues](https://github.com/mmornati/home-assistant-csnet-home/issues) with:
    - Your device configuration
    - Debug logs
-   - Elements JSON response (redact personal info)
+   - The diagnostics file (credentials, location and serial numbers are already redacted)
 
 ---
 

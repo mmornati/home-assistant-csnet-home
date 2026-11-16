@@ -359,7 +359,7 @@ If you don't see the fixed water temperature number entity, it's because:
 
 **To enable fixed temperature control**:
 - Change your OTC type to FIX in the CSNet Manager app or website (or on the unit)
-- Reload the integration (**Settings → Devices & Services → Hitachi CSNet Home → ⋮ → Reload**) so the number entity is created
+- Reload the integration (**Settings → Devices & Services → CSNet Home (unofficial, for Hitachi) → ⋮ → Reload**) so the number entity is created
 
 #### Example: Seasonal Temperature Adjustment
 

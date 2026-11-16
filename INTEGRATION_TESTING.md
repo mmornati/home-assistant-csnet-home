@@ -237,7 +237,7 @@ Notes:
 6. **Add the CSNet Home integration:**
    - Go to **Configuration** → **Integrations**
    - Click **"+ Add Integration"**
-   - Search for **"Hitachi CSNet Home"**
+   - Search for **"CSNet Home (unofficial, for Hitachi)"**
    - Enter your CSNet account credentials
    - The integration will discover and load your devices
 
