@@ -1,6 +1,6 @@
 <img src="./docs/images/mark.svg" alt="" width="72" height="72">
 
-# Hitachi CSNet Home Integration for Home Assistant
+# CSNet Home for Home Assistant: unofficial integration for Hitachi heat pumps
 
 [![GitHub Release](https://img.shields.io/github/v/release/mmornati/home-assistant-csnet-home.svg?style=for-the-badge)](https://github.com/mmornati/home-assistant-csnet-home/releases)
 [![GitHub Release Date](https://img.shields.io/github/release-date/mmornati/home-assistant-csnet-home?label=Last%20Release&style=for-the-badge)](https://github.com/mmornati/home-assistant-csnet-home)
@@ -272,7 +272,7 @@ When an alarm is detected (non-zero `alarm_code`), the integration automatically
 
 ### Integration Not Working?
 
-This integration was developed by reverse-engineering the CSNet Manager web interface. While it works with many configurations, different devices or setups may behave differently.
+This integration was built by observing how the CSNet Manager web application behaves, on a limited number of installations. While it works with many configurations, different devices or setups may behave differently.
 
 **Please help improve this integration by reporting issues!**
 
@@ -289,26 +289,23 @@ logger:
     custom_components.csnet_home: debug
 ```
 
-2. **Capture the elements response:**
-   - Open your browser's Developer Tools (F12)
-   - Navigate to the CSNet Manager website
-   - Go to the **Network** tab
-   - Look for the `elements` call
-   - Copy the JSON response
+2. **Download the diagnostics file:**
+   - Go to **Settings → Devices & services → CSNet Home (unofficial, for Hitachi)**
+   - Open the **⋮** menu of the entry and choose **Download diagnostics**
 
-   ![Elements](docs/images/elements.png)
+   The file holds the data the integration last received, with your credentials, location and serial numbers redacted.
 
 3. **Create an issue** on [GitHub Issues](https://github.com/mmornati/home-assistant-csnet-home/issues) with:
    - Your configuration (number of zones, device type)
    - Debug logs
-   - Elements JSON response (feel free to redact any private information)
+   - The diagnostics file (look it over before posting: zone and device names are kept)
 
 ### Control Not Working?
 
 If a control has no effect:
-1. Open your browser DevTools on the CSNet web app
-2. Confirm the same action works there
-3. Report the mismatch as an issue with a snippet from the `elements` response
+1. Try the same action in the official CSNet Manager app or website
+2. If it works there, download the diagnostics file (see above)
+3. Report the mismatch as an issue and attach the file
 
 ### Join the Discussion
 
@@ -515,7 +512,7 @@ The integration testing environment:
 3. **Add your integration:**
    - Go to **Configuration** → **Integrations**
    - Click **"Add Integration"**
-   - Search for **"Hitachi CSNet Home"**
+   - Search for **"CSNet Home (unofficial, for Hitachi)"**
    - Enter your CSNet credentials
 
 4. **Test your integration** with real devices

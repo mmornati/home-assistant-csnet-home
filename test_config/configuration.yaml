@@ -29,4 +29,4 @@ script: !include scripts.yaml
 scene: !include scenes.yaml
 
 # The CSNet Home integration will be configured through the UI
-# Go to: Configuration -> Integrations -> Add Integration -> Hitachi CSNet Home
+# Go to: Configuration -> Integrations -> Add Integration -> CSNet Home (unofficial, for Hitachi)

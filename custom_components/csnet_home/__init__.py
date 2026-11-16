@@ -15,6 +15,7 @@ from custom_components.csnet_home.const import (
     CONF_ENABLE_ALARM_NOTIFICATIONS,
     CONF_FILTERED_ALARM_CODES,
     CONF_LANGUAGE,
+    CONF_USER_AGENT,
     DEFAULT_ENABLE_ALARM_NOTIFICATIONS,
     DEFAULT_FILTERED_ALARM_CODES,
     DOMAIN,
@@ -56,7 +57,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CSNetHomeConfigEntry):
     password = entry.data.get("password")
 
     # Initialize the CloudServiceAPI with credentials from config
-    api = CSNetHomeAPI(hass, username, password)
+    api = CSNetHomeAPI(hass, username, password, user_agent=entry.data.get(CONF_USER_AGENT))
     # store preferred language for translations
     api.preferred_language = entry.data.get(CONF_LANGUAGE)
 

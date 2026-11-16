@@ -1,6 +1,6 @@
 # Configuration Guide
 
-This guide will help you configure the Hitachi CSNet Home integration after installation.
+This guide will help you configure the CSNet Home (unofficial, for Hitachi) integration after installation.
 
 ## Prerequisites
 
@@ -21,9 +21,9 @@ Before configuring, ensure:
 2. Navigate to **Settings** → **Devices & Services**
 3. Click the **+ Add Integration** button (bottom right)
 4. Search for **"Hitachi"** or **"CSNet"**
-5. Click on **Hitachi CSNet Home**
+5. Click on **CSNet Home (unofficial, for Hitachi)**
 
-![integration search showing Hitachi CSNet Home](../images/integration_search.png)
+![integration search showing CSNet Home (unofficial, for Hitachi)](../images/integration_search.png)
 
 ### Step 2: Enter Your Credentials
 
@@ -40,6 +40,7 @@ You'll see a configuration dialog with the following fields:
 | **Fan Coil Control Model** | `standard` or `legacy` fan speed mapping | `standard` |
 | **Enable Alarm Notifications** | Create persistent notifications for new alarms | enabled |
 | **Filtered Alarm Codes** | Comma-separated alarm codes that never create a notification | `-1` |
+| **User-Agent (advanced)** | How the integration presents itself to CSNet Manager | a desktop Chrome browser |
 
 
 #### Field Details
@@ -49,6 +50,14 @@ You'll see a configuration dialog with the following fields:
   - CSNet Manager mobile app
   - CSNet Manager website (www.csnetmanager.com)
 - Credentials are stored in the Home Assistant config entry (in the `.storage` folder of your configuration directory)
+
+**User-Agent** (Advanced)
+{ #user-agent }
+
+- The `User-Agent` header sent with every request to CSNet Manager
+- **Default**: the one of a desktop Chrome browser, shown in the field. Empty the field to go back to it
+- Leave it alone unless you are testing another value: CSNet Manager may refuse a client it does not recognise, and the integration then stops updating until you restore the default
+- A new value is used after the integration reloads, which **Reconfigure** does for you
 
 **Scan Interval** (Optional)
 { #scan-interval }
@@ -406,7 +415,7 @@ To change configuration:
 ### Option 1: Reconfigure (Keeps Data)
 
 1. Go to **Settings** → **Devices & Services**
-2. Find **Hitachi CSNet Home**
+2. Find **CSNet Home (unofficial, for Hitachi)**
 3. Click **⋮** (three dots) → **Reconfigure**
 4. Update settings (the form is pre-filled with the current values)
 5. Click **Submit**
@@ -418,7 +427,7 @@ Only one CSNet Home entry can be configured per Home Assistant instance.
 ### Option 2: Remove and Re-add (Fresh Start)
 
 1. Go to **Settings** → **Devices & Services**
-2. Find **Hitachi CSNet Home**
+2. Find **CSNet Home (unofficial, for Hitachi)**
 3. Click **⋮** (three dots)
 4. Select **Delete**
 5. Confirm deletion

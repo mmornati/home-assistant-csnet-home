@@ -191,7 +191,7 @@ on:
 ### Key Settings
 
 ```yaml
-site_name: Hitachi CSNet Home Integration
+site_name: CSNet Home (unofficial, for Hitachi)
 site_url: https://mmornati.github.io/home-assistant-csnet-home
 repo_url: https://github.com/mmornati/home-assistant-csnet-home
 

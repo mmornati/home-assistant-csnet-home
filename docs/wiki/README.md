@@ -1,6 +1,6 @@
-# Hitachi CSNet Home Integration - Wiki Documentation
+# CSNet Home (unofficial, for Hitachi) Integration - Wiki Documentation
 
-This directory contains comprehensive user documentation for the Hitachi CSNet Home integration for Home Assistant.
+This directory contains comprehensive user documentation for the CSNet Home (unofficial, for Hitachi) integration for Home Assistant.
 
 ## 📚 Documentation Structure
 

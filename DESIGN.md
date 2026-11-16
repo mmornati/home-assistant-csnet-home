@@ -1,5 +1,5 @@
 ---
-name: Hitachi CSNet Home
+name: CSNet Home (unofficial, for Hitachi)
 description: The integration seen through a thermal camera; heat made visible, each zone a spot reading.
 colors:
   ink-0: "#0b0712"
@@ -113,7 +113,7 @@ components:
     padding: "0.9rem"
 ---
 
-# Design System: Hitachi CSNet Home
+# Design System: CSNet Home (unofficial, for Hitachi)
 
 ## Overview
 

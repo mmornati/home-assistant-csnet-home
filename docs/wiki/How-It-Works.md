@@ -1,5 +1,5 @@
 ---
-description: How the Hitachi CSNet Home integration talks to CSNet Manager, what data it sends, and why it is unofficial.
+description: How the CSNet Home (unofficial, for Hitachi) integration talks to CSNet Manager, what data it sends, and why it is unofficial.
 ---
 
 # How it works & disclaimer
@@ -39,6 +39,7 @@ The integration never talks to your heat pump directly and needs nothing on your
 | **On start-up** | Sign-in (`GET` then `POST /login`) and three alarm translation files (`/translations/*.json`). |
 | **When you change something** | One `POST /data/indoor/heat_setting` per change (temperature, mode, preset, hot water, pool, silent mode, fan speed, fixed water temperature). Clearing an alarm calls `POST /data/deletemyspecificalarm`. |
 | **Timeout** | 10 seconds per request. |
+| **User-Agent** | The one of a desktop Chrome browser by default. It is a [setting](Configuration-Guide.md#user-agent), so another value can be tried. |
 | **Session** | Signs in like the web app: fetches a CSRF token from the login page, posts the login form, then reuses the session cookie. Only one sign-in runs at a time. If a read fails, it signs in again on the next poll; if a change comes back with the login page, it signs in again and resends the change once. |
 | **When sign-in fails** | Waits before trying again: 1 minute, then 2, 4, 8… up to 30 minutes between attempts, with no other requests in between. A successful sign-in resets the delay. |
 
@@ -70,4 +71,4 @@ These come from how the integration works today. They are tracked on GitHub and 
 
 ## Contributing
 
-The best way to make the integration more robust is to share what you see. If a value is wrong or missing for your unit, open an issue with your model and a redacted `/data/elements` response (see [Troubleshooting](Troubleshooting.md)), or add your setup to the [compatibility matrix](../SUPPORTED_DEVICES.md).
+The best way to make the integration more robust is to share what you see. If a value is wrong or missing for your unit, open an issue with your model and the diagnostics file (see [Troubleshooting](Troubleshooting.md#download-diagnostics)), or add your setup to the [compatibility matrix](../SUPPORTED_DEVICES.md).

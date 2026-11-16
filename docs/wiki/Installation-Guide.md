@@ -1,6 +1,6 @@
 # Installation Guide
 
-This guide will walk you through installing the Hitachi CSNet Home integration for Home Assistant.
+This guide will walk you through installing the CSNet Home (unofficial, for Hitachi) integration for Home Assistant.
 
 ## Prerequisites
 
@@ -65,7 +65,7 @@ If you don't have HACS installed:
 1. In **HACS** → **Integrations**
 2. Click the **+ Explore & Download Repositories** button
 3. Search for **"CSNet Home"** or **"Hitachi"**
-4. Click on **Hitachi CSNet Home**
+4. Click on **CSNet Home (unofficial, for Hitachi)**
 5. Click **Download**
 6. Select the latest version
 7. Click **Download** again
@@ -239,7 +239,7 @@ You can test unreleased features or bug fixes from Pull Requests.
 ⚠️ **Important**: If you installed via HACS, disable automatic updates to prevent the preview from being overwritten.
 
 1. Go to **HACS** → **Integrations**
-2. Find **Hitachi CSNet Home**
+2. Find **CSNet Home (unofficial, for Hitachi)**
 3. Disable automatic updates for this integration
 
 ### Reverting to Stable
@@ -266,9 +266,9 @@ After restarting, verify the integration is properly installed:
 1. Go to **Settings** → **Devices & Services**
 2. Click **+ Add Integration**
 3. Search for **"Hitachi"**
-4. You should see **"Hitachi CSNet Home"** in the results
+4. You should see **"CSNet Home (unofficial, for Hitachi)"** in the results
 
-![integration search showing Hitachi CSNet Home](../images/integration_search.png)
+![integration search showing CSNet Home (unofficial, for Hitachi)](../images/integration_search.png)
 
 If you see the integration in search results, installation was successful! 🎉
 
@@ -278,7 +278,7 @@ If you see the integration in search results, installation was successful! 🎉
 
 ### Integration Not Showing in Search
 
-**Problem**: Can't find "Hitachi CSNet Home" when adding integration.
+**Problem**: Can't find "CSNet Home (unofficial, for Hitachi)" when adding integration.
 
 **Solutions**:
 1. **Clear browser cache**: Press Ctrl+Shift+R (or Cmd+Shift+R on Mac)
@@ -340,7 +340,7 @@ Now that installation is complete:
 
 1. HACS will notify you when updates are available
 2. Go to **HACS** → **Integrations**
-3. Find **Hitachi CSNet Home**
+3. Find **CSNet Home (unofficial, for Hitachi)**
 4. Click **Update**
 5. Restart Home Assistant
 
@@ -376,7 +376,7 @@ If you need to remove the integration:
 ### Step 1: Remove Configuration
 
 1. Go to **Settings** → **Devices & Services**
-2. Find **Hitachi CSNet Home**
+2. Find **CSNet Home (unofficial, for Hitachi)**
 3. Click the **⋮** (three dots) menu
 4. Select **Delete**
 5. Confirm deletion
@@ -385,7 +385,7 @@ If you need to remove the integration:
 
 **Via HACS**:
 1. Go to **HACS** → **Integrations**
-2. Find **Hitachi CSNet Home**
+2. Find **CSNet Home (unofficial, for Hitachi)**
 3. Click **⋮** → **Remove**
 
 **Manually**:

@@ -1,6 +1,6 @@
 # Sensors Reference
 
-Complete reference of all sensors provided by the Hitachi CSNet Home integration.
+Complete reference of all sensors provided by the CSNet Home (unofficial, for Hitachi) integration.
 
 ## Overview
 

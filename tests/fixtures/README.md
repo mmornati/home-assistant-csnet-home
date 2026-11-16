@@ -58,18 +58,15 @@ async def test_with_mock_api(mock_aiohttp_client, hass):
 
 ## Recording New Fixtures
 
-### Method 1: From Browser DevTools (Recommended)
+### Method 1: From the Diagnostics Download (Recommended)
 
-1. **Open CSNet Manager** in your browser with DevTools (F12)
-2. **Navigate to Network tab**
-3. **Perform actions** in the web interface
-4. **Find the API call** (e.g., `elements`, `installationdevices`)
-5. **Right-click** → **Copy** → **Copy Response**
-6. **Sanitize the data:**
-   - Replace personal information (names, locations, IDs)
+1. In Home Assistant, go to **Settings → Devices & services**, open the **⋮** menu of the integration entry and choose **Download diagnostics**
+2. The file holds the data the integration last received from your own installation, already redacted
+3. **Sanitize what is left:**
+   - Replace zone and device names
    - Keep the structure intact
    - Use placeholder values like "Device1", "Room1", etc.
-7. **Save** to `tests/fixtures/api_responses/`
+4. **Save** to `tests/fixtures/api_responses/`
 
 ### Method 2: From Integration Debug Logs
 
