@@ -1,6 +1,6 @@
 ---
 title: Release notes
-description: What changed in each version of the Hitachi CSNet Home integration, from the first release to today.
+description: What changed in each version of the CSNet Home (unofficial, for Hitachi) integration, from the first release to today.
 ---
 
 # Release notes

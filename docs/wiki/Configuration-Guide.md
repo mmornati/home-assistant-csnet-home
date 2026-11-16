@@ -20,10 +20,8 @@ Before configuring, ensure:
 1. Open **Home Assistant**
 2. Navigate to **Settings** → **Devices & Services**
 3. Click the **+ Add Integration** button (bottom right)
-4. Search for **"Hitachi"** or **"CSNet"**
+4. Search for **"CSNet"**
 5. Click on **CSNet Home (unofficial, for Hitachi)**
-
-![integration search showing CSNet Home (unofficial, for Hitachi)](../images/integration_search.png)
 
 ### Step 2: Enter Your Credentials
 
