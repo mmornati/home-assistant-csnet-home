@@ -341,7 +341,7 @@ const TEXTS = {
     daily_energy: "Energía por día",
     power_profile: "Potencia de hoy vs el día habitual",
     energy_signature: "Previsión de consumo",
-    after_valve: "tras mezcla",
+    after_valve: "Tras mezcla",
     last_3_days: "últimos 3 días",
     before_days: "antes ({d} días)",
     mixing_note: "La unidad produce el agua de la curva más caliente; la válvula mezcladora la enfría para el otro circuito.",
