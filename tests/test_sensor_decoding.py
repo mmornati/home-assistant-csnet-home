@@ -12,6 +12,7 @@ from custom_components.csnet_home.helpers import extract_heating_status
 from custom_components.csnet_home.sensor import (
     CALCULATED_SENSOR_DESCRIPTIONS,
     COMPRESSOR_SENSOR_DESCRIPTIONS,
+    CRANKCASE_HEATER_POWER_W,
     DAILY_SENSOR_DESCRIPTIONS,
     FAN_DEFAULT_POWER_W,
     FAN_MAX_POWER_W,
@@ -255,15 +256,24 @@ def _electric_power(heating_status):
     return sensor._calculate_complex_power(heating_status)
 
 
+IDLE_W = STANDBY_POWER_W + CRANKCASE_HEATER_POWER_W
+
+
 def test_stopped_unit_draws_its_standby():
-    """With the compressor and the pump stopped only the controllers are left."""
-    assert _electric_power(STOPPED) == STANDBY_POWER_W
+    """With the compressor and the pump stopped the controllers and the crankcase heater are left."""
+    assert _electric_power(STOPPED) == IDLE_W
+
+
+def test_crankcase_heater_is_off_while_the_compressor_runs():
+    """During a defrost with no fan: electronics, compressor, pump and controllers, no heater."""
+    running = {"ouHz": 60, "ouCurrent": 4, "ouDischargePress": 5, "ouSuctionPress": 8, "waterFlow": 20, "pumpSpeed": 100, "fanRPM": 0}
+    assert _electric_power(running) == round(OUTDOOR_ELECTRONICS_POWER_W + 60 * 15 + STANDBY_POWER_W + PUMP_MAX_POWER_W)
 
 
 def test_pump_running_without_the_compressor_is_counted():
     """Water flowing means the pump runs: 10 W plus 65 W by the square of its speed."""
-    assert _electric_power(STOPPED | {"waterFlow": 12, "pumpSpeed": 100}) == STANDBY_POWER_W + PUMP_MAX_POWER_W
-    assert _electric_power(STOPPED | {"waterFlow": 12, "pumpSpeed": 50}) == round(STANDBY_POWER_W + PUMP_MIN_POWER_W + 65 * 0.25)
+    assert _electric_power(STOPPED | {"waterFlow": 12, "pumpSpeed": 100}) == IDLE_W + PUMP_MAX_POWER_W
+    assert _electric_power(STOPPED | {"waterFlow": 12, "pumpSpeed": 50}) == round(IDLE_W + PUMP_MIN_POWER_W + 65 * 0.25)
 
 
 @pytest.mark.parametrize("speed", [None, -1, 0, 255])
@@ -304,7 +314,7 @@ COP_RUN = SIX_AMPS | RUNNING | {"operationStatus": 6, "pumpSpeed": 100}
 
 
 def test_daily_cop_counts_the_standby_between_compressor_runs():
-    """With the compressor stopped the controllers still draw: the daily COP counts it."""
+    """With the compressor stopped the controllers and the crankcase heater still draw: the daily COP counts it."""
     sensor = _daily_sensor("daily_cop_hvac")
     sensor._get_heating_status().update(STOPPED | {"operationStatus": 4})
     now = dt_util.now().replace(hour=12, minute=0, second=0, microsecond=0)
@@ -313,7 +323,7 @@ def test_daily_cop_counts_the_standby_between_compressor_runs():
     with patch("custom_components.csnet_home.sensor.dt_util.now", return_value=now):
         sensor._handle_coordinator_update()
 
-    assert sensor._energy_in == pytest.approx(STANDBY_POWER_W / 60 / 1000)
+    assert sensor._energy_in == pytest.approx(IDLE_W / 60 / 1000)
     assert sensor._energy_out == 0
 
 

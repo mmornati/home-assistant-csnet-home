@@ -3034,7 +3034,7 @@ def test_issue_199_daily_cop_sensors_use_measurement_state_class():
 
 
 def test_calculated_sensor_instant_consumption_is_the_standby_when_compressor_off():
-    """When the compressor and the pump are off only the 15 W of the controllers are left."""
+    """When the compressor and the pump are off the controllers (15 W) and the crankcase heater (40 W) are left."""
     coordinator = _build_installation_coordinator(
         {
             "ouHz": 0,
@@ -3049,7 +3049,7 @@ def test_calculated_sensor_instant_consumption_is_the_standby_when_compressor_of
     )
     description = CALCULATED_SENSOR_DESCRIPTIONS["instant_consumption"]
     s = CSNetHomeCalculatedSensor(coordinator, _global_device_data(), {}, description)
-    assert s.state == 15
+    assert s.state == 55
 
 
 def test_calculated_sensor_instant_consumption_uses_amps_guardrail():

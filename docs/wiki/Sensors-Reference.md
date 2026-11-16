@@ -499,14 +499,16 @@ The sum of two parts:
 
 - **Outdoor unit**, while the compressor runs: estimated from compressor frequency, discharge and suction pressures and discharge temperature, plus 35 W for its electronics and the outdoor fan. The result is clamped to the range given by the reported compressor current (current × 230 V up to (current + 0.99) × 230 V).
 - **Auxiliary consumption**, which that current does not feed: 15 W for the controllers at all times, and the circulation pump while water flows.
+- **Crankcase heater**, 40 W while the compressor is stopped.
 
 | Part | Estimate |
 |------|----------|
 | Controllers (standby) | 15 W, always |
+| Crankcase (oil) heater | 40 W while the compressor is stopped |
 | Circulation pump | 10 W to 75 W with the square of Pump Speed; 75 % is assumed when the unit reports no speed |
 | Outdoor fan | Up to 90 W at 900 rpm, with the cube of Outdoor Fan RPM; 40 W when the unit reports no speed, 0 W during a defrost |
 
-With the compressor stopped the sensor shows the auxiliary consumption alone: 15 W, or more while the pump runs. Backup and tank heaters are not counted.
+With the compressor stopped the sensor shows 55 W (controllers and crankcase heater), or more while the pump runs. Backup and tank heaters are not counted. The crankcase heater is counted even on a unit set to switch it off while stopped (outdoor unit function F8).
 
 ### Output Power
 

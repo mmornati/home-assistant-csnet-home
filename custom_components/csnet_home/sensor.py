@@ -675,6 +675,8 @@ WATTS_PER_AMP_THREE_PHASE = 400.0 * 1.732 * 0.95
 # Auxiliary consumption of the estimated power (compressor aside).
 # The controllers of the indoor and outdoor units, at all times
 STANDBY_POWER_W = 15.0
+# Crankcase (oil) heater of the compressor: on while the compressor is stopped
+CRANKCASE_HEATER_POWER_W = 40.0
 # Inverter and outdoor electronics, while the compressor runs
 OUTDOOR_ELECTRONICS_POWER_W = 35.0
 # Circulation pump: from PUMP_MIN_POWER_W to PUMP_MAX_POWER_W with the square of its speed
@@ -1559,9 +1561,10 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
         # Controllers and pump: drawn whether or not the compressor runs
         auxiliary_power = STANDBY_POWER_W + self._pump_power(heating_status, hz > 0)
 
-        # Compressor OFF (0 Hz): only the auxiliary consumption is left
+        # Compressor OFF (0 Hz): the auxiliary consumption and the crankcase
+        # heater, which keeps the oil warm until the next start
         if hz == 0:
-            return round(auxiliary_power)
+            return round(auxiliary_power + CRANKCASE_HEATER_POWER_W)
 
         # 2. Efficiency Model (Base)
         slope = 0.0085
