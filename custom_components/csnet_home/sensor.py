@@ -40,7 +40,7 @@ from .const import (
 )
 from .coordinator import CSNetHomeCoordinator
 from .helpers import find_indoor_unit, zone_device_identifier, zone_key
-from .power_calibration import PowerCalibration
+from .power_calibration import CrankcaseHeaterTracker, PowerCalibration
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -676,7 +676,7 @@ WATTS_PER_AMP_THREE_PHASE = 400.0 * 1.732 * 0.95
 # Auxiliary consumption of the estimated power (compressor aside).
 # The controllers of the indoor and outdoor units, at all times
 STANDBY_POWER_W = 15.0
-# Crankcase (oil) heater of the compressor: on while the compressor is stopped
+# Crankcase (oil) heater of the compressor: runs in cycles while the compressor is stopped
 CRANKCASE_HEATER_POWER_W = 40.0
 # Inverter and outdoor electronics, while the compressor runs
 OUTDOOR_ELECTRONICS_POWER_W = 35.0
@@ -1530,6 +1530,17 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
                 pass
         return calibration
 
+    def _crankcase_heater(self) -> CrankcaseHeaterTracker:
+        """Return the crankcase heater tracker shared by the sensors of this coordinator."""
+        tracker = getattr(self._coordinator, "crankcase_heater", None)
+        if not isinstance(tracker, CrankcaseHeaterTracker):
+            tracker = CrankcaseHeaterTracker()
+            try:
+                self._coordinator.crankcase_heater = tracker
+            except AttributeError:  # pragma: no cover - a coordinator that takes no attribute
+                pass
+        return tracker
+
     @property
     def extra_state_attributes(self):
         """Show the learnt correction factors on the consumption sensor."""
@@ -1575,6 +1586,8 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
 
         # Get temp using the module-level helper function
         t_discharge = _convert_unsigned_to_signed_byte(heating_status.get("ouDischargeTemperature"))
+        # The crankcase heater shows in the discharge temperature of a stopped compressor
+        crankcase_heating = self._crankcase_heater().update(heating_status, hz > 0, t_discharge)
         if t_discharge is None:
             t_discharge = 0
 
@@ -1584,10 +1597,10 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
         # Controllers and pump: drawn whether or not the compressor runs
         auxiliary_power = STANDBY_POWER_W + self._pump_power(heating_status, hz > 0)
 
-        # Compressor OFF (0 Hz): the auxiliary consumption and the crankcase
-        # heater, which keeps the oil warm until the next start
+        # Compressor OFF (0 Hz): the auxiliary consumption, and the crankcase
+        # heater during the part of its cycle it is heating
         if hz == 0:
-            return round(auxiliary_power + CRANKCASE_HEATER_POWER_W)
+            return round(auxiliary_power + (CRANKCASE_HEATER_POWER_W if crankcase_heating else 0.0))
 
         # 2. Efficiency Model (Base)
         slope = 0.0085

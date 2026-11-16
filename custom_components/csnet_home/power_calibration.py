@@ -118,3 +118,40 @@ class PowerCalibration:
             await self._store.async_save({"factors": {str(band): factor for band, factor in self.factors.items()}})
         except Exception as exc:  # pylint: disable=broad-except
             _LOGGER.debug("Could not save the power calibration: %s", exc)
+
+
+class CrankcaseHeaterTracker:
+    """Tell whether the crankcase heater is on, from the discharge temperature.
+
+    With the compressor stopped the heater runs in cycles: the discharge
+    temperature climbs a few degrees while it heats and falls back while it
+    rests. The direction of the last change says which of the two it is. The
+    temperature comes in whole degrees, so the state holds between changes.
+    """
+
+    def __init__(self) -> None:
+        """Start as heating: nothing is known until the temperature moves."""
+        self.heating = True
+        self._temperature = None
+        self._last_reading = None
+
+    def update(self, reading, compressor_running: bool, discharge_temperature) -> bool:
+        """Take a reading into account, once, and return whether the heater is on."""
+        if reading is self._last_reading:
+            return self.heating
+        self._last_reading = reading
+        if compressor_running:
+            # A compressor that has just run is hot: no heating until it has
+            # cooled down and the temperature climbs again
+            self.heating = False
+            self._temperature = None
+            return self.heating
+        if not isinstance(discharge_temperature, (int, float)):
+            return self.heating
+        if self._temperature is not None:
+            if discharge_temperature > self._temperature:
+                self.heating = True
+            elif discharge_temperature < self._temperature:
+                self.heating = False
+        self._temperature = discharge_temperature
+        return self.heating

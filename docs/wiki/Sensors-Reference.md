@@ -499,12 +499,12 @@ The sum of two parts:
 
 - **Outdoor unit**, while the compressor runs: estimated from compressor frequency, discharge and suction pressures and discharge temperature, plus 35 W for its electronics and the outdoor fan. The result is clamped to the range given by the reported compressor current (current × 230 V up to (current + 0.99) × 230 V).
 - **Auxiliary consumption**, which that current does not feed: 15 W for the controllers at all times, and the circulation pump while water flows.
-- **Crankcase heater**, 40 W while the compressor is stopped.
+- **Crankcase heater**, 40 W while it heats the stopped compressor.
 
 | Part | Estimate |
 |------|----------|
 | Controllers (standby) | 15 W, always |
-| Crankcase (oil) heater | 40 W while the compressor is stopped |
+| Crankcase (oil) heater | 40 W while the discharge temperature of the stopped compressor climbs, 0 W while it falls |
 | Circulation pump | 10 W to 75 W with the square of Pump Speed, while water flows or the compressor runs |
 | Outdoor fan | Up to 90 W at 900 rpm, with the cube of Outdoor Fan RPM; 40 W when the unit reports no speed, 0 W during a defrost |
 
@@ -516,7 +516,9 @@ The unit reports its current in whole Amps, truncated: 6 A means 6.0 to 6.99 A. 
 - The factors are kept across restarts and shown in the `power_calibration` attribute of Instant Consumption.
 - Nothing is learnt during a defrost, which uses a separate estimate (35 W + fan + 15 W per Hz). A defrost is taken from the unit's own defrost flag.
 
-With the compressor stopped the sensor shows 55 W (controllers and crankcase heater), or more while the pump runs. Backup and tank heaters are not counted. The crankcase heater is counted even on a unit set to switch it off while stopped (outdoor unit function F8).
+With the compressor stopped the sensor shows 15 W, or 55 W while the crankcase heater is on, and more while the pump runs. Backup and tank heaters are not counted.
+
+The crankcase heater runs in cycles: the discharge temperature of the stopped compressor climbs a few degrees while it heats and falls back while it rests. The integration follows the direction of that temperature. Right after a compressor run the heater is not counted until the temperature climbs again, and after a restart of Home Assistant it is counted until the temperature first moves.
 
 ### Output Power
 

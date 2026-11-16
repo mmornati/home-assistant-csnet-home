@@ -264,6 +264,53 @@ def test_stopped_unit_draws_its_standby():
     assert _electric_power(STOPPED) == IDLE_W
 
 
+def _stopped_readings(sensor, *temperatures):
+    """Feed the sensor one reading per discharge temperature and return the last power."""
+    power = None
+    for temperature in temperatures:
+        power = sensor._calculate_complex_power(STOPPED | {"ouDischargeTemperature": temperature})
+    return power
+
+
+def test_crankcase_heater_counts_while_the_discharge_temperature_climbs():
+    """A stopped compressor getting warmer is being heated; getting cooler, it is not."""
+    sensor, _ = _calibrated_sensor()
+    assert _stopped_readings(sensor, 31, 32) == IDLE_W
+    assert _stopped_readings(sensor, 33, 32) == STANDBY_POWER_W
+
+
+def test_crankcase_heater_state_holds_between_whole_degrees():
+    """The temperature moves a degree every few minutes: the state holds meanwhile."""
+    sensor, _ = _calibrated_sensor()
+    assert _stopped_readings(sensor, 35, 34, 34, 34) == STANDBY_POWER_W
+    assert _stopped_readings(sensor, 35, 35, 35) == IDLE_W
+
+
+def test_crankcase_heater_is_not_counted_right_after_a_run():
+    """A compressor that has just stopped is hot and cooling: no heating until it warms again."""
+    sensor, _ = _calibrated_sensor()
+    sensor._calculate_complex_power(dict(LOW_MODEL))
+    assert _stopped_readings(sensor, 70, 68, 60) == STANDBY_POWER_W
+    assert _stopped_readings(sensor, 61) == IDLE_W
+
+
+def test_crankcase_heater_keeps_its_state_without_a_temperature():
+    """A reading with no discharge temperature changes nothing."""
+    sensor, _ = _calibrated_sensor()
+    assert _stopped_readings(sensor, 33, 32, None) == STANDBY_POWER_W
+
+
+def test_crankcase_heater_takes_one_reading_once():
+    """Several sensors ask for the power of the same reading: the tracker moves once."""
+    sensor, coordinator = _calibrated_sensor()
+    _stopped_readings(sensor, 33, 32)
+    reading = STOPPED | {"ouDischargeTemperature": 33}
+    sensor._calculate_complex_power(reading)
+    reading["ouDischargeTemperature"] = 20  # the same reading, asked for again
+    assert sensor._calculate_complex_power(reading) == IDLE_W
+    assert coordinator.crankcase_heater.heating is True
+
+
 def test_crankcase_heater_is_off_while_the_compressor_runs():
     """During a defrost with no fan: electronics, compressor, pump and controllers, no heater."""
     running = {"ouHz": 60, "ouCurrent": 4, "ouDischargePress": 5, "ouSuctionPress": 8, "waterFlow": 20, "pumpSpeed": 100, "fanRPM": 0}
