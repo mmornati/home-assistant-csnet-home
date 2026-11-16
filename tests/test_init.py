@@ -10,9 +10,9 @@ from homeassistant.exceptions import ConfigEntryNotReady
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.csnet_home import async_remove_entry, async_setup_entry, async_unload_entry
-from custom_components.csnet_home.power_calibration import power_calibration_storage_key
 from custom_components.csnet_home.const import DOMAIN
 from custom_components.csnet_home.coordinator import CSNetHomeData, alarm_storage_key
+from custom_components.csnet_home.power_calibration import power_calibration_storage_key
 
 
 async def test_setup_entry_registers_no_update_listener(hass):
