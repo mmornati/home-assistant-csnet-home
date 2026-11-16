@@ -683,7 +683,6 @@ OUTDOOR_ELECTRONICS_POWER_W = 35.0
 # Circulation pump: from PUMP_MIN_POWER_W to PUMP_MAX_POWER_W with the square of its speed
 PUMP_MIN_POWER_W = 10.0
 PUMP_MAX_POWER_W = 75.0
-PUMP_DEFAULT_SPEED = 75  # percent, for units that do not report the speed
 # Outdoor fan: with the cube of its speed, up to FAN_MAX_POWER_W at FAN_MAX_RPM
 FAN_MAX_POWER_W = 90.0
 FAN_MAX_RPM = 900.0
@@ -1540,17 +1539,18 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
 
     @staticmethod
     def _pump_power(heating_status, compressor_running: bool) -> float:
-        """Return the Watts of the circulation pump, estimated from its speed.
+        """Return the Watts of the circulation pump, from the speed the unit reports.
 
-        The pump runs while water flows. A unit with no flow reading still
-        needs the pump for the compressor to run.
+        The pump runs while water flows, or while the compressor runs. Its
+        speed is still reported after it stops, so the speed alone does not
+        say that it runs.
         """
         if not ((heating_status.get("waterFlow") or 0) > 0 or compressor_running):
             return 0.0
         speed = heating_status.get("pumpSpeed")
-        if not isinstance(speed, (int, float)) or not 0 < speed <= 100:
-            speed = PUMP_DEFAULT_SPEED
-        return PUMP_MIN_POWER_W + (PUMP_MAX_POWER_W - PUMP_MIN_POWER_W) * (speed / 100.0) ** 2
+        if not isinstance(speed, (int, float)) or speed <= 0:
+            return 0.0
+        return PUMP_MIN_POWER_W + (PUMP_MAX_POWER_W - PUMP_MIN_POWER_W) * (min(speed, 100) / 100.0) ** 2
 
     @staticmethod
     def _fan_power(heating_status) -> float:

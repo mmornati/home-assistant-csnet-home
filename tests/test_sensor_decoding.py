@@ -20,7 +20,6 @@ from custom_components.csnet_home.sensor import (
     INSTALLATION_SENSOR_DESCRIPTIONS,
     MAX_ENERGY_INTEGRATION_HOURS,
     OUTDOOR_ELECTRONICS_POWER_W,
-    PUMP_DEFAULT_SPEED,
     PUMP_MAX_POWER_W,
     PUMP_MIN_POWER_W,
     STANDBY_POWER_W,
@@ -277,11 +276,14 @@ def test_pump_running_without_the_compressor_is_counted():
     assert _electric_power(STOPPED | {"waterFlow": 12, "pumpSpeed": 50}) == round(IDLE_W + PUMP_MIN_POWER_W + 65 * 0.25)
 
 
-@pytest.mark.parametrize("speed", [None, -1, 0, 255])
-def test_pump_without_a_usable_speed_counts_at_the_default_speed(speed):
-    """A unit that reports no pump speed still has a pump."""
-    expected = _electric_power(STOPPED | {"waterFlow": 12, "pumpSpeed": PUMP_DEFAULT_SPEED})
-    assert _electric_power(STOPPED | {"waterFlow": 12, "pumpSpeed": speed}) == expected
+def test_pump_speed_alone_does_not_mean_the_pump_runs():
+    """The unit keeps reporting the last speed after the pump stops: no flow, no pump power."""
+    assert _electric_power(STOPPED | {"pumpSpeed": 75}) == IDLE_W
+
+
+def test_pump_at_zero_speed_draws_nothing():
+    """A pump the unit reports at 0 % is not counted."""
+    assert _electric_power(STOPPED | {"waterFlow": 12, "pumpSpeed": 0}) == IDLE_W
 
 
 def test_pump_and_controllers_are_added_to_the_current_range():

@@ -505,7 +505,7 @@ The sum of two parts:
 |------|----------|
 | Controllers (standby) | 15 W, always |
 | Crankcase (oil) heater | 40 W while the compressor is stopped |
-| Circulation pump | 10 W to 75 W with the square of Pump Speed; 75 % is assumed when the unit reports no speed |
+| Circulation pump | 10 W to 75 W with the square of Pump Speed, while water flows or the compressor runs |
 | Outdoor fan | Up to 90 W at 900 rpm, with the cube of Outdoor Fan RPM; 40 W when the unit reports no speed, 0 W during a defrost |
 
 #### Self-calibration
