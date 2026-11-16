@@ -64,13 +64,13 @@ If you don't have HACS installed:
 
 1. In **HACS** → **Integrations**
 2. Click the **+ Explore & Download Repositories** button
-3. Search for **"CSNet Home"** or **"Hitachi"**
+3. Search for **"CSNet Home"**
 4. Click on **CSNet Home (unofficial, for Hitachi)**
 5. Click **Download**
 6. Select the latest version
 7. Click **Download** again
 
-![HACS integration search and install](../images/search_install.png)
+![HACS search showing the csnet_home repository](../images/integration_search.png)
 
 ### Step 4: Restart Home Assistant
 
@@ -265,10 +265,8 @@ After restarting, verify the integration is properly installed:
 
 1. Go to **Settings** → **Devices & Services**
 2. Click **+ Add Integration**
-3. Search for **"Hitachi"**
+3. Search for **"CSNet"**
 4. You should see **"CSNet Home (unofficial, for Hitachi)"** in the results
-
-![integration search showing CSNet Home (unofficial, for Hitachi)](../images/integration_search.png)
 
 If you see the integration in search results, installation was successful! 🎉
 

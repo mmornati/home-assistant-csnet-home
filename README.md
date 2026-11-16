@@ -128,7 +128,7 @@ This custom integration solves that problem by connecting directly to the CSNet 
 1. Ensure [HACS](https://hacs.xyz/) is installed in your Home Assistant instance
 2. In Home Assistant, go to **HACS** → **Integrations**
 3. Click the **"+"** button in the bottom right
-4. Search for **"csnet home"** or **"Hitachi"**
+4. Search for **"CSNet Home"**
 5. Click **Install**
 6. Restart Home Assistant
 7. Continue to [Configuration](#configuration)
@@ -184,11 +184,9 @@ After installation and restart:
 
 1. Go to **Settings** → **Devices & Services** → **Integrations**
 2. Click **"+ Add Integration"** in the bottom right
-3. Search for **"Hitachi"**
+3. Search for **"CSNet"**
 4. Enter your **CSNet Manager credentials** (same as used on the CSNet Manager website/app)
 5. Click **Submit**
-
-![Add Integration](docs/images/add_integration.png)
 
 ### Quick Start Checklist
 
