@@ -669,9 +669,11 @@ YUTAKI_S80_UNIT_MODEL = 2  # Only the S80 has a second (R134a) refrigerant cycle
 SUCTION_PRESSURE_KEYS = ("suction_pressure", "suction_pressure_correction")
 
 # Watts per reported compressor Amp, by outdoor unit power supply (Issue #229).
-# Single phase keeps the original PR #155 model (230 V). Three phase uses
-# 400 V * sqrt(3) * cos(phi), with cos(phi) assumed to be 0.95.
-WATTS_PER_AMP_SINGLE_PHASE = 230.0
+# Single phase: the mains voltage times the power factor. Measured on a
+# Yutaki S 2.0 with a meter: 245 V and a power factor of 0.81 to 0.92, about
+# 210 W per Amp over a whole run. Three phase uses 400 V * sqrt(3) * cos(phi),
+# with cos(phi) assumed to be 0.95.
+WATTS_PER_AMP_SINGLE_PHASE = 210.0
 WATTS_PER_AMP_THREE_PHASE = 400.0 * 1.732 * 0.95
 # Auxiliary consumption of the estimated power (compressor aside).
 # The controllers of the indoor and outdoor units, at all times
@@ -680,9 +682,10 @@ STANDBY_POWER_W = 15.0
 CRANKCASE_HEATER_POWER_W = 40.0
 # Inverter and outdoor electronics, while the compressor runs
 OUTDOOR_ELECTRONICS_POWER_W = 35.0
-# Circulation pump: from PUMP_MIN_POWER_W to PUMP_MAX_POWER_W with the square of its speed
-PUMP_MIN_POWER_W = 10.0
-PUMP_MAX_POWER_W = 75.0
+# Circulation pump: from PUMP_MIN_POWER_W to PUMP_MAX_POWER_W with the square
+# of its speed. Measured: about 15 W at 60 % and 47 W at 100 %.
+PUMP_MIN_POWER_W = 0.0
+PUMP_MAX_POWER_W = 47.0
 # Outdoor fan: with the cube of its speed, up to FAN_MAX_POWER_W at FAN_MAX_RPM
 FAN_MAX_POWER_W = 90.0
 FAN_MAX_RPM = 900.0

@@ -23,6 +23,7 @@ from custom_components.csnet_home.sensor import (
     PUMP_MAX_POWER_W,
     PUMP_MIN_POWER_W,
     STANDBY_POWER_W,
+    WATTS_PER_AMP_SINGLE_PHASE,
     CSNetHomeCalculatedSensor,
     CSNetHomeCompressorSensor,
     CSNetHomeDailySensor,
@@ -247,7 +248,7 @@ def test_hot_water_falls_back_to_the_circuit_outlet_probe():
 # --------------------------------------------------------------------------
 
 STOPPED = {"ouHz": 0, "ouCurrent": 0, "ouDischargePress": 0, "ouSuctionPress": 0, "waterFlow": 0}
-# 6 A single phase: the outdoor unit is held between 1380 and 1607 W
+# 6 A single phase: the outdoor unit is held between 1260 and 1468 W
 SIX_AMPS = {"ouHz": 80, "ouCurrent": 6, "ouDischargePress": 25, "ouSuctionPress": 8, "ouDischargeTemperature": 70, "waterFlow": 20}
 
 
@@ -320,7 +321,7 @@ def test_crankcase_heater_is_off_while_the_compressor_runs():
 def test_pump_running_without_the_compressor_is_counted():
     """Water flowing means the pump runs: 10 W plus 65 W by the square of its speed."""
     assert _electric_power(STOPPED | {"waterFlow": 12, "pumpSpeed": 100}) == IDLE_W + PUMP_MAX_POWER_W
-    assert _electric_power(STOPPED | {"waterFlow": 12, "pumpSpeed": 50}) == round(IDLE_W + PUMP_MIN_POWER_W + 65 * 0.25)
+    assert _electric_power(STOPPED | {"waterFlow": 12, "pumpSpeed": 50}) == round(IDLE_W + PUMP_MIN_POWER_W + (PUMP_MAX_POWER_W - PUMP_MIN_POWER_W) * 0.25)
 
 
 def test_pump_speed_alone_does_not_mean_the_pump_runs():
@@ -337,12 +338,12 @@ def test_pump_and_controllers_are_added_to_the_current_range():
     """The reported current is the outdoor unit's: the pump and the controllers come on top."""
     auxiliary = STANDBY_POWER_W + PUMP_MAX_POWER_W
     power = _electric_power(SIX_AMPS | {"pumpSpeed": 100})
-    assert 1380 + auxiliary <= power <= 1608 + auxiliary
+    assert 6 * WATTS_PER_AMP_SINGLE_PHASE + auxiliary <= power <= 6.99 * WATTS_PER_AMP_SINGLE_PHASE + auxiliary + 1
 
 
 def test_outdoor_fan_follows_its_speed():
     """A faster fan draws more, inside the range of the reported current."""
-    free = SIX_AMPS | {"pumpSpeed": 100}  # the model lands inside the 6 A range
+    free = SIX_AMPS | {"pumpSpeed": 100, "ouDischargePress": 24}  # the model lands inside the 6 A range
     slow = _electric_power(free | {"fanRPM": 300})
     fast = _electric_power(free | {"fanRPM": 900})
     assert fast - slow == round(FAN_MAX_POWER_W * (1 - (300 / 900) ** 3))
@@ -368,7 +369,7 @@ def test_defrost_is_taken_from_the_unit_flag():
 # Estimated electricity: self-calibration from the reported current
 # --------------------------------------------------------------------------
 
-# 31 Hz and 17 bar apart: the model says 669 W for the compressor, well under the 1380 W of 6 A
+# 31 Hz and 17 bar apart: the model says 669 W for the compressor, well under the 1260 W of 6 A
 LOW_MODEL = {"ouHz": 31, "ouCurrent": 6, "ouDischargePress": 25, "ouSuctionPress": 8, "waterFlow": 20, "pumpSpeed": 100, "fanRPM": 0}
 
 
@@ -414,13 +415,13 @@ def test_one_reading_is_learnt_from_once():
 def test_calibrated_model_reaches_the_current_range():
     """After enough readings the model lands on the range instead of being cut to it."""
     sensor, coordinator = _calibrated_sensor()
-    reading = LOW_MODEL | {"ouCurrent": 3}  # 690 to 918 W: the model's 704 W of outdoor power is inside
+    reading = LOW_MODEL | {"ouCurrent": 3}  # 630 to 838 W: the model's 704 W of outdoor power is inside
     assert sensor._calculate_complex_power(dict(reading)) == round(35 + 1.27 * 31 * 17 + STANDBY_POWER_W + PUMP_MAX_POWER_W)
-    reading = LOW_MODEL | {"ouCurrent": 4}  # 920 to 1148 W: the model is under it
+    reading = LOW_MODEL | {"ouCurrent": 4}  # 840 to 1048 W: the model is under it
     for _ in range(200):
         sensor._calculate_complex_power(dict(reading))
     factor = coordinator.power_calibration.factor(31)
-    assert 35 + 1.27 * 31 * 17 * factor == pytest.approx(920, abs=1)
+    assert 35 + 1.27 * 31 * 17 * factor == pytest.approx(4 * WATTS_PER_AMP_SINGLE_PHASE, abs=1)
 
 
 def test_factor_stays_within_its_limits():

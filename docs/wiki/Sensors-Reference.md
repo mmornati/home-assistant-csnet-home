@@ -497,7 +497,7 @@ Installation-wide sensors on the **System-Controller** device. The CSNet API doe
 
 The sum of two parts:
 
-- **Outdoor unit**, while the compressor runs: estimated from compressor frequency, discharge and suction pressures and discharge temperature, plus 35 W for its electronics and the outdoor fan. The result is clamped to the range given by the reported compressor current (current × 230 V up to (current + 0.99) × 230 V).
+- **Outdoor unit**, while the compressor runs: estimated from compressor frequency, discharge and suction pressures and discharge temperature, plus 35 W for its electronics and the outdoor fan. The result is clamped to the range given by the reported compressor current (current × 210 W up to (current + 0.99) × 210 W in single phase: the mains voltage times the power factor, as measured on a Yutaki S 2.0).
 - **Auxiliary consumption**, which that current does not feed: 15 W for the controllers at all times, and the circulation pump while water flows.
 - **Crankcase heater**, 40 W while it heats the stopped compressor.
 
@@ -505,7 +505,7 @@ The sum of two parts:
 |------|----------|
 | Controllers (standby) | 15 W, always |
 | Crankcase (oil) heater | 40 W while the discharge temperature of the stopped compressor climbs, 0 W while it falls |
-| Circulation pump | 10 W to 75 W with the square of Pump Speed, while water flows or the compressor runs |
+| Circulation pump | Up to 47 W with the square of Pump Speed, while water flows or the compressor runs |
 | Outdoor fan | Up to 90 W at 900 rpm, with the cube of Outdoor Fan RPM; 40 W when the unit reports no speed, 0 W during a defrost |
 
 #### Self-calibration
