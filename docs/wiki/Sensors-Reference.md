@@ -538,7 +538,7 @@ Output is also 0 when ΔT is not positive or the flow is below 0.01 m³/h.
 
 ### Instant COP
 
-The heat delivered divided by the electricity used over the last 15 minutes of the current compressor run, rounded to 2 decimals. The unit reports whole degrees, so a single reading can be off by 20 % or more; the average evens that out. It reports `0` while the compressor is stopped, and each run starts a new average.
+The heat delivered divided by the electricity used over the last 15 minutes of the current compressor run, rounded to 2 decimals. The unit reports whole degrees, so a single reading can be off by 20 % or more; the average evens that out. It reports `0` while the compressor is stopped, and each run starts a new average. With an electricity meter chosen in the integration's settings, the electricity is what that meter counted over the window instead of the estimate, once it has counted 20 Wh.
 
 ### Daily Sensors
 

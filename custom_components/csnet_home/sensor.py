@@ -702,6 +702,8 @@ FAN_MAX_RPM = 900.0
 FAN_DEFAULT_POWER_W = 40.0  # for units that do not report the speed
 # Window the instant COP is averaged over
 INSTANT_COP_WINDOW = timedelta(minutes=15)
+# Electricity a meter has to count in that window before the instant COP uses it
+MIN_METERED_COP_KWH = 0.02
 
 # Yutaki outdoor capacity codes (ouCapacityCode & 0x7F, as decoded by CSNet
 # Manager's getUnitCapacitiText): 64 = 8 HP, 80 = 10 HP. These sizes only
@@ -1068,6 +1070,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 description,
             )
             calculated_sensor.power_supply = power_supply
+            calculated_sensor.energy_meter = entry.data.get(CONF_ENERGY_METER)
             sensors.append(calculated_sensor)
 
         # ----------------------------------------------------------------------
@@ -1550,9 +1553,29 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
     # "three_phase"); set from the config entry in async_setup_entry.
     power_supply = DEFAULT_POWER_SUPPLY
 
-    # Readings the instant COP is averaged over: (time, heat W, electricity W),
-    # taken at each poll while the compressor runs
+    # The user's electricity meter (an energy sensor), when one is configured
+    energy_meter: str | None = None
+
+    # Readings the instant COP is averaged over: (time, heat W, estimated
+    # electricity W, meter reading kWh or None), taken at each poll while the
+    # compressor runs
     _cop_samples: deque | None = None
+
+    def _metered_cop(self) -> float | None:
+        """Return the heat over the meter's electricity across the window, or None.
+
+        The heat of each reading stands until the next one, so both cover the
+        same stretch: from the first reading with a meter value to the last.
+        """
+        samples = [sample for sample in self._cop_samples or () if sample[3] is not None]
+        if len(samples) < 2:
+            return None
+        electricity_kwh = samples[-1][3] - samples[0][3]
+        if electricity_kwh < MIN_METERED_COP_KWH:
+            # too little counted yet, or the meter was reset
+            return None
+        heat_kwh = sum(earlier[1] * (later[0] - earlier[0]).total_seconds() / 3_600_000 for earlier, later in zip(samples, samples[1:]))
+        return round(heat_kwh / electricity_kwh, 2)
 
     def _drop_old_cop_samples(self, now) -> None:
         """Forget the readings that have left the averaging window."""
@@ -1570,7 +1593,12 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
                 now = dt_util.now()
                 self._drop_old_cop_samples(now)
                 heat = self._get_thermal_power_values(heating_status)[0]
-                self._cop_samples.append((now, heat, self._calculate_complex_power(heating_status)))
+                meter = None
+                if self.energy_meter and self.hass:
+                    from .server_energy import meter_reading_kwh  # pylint: disable=import-outside-toplevel
+
+                    meter = meter_reading_kwh(self.hass, self.energy_meter)
+                self._cop_samples.append((now, heat, self._calculate_complex_power(heating_status), meter))
             else:
                 # the compressor stopped: the next run starts a new average
                 self._cop_samples.clear()
@@ -1811,6 +1839,11 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
                 return 0.0
             if self._cop_samples:
                 self._drop_old_cop_samples(dt_util.now())
+            if self._cop_samples and self.energy_meter:
+                # the electricity the user's meter counted, when it has counted enough
+                metered = self._metered_cop()
+                if metered is not None:
+                    return metered
             if self._cop_samples:
                 electricity = sum(sample[2] for sample in self._cop_samples)
                 if electricity > 0:

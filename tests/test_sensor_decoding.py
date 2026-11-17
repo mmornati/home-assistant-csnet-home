@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from homeassistant.const import UnitOfEnergy
 from homeassistant.util import dt as dt_util
 
 from custom_components.csnet_home.const import POWER_SUPPLY_THREE_PHASE
@@ -618,6 +619,53 @@ def test_instant_cop_ignores_a_failed_poll():
     sensor.coordinator.last_update_success = False
     _poll(sensor, start + timedelta(minutes=1), waterOutletTemp=45)
     assert len(sensor._cop_samples) == 1
+
+
+def _metered_cop_sensor(heating_status):
+    """An instant COP sensor with a meter whose reading the test sets."""
+    sensor = _cop_sensor(heating_status)
+    meter = {"state": "10.0"}
+    sensor.energy_meter = "sensor.heat_pump_energy"
+    sensor.hass = SimpleNamespace(
+        states=SimpleNamespace(get=lambda entity_id: SimpleNamespace(state=meter["state"], attributes={"unit_of_measurement": UnitOfEnergy.KILO_WATT_HOUR}))
+    )
+    return sensor, meter
+
+
+def _metered_poll(sensor, meter, when, reading, **changes):
+    meter["state"] = reading
+    return _poll(sensor, when, **changes)
+
+
+def test_instant_cop_uses_the_meter_when_one_is_configured():
+    """Heat over what the meter counted between the first and the last reading of the window."""
+    sensor, meter = _metered_cop_sensor(COP_RUN)
+    start = dt_util.now().replace(hour=12, minute=0, second=0, microsecond=0)
+    _metered_poll(sensor, meter, start, "10.0", waterOutletTemp=45)
+    cop = _metered_poll(sensor, meter, start + timedelta(minutes=5), "10.1", waterOutletTemp=45)
+    heat_kwh = 2.5 * 1160 * 5 * (5 / 60) / 1000  # 5 K for 5 minutes
+    assert cop == round(heat_kwh / 0.1, 2)
+
+
+def test_instant_cop_uses_the_estimate_until_the_meter_has_counted_enough():
+    """Under 20 Wh in the window the meter's steps would make the COP jump."""
+    sensor, meter = _metered_cop_sensor(COP_RUN)
+    start = dt_util.now().replace(hour=12, minute=0, second=0, microsecond=0)
+    _metered_poll(sensor, meter, start, "10.0", waterOutletTemp=45)
+    cop = _metered_poll(sensor, meter, start + timedelta(minutes=1), "10.01", waterOutletTemp=45)
+    electricity = sensor._calculate_complex_power(sensor._get_heating_status())
+    assert cop == round(2.5 * 1160 * 5 / electricity, 2)
+
+
+@pytest.mark.parametrize("reading", ["unavailable", "9.0"])
+def test_instant_cop_uses_the_estimate_when_the_meter_cannot_tell(reading):
+    """A meter with no reading, or one that was reset, says nothing about the window."""
+    sensor, meter = _metered_cop_sensor(COP_RUN)
+    start = dt_util.now().replace(hour=12, minute=0, second=0, microsecond=0)
+    _metered_poll(sensor, meter, start, "10.0", waterOutletTemp=45)
+    cop = _metered_poll(sensor, meter, start + timedelta(minutes=5), reading, waterOutletTemp=45)
+    electricity = sensor._calculate_complex_power(sensor._get_heating_status())
+    assert cop == round(2.5 * 1160 * 5 / electricity, 2)
 
 
 def test_daily_cop_counts_the_standby_between_compressor_runs():
