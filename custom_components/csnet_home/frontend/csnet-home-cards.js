@@ -1202,6 +1202,10 @@ class CsnetWaterCircuitCard extends CsnetBaseCard {
     const running = isOn(hass, unit.compressor) || (num(hass, unit.compressor_frequency) || 0) > 0;
     const defrost = isOn(hass, unit.defrost);
     const pumping = ["pump_1", "pump_2", "pump_3"].some((p) => isOn(hass, unit[p])) || running;
+    // While the heat pump heats the tank its water goes there, not to the
+    // circuits: the flow is the exchanger's outlet, not the circuits' one
+    const heatingTank = isOn(hass, this._roles?.dhw?.heating) && num(hass, unit.water_out_hp) !== null;
+    const flowEntity = heatingTank ? unit.water_out_hp : unit.water_out;
     const targets = [];
     for (const c of this.circuits) {
       const climate = stateOf(hass, c.climate);
@@ -1294,11 +1298,11 @@ class CsnetWaterCircuitCard extends CsnetBaseCard {
         ${fanSvg(outdoorBox.x + outdoorBox.w / 2, midY + 2, 19, running, fanColor)}
         <text x="${outdoorBox.x + outdoorBox.w / 2}" y="${outdoorBox.y + outdoorBox.h - 10}" text-anchor="middle" font-size="11" fill="var(--primary-text-color)">${fmt(hass, outdoor)}°C · ${fmt(hass, hz, 0)} Hz${defrost ? ` · ${t(hass, "defrost")}` : ""}</text>
       </g>
-      <g data-entity="${escapeHtml(unit.water_out || "")}">
+      <g data-entity="${escapeHtml(flowEntity || "")}">
         <rect x="${hydro.x}" y="${hydro.y}" width="${hydro.w}" height="${hydro.h}" rx="12" fill="color-mix(in srgb, ${hot} 8%, transparent)" stroke="${hot}" stroke-width="1.5"/>
         <text x="${hydro.x + hydro.w / 2}" y="${hydro.y + 18}" text-anchor="middle" font-size="10" letter-spacing="1.5" fill="var(--secondary-text-color)">${t(hass, "hydro_module").toUpperCase()}</text>
         <text x="${hydro.x + hydro.w / 2}" y="${hydro.y + 40}" text-anchor="middle" font-size="11" fill="var(--secondary-text-color)">${t(hass, "flow")}</text>
-        <text x="${hydro.x + hydro.w / 2}" y="${hydro.y + 64}" text-anchor="middle" font-size="24" font-weight="700" fill="${hot}">${fmt(hass, num(hass, unit.water_out))}°</text>
+        <text x="${hydro.x + hydro.w / 2}" y="${hydro.y + 64}" text-anchor="middle" font-size="24" font-weight="700" fill="${hot}">${fmt(hass, num(hass, flowEntity))}°</text>
         <text x="${hydro.x + hydro.w / 2}" y="${hydro.y + 84}" text-anchor="middle" font-size="11" fill="var(--secondary-text-color)">${t(hass, "return")}</text>
         <text x="${hydro.x + hydro.w / 2}" y="${hydro.y + 106}" text-anchor="middle" font-size="18" font-weight="700" fill="var(--primary-text-color)">${fmt(hass, num(hass, unit.water_in))}°</text>
       </g>

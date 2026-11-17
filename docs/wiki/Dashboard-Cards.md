@@ -7,7 +7,7 @@ The cards find their entities themselves, so a card works as soon as you add it,
 | Card | Type | What it shows |
 |------|------|---------------|
 | Heat pump | `custom:csnet-heat-pump-card` | Power gauge with a spinning fan while the compressor runs, the unit's status, compressor frequency, outdoor temperature, water ΔT, today's electricity, heat and COP |
-| Water circuit | `custom:csnet-water-circuit-card` | Live diagram: outdoor unit, flow and return temperatures, each circuit with its room temperature, setpoint and demand, the mixing valve of circuit 2, the hot water tank and pool when present, pumps, flow rate and pressure |
+| Water circuit | `custom:csnet-water-circuit-card` | Live diagram: outdoor unit, flow and return temperatures (the flow is the heat exchanger's outlet while the tank is being heated), each circuit with its room temperature, setpoint and demand, the mixing valve of circuit 2, the hot water tank and pool when present, pumps, flow rate and pressure |
 | Heating curve | `custom:csnet-heating-curve-card` | The heating curves you entered in the integration options, where the unit is on them now, and the unit's water target over the last days |
 | Performance | `custom:csnet-performance-card` | COP now, today, yesterday, this month and last month, with the share of heat taken from the air |
 | System health | `custom:csnet-system-health-card` | Alarms, gateway, central control, defrost and water pressure |

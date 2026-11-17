@@ -29,11 +29,12 @@ async def test_roles_follow_unique_ids_not_entity_ids(hass: HomeAssistant):
     registry = er.async_get(hass)
     power = _add(registry, "sensor", f"{DOMAIN}-installation-instant_consumption", "sensor.my_renamed_power")
     _add(registry, "sensor", f"{DOMAIN}-installation-out_water_temperature", "sensor.depart")
+    _add(registry, "sensor", f"{DOMAIN}-installation-heat_exchanger_water_outlet_temperature", "sensor.depart_pac")
     _add(registry, "binary_sensor", f"{DOMAIN}-binary-defrost", "binary_sensor.degivrage", disabled=True)
     registry.async_get_or_create("sensor", "other_integration", f"{DOMAIN}-installation-water_flow")
 
     roles = dashboard_entities(hass)
-    assert roles["unit"] == {"power": power, "water_out": "sensor.depart"}
+    assert roles["unit"] == {"power": power, "water_out": "sensor.depart", "water_out_hp": "sensor.depart_pac"}
     assert roles["circuits"] == []
     assert roles["dhw"] is None
     assert roles["pool"] is None
