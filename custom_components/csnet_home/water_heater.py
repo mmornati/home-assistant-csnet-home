@@ -12,11 +12,10 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
-    CONF_FAN_COIL_MODEL,
+    CONF_ALWAYS_OFFER_DHW_BOOST,
     CONF_MAX_TEMP_OVERRIDE,
-    DEFAULT_FAN_COIL_MODEL,
+    DEFAULT_ALWAYS_OFFER_DHW_BOOST,
     DOMAIN,
-    FAN_COIL_MODEL_LEGACY,
     SWIMMING_POOL_MAX_TEMPERATURE,
     SWIMMING_POOL_MIN_TEMPERATURE,
     WATER_HEATER_MAX_TEMPERATURE,
@@ -127,13 +126,12 @@ class CSNetHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
         _LOGGER.debug("Water heater doingBoost: %s", self._sensor_data.get("doingBoost", False))
 
     def _operations(self) -> list[str]:
-        """Return the modes of a hot water tank.
+        """Return the modes of a hot water tank: boost ("performance") only where the unit offers it.
 
-        Boost ("performance") is offered where the unit reports it. With the
-        Legacy control option it is always offered: some units report
-        hasBoost=false although their DHW boost works.
+        The user can offer it whatever the unit reports: some units report
+        hasBoost=false and still run the boost they are sent.
         """
-        if self.entry.data.get(CONF_FAN_COIL_MODEL, DEFAULT_FAN_COIL_MODEL) == FAN_COIL_MODEL_LEGACY:
+        if self.entry.data.get(CONF_ALWAYS_OFFER_DHW_BOOST, DEFAULT_ALWAYS_OFFER_DHW_BOOST):
             return ["off", "eco", "performance"]
         if self._sensor_data.get("has_boost") is False and not self._sensor_data.get("doingBoost"):
             return ["off", "eco"]

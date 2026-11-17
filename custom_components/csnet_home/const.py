@@ -22,6 +22,10 @@ CONF_FILTERED_ALARM_CODES = "filtered_alarm_codes"
 FAN_COIL_MODEL_STANDARD = "standard"
 FAN_COIL_MODEL_LEGACY = "legacy"
 DEFAULT_FAN_COIL_MODEL = FAN_COIL_MODEL_STANDARD
+# Offer the hot water boost although the unit reports it has none: some
+# units report hasBoost=false and still run the boost they are sent
+CONF_ALWAYS_OFFER_DHW_BOOST = "always_offer_dhw_boost"
+DEFAULT_ALWAYS_OFFER_DHW_BOOST = False
 DEFAULT_ENABLE_ALARM_NOTIFICATIONS = True
 DEFAULT_FILTERED_ALARM_CODES = "-1"
 # Outdoor unit power supply, used by the instant power estimation (Issue #229)
