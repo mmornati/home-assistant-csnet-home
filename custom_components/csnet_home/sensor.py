@@ -685,7 +685,7 @@ WATTS_PER_AMP_THREE_PHASE = 400.0 * 1.732 * 0.95
 # The controllers of the indoor and outdoor units, at all times
 STANDBY_POWER_W = 15.0
 # Crankcase (oil) heater of the compressor: runs in cycles while the compressor is stopped
-CRANKCASE_HEATER_POWER_W = 40.0
+CRANKCASE_HEATER_POWER_W = 30.0  # measured: 45 W in all with the controllers
 # Inverter and outdoor electronics, while the compressor runs
 OUTDOOR_ELECTRONICS_POWER_W = 35.0
 # Circulation pump: from PUMP_MIN_POWER_W to PUMP_MAX_POWER_W with the square
