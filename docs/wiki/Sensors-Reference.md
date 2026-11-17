@@ -497,7 +497,7 @@ Installation-wide sensors on the **System-Controller** device. The CSNet API doe
 
 The sum of two parts:
 
-- **Outdoor unit**, while the compressor runs: estimated from compressor frequency, discharge and suction pressures and discharge temperature, plus 35 W for its electronics and the outdoor fan. The result is clamped to the range given by the reported compressor current (current × 210 W up to (current + 0.99) × 210 W in single phase: the mains voltage times the power factor, as measured on a Yutaki S 2.0).
+- **Outdoor unit**, while the compressor runs: estimated as 1.0 W per Hz and per bar of pressure difference (with corrections above 115 Hz and above 90 °C of discharge temperature), plus 35 W for its electronics and the outdoor fan. The result is clamped to the range given by the reported compressor current (current × 220 W up to (current + 0.99) × 220 W in single phase: the mains voltage times the power factor, fitted on a metered Yutaki S 2.0). Below 40 Hz the current only caps the estimate: at the minimum speed the unit reports 2 A for under 400 W.
 - **Auxiliary consumption**, which that current does not feed: 15 W for the controllers at all times, and the circulation pump while water flows.
 - **Crankcase heater**, 40 W while it heats the stopped compressor.
 

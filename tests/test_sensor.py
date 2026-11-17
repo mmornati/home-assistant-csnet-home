@@ -3056,7 +3056,7 @@ def test_calculated_sensor_instant_consumption_uses_amps_guardrail():
     """Final power is clamped to the reported amperage window."""
     coordinator = _build_installation_coordinator(
         {
-            # 6A @ 210 W/A -> legal range [1260, 1468] W
+            # 6A @ 220 W/A -> legal range [1320, 1538] W
             "ouHz": 80,
             "ouDischargePress": 25,
             "ouSuctionPress": 8,
@@ -3072,7 +3072,7 @@ def test_calculated_sensor_instant_consumption_uses_amps_guardrail():
     result = s.state
     assert isinstance(result, int)
     # plus the controllers and the pump, which that current does not feed
-    assert 1260 <= result <= 1468 + 62
+    assert 1320 <= result <= 1538 + 62
 
 
 def _issue_229_status(capacity_code):
@@ -3101,11 +3101,11 @@ THREE_PHASE_W_PER_A = 400 * 1.732 * 0.95
         (80, "auto", THREE_PHASE_W_PER_A),
         (64 | 0x80, "auto", THREE_PHASE_W_PER_A),
         # Auto: smaller units stay on the single phase model
-        (40, "auto", 210),
-        (None, "auto", 210),
+        (40, "auto", 220),
+        (None, "auto", 220),
         # Manual override wins over detection
         (40, "three_phase", THREE_PHASE_W_PER_A),
-        (64, "single_phase", 210),
+        (64, "single_phase", 220),
     ],
 )
 def test_issue_229_instant_consumption_power_supply(capacity_code, power_supply, watts_per_amp):

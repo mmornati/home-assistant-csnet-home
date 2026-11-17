@@ -669,11 +669,17 @@ YUTAKI_S80_UNIT_MODEL = 2  # Only the S80 has a second (R134a) refrigerant cycle
 SUCTION_PRESSURE_KEYS = ("suction_pressure", "suction_pressure_correction")
 
 # Watts per reported compressor Amp, by outdoor unit power supply (Issue #229).
-# Single phase: the mains voltage times the power factor. Measured on a
-# Yutaki S 2.0 with a meter: 245 V and a power factor of 0.81 to 0.92, about
-# 210 W per Amp over a whole run. Three phase uses 400 V * sqrt(3) * cos(phi),
-# with cos(phi) assumed to be 0.95.
-WATTS_PER_AMP_SINGLE_PHASE = 210.0
+# Single phase: the mains voltage times the power factor. Fitted on a
+# Yutaki S 2.0 with a meter, over a hot water run and a heating run.
+# Three phase uses 400 V * sqrt(3) * cos(phi), with cos(phi) assumed to be 0.95.
+WATTS_PER_AMP_SINGLE_PHASE = 220.0
+# Below this compressor frequency the reported current is not taken as a
+# floor: at the minimum speed the unit reports 2 A for under 400 W.
+CURRENT_FLOOR_MIN_HZ = 40
+# Watts of the compressor per Hz and per bar of pressure difference. With the
+# fixed and auxiliary consumption counted apart, a metered Yutaki S 2.0 fits
+# 1.0 from its minimum speed (31 Hz) to 65 Hz.
+COMPRESSOR_FACTOR = 1.0
 WATTS_PER_AMP_THREE_PHASE = 400.0 * 1.732 * 0.95
 # Auxiliary consumption of the estimated power (compressor aside).
 # The controllers of the indoor and outdoor units, at all times
@@ -1606,17 +1612,7 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
             return round(auxiliary_power + (CRANKCASE_HEATER_POWER_W if crankcase_heating else 0.0))
 
         # 2. Efficiency Model (Base)
-        slope = 0.0085
-        k_ref = 1.27
-        hz_ref = 31.0
-
-        k_dynamic = k_ref - ((hz - hz_ref) * slope)
-
-        # Base Limits (1.0 - 1.4)
-        if k_dynamic < 1.00:
-            k_dynamic = 1.00
-        if k_dynamic > 1.40:
-            k_dynamic = 1.40
+        k_dynamic = COMPRESSOR_FACTOR
 
         # 3. Red Zone Corrections
 
@@ -1633,8 +1629,9 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
             factor_temp = 1.0 - (excess_temp * 0.025)
 
         # 4. Range the reported current allows. It is truncated to whole Amps:
-        # 6 A means 6.0 to 6.99 A (1380 to 1607 W single phase)
-        min_watts = current_amps * watts_per_amp
+        # 6 A means 6.0 to 6.99 A (1320 to 1538 W single phase). At low speed
+        # the current over-reads, so it only caps the estimate there.
+        min_watts = current_amps * watts_per_amp if hz >= CURRENT_FLOOR_MIN_HZ else 0.0
         max_watts = (current_amps + 0.99) * watts_per_amp
 
         # 5. Preliminary Calculation

@@ -248,7 +248,7 @@ def test_hot_water_falls_back_to_the_circuit_outlet_probe():
 # --------------------------------------------------------------------------
 
 STOPPED = {"ouHz": 0, "ouCurrent": 0, "ouDischargePress": 0, "ouSuctionPress": 0, "waterFlow": 0}
-# 6 A single phase: the outdoor unit is held between 1260 and 1468 W
+# 6 A single phase: the outdoor unit is held between 1320 and 1538 W
 SIX_AMPS = {"ouHz": 80, "ouCurrent": 6, "ouDischargePress": 25, "ouSuctionPress": 8, "ouDischargeTemperature": 70, "waterFlow": 20}
 
 
@@ -312,6 +312,14 @@ def test_crankcase_heater_takes_one_reading_once():
     assert coordinator.crankcase_heater.heating is True
 
 
+def test_reported_current_is_no_floor_at_low_speed():
+    """At the minimum speed the unit reports 2 A for under 400 W: the current only caps the estimate."""
+    minimum = {"ouHz": 31, "ouCurrent": 2, "ouDischargePress": 18, "ouSuctionPress": 9, "waterFlow": 20, "pumpSpeed": 76, "fanRPM": -1}
+    auxiliary = STANDBY_POWER_W + PUMP_MAX_POWER_W * 0.76**2
+    assert _electric_power(minimum) == round(OUTDOOR_ELECTRONICS_POWER_W + FAN_DEFAULT_POWER_W + 31 * 9 + auxiliary)
+    assert _electric_power(minimum | {"ouHz": 41}) >= 2 * WATTS_PER_AMP_SINGLE_PHASE
+
+
 def test_crankcase_heater_is_off_while_the_compressor_runs():
     """During a defrost with no fan: electronics, compressor, pump and controllers, no heater."""
     running = {"ouHz": 60, "ouCurrent": 4, "ouDischargePress": 5, "ouSuctionPress": 8, "waterFlow": 20, "pumpSpeed": 100, "fanRPM": 0}
@@ -343,7 +351,7 @@ def test_pump_and_controllers_are_added_to_the_current_range():
 
 def test_outdoor_fan_follows_its_speed():
     """A faster fan draws more, inside the range of the reported current."""
-    free = SIX_AMPS | {"pumpSpeed": 100, "ouDischargePress": 24}  # the model lands inside the 6 A range
+    free = SIX_AMPS | {"pumpSpeed": 100}  # the model lands inside the 6 A range
     slow = _electric_power(free | {"fanRPM": 300})
     fast = _electric_power(free | {"fanRPM": 900})
     assert fast - slow == round(FAN_MAX_POWER_W * (1 - (300 / 900) ** 3))
@@ -369,8 +377,8 @@ def test_defrost_is_taken_from_the_unit_flag():
 # Estimated electricity: self-calibration from the reported current
 # --------------------------------------------------------------------------
 
-# 31 Hz and 17 bar apart: the model says 669 W for the compressor, well under the 1260 W of 6 A
-LOW_MODEL = {"ouHz": 31, "ouCurrent": 6, "ouDischargePress": 25, "ouSuctionPress": 8, "waterFlow": 20, "pumpSpeed": 100, "fanRPM": 0}
+# 41 Hz and 17 bar apart: the model says 697 W for the compressor, well under the 1320 W of 6 A
+LOW_MODEL = {"ouHz": 41, "ouCurrent": 6, "ouDischargePress": 25, "ouSuctionPress": 8, "waterFlow": 20, "pumpSpeed": 100, "fanRPM": 0}
 
 
 def _calibrated_sensor():
@@ -382,9 +390,9 @@ def test_model_below_the_current_range_raises_its_factor():
     """Each new reading under the range moves the factor of that frequency band up."""
     sensor, coordinator = _calibrated_sensor()
     sensor._calculate_complex_power(dict(LOW_MODEL))
-    first = coordinator.power_calibration.factor(31)
+    first = coordinator.power_calibration.factor(41)
     sensor._calculate_complex_power(dict(LOW_MODEL))
-    assert 1.0 < first < coordinator.power_calibration.factor(31)
+    assert 1.0 < first < coordinator.power_calibration.factor(41)
     assert coordinator.power_calibration.factor(80) == 1.0  # another band is left alone
 
 
@@ -392,7 +400,7 @@ def test_model_above_the_current_range_lowers_its_factor():
     """A model over the range of 1 A is brought down."""
     sensor, coordinator = _calibrated_sensor()
     sensor._calculate_complex_power(LOW_MODEL | {"ouCurrent": 1})
-    assert coordinator.power_calibration.factor(31) < 1.0
+    assert coordinator.power_calibration.factor(41) < 1.0
 
 
 def test_model_inside_the_current_range_keeps_its_factor():
@@ -415,13 +423,13 @@ def test_one_reading_is_learnt_from_once():
 def test_calibrated_model_reaches_the_current_range():
     """After enough readings the model lands on the range instead of being cut to it."""
     sensor, coordinator = _calibrated_sensor()
-    reading = LOW_MODEL | {"ouCurrent": 3}  # 630 to 838 W: the model's 704 W of outdoor power is inside
-    assert sensor._calculate_complex_power(dict(reading)) == round(35 + 1.27 * 31 * 17 + STANDBY_POWER_W + PUMP_MAX_POWER_W)
-    reading = LOW_MODEL | {"ouCurrent": 4}  # 840 to 1048 W: the model is under it
+    reading = LOW_MODEL | {"ouCurrent": 3}  # 660 to 878 W: the model's 732 W of outdoor power is inside
+    assert sensor._calculate_complex_power(dict(reading)) == round(35 + 41 * 17 + STANDBY_POWER_W + PUMP_MAX_POWER_W)
+    reading = LOW_MODEL | {"ouCurrent": 4}  # 880 to 1098 W: the model is under it
     for _ in range(200):
         sensor._calculate_complex_power(dict(reading))
-    factor = coordinator.power_calibration.factor(31)
-    assert 35 + 1.27 * 31 * 17 * factor == pytest.approx(4 * WATTS_PER_AMP_SINGLE_PHASE, abs=1)
+    factor = coordinator.power_calibration.factor(41)
+    assert 35 + 41 * 17 * factor == pytest.approx(4 * WATTS_PER_AMP_SINGLE_PHASE, abs=1)
 
 
 def test_factor_stays_within_its_limits():
@@ -429,7 +437,7 @@ def test_factor_stays_within_its_limits():
     sensor, coordinator = _calibrated_sensor()
     for _ in range(500):
         sensor._calculate_complex_power(LOW_MODEL | {"ouCurrent": 12})
-    assert coordinator.power_calibration.factor(31) == MAX_FACTOR
+    assert coordinator.power_calibration.factor(41) == MAX_FACTOR
 
 
 def test_defrost_teaches_nothing():
@@ -444,8 +452,8 @@ def test_consumption_sensor_shows_the_learnt_factors():
     sensor, coordinator = _calibrated_sensor()
     sensor._calculate_complex_power(dict(LOW_MODEL))
     attributes = sensor.extra_state_attributes["power_calibration"]
-    assert list(attributes) == ["20-39 Hz"]
-    assert attributes["20-39 Hz"] == round(coordinator.power_calibration.factor(31), 3)
+    assert list(attributes) == ["40-59 Hz"]
+    assert attributes["40-59 Hz"] == round(coordinator.power_calibration.factor(41), 3)
     cop = CSNetHomeCalculatedSensor(coordinator, DEVICE_DATA, {}, CALCULATED_SENSOR_DESCRIPTIONS["instant_cop"])
     assert cop.extra_state_attributes is None
 
