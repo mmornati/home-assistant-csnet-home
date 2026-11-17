@@ -547,6 +547,7 @@ The heat delivered divided by the electricity used over the last 15 minutes of t
 - **Daily HVAC COP** accumulates while the unit is heating or cooling, or defrosting outside DHW production.
 - **DHW Daily COP** accumulates while the unit is producing DHW, or defrosting outside space heating.
 - Both daily COPs include the auxiliary consumption between compressor runs, as a meter on the heat pump would.
+- Both daily COPs show the day's totals they come from in their `electricity_kwh` and `heat_kwh` attributes, and keep them across a restart of Home Assistant or a reload of the integration.
 
 !!! note "Renamed sensor"
     The daily space-heating COP sensor was renamed from **Daily COP** to **Daily HVAC COP** when cooling support was added. It now has a new unique ID, so Home Assistant creates a new entity; the old one is left orphaned and can be deleted.

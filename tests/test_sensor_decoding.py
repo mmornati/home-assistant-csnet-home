@@ -690,6 +690,45 @@ async def test_daily_total_saved_yesterday_is_not_restored():
     assert sensor.native_value == 0
 
 
+async def _restore_with(sensor, state, saved_at, attributes):
+    last_state = SimpleNamespace(state=state, last_updated=saved_at, attributes=attributes)
+    with (
+        patch.object(CSNetHomeDailySensor, "async_get_last_state", AsyncMock(return_value=last_state)),
+        patch.object(CSNetHomeInstallationSensor, "async_added_to_hass", AsyncMock(), create=True),
+    ):
+        await sensor.async_added_to_hass()
+
+
+async def test_daily_cop_keeps_its_totals_across_a_restart():
+    """The day's COP goes on from the totals before the restart instead of starting over."""
+    sensor = _daily_sensor("daily_cop_hvac")
+    await _restore_with(sensor, "4.0", dt_util.now(), {"electricity_kwh": 2.0, "heat_kwh": 8.0})
+    assert sensor.native_value == 4.0
+    assert sensor.extra_state_attributes == {"electricity_kwh": 2.0, "heat_kwh": 8.0}
+
+    # a minute of standby is added to the day's totals, not to new ones
+    sensor._get_heating_status().update(STOPPED | {"operationStatus": 4})
+    now = dt_util.now()
+    sensor._last_update_time = now - timedelta(minutes=1)
+    with patch("custom_components.csnet_home.sensor.dt_util.now", return_value=now):
+        sensor._handle_coordinator_update()
+    assert 2.0 < sensor._energy_in < 2.01
+    assert sensor._energy_out == 8.0
+    assert sensor.native_value == round(8.0 / sensor._energy_in, 2)
+
+
+async def test_daily_cop_totals_from_yesterday_are_not_restored():
+    """Yesterday's totals belong to yesterday."""
+    sensor = _daily_sensor("daily_cop_dhw")
+    await _restore_with(sensor, "4.0", dt_util.now() - timedelta(days=1), {"electricity_kwh": 2.0, "heat_kwh": 8.0})
+    assert sensor.extra_state_attributes == {"electricity_kwh": 0.0, "heat_kwh": 0.0}
+
+
+def test_daily_energy_sensors_show_no_totals():
+    """Only the COPs carry their totals."""
+    assert _daily_sensor("daily_heating").extra_state_attributes is None
+
+
 def test_failed_poll_adds_no_energy():
     """Without a new reading nothing is accumulated and the clock does not move."""
     sensor = _daily_sensor(last_update_success=False)

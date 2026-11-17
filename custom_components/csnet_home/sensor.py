@@ -1820,6 +1820,12 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
         return None
 
 
+# Daily COPs, and the attributes that keep the totals they are worked out from
+DAILY_COP_KEYS = ("daily_cop_hvac", "daily_cop_dhw")
+ATTR_ELECTRICITY_KWH = "electricity_kwh"
+ATTR_HEAT_KWH = "heat_kwh"
+
+
 class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
     """Sensor for accumulated daily values (Energy, Daily COP) with reset.
 
@@ -1872,9 +1878,25 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
                 self._state = float(clean_state)
             except (TypeError, ValueError):
                 self._state = 0.0
+            # A daily COP is a ratio of two totals: without them the day's
+            # COP would start over from the readings after the restart
+            if self._key in DAILY_COP_KEYS:
+                attributes = getattr(last_state, "attributes", None) or {}
+                try:
+                    self._energy_in = max(0.0, float(attributes.get(ATTR_ELECTRICITY_KWH, 0.0)))
+                    self._energy_out = max(0.0, float(attributes.get(ATTR_HEAT_KWH, 0.0)))
+                except (TypeError, ValueError):
+                    self._energy_in = self._energy_out = 0.0
         else:
             self._state = 0.0
         self._last_update_time = dt_util.now()
+
+    @property
+    def extra_state_attributes(self):
+        """Show the day's totals a daily COP comes from, which are also kept across restarts."""
+        if self._key not in DAILY_COP_KEYS:
+            return None
+        return {ATTR_ELECTRICITY_KWH: round(self._energy_in, 4), ATTR_HEAT_KWH: round(self._energy_out, 4)}
 
     @property
     def native_value(self):
@@ -1944,7 +1966,7 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
             self._state += energy_heating_kwh
 
         # Daily COPs
-        elif self._key in ["daily_cop_hvac", "daily_cop_dhw"]:
+        elif self._key in DAILY_COP_KEYS:
             defrost_active = heating_status.get("defrosting") == 1
 
             should_accumulate = False
