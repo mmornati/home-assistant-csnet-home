@@ -55,6 +55,7 @@ const TEXTS = {
     hydro_module: "Indoor unit",
     circuit: "Circuit {n}",
     hot_water: "Hot water",
+    tank_heater: "Tank heater",
     pool: "Pool",
     mix_valve: "Mixing valve",
     setpoint: "set {v}",
@@ -173,6 +174,7 @@ const TEXTS = {
     hydro_module: "Module hydro",
     circuit: "Circuit {n}",
     hot_water: "Eau chaude",
+    tank_heater: "Résistance du ballon",
     pool: "Piscine",
     mix_valve: "Vanne 3 voies",
     setpoint: "consigne {v}",
@@ -291,6 +293,7 @@ const TEXTS = {
     hydro_module: "Unidad interior",
     circuit: "Circuito {n}",
     hot_water: "Agua caliente",
+    tank_heater: "Resistencia del depósito",
     pool: "Piscina",
     mix_valve: "Válvula mezcladora",
     setpoint: "consigna {v}",
@@ -1226,7 +1229,8 @@ class CsnetWaterCircuitCard extends CsnetBaseCard {
         tag: "DHW",
         value: heater?.attributes?.current_temperature,
         setpoint: heater?.attributes?.temperature,
-        active: isOn(hass, dhw.heating),
+        // heated by the heat pump or by the tank's electric heater
+        active: isOn(hass, dhw.heating) || isOn(hass, dhw.electric_heater),
         color: "var(--csnet-bad)",
       });
     }
@@ -1313,6 +1317,7 @@ class CsnetWaterCircuitCard extends CsnetBaseCard {
     chip(unit.pump_3, t(hass, "pump", { n: 3 }));
     for (const c of this.circuits) chip(c.demand, `${t(hass, "demand")} C${c.circuit}`, "heat");
     if (dhw) chip(dhw.heating, t(hass, "hot_water"), "heat");
+    if (dhw) chip(dhw.electric_heater, t(hass, "tank_heater"), "heat");
     chip(unit.backup_heater, t(hass, "backup_heater"), "heat");
     chip(unit.boiler, t(hass, "boiler"), "heat");
 
@@ -1815,6 +1820,7 @@ class CsnetActivityCard extends CsnetBaseCard {
       [unit.defrost, t(hass, "defrost"), "var(--csnet-cool)"],
       ...this.circuits.map((c) => [c.demand, t(hass, "demand_of", { name: friendly(hass, c.climate, `C${c.circuit}`) }), c.circuit === 1 ? "var(--csnet-c1)" : "var(--csnet-c2)"]),
       [this._roles?.dhw?.heating, t(hass, "hot_water"), "var(--csnet-bad)"],
+      [this._roles?.dhw?.electric_heater, t(hass, "tank_heater"), "var(--csnet-bad)"],
       [unit.pump_1, t(hass, "pump", { n: 1 }), "var(--csnet-ok)"],
       [unit.pump_2, t(hass, "pump", { n: 2 }), "var(--csnet-ok)"],
       [unit.pump_3, t(hass, "pump", { n: 3 }), "var(--csnet-ok)"],

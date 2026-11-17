@@ -101,7 +101,9 @@ CIRCUIT_ROLES = {
 
 # role -> unique id, for the hot water tank
 DHW_ROLES = {
-    "heating": f"{DOMAIN}-binary-dhw_heater",
+    # the tank being heated by the heat pump, and by its electric heater
+    "heating": f"{DOMAIN}-binary-dhw_production",
+    "electric_heater": f"{DOMAIN}-binary-dhw_heater",
     "mode": f"{DOMAIN}-unit-dhw_mode",
     "anti_legionella": f"{DOMAIN}-binary-dhw_anti_legionella",
 }

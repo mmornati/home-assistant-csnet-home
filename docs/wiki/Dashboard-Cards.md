@@ -13,7 +13,7 @@ The cards find their entities themselves, so a card works as soon as you add it,
 | System health | `custom:csnet-system-health-card` | Alarms, gateway, central control, defrost and water pressure |
 | Refrigerant circuit | `custom:csnet-refrigerant-card` | Compressor frequency and current, discharge, evaporator, gas and liquid temperatures, pressures, expansion valve, outdoor fan |
 | Temperatures | `custom:csnet-temperatures-card` | Flow, return, after the mixing valve, water target and outdoor temperature over the last hours, with the compressor frequency behind |
-| Activity | `custom:csnet-activity-card` | What ran over the last hours, with the total time: compressor, defrost, each circuit's demand, hot water, pumps, backup heater, boiler |
+| Activity | `custom:csnet-activity-card` | What ran over the last hours, with the total time: compressor, defrost, each circuit's demand, hot water (the heat pump heating the tank), the tank's electric heater, pumps, backup heater, boiler |
 | Energy per day | `custom:csnet-daily-energy-card` | Electricity and heat per day, the COP of each day and the average outdoor temperature |
 | Power today | `custom:csnet-power-profile-card` | Today's power against the average day of the last two weeks |
 | Energy signature | `custom:csnet-energy-signature-card` | Tomorrow's electricity from the weather forecast, kWh per degree colder, 7-day average and base load |
