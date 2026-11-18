@@ -7,13 +7,13 @@ The cards find their entities themselves, so a card works as soon as you add it,
 | Card | Type | What it shows |
 |------|------|---------------|
 | Heat pump | `custom:csnet-heat-pump-card` | Power gauge with a spinning fan while the compressor runs, the unit's status, compressor frequency, outdoor temperature, water ΔT, today's electricity, heat and COP |
-| Water circuit | `custom:csnet-water-circuit-card` | Live diagram: outdoor unit, flow and return temperatures, each circuit with its room temperature, setpoint and demand, the mixing valve of circuit 2, the hot water tank and pool when present, pumps, flow rate and pressure |
+| Water circuit | `custom:csnet-water-circuit-card` | Live diagram: outdoor unit, flow and return temperatures (the flow is the heat exchanger's outlet while the tank is being heated), each circuit with its room temperature, setpoint and demand, the mixing valve of circuit 2, the hot water tank and pool when present, pumps, flow rate and pressure |
 | Heating curve | `custom:csnet-heating-curve-card` | The heating curves you entered in the integration options, where the unit is on them now, and the unit's water target over the last days |
 | Performance | `custom:csnet-performance-card` | COP now, today, yesterday, this month and last month, with the share of heat taken from the air |
 | System health | `custom:csnet-system-health-card` | Alarms, gateway, central control, defrost and water pressure |
 | Refrigerant circuit | `custom:csnet-refrigerant-card` | Compressor frequency and current, discharge, evaporator, gas and liquid temperatures, pressures, expansion valve, outdoor fan |
 | Temperatures | `custom:csnet-temperatures-card` | Flow, return, after the mixing valve, water target and outdoor temperature over the last hours, with the compressor frequency behind |
-| Activity | `custom:csnet-activity-card` | What ran over the last hours, with the total time: compressor, defrost, each circuit's demand, hot water, pumps, backup heater, boiler |
+| Activity | `custom:csnet-activity-card` | What ran over the last hours, with the total time: compressor, defrost, each circuit's demand, hot water (the heat pump heating the tank), the tank's electric heater, pumps, backup heater, boiler |
 | Energy per day | `custom:csnet-daily-energy-card` | Electricity and heat per day, the COP of each day and the average outdoor temperature |
 | Power today | `custom:csnet-power-profile-card` | Today's power against the average day of the last two weeks |
 | Energy signature | `custom:csnet-energy-signature-card` | Tomorrow's electricity from the weather forecast, kWh per degree colder, 7-day average and base load |

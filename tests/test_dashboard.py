@@ -29,11 +29,12 @@ async def test_roles_follow_unique_ids_not_entity_ids(hass: HomeAssistant):
     registry = er.async_get(hass)
     power = _add(registry, "sensor", f"{DOMAIN}-installation-instant_consumption", "sensor.my_renamed_power")
     _add(registry, "sensor", f"{DOMAIN}-installation-out_water_temperature", "sensor.depart")
+    _add(registry, "sensor", f"{DOMAIN}-installation-heat_exchanger_water_outlet_temperature", "sensor.depart_pac")
     _add(registry, "binary_sensor", f"{DOMAIN}-binary-defrost", "binary_sensor.degivrage", disabled=True)
     registry.async_get_or_create("sensor", "other_integration", f"{DOMAIN}-installation-water_flow")
 
     roles = dashboard_entities(hass)
-    assert roles["unit"] == {"power": power, "water_out": "sensor.depart"}
+    assert roles["unit"] == {"power": power, "water_out": "sensor.depart", "water_out_hp": "sensor.depart_pac"}
     assert roles["circuits"] == []
     assert roles["dhw"] is None
     assert roles["pool"] is None
@@ -49,14 +50,15 @@ async def test_circuits_tank_and_gateway(hass: HomeAssistant):
     _add(registry, "sensor", f"{DOMAIN}-unit-c2_heating_curve_water_temperature", "sensor.c2_curve")
     _add(registry, "sensor", f"{DOMAIN}-zone-11-21-1-connectivity", "sensor.gw_conn")
     tank = _add(registry, "water_heater", f"{DOMAIN}-water-heater-11-23-3", "water_heater.ecs")
-    _add(registry, "binary_sensor", f"{DOMAIN}-binary-dhw_heater", "binary_sensor.ecs_heating")
+    _add(registry, "binary_sensor", f"{DOMAIN}-binary-dhw_production", "binary_sensor.ecs_heating")
+    _add(registry, "binary_sensor", f"{DOMAIN}-binary-dhw_heater", "binary_sensor.ecs_electric_heater")
 
     roles = dashboard_entities(hass)
     assert roles["circuits"] == [
         {"circuit": 1, "zone_id": 1, "water_control": False, "climate": c1, "current_temperature": "sensor.etage_temp", "demand": "binary_sensor.c1_demand"},
         {"circuit": 2, "zone_id": 6, "water_control": True, "climate": c2, "current_temperature": None, "curve": "sensor.c2_curve"},
     ]
-    assert roles["dhw"] == {"water_heater": tank, "heating": "binary_sensor.ecs_heating"}
+    assert roles["dhw"] == {"water_heater": tank, "heating": "binary_sensor.ecs_heating", "electric_heater": "binary_sensor.ecs_electric_heater"}
     assert roles["gateway"] == {"connectivity": "sensor.gw_conn"}
 
 

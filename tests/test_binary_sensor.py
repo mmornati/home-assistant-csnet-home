@@ -185,6 +185,26 @@ def test_anti_legionella_follows_the_units_status(value, expected):
     assert _read({"antiLegionellaStatusDHW": value}, BY_KEY["dhw_anti_legionella"]) is expected
 
 
+@pytest.mark.parametrize(("status", "expected"), [(8, True), (7, False), (6, False), (0, False), (-1, None), (None, None)])
+def test_dhw_production_is_the_heat_pump_heating_the_tank(status, expected):
+    """On while the unit reports "DHW on" (8), whatever its tank heater does."""
+    assert _read({"operationStatus": status, "systemStatus2Flags": 0}, BY_KEY["dhw_production"]) is expected
+
+
+def test_dhw_production_and_the_electric_heater_are_apart():
+    """The live reading of a tank heated by the heat pump: production on, electric heater off."""
+    status = {"operationStatus": 8, "systemStatus2Flags": 36}  # pump 1 and compressor
+    assert _read(status, BY_KEY["dhw_production"]) is True
+    assert _read(status, BY_KEY["dhw_heater"]) is False
+
+
+async def test_dhw_production_only_on_units_with_a_tank():
+    """The operation status is reported by every unit; only one with a tank gets the sensor."""
+    status = {"systemStatus2Flags": 0, "defrosting": 0, "operationStatus": 8}
+    assert "dhw_production" not in await _setup(_coordinator(status, (1, 2)))
+    assert "dhw_production" in await _setup(_coordinator(status, (1, 3)))
+
+
 async def test_anti_legionella_only_on_units_with_a_tank():
     """A unit without a hot water zone reports the field too, and gets no entity for it."""
     status = {"systemStatus2Flags": 0, "defrosting": 0, "antiLegionellaStatusDHW": 0}

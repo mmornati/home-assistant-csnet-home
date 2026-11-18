@@ -55,6 +55,7 @@ const TEXTS = {
     hydro_module: "Indoor unit",
     circuit: "Circuit {n}",
     hot_water: "Hot water",
+    tank_heater: "Tank heater",
     pool: "Pool",
     mix_valve: "Mixing valve",
     setpoint: "set {v}",
@@ -173,6 +174,7 @@ const TEXTS = {
     hydro_module: "Module hydro",
     circuit: "Circuit {n}",
     hot_water: "Eau chaude",
+    tank_heater: "Résistance du ballon",
     pool: "Piscine",
     mix_valve: "Vanne 3 voies",
     setpoint: "consigne {v}",
@@ -291,6 +293,7 @@ const TEXTS = {
     hydro_module: "Unidad interior",
     circuit: "Circuito {n}",
     hot_water: "Agua caliente",
+    tank_heater: "Resistencia del depósito",
     pool: "Piscina",
     mix_valve: "Válvula mezcladora",
     setpoint: "consigna {v}",
@@ -361,7 +364,7 @@ const TEXTS = {
     not_enough_history: "hacen falta al menos 7 días de historial",
     base_load: "Consumo base (14 días)",
     base_load_detail: "potencia mínima: bombas y electrónica",
-    signature_note: "kWh por día = a + b × temperatura exterior media, en los últimos {d} días. Una estimación, no una promesa.",
+    signature_note: "kWh por día = a + b × temperatura exterior media, en los últimos {d} días. Valor estimado, puede variar.",
     cost_today: "Coste de hoy",
     cost_month: "Coste del mes",
     price_used: "precio {v} {c}/kWh",
@@ -1199,6 +1202,10 @@ class CsnetWaterCircuitCard extends CsnetBaseCard {
     const running = isOn(hass, unit.compressor) || (num(hass, unit.compressor_frequency) || 0) > 0;
     const defrost = isOn(hass, unit.defrost);
     const pumping = ["pump_1", "pump_2", "pump_3"].some((p) => isOn(hass, unit[p])) || running;
+    // While the heat pump heats the tank its water goes there, not to the
+    // circuits: the flow is the exchanger's outlet, not the circuits' one
+    const heatingTank = isOn(hass, this._roles?.dhw?.heating) && num(hass, unit.water_out_hp) !== null;
+    const flowEntity = heatingTank ? unit.water_out_hp : unit.water_out;
     const targets = [];
     for (const c of this.circuits) {
       const climate = stateOf(hass, c.climate);
@@ -1226,7 +1233,8 @@ class CsnetWaterCircuitCard extends CsnetBaseCard {
         tag: "DHW",
         value: heater?.attributes?.current_temperature,
         setpoint: heater?.attributes?.temperature,
-        active: isOn(hass, dhw.heating),
+        // heated by the heat pump or by the tank's electric heater
+        active: isOn(hass, dhw.heating) || isOn(hass, dhw.electric_heater),
         color: "var(--csnet-bad)",
       });
     }
@@ -1290,11 +1298,11 @@ class CsnetWaterCircuitCard extends CsnetBaseCard {
         ${fanSvg(outdoorBox.x + outdoorBox.w / 2, midY + 2, 19, running, fanColor)}
         <text x="${outdoorBox.x + outdoorBox.w / 2}" y="${outdoorBox.y + outdoorBox.h - 10}" text-anchor="middle" font-size="11" fill="var(--primary-text-color)">${fmt(hass, outdoor)}°C · ${fmt(hass, hz, 0)} Hz${defrost ? ` · ${t(hass, "defrost")}` : ""}</text>
       </g>
-      <g data-entity="${escapeHtml(unit.water_out || "")}">
+      <g data-entity="${escapeHtml(flowEntity || "")}">
         <rect x="${hydro.x}" y="${hydro.y}" width="${hydro.w}" height="${hydro.h}" rx="12" fill="color-mix(in srgb, ${hot} 8%, transparent)" stroke="${hot}" stroke-width="1.5"/>
         <text x="${hydro.x + hydro.w / 2}" y="${hydro.y + 18}" text-anchor="middle" font-size="10" letter-spacing="1.5" fill="var(--secondary-text-color)">${t(hass, "hydro_module").toUpperCase()}</text>
         <text x="${hydro.x + hydro.w / 2}" y="${hydro.y + 40}" text-anchor="middle" font-size="11" fill="var(--secondary-text-color)">${t(hass, "flow")}</text>
-        <text x="${hydro.x + hydro.w / 2}" y="${hydro.y + 64}" text-anchor="middle" font-size="24" font-weight="700" fill="${hot}">${fmt(hass, num(hass, unit.water_out))}°</text>
+        <text x="${hydro.x + hydro.w / 2}" y="${hydro.y + 64}" text-anchor="middle" font-size="24" font-weight="700" fill="${hot}">${fmt(hass, num(hass, flowEntity))}°</text>
         <text x="${hydro.x + hydro.w / 2}" y="${hydro.y + 84}" text-anchor="middle" font-size="11" fill="var(--secondary-text-color)">${t(hass, "return")}</text>
         <text x="${hydro.x + hydro.w / 2}" y="${hydro.y + 106}" text-anchor="middle" font-size="18" font-weight="700" fill="var(--primary-text-color)">${fmt(hass, num(hass, unit.water_in))}°</text>
       </g>
@@ -1313,6 +1321,7 @@ class CsnetWaterCircuitCard extends CsnetBaseCard {
     chip(unit.pump_3, t(hass, "pump", { n: 3 }));
     for (const c of this.circuits) chip(c.demand, `${t(hass, "demand")} C${c.circuit}`, "heat");
     if (dhw) chip(dhw.heating, t(hass, "hot_water"), "heat");
+    if (dhw) chip(dhw.electric_heater, t(hass, "tank_heater"), "heat");
     chip(unit.backup_heater, t(hass, "backup_heater"), "heat");
     chip(unit.boiler, t(hass, "boiler"), "heat");
 
@@ -1815,6 +1824,7 @@ class CsnetActivityCard extends CsnetBaseCard {
       [unit.defrost, t(hass, "defrost"), "var(--csnet-cool)"],
       ...this.circuits.map((c) => [c.demand, t(hass, "demand_of", { name: friendly(hass, c.climate, `C${c.circuit}`) }), c.circuit === 1 ? "var(--csnet-c1)" : "var(--csnet-c2)"]),
       [this._roles?.dhw?.heating, t(hass, "hot_water"), "var(--csnet-bad)"],
+      [this._roles?.dhw?.electric_heater, t(hass, "tank_heater"), "var(--csnet-bad)"],
       [unit.pump_1, t(hass, "pump", { n: 1 }), "var(--csnet-ok)"],
       [unit.pump_2, t(hass, "pump", { n: 2 }), "var(--csnet-ok)"],
       [unit.pump_3, t(hass, "pump", { n: 3 }), "var(--csnet-ok)"],

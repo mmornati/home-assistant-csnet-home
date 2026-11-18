@@ -54,6 +54,8 @@ UNIT_ROLES = {
     "cop_last_month": f"{DOMAIN}-metered_cop_last_month",
     # water side
     "water_out": f"{DOMAIN}-installation-out_water_temperature",
+    # outlet of the heat pump's exchanger, before the 3-way valve: the flow to the tank
+    "water_out_hp": f"{DOMAIN}-installation-heat_exchanger_water_outlet_temperature",
     "water_in": f"{DOMAIN}-installation-in_water_temperature",
     "water_target": f"{DOMAIN}-installation-set_water_temperature",
     "water_c2": f"{DOMAIN}-installation-c2_water_temperature",
@@ -101,7 +103,9 @@ CIRCUIT_ROLES = {
 
 # role -> unique id, for the hot water tank
 DHW_ROLES = {
-    "heating": f"{DOMAIN}-binary-dhw_heater",
+    # the tank being heated by the heat pump, and by its electric heater
+    "heating": f"{DOMAIN}-binary-dhw_production",
+    "electric_heater": f"{DOMAIN}-binary-dhw_heater",
     "mode": f"{DOMAIN}-unit-dhw_mode",
     "anti_legionella": f"{DOMAIN}-binary-dhw_anti_legionella",
 }

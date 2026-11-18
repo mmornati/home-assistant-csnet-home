@@ -15,7 +15,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CIRCUIT_1_ZONES, CIRCUIT_2_ZONES, DHW_ZONES, DOMAIN
+from .const import CIRCUIT_1_ZONES, CIRCUIT_2_ZONES, DHW_ZONES, DOMAIN, OPST_DHW_ON
 from .coordinator import CSNetHomeConfigEntry, CSNetHomeCoordinator
 from .sensor import SYSTEM_STATUS_FLAG_BITS, _get_heating_status_from_installation_data, unit_device_info
 
@@ -30,12 +30,14 @@ class CSNetHomeBinarySensorDescription(BinarySensorEntityDescription):
     """A binary sensor read from the unit status.
 
     ``flag`` names a bit of systemStatus2Flags; without it the sensor reads
-    ``status_key`` (anything above 0 means on, as in the web app). ``needs_zone`` limits the sensor to units
+    ``status_key`` (anything above 0 means on, as in the web app, or one of
+    ``on_values`` when given). ``needs_zone`` limits the sensor to units
     that have one of these zones.
     """
 
     flag: str | None = None
     status_key: str | None = None
+    on_values: frozenset[int] | None = None
     needs_zone: frozenset[int] | None = None
 
 
@@ -47,6 +49,16 @@ BINARY_SENSOR_DESCRIPTIONS: tuple[CSNetHomeBinarySensorDescription, ...] = (
     CSNetHomeBinarySensorDescription(key="water_pump_3", name="Water pump 3", device_class=BinarySensorDeviceClass.RUNNING, flag="water_pump_3"),
     CSNetHomeBinarySensorDescription(key="circuit_1_demand", name="Circuit 1 demand", flag="c1_demand", needs_zone=CIRCUIT_1_ZONES),
     CSNetHomeBinarySensorDescription(key="circuit_2_demand", name="Circuit 2 demand", flag="c2_demand", needs_zone=CIRCUIT_2_ZONES),
+    # The heat pump heating the tank: the unit's operation status, which the
+    # web app shows as "DHW on". The electric heater below is another thing.
+    CSNetHomeBinarySensorDescription(
+        key="dhw_production",
+        name="DHW production",
+        device_class=BinarySensorDeviceClass.RUNNING,
+        status_key="operationStatus",
+        on_values=frozenset({OPST_DHW_ON}),
+        needs_zone=DHW_ZONES,
+    ),
     CSNetHomeBinarySensorDescription(
         key="dhw_heater",
         name="DHW electric heater",
@@ -106,6 +118,8 @@ def _read(heating_status, description: CSNetHomeBinarySensorDescription) -> bool
     value = heating_status.get(description.status_key)
     if not isinstance(value, int) or isinstance(value, bool) or value < 0:
         return None
+    if description.on_values is not None:
+        return value in description.on_values
     return value >= 1
 
 
