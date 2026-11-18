@@ -94,14 +94,17 @@ jobs:
           retention-days: 30
           compression-level: 9
 
+      # Fork PRs get a read-only GITHUB_TOKEN, so commenting would fail.
       - name: Find existing comment
         id: find_comment
+        if: github.event.pull_request.head.repo.full_name == github.repository
         uses: peter-evans/find-comment@v4
         with:
           issue-number: ${{ github.event.pull_request.number }}
           body-includes: '📚 Documentation Preview'
 
       - name: Add or Update PR comment
+        if: github.event.pull_request.head.repo.full_name == github.repository
         uses: peter-evans/create-or-update-comment@v5
         with:
           comment-id: ${{ steps.find_comment.outputs.comment-id }}
