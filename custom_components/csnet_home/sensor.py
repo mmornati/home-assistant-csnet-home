@@ -1562,6 +1562,29 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
     _cop_samples: deque | None = None
     _exchanger_probe_missing_logged = False
 
+    def _poll_seconds(self) -> float:
+        """Return the coordinator's poll interval in seconds."""
+        interval = getattr(self.coordinator, "update_interval", None)
+        return interval.total_seconds() if isinstance(interval, timedelta) and interval.total_seconds() > 0 else 60.0
+
+    def _estimated_cop(self) -> float | None:
+        """Return the heat over the estimated electricity across the window, or None.
+
+        Each reading counts for the time since the one before it (the first of
+        the window for one poll interval), so an extra refresh a few seconds
+        after a poll weighs a few seconds, not a whole poll.
+        """
+        heat = electricity = 0.0
+        previous = None
+        for when, sample_heat, sample_power, _meter in self._cop_samples or ():
+            seconds = (when - previous).total_seconds() if previous is not None else self._poll_seconds()
+            previous = when
+            heat += sample_heat * seconds
+            electricity += sample_power * seconds
+        if electricity <= 0:
+            return None
+        return round(heat / electricity, 2)
+
     def _metered_cop(self) -> float | None:
         """Return the heat over the meter's electricity across the window, or None.
 
@@ -1849,10 +1872,9 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
                 metered = self._metered_cop()
                 if metered is not None:
                     return metered
-            if self._cop_samples:
-                electricity = sum(sample[2] for sample in self._cop_samples)
-                if electricity > 0:
-                    return round(sum(sample[1] for sample in self._cop_samples) / electricity, 2)
+            estimated = self._estimated_cop()
+            if estimated is not None:
+                return estimated
             return round(heating_power / instant_consumption, 2)
 
         return None

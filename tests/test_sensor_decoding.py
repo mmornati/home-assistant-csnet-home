@@ -598,6 +598,18 @@ def test_instant_cop_is_averaged_over_the_window():
     assert averaged == round(2.5 * 1160 * 4 / electricity, 2)
 
 
+def test_instant_cop_weighs_each_reading_by_its_time():
+    """An extra refresh a few seconds after a poll weighs those seconds, not a whole poll."""
+    sensor = _cop_sensor(COP_RUN)
+    start = dt_util.now().replace(hour=12, minute=0, second=0, microsecond=0)
+    _poll(sensor, start, waterOutletHPTemp=43)
+    _poll(sensor, start + timedelta(minutes=1), waterOutletHPTemp=43)
+    averaged = _poll(sensor, start + timedelta(minutes=1, seconds=6), waterOutletHPTemp=53)
+    electricity = sensor._calculate_complex_power(sensor._get_heating_status())
+    # 3 K for two minutes, 13 K for six seconds
+    assert averaged == round(2.5 * 1160 * (3 * 120 + 13 * 6) / 126 / electricity, 2)
+
+
 def test_instant_cop_forgets_readings_older_than_the_window():
     """A reading from before the window no longer weighs."""
     sensor = _cop_sensor(COP_RUN)
