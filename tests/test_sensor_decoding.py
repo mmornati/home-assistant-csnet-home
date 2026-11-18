@@ -238,17 +238,24 @@ def test_cooling_status_sent_as_text_is_not_counted_as_heating():
     assert _thermal_power(RUNNING | {"operationStatus": "Cooling Thermostat Off"}) == 0
 
 
-@pytest.mark.parametrize("probe", ["waterInletTemp", "waterOutletHPTemp"])
+@pytest.mark.parametrize("probe", ["waterInletTemp", "waterOutletTemp"])
 def test_no_heat_from_a_missing_probe(probe):
     """A -127 marker must not turn into hundreds of kilowatts."""
-    assert _thermal_power(RUNNING | {"operationStatus": 5, probe: -127}) == 0
+    assert _thermal_power(RUNNING | {"operationStatus": 5, "waterOutletHPTemp": -127, probe: -127}) == 0
+    assert _thermal_power(RUNNING | {"operationStatus": 5, "waterInletTemp": -127}) == 0
+
+
+def test_heat_is_measured_at_the_water_outlet_without_an_exchanger_probe():
+    """A unit that does not send the exchanger outlet, or reports it failed, is measured at its water outlet."""
+    without = {key: value for key, value in RUNNING.items() if key != "waterOutletHPTemp"}
+    assert _thermal_power(without | {"operationStatus": 6}) == 2.5 * 1160 * 10
+    assert _thermal_power(RUNNING | {"operationStatus": 6, "waterOutletHPTemp": -127}) == 2.5 * 1160 * 10
 
 
 @pytest.mark.parametrize("status", [5, 6, 8])
 def test_heat_is_measured_at_the_exchanger_outlet(status):
-    """The exchanger outlet is used in every mode; a failed exchanger probe gives no heat."""
+    """The exchanger outlet is used in every mode, not the water outlet after the backup heater."""
     assert _thermal_power(RUNNING | {"operationStatus": status, "waterOutletHPTemp": 45}) == 2.5 * 1160 * 5
-    assert _thermal_power(RUNNING | {"operationStatus": status, "waterOutletHPTemp": -127}) == 0
 
 
 def test_cooling_is_measured_at_the_exchanger_outlet():

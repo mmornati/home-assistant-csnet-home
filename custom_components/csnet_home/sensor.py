@@ -1560,6 +1560,7 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
     # electricity W, meter reading kWh or None), taken at each poll while the
     # compressor runs
     _cop_samples: deque | None = None
+    _exchanger_probe_missing_logged = False
 
     def _metered_cop(self) -> float | None:
         """Return the heat over the meter's electricity across the window, or None.
@@ -1776,8 +1777,14 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
 
         # The outlet of the heat pump's exchanger, in every mode: the unit's
         # water outlet sits after the backup heater and would count its heat
-        # as the heat pump's. Every unit has that probe.
-        temp_out = heating_status.get("waterOutletHPTemp", 0)
+        # as the heat pump's. A unit that does not send that probe, or reports
+        # it failed, is measured at its water outlet instead.
+        temp_out = heating_status.get("waterOutletHPTemp")
+        if temp_out is None or _is_missing_probe(temp_out):
+            if not self._exchanger_probe_missing_logged:
+                _LOGGER.debug("No heat exchanger outlet temperature (waterOutletHPTemp=%s): measuring the heat at the water outlet", temp_out)
+                self._exchanger_probe_missing_logged = True
+            temp_out = heating_status.get("waterOutletTemp", 0)
 
         # Without both probes there is no temperature difference to measure
         if _is_missing_probe(temp_in) or _is_missing_probe(temp_out):
