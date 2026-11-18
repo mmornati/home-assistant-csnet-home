@@ -527,16 +527,18 @@ Thermal power = water flow (m³/h) × 1160 × ΔT, in watts.
 
 | Operation status | ΔT used | Outlet temperature used |
 |------------------|---------|-------------------------|
-| Heating Thermostat On (6) | outlet − inlet | Out Water Temperature |
+| Heating Thermostat On (6) | outlet − inlet | Heat Exchanger Water Outlet Temperature |
 | Domestic Hot Water On (8) | outlet − inlet | Heat Exchanger Water Outlet Temperature |
-| Cooling Thermostat On (3) | inlet − outlet | Out Water Temperature |
+| Cooling Thermostat On (3) | inlet − outlet | Heat Exchanger Water Outlet Temperature |
 | Anything else | – | Output is 0 |
+
+The outlet of the heat pump's exchanger is used in every mode, so the heat of a backup heater placed after it is not counted as the heat pump's. Units without that probe use Out Water Temperature.
 
 Output is also 0 when ΔT is not positive or the flow is below 0.01 m³/h.
 
 ### Instant COP
 
-Output Power divided by Instant Consumption, rounded to 2 decimals. It reports `0` while the compressor is stopped.
+The heat delivered divided by the electricity used over the last 15 minutes of the current compressor run, rounded to 2 decimals. The unit reports whole degrees, so a single reading can be off by 20 % or more; the average evens that out. It reports `0` while the compressor is stopped, and each run starts a new average.
 
 ### Daily Sensors
 

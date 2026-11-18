@@ -19,6 +19,7 @@ from custom_components.csnet_home.sensor import (
     FAN_DEFAULT_POWER_W,
     FAN_MAX_POWER_W,
     INSTALLATION_SENSOR_DESCRIPTIONS,
+    INSTANT_COP_WINDOW,
     MAX_ENERGY_INTEGRATION_HOURS,
     OUTDOOR_ELECTRONICS_POWER_W,
     PUMP_MAX_POWER_W,
@@ -241,10 +242,16 @@ def test_no_heat_from_a_missing_probe(probe):
     assert _thermal_power(RUNNING | {"operationStatus": 5, probe: -127}) == 0
 
 
-def test_hot_water_falls_back_to_the_circuit_outlet_probe():
-    """Status 8 uses the exchanger outlet, or the normal outlet when that probe is missing."""
-    assert _thermal_power(RUNNING | {"operationStatus": 8, "waterOutletHPTemp": 45}) == 2.5 * 1160 * 5
-    assert _thermal_power(RUNNING | {"operationStatus": 8, "waterOutletHPTemp": -127}) == EXPECTED_W
+@pytest.mark.parametrize("status", [5, 6, 8])
+def test_heat_is_measured_at_the_exchanger_outlet(status):
+    """The exchanger outlet is used in every mode, or the unit outlet when that probe is missing."""
+    assert _thermal_power(RUNNING | {"operationStatus": status, "waterOutletHPTemp": 45}) == 2.5 * 1160 * 5
+    assert _thermal_power(RUNNING | {"operationStatus": status, "waterOutletHPTemp": -127}) == EXPECTED_W
+
+
+def test_cooling_is_measured_at_the_exchanger_outlet():
+    """In cooling the exchanger outlet is the cold side: 40 in, 36 out."""
+    assert _thermal_power(RUNNING | {"operationStatus": 3, "waterOutletHPTemp": 36}) == 2.5 * 1160 * 4
 
 
 # --------------------------------------------------------------------------
@@ -548,6 +555,69 @@ def test_learnt_factor_is_saved_once_it_has_moved_enough():
 # --------------------------------------------------------------------------
 
 COP_RUN = SIX_AMPS | RUNNING | {"operationStatus": 6, "pumpSpeed": 100}
+
+
+def _cop_sensor(heating_status):
+    sensor = CSNetHomeCalculatedSensor(_coordinator(dict(heating_status)), DEVICE_DATA, {}, CALCULATED_SENSOR_DESCRIPTIONS["instant_cop"])
+    sensor.hass = SimpleNamespace()
+    sensor.async_write_ha_state = lambda: None
+    return sensor
+
+
+def _poll(sensor, when, **changes):
+    sensor._get_heating_status().update(changes)
+    with patch("custom_components.csnet_home.sensor.dt_util.now", return_value=when):
+        sensor._handle_coordinator_update()
+        return sensor.native_value
+
+
+def test_instant_cop_before_any_poll_is_the_single_reading():
+    """Nothing to average yet: heat over electricity of the reading at hand."""
+    sensor = _cop_sensor(COP_RUN)
+    heat = sensor._get_thermal_power_values(COP_RUN)[0]
+    assert sensor.native_value == round(heat / sensor._calculate_complex_power(COP_RUN), 2)
+
+
+def test_instant_cop_is_averaged_over_the_window():
+    """Two readings 3 K and 5 K apart give the COP of 4 K, not of the last one."""
+    sensor = _cop_sensor(COP_RUN)
+    start = dt_util.now().replace(hour=12, minute=0, second=0, microsecond=0)
+    low = _poll(sensor, start, waterOutletTemp=43)
+    averaged = _poll(sensor, start + timedelta(minutes=1), waterOutletTemp=45)
+    electricity = sensor._calculate_complex_power(sensor._get_heating_status())
+    assert low == round(2.5 * 1160 * 3 / electricity, 2)
+    assert averaged == round(2.5 * 1160 * 4 / electricity, 2)
+
+
+def test_instant_cop_forgets_readings_older_than_the_window():
+    """A reading from before the window no longer weighs."""
+    sensor = _cop_sensor(COP_RUN)
+    start = dt_util.now().replace(hour=12, minute=0, second=0, microsecond=0)
+    _poll(sensor, start, waterOutletTemp=43)
+    later = _poll(sensor, start + INSTANT_COP_WINDOW + timedelta(minutes=1), waterOutletTemp=45)
+    electricity = sensor._calculate_complex_power(sensor._get_heating_status())
+    assert later == round(2.5 * 1160 * 5 / electricity, 2)
+
+
+def test_instant_cop_is_zero_while_the_compressor_is_stopped_and_starts_anew():
+    """A stop empties the average: the next run does not inherit the last one."""
+    sensor = _cop_sensor(COP_RUN)
+    start = dt_util.now().replace(hour=12, minute=0, second=0, microsecond=0)
+    _poll(sensor, start, waterOutletTemp=43)
+    assert _poll(sensor, start + timedelta(minutes=1), ouHz=0) == 0.0
+    restarted = _poll(sensor, start + timedelta(minutes=2), ouHz=31, waterOutletTemp=45)
+    electricity = sensor._calculate_complex_power(sensor._get_heating_status())
+    assert restarted == round(2.5 * 1160 * 5 / electricity, 2)
+
+
+def test_instant_cop_ignores_a_failed_poll():
+    """A failed poll brings no new reading into the average."""
+    sensor = _cop_sensor(COP_RUN)
+    start = dt_util.now().replace(hour=12, minute=0, second=0, microsecond=0)
+    _poll(sensor, start, waterOutletTemp=43)
+    sensor.coordinator.last_update_success = False
+    _poll(sensor, start + timedelta(minutes=1), waterOutletTemp=45)
+    assert len(sensor._cop_samples) == 1
 
 
 def test_daily_cop_counts_the_standby_between_compressor_runs():
