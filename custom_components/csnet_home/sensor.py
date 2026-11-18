@@ -1776,10 +1776,8 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
 
         # The outlet of the heat pump's exchanger, in every mode: the unit's
         # water outlet sits after the backup heater and would count its heat
-        # as the heat pump's. Units without that probe keep the unit outlet.
-        temp_out = heating_status.get("waterOutletHPTemp")
-        if not isinstance(temp_out, (int, float)) or _is_missing_probe(temp_out):
-            temp_out = heating_status.get("waterOutletTemp", 0)
+        # as the heat pump's. Every unit has that probe.
+        temp_out = heating_status.get("waterOutletHPTemp", 0)
 
         # Without both probes there is no temperature difference to measure
         if _is_missing_probe(temp_in) or _is_missing_probe(temp_out):

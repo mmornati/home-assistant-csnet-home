@@ -532,7 +532,7 @@ Thermal power = water flow (m³/h) × 1160 × ΔT, in watts.
 | Cooling Thermostat On (3) | inlet − outlet | Heat Exchanger Water Outlet Temperature |
 | Anything else | – | Output is 0 |
 
-The outlet of the heat pump's exchanger is used in every mode, so the heat of a backup heater placed after it is not counted as the heat pump's. Units without that probe use Out Water Temperature.
+The outlet of the heat pump's exchanger is used in every mode, so the heat of a backup heater placed after it is not counted as the heat pump's. Output is 0 while that probe reports a fault.
 
 Output is also 0 when ΔT is not positive or the flow is below 0.01 m³/h.
 
