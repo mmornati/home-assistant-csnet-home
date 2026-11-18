@@ -426,6 +426,19 @@ def test_the_power_model_learns_once_per_update_of_the_coordinator():
     assert 1.0 < first < coordinator.power_calibration.factor(41)
 
 
+def test_the_estimated_electricity_moves_at_each_update_without_any_cop_sensor():
+    """The listener brings the estimate up to date itself, with the power of the new reading."""
+    coordinator = _coordinator(dict(SIX_AMPS))
+    coordinator.estimated_energy = MagicMock()
+    observer = CSNetHomeCalculatedSensor(coordinator, DEVICE_DATA, {}, CALCULATED_SENSOR_DESCRIPTIONS["instant_consumption"])
+    follow = _power_reading_follower(coordinator, observer)
+    follow()
+    follow()
+    assert coordinator.estimated_energy.async_update.call_count == 2
+    _now, watts = coordinator.estimated_energy.async_update.call_args.args
+    assert watts == observer._calculate_complex_power(observer._get_heating_status())
+
+
 def test_the_power_model_learns_nothing_from_a_failed_update():
     """A failed poll leaves the last reading in place: nothing new to learn from."""
     coordinator = _coordinator(dict(LOW_MODEL))

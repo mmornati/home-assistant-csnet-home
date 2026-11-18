@@ -456,15 +456,13 @@ class EstimatedEnergyCounter:
     over the electricity of the same period.
     """
 
-    def __init__(self, hass: HomeAssistant, entry_id: str, power, max_hours: float = ESTIMATE_MAX_INTEGRATION_HOURS) -> None:
-        """Initialize; ``power`` returns (the reading it comes from, Watts), or None without a reading."""
+    def __init__(self, hass: HomeAssistant, entry_id: str, max_hours: float = ESTIMATE_MAX_INTEGRATION_HOURS) -> None:
+        """Initialize; it is fed the estimated power of each new reading."""
         self.hass = hass
-        self._power = power
         self._max_hours = max_hours
         self._store = Store(hass, METER_STORAGE_VERSION, estimated_energy_storage_key(entry_id))
         self.total_kwh = 0.0
         self._last_time: datetime | None = None
-        self._last_reading = None
         self._loaded = False
 
     async def async_load(self) -> None:
@@ -485,15 +483,12 @@ class EstimatedEnergyCounter:
         return self.total_kwh
 
     @callback
-    def async_update(self, now: datetime) -> None:
-        """Add the estimated power of a new reading for the time since the last one."""
-        figure = self._power()
-        if figure is None:
-            return
-        reading, watts = figure
-        if reading is self._last_reading:
-            return
-        self._last_reading = reading
+    def async_update(self, now: datetime, watts: float) -> None:
+        """Add the estimated power of a new reading for the time since the last one.
+
+        Called once per update of the coordinator, by the listener that also
+        lets the power model learn from the reading.
+        """
         if self._last_time is not None and watts > 0:
             # after an outage the last reading says nothing about the gap
             hours = min((now - self._last_time).total_seconds() / 3600.0, self._max_hours)
@@ -550,16 +545,11 @@ class CSNetHomeMeteredCopSensor(CoordinatorEntity, SensorEntity):
         self._counter = counter
 
     def _follow(self) -> None:
-        """Bring the estimate up to date first, then take the period readings."""
-        now = dt_util.now()
-        if self._counter is not None:
-            self._counter.async_update(now)
-        self._tracker.async_update(now)
+        """Take the period readings (the estimate is brought up to date before the sensors)."""
+        self._tracker.async_update(dt_util.now())
 
     async def async_added_to_hass(self) -> None:
         """Load the kept meter readings before the first state is written."""
-        if self._counter is not None:
-            await self._counter.async_load()
         await self._tracker.async_load()
         self._follow()
         await super().async_added_to_hass()

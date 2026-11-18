@@ -937,8 +937,8 @@ def _power_reading_follower(coordinator, observer):
     """Return the listener that lets the power model learn from each update of the coordinator.
 
     Added before the sensors' own listeners, it runs first at every update:
-    the crankcase heater's state and the model's correction factor are then
-    up to date when the sensors ask for the power.
+    the crankcase heater's state, the model's correction factor and the
+    estimated electricity are then up to date when the sensors read them.
     """
 
     @callback
@@ -946,8 +946,13 @@ def _power_reading_follower(coordinator, observer):
         if getattr(coordinator, "last_update_success", True) is False:
             return
         heating_status = observer._get_heating_status()  # pylint: disable=protected-access
-        if heating_status:
-            observer.observe_power_reading(heating_status)
+        if not heating_status:
+            return
+        observer.observe_power_reading(heating_status)
+        # the estimated electricity, followed like a meter, also without any COP sensor
+        counter = getattr(coordinator, "estimated_energy", None)
+        if counter is not None:
+            counter.async_update(dt_util.now(), observer._calculate_complex_power(heating_status))  # pylint: disable=protected-access
 
     return _follow
 
@@ -1106,12 +1111,10 @@ async def async_setup_entry(hass, entry, async_add_entities):
         calibration = PowerCalibration(hass, entry.entry_id)
         await calibration.async_load()
         coordinator.power_calibration = calibration
-        # The power model learns from each reading once, before the sensors ask for the power
+        # The power model's own instance: it learns from each reading once,
+        # before the sensors ask for the power, and feeds the estimate
         observer = CSNetHomeCalculatedSensor(coordinator, global_device_data, common_data, CALCULATED_SENSOR_DESCRIPTIONS["instant_consumption"])
         observer.power_supply = power_supply
-        follow = _power_reading_follower(coordinator, observer)
-        follow()
-        entry.async_on_unload(coordinator.async_add_listener(follow))
 
         # Where the electricity comes from: the user's meter (and the power
         # sensor of the same device), or else the estimate
@@ -1121,20 +1124,18 @@ async def async_setup_entry(hass, entry, async_add_entities):
             from .dashboard import meter_power_entity  # pylint: disable=import-outside-toplevel
 
             energy_meter_power = meter_power_entity(er.async_get(hass), energy_meter)
+            coordinator.estimated_energy = None
         else:
             from .server_energy import EstimatedEnergyCounter  # pylint: disable=import-outside-toplevel
 
-            estimator = CSNetHomeCalculatedSensor(coordinator, global_device_data, common_data, CALCULATED_SENSOR_DESCRIPTIONS["instant_consumption"])
-            estimator.power_supply = power_supply
+            max_hours = observer._max_integration_hours()  # pylint: disable=protected-access
+            counter = EstimatedEnergyCounter(hass, entry.entry_id, max_hours=max_hours)
+            await counter.async_load()
+            coordinator.estimated_energy = counter
 
-            def _estimated_power():
-                heating_status = estimator._get_heating_status()  # pylint: disable=protected-access
-                if not heating_status or getattr(coordinator, "last_update_success", True) is False:
-                    return None
-                return heating_status, estimator._calculate_complex_power(heating_status)  # pylint: disable=protected-access
-
-            max_hours = estimator._max_integration_hours()  # pylint: disable=protected-access
-            coordinator.estimated_energy = EstimatedEnergyCounter(hass, entry.entry_id, _estimated_power, max_hours=max_hours)
+        follow = _power_reading_follower(coordinator, observer)
+        follow()
+        entry.async_on_unload(coordinator.async_add_listener(follow))
 
         for description in INSTALLATION_SENSOR_DESCRIPTIONS:
             sensors.append(

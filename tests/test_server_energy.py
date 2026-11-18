@@ -497,33 +497,23 @@ async def test_cop_yesterday_waits_for_the_last_hour_of_yesterday(hass, hass_sto
 
 
 def _counter(hass, watts):
-    """An estimated-energy counter whose power the test sets; each call is a new reading."""
+    """An estimated-energy counter, and the power the test feeds it."""
     power = {"watts": watts}
-    counter = EstimatedEnergyCounter(hass, "entry", lambda: (object(), power["watts"]))
-    return counter, power
+    return EstimatedEnergyCounter(hass, "entry"), power
 
 
 async def test_estimated_counter_adds_the_power_over_time(hass, hass_storage):
     """1 kW for six minutes is 0.1 kWh; a gap longer than ten minutes counts ten."""
     counter, power = _counter(hass, 1000)
     await counter.async_load()
-    counter.async_update(at(13, 10, 0))
-    counter.async_update(at(13, 10, 6))
+    counter.async_update(at(13, 10, 0), power["watts"])
+    counter.async_update(at(13, 10, 6), power["watts"])
     assert counter.reading_kwh() == pytest.approx(0.1)
-    counter.async_update(at(13, 11, 6))
+    counter.async_update(at(13, 11, 6), power["watts"])
     assert counter.reading_kwh() == pytest.approx(0.1 + 10 / 60)
     power["watts"] = 0
-    counter.async_update(at(13, 11, 7))
+    counter.async_update(at(13, 11, 7), power["watts"])
     assert counter.reading_kwh() == pytest.approx(0.1 + 10 / 60)
-
-
-async def test_estimated_counter_counts_one_reading_once(hass, hass_storage):
-    """Several sensors bring it up to date at the same poll: the reading counts once."""
-    reading = object()
-    counter = EstimatedEnergyCounter(hass, "entry", lambda: (reading, 1000))
-    counter.async_update(at(13, 10, 0))
-    counter.async_update(at(13, 10, 6))
-    assert counter.reading_kwh() == 0
 
 
 async def test_estimated_counter_survives_a_restart(hass, hass_storage):
@@ -544,10 +534,10 @@ async def test_estimated_electricity_is_followed_like_a_meter(hass, hass_storage
     counter, _ = _counter(hass, 2000)
     tracker = MeterTracker(hass, "entry", "estimate", reader=counter.reading_kwh, storage_key=estimated_meter_storage_key("entry"))
     await tracker.async_load()
-    counter.async_update(at(13, 0, 0))
+    counter.async_update(at(13, 0, 0), 2000)
     tracker.async_update(at(13, 0, 1))
-    counter.async_update(at(13, 0, 6))
-    counter.async_update(at(13, 0, 12))
+    counter.async_update(at(13, 0, 6), 2000)
+    counter.async_update(at(13, 0, 12), 2000)
     assert tracker.electricity("day", at(13, 0, 12)) == pytest.approx(0.4)
     await hass.async_block_till_done()
     assert estimated_meter_storage_key("entry") in hass_storage
