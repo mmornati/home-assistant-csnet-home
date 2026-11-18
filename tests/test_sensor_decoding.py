@@ -13,8 +13,15 @@ from custom_components.csnet_home.sensor import (
     CALCULATED_SENSOR_DESCRIPTIONS,
     COMPRESSOR_SENSOR_DESCRIPTIONS,
     DAILY_SENSOR_DESCRIPTIONS,
+    FAN_DEFAULT_POWER_W,
+    FAN_MAX_POWER_W,
     INSTALLATION_SENSOR_DESCRIPTIONS,
     MAX_ENERGY_INTEGRATION_HOURS,
+    OUTDOOR_ELECTRONICS_POWER_W,
+    PUMP_DEFAULT_SPEED,
+    PUMP_MAX_POWER_W,
+    PUMP_MIN_POWER_W,
+    STANDBY_POWER_W,
     CSNetHomeCalculatedSensor,
     CSNetHomeCompressorSensor,
     CSNetHomeDailySensor,
@@ -232,6 +239,82 @@ def test_hot_water_falls_back_to_the_circuit_outlet_probe():
     """Status 8 uses the exchanger outlet, or the normal outlet when that probe is missing."""
     assert _thermal_power(RUNNING | {"operationStatus": 8, "waterOutletHPTemp": 45}) == 2.5 * 1160 * 5
     assert _thermal_power(RUNNING | {"operationStatus": 8, "waterOutletHPTemp": -127}) == EXPECTED_W
+
+
+# --------------------------------------------------------------------------
+# Estimated electricity: auxiliary consumption
+# --------------------------------------------------------------------------
+
+STOPPED = {"ouHz": 0, "ouCurrent": 0, "ouDischargePress": 0, "ouSuctionPress": 0, "waterFlow": 0}
+# 6 A single phase: the outdoor unit is held between 1380 and 1607 W
+SIX_AMPS = {"ouHz": 80, "ouCurrent": 6, "ouDischargePress": 25, "ouSuctionPress": 8, "ouDischargeTemperature": 70, "waterFlow": 20}
+
+
+def _electric_power(heating_status):
+    sensor = CSNetHomeCalculatedSensor(_coordinator(heating_status), DEVICE_DATA, {}, CALCULATED_SENSOR_DESCRIPTIONS["instant_consumption"])
+    return sensor._calculate_complex_power(heating_status)
+
+
+def test_stopped_unit_draws_its_standby():
+    """With the compressor and the pump stopped only the controllers are left."""
+    assert _electric_power(STOPPED) == STANDBY_POWER_W
+
+
+def test_pump_running_without_the_compressor_is_counted():
+    """Water flowing means the pump runs: 10 W plus 65 W by the square of its speed."""
+    assert _electric_power(STOPPED | {"waterFlow": 12, "pumpSpeed": 100}) == STANDBY_POWER_W + PUMP_MAX_POWER_W
+    assert _electric_power(STOPPED | {"waterFlow": 12, "pumpSpeed": 50}) == round(STANDBY_POWER_W + PUMP_MIN_POWER_W + 65 * 0.25)
+
+
+@pytest.mark.parametrize("speed", [None, -1, 0, 255])
+def test_pump_without_a_usable_speed_counts_at_the_default_speed(speed):
+    """A unit that reports no pump speed still has a pump."""
+    expected = _electric_power(STOPPED | {"waterFlow": 12, "pumpSpeed": PUMP_DEFAULT_SPEED})
+    assert _electric_power(STOPPED | {"waterFlow": 12, "pumpSpeed": speed}) == expected
+
+
+def test_pump_and_controllers_are_added_to_the_current_range():
+    """The reported current is the outdoor unit's: the pump and the controllers come on top."""
+    auxiliary = STANDBY_POWER_W + PUMP_MAX_POWER_W
+    power = _electric_power(SIX_AMPS | {"pumpSpeed": 100})
+    assert 1380 + auxiliary <= power <= 1608 + auxiliary
+
+
+def test_outdoor_fan_follows_its_speed():
+    """A faster fan draws more, inside the range of the reported current."""
+    free = SIX_AMPS | {"pumpSpeed": 100}  # the model lands inside the 6 A range
+    slow = _electric_power(free | {"fanRPM": 300})
+    fast = _electric_power(free | {"fanRPM": 900})
+    assert fast - slow == round(FAN_MAX_POWER_W * (1 - (300 / 900) ** 3))
+
+
+def test_fan_without_a_speed_reading_stops_during_a_defrost():
+    """No fanRPM: a default while the compressor runs, nothing during a defrost."""
+    defrost = {"ouHz": 60, "ouCurrent": 0, "ouDischargePress": 5, "ouSuctionPress": 8, "waterFlow": 20, "pumpSpeed": 100, "fanRPM": -1}
+    auxiliary = STANDBY_POWER_W + PUMP_MAX_POWER_W
+    assert _electric_power(defrost | {"ouCurrent": 4, "defrosting": 1}) == round(OUTDOOR_ELECTRONICS_POWER_W + 60 * 15 + auxiliary)
+    assert _electric_power(defrost | {"ouCurrent": 4, "defrosting": 0}) == round(OUTDOOR_ELECTRONICS_POWER_W + FAN_DEFAULT_POWER_W + 60 * 15 + auxiliary)
+
+
+# --------------------------------------------------------------------------
+# Instant COP, averaged
+# --------------------------------------------------------------------------
+
+COP_RUN = SIX_AMPS | RUNNING | {"operationStatus": 6, "pumpSpeed": 100}
+
+
+def test_daily_cop_counts_the_standby_between_compressor_runs():
+    """With the compressor stopped the controllers still draw: the daily COP counts it."""
+    sensor = _daily_sensor("daily_cop_hvac")
+    sensor._get_heating_status().update(STOPPED | {"operationStatus": 4})
+    now = dt_util.now().replace(hour=12, minute=0, second=0, microsecond=0)
+    sensor._last_update_time = now - timedelta(minutes=1)
+
+    with patch("custom_components.csnet_home.sensor.dt_util.now", return_value=now):
+        sensor._handle_coordinator_update()
+
+    assert sensor._energy_in == pytest.approx(STANDBY_POWER_W / 60 / 1000)
+    assert sensor._energy_out == 0
 
 
 @pytest.mark.parametrize("status", [1, 2])

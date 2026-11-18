@@ -3033,8 +3033,8 @@ def test_issue_199_daily_cop_sensors_use_measurement_state_class():
         assert s.unit_of_measurement in (None, "")
 
 
-def test_calculated_sensor_instant_consumption_zero_when_compressor_off():
-    """When the compressor is off (0 Hz) the instant consumption must be 0 W."""
+def test_calculated_sensor_instant_consumption_is_the_standby_when_compressor_off():
+    """When the compressor and the pump are off only the 15 W of the controllers are left."""
     coordinator = _build_installation_coordinator(
         {
             "ouHz": 0,
@@ -3049,7 +3049,7 @@ def test_calculated_sensor_instant_consumption_zero_when_compressor_off():
     )
     description = CALCULATED_SENSOR_DESCRIPTIONS["instant_consumption"]
     s = CSNetHomeCalculatedSensor(coordinator, _global_device_data(), {}, description)
-    assert s.state == 0
+    assert s.state == 15
 
 
 def test_calculated_sensor_instant_consumption_uses_amps_guardrail():
@@ -3071,7 +3071,8 @@ def test_calculated_sensor_instant_consumption_uses_amps_guardrail():
     s = CSNetHomeCalculatedSensor(coordinator, _global_device_data(), {}, description)
     result = s.state
     assert isinstance(result, int)
-    assert 1380 <= result <= 1607
+    # plus the controllers and the pump, which that current does not feed
+    assert 1380 <= result <= 1607 + 90
 
 
 def _issue_229_status(capacity_code):
@@ -3113,7 +3114,8 @@ def test_issue_229_instant_consumption_power_supply(capacity_code, power_supply,
     description = CALCULATED_SENSOR_DESCRIPTIONS["instant_consumption"]
     s = CSNetHomeCalculatedSensor(coordinator, _global_device_data(), {}, description)
     s.power_supply = power_supply
-    assert round(6 * watts_per_amp) <= s.state <= round(6.99 * watts_per_amp)
+    # plus the controllers and the pump, which that current does not feed
+    assert round(6 * watts_per_amp) <= s.state <= round(6.99 * watts_per_amp) + 90
 
 
 def test_issue_229_default_power_supply_is_auto():

@@ -495,7 +495,18 @@ Installation-wide sensors on the **System-Controller** device. The CSNet API doe
 
 ### Instant Consumption
 
-Estimated from compressor frequency, discharge and suction pressures and discharge temperature, then clamped to the range given by the reported compressor current (current × 230 V up to (current + 0.99) × 230 V). It is `0` when the compressor runs at 0 Hz.
+The sum of two parts:
+
+- **Outdoor unit**, while the compressor runs: estimated from compressor frequency, discharge and suction pressures and discharge temperature, plus 35 W for its electronics and the outdoor fan. The result is clamped to the range given by the reported compressor current (current × 230 V up to (current + 0.99) × 230 V).
+- **Auxiliary consumption**, which that current does not feed: 15 W for the controllers at all times, and the circulation pump while water flows.
+
+| Part | Estimate |
+|------|----------|
+| Controllers (standby) | 15 W, always |
+| Circulation pump | 10 W to 75 W with the square of Pump Speed; 75 % is assumed when the unit reports no speed |
+| Outdoor fan | Up to 90 W at 900 rpm, with the cube of Outdoor Fan RPM; 40 W when the unit reports no speed, 0 W during a defrost |
+
+With the compressor stopped the sensor shows the auxiliary consumption alone: 15 W, or more while the pump runs. Backup and tank heaters are not counted.
 
 ### Output Power
 
@@ -512,7 +523,7 @@ Output is also 0 when ΔT is not positive or the flow is below 0.01 m³/h.
 
 ### Instant COP
 
-Output Power divided by Instant Consumption, rounded to 2 decimals. It reports `0` while consumption is below 50 W.
+Output Power divided by Instant Consumption, rounded to 2 decimals. It reports `0` while the compressor is stopped.
 
 ### Daily Sensors
 
@@ -520,6 +531,7 @@ Output Power divided by Instant Consumption, rounded to 2 decimals. It reports `
 - **Daily Consumption** and **Daily Output Energy** use state class `total_increasing`, so they can be added to the Energy dashboard (remember they are estimates).
 - **Daily HVAC COP** accumulates while the unit is heating or cooling, or defrosting outside DHW production.
 - **DHW Daily COP** accumulates while the unit is producing DHW, or defrosting outside space heating.
+- Both daily COPs include the auxiliary consumption between compressor runs, as a meter on the heat pump would.
 
 !!! note "Renamed sensor"
     The daily space-heating COP sensor was renamed from **Daily COP** to **Daily HVAC COP** when cooling support was added. It now has a new unique ID, so Home Assistant creates a new entity; the old one is left orphaned and can be deleted.

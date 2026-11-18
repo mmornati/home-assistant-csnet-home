@@ -672,6 +672,20 @@ SUCTION_PRESSURE_KEYS = ("suction_pressure", "suction_pressure_correction")
 # 400 V * sqrt(3) * cos(phi), with cos(phi) assumed to be 0.95.
 WATTS_PER_AMP_SINGLE_PHASE = 230.0
 WATTS_PER_AMP_THREE_PHASE = 400.0 * 1.732 * 0.95
+# Auxiliary consumption of the estimated power (compressor aside).
+# The controllers of the indoor and outdoor units, at all times
+STANDBY_POWER_W = 15.0
+# Inverter and outdoor electronics, while the compressor runs
+OUTDOOR_ELECTRONICS_POWER_W = 35.0
+# Circulation pump: from PUMP_MIN_POWER_W to PUMP_MAX_POWER_W with the square of its speed
+PUMP_MIN_POWER_W = 10.0
+PUMP_MAX_POWER_W = 75.0
+PUMP_DEFAULT_SPEED = 75  # percent, for units that do not report the speed
+# Outdoor fan: with the cube of its speed, up to FAN_MAX_POWER_W at FAN_MAX_RPM
+FAN_MAX_POWER_W = 90.0
+FAN_MAX_RPM = 900.0
+FAN_DEFAULT_POWER_W = 40.0  # for units that do not report the speed
+
 # Yutaki outdoor capacity codes (ouCapacityCode & 0x7F, as decoded by CSNet
 # Manager's getUnitCapacitiText): 64 = 8 HP, 80 = 10 HP. These sizes only
 # exist with a three phase power supply.
@@ -1499,10 +1513,38 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
             return WATTS_PER_AMP_THREE_PHASE
         return WATTS_PER_AMP_SINGLE_PHASE
 
+    @staticmethod
+    def _pump_power(heating_status, compressor_running: bool) -> float:
+        """Return the Watts of the circulation pump, estimated from its speed.
+
+        The pump runs while water flows. A unit with no flow reading still
+        needs the pump for the compressor to run.
+        """
+        if not ((heating_status.get("waterFlow") or 0) > 0 or compressor_running):
+            return 0.0
+        speed = heating_status.get("pumpSpeed")
+        if not isinstance(speed, (int, float)) or not 0 < speed <= 100:
+            speed = PUMP_DEFAULT_SPEED
+        return PUMP_MIN_POWER_W + (PUMP_MAX_POWER_W - PUMP_MIN_POWER_W) * (speed / 100.0) ** 2
+
+    @staticmethod
+    def _fan_power(heating_status) -> float:
+        """Return the Watts of the outdoor fan while the compressor runs."""
+        rpm = heating_status.get("fanRPM")
+        if isinstance(rpm, (int, float)) and rpm >= 0:
+            return FAN_MAX_POWER_W * min(1.0, rpm / FAN_MAX_RPM) ** 3
+        # no speed reported: the fan stops during a defrost
+        return 0.0 if heating_status.get("defrosting") else FAN_DEFAULT_POWER_W
+
     def _calculate_complex_power(self, heating_status):
-        """Calculate power using the complex physical model with guardrails."""
+        """Calculate power using the complex physical model with guardrails.
+
+        The outdoor unit (compressor, inverter, fan) is kept inside the range
+        of its reported current. The pump and the controllers are fed apart
+        from that current and are added on top.
+        """
         # 1. Inputs
-        hz = heating_status.get("ouHz", 0)
+        hz = heating_status.get("ouHz", 0) or 0
         p_high = heating_status.get("ouDischargePress", 0)
         p_low = heating_status.get("ouSuctionPress", 0)
 
@@ -1514,9 +1556,12 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
         current_amps = heating_status.get("ouCurrent", 0)
         watts_per_amp = self._watts_per_amp(heating_status)
 
-        # If compressor is OFF (0 Hz), consumption is 0 W
+        # Controllers and pump: drawn whether or not the compressor runs
+        auxiliary_power = STANDBY_POWER_W + self._pump_power(heating_status, hz > 0)
+
+        # Compressor OFF (0 Hz): only the auxiliary consumption is left
         if hz == 0:
-            return 0
+            return round(auxiliary_power)
 
         # 2. Efficiency Model (Base)
         slope = 0.0085
@@ -1546,7 +1591,7 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
             factor_temp = 1.0 - (excess_temp * 0.025)
 
         # 4. Preliminary Calculation
-        base_power = 50.0  # Electronics + Pumps
+        base_power = OUTDOOR_ELECTRONICS_POWER_W + self._fan_power(heating_status)
 
         if p_high > p_low:
             delta_p = p_high - p_low
@@ -1567,16 +1612,16 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
         # Upper limit: reported amps + 0.99 (next integer) (e.g., 6A means < 7A)
         max_watts = (current_amps + 0.99) * watts_per_amp
 
-        final_power = calculated_power
+        outdoor_power = calculated_power
 
         if calculated_power < min_watts:
             # Error: Formula result too low, correct to minimum
-            final_power = min_watts
+            outdoor_power = min_watts
         elif calculated_power > max_watts:
             # Error: Formula result too high, correct to maximum
-            final_power = max_watts
+            outdoor_power = max_watts
 
-        return round(final_power)
+        return round(outdoor_power + auxiliary_power)
 
     def _get_operation_status_text(self, operation_status):
         """Return a normalized operation status text."""
@@ -1649,9 +1694,10 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
         if self._key == "heating_power":
             return heating_power
 
-        # 3. Instant COP
+        # 3. Instant COP: 0 while the compressor is stopped (the standby
+        # consumption is never 0 now)
         if self._key == "instant_cop":
-            if instant_consumption < 50:
+            if (heating_status.get("ouHz") or 0) <= 0 or instant_consumption <= 0:
                 return 0.0
             return round(heating_power / instant_consumption, 2)
 
@@ -1809,12 +1855,10 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
                     should_accumulate = True
 
             if should_accumulate:
-                # Accumulate values ONLY when in the correct mode AND accumulating
-                # positive energy. This prevents accumulation of residual heat
-                # (energy_out) when electric power (energy_in) is zero.
-                if power_consumption_w > 0:
-                    self._energy_in += energy_consumption_kwh
-                    self._energy_out += energy_heating_kwh
+                # Only in the matching mode. The standby and pump consumption
+                # between compressor runs counts too, as a meter would count it.
+                self._energy_in += energy_consumption_kwh
+                self._energy_out += energy_heating_kwh
 
                 # Calculate COP based on Accumulated totals
                 if self._energy_in > 0.01:
