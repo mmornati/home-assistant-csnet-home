@@ -93,6 +93,15 @@ def test_hot_water_boost_is_offered_only_where_the_unit_has_it(hass, has_boost, 
     assert entity.operation_list == expected
 
 
+def test_hot_water_boost_can_be_offered_whatever_the_unit_reports(hass):
+    """With the option on, boost is offered even where the unit reports it has none."""
+    entity = build_water_heater_entity(hass, zone_id=3)
+    entity._sensor_data["has_boost"] = False
+    entity.entry.data["always_offer_dhw_boost"] = True
+    entity._update_attributes()
+    assert entity.operation_list == ["off", "eco", "performance"]
+
+
 def test_pool_modes_are_unchanged(hass):
     """A pool is on or off."""
     assert build_water_heater_entity(hass, zone_id=4).operation_list == ["off", "on"]

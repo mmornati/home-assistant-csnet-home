@@ -12,7 +12,9 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
+    CONF_ALWAYS_OFFER_DHW_BOOST,
     CONF_MAX_TEMP_OVERRIDE,
+    DEFAULT_ALWAYS_OFFER_DHW_BOOST,
     DOMAIN,
     SWIMMING_POOL_MAX_TEMPERATURE,
     SWIMMING_POOL_MIN_TEMPERATURE,
@@ -124,7 +126,13 @@ class CSNetHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
         _LOGGER.debug("Water heater doingBoost: %s", self._sensor_data.get("doingBoost", False))
 
     def _operations(self) -> list[str]:
-        """Return the modes of a hot water tank: boost ("performance") only where the unit offers it."""
+        """Return the modes of a hot water tank: boost ("performance") only where the unit offers it.
+
+        The user can offer it whatever the unit reports: some units report
+        hasBoost=false and still run the boost they are sent.
+        """
+        if self.entry.data.get(CONF_ALWAYS_OFFER_DHW_BOOST, DEFAULT_ALWAYS_OFFER_DHW_BOOST):
+            return ["off", "eco", "performance"]
         if self._sensor_data.get("has_boost") is False and not self._sensor_data.get("doingBoost"):
             return ["off", "eco"]
         return ["off", "eco", "performance"]

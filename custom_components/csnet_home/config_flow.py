@@ -22,6 +22,7 @@ from homeassistant.helpers.selector import (
 
 from .const import (
     CARD_LANGUAGES,
+    CONF_ALWAYS_OFFER_DHW_BOOST,
     CONF_CARD_LANGUAGE,
     CONF_ENABLE_ALARM_NOTIFICATIONS,
     CONF_ENERGY_METER,
@@ -31,6 +32,7 @@ from .const import (
     CONF_MAX_TEMP_OVERRIDE,
     CONF_POWER_SUPPLY,
     CONF_USER_AGENT,
+    DEFAULT_ALWAYS_OFFER_DHW_BOOST,
     DEFAULT_CARD_LANGUAGE,
     DEFAULT_ENABLE_ALARM_NOTIFICATIONS,
     DEFAULT_FAN_COIL_MODEL,
@@ -77,6 +79,10 @@ def _settings_schema(current: dict) -> dict:
             [FAN_COIL_MODEL_STANDARD, FAN_COIL_MODEL_LEGACY]
         ),
         vol.Optional(
+            CONF_ALWAYS_OFFER_DHW_BOOST,
+            default=current.get(CONF_ALWAYS_OFFER_DHW_BOOST, DEFAULT_ALWAYS_OFFER_DHW_BOOST),
+        ): bool,
+        vol.Optional(
             CONF_ENABLE_ALARM_NOTIFICATIONS,
             default=current.get(CONF_ENABLE_ALARM_NOTIFICATIONS, DEFAULT_ENABLE_ALARM_NOTIFICATIONS),
         ): bool,
@@ -101,6 +107,7 @@ def _settings_from_input(user_input: dict) -> dict:
         CONF_CARD_LANGUAGE: user_input.get(CONF_CARD_LANGUAGE, DEFAULT_CARD_LANGUAGE),
         CONF_MAX_TEMP_OVERRIDE: user_input.get(CONF_MAX_TEMP_OVERRIDE),
         CONF_FAN_COIL_MODEL: user_input.get(CONF_FAN_COIL_MODEL, DEFAULT_FAN_COIL_MODEL),
+        CONF_ALWAYS_OFFER_DHW_BOOST: user_input.get(CONF_ALWAYS_OFFER_DHW_BOOST, DEFAULT_ALWAYS_OFFER_DHW_BOOST),
         CONF_ENABLE_ALARM_NOTIFICATIONS: user_input.get(CONF_ENABLE_ALARM_NOTIFICATIONS, DEFAULT_ENABLE_ALARM_NOTIFICATIONS),
         # the frontend leaves an emptied field out of what it sends
         CONF_FILTERED_ALARM_CODES: user_input.get(CONF_FILTERED_ALARM_CODES, ""),
