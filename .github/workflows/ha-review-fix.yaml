@@ -5,11 +5,19 @@
 # The label is the decision: only someone with write access can trigger this,
 # and the result is always a PR for human review, never a merge.
 #
-# Security: the review issue was generated from third-party text, so the job
-# that runs Claude (scripts/ci/ha_fix.py) has `contents: read` only and tools
-# confined to custom_components/csnet_home and tests, plus pytest. It produces
-# a patch; a separate job without an LLM checks the touched paths and opens the
-# PR.
+# Security: the review issue was generated from third-party text.
+#   fix     runs Claude (scripts/ci/ha_fix.py) with `contents: read` only and
+#           tools confined to custom_components/csnet_home and tests, plus
+#           pytest, which runs Claude's code as a separate user without network
+#           (scripts/ci/sandbox.sh) so it cannot read the API key. It produces
+#           a patch.
+#   verify  a fresh job without secrets applies the path-checked patch to the
+#           base commit and runs the tests in the sandbox: the only test result
+#           the PR reports.
+#   pr      without an LLM, checks the patch paths again before applying it,
+#           and pushes with the token only after that.
+# Path checks always run a copy of scripts/ci saved from the base commit
+# before any patch is applied, never the work tree's.
 #
 # Requires the ANTHROPIC_API_KEY repository secret. The model follows the
 # HA_REVIEW_MODEL repository variable, like the review workflow.
@@ -64,6 +72,10 @@ jobs:
           if ! [[ "$ISSUE" =~ ^[0-9]+$ ]]; then
             echo "::error::Invalid issue number '$ISSUE'"; exit 1
           fi
+          # Every job checks out this commit and the PR targets main.
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::Run this workflow from main, not $GITHUB_REF"; exit 1
+          fi
           if ! gh issue view "$ISSUE" --json labels --jq '.labels[].name' | grep -qx ha-release-review; then
             echo "::error::#$ISSUE is not an HA release review issue"; exit 1
           fi
@@ -112,12 +124,19 @@ jobs:
     outputs:
       result: ${{ steps.result.outputs.result }}
       has_patch: ${{ steps.patch.outputs.has_patch }}
-      tests: ${{ steps.verify.outputs.tests }}
+      tests_version: ${{ steps.ha.outputs.latest }}
+      python: ${{ steps.ha.outputs.latest_python }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
+
+      # Taken before any Claude-written file exists: the path check and the
+      # sandbox below always run from this copy, never from the work tree.
+      - name: Save trusted CI scripts
+        run: cp -r scripts/ci "$RUNNER_TEMP/ci"
 
       - name: Resolve latest Home Assistant
         id: ha
@@ -139,6 +158,7 @@ jobs:
 
       # Claude reads the source of the HA version the review was about (often a
       # beta); tests run on the latest stable, the newest the harness supports.
+      # ha_fix.py reads this source itself: the sandbox does not need it.
       - name: Download reviewed Home Assistant source
         id: source
         env:
@@ -156,7 +176,17 @@ jobs:
             echo "version=${{ steps.ha.outputs.latest }}" >> "$GITHUB_OUTPUT"
           fi
 
-      # Separate venv for the SDK; pytest runs in the Home Assistant env above.
+      # run_tests runs Claude's code as another user, without network, so that
+      # code cannot read ANTHROPIC_API_KEY from ha_fix.py's environment.
+      - name: Set up the sandbox
+        run: |
+          "$RUNNER_TEMP/ci/sandbox.sh" setup
+          "$RUNNER_TEMP/ci/sandbox.sh" run "$(command -v python)" -c \
+            'import homeassistant, pytest_homeassistant_custom_component'
+
+      # Separate venv for the SDK; pytest runs in the Home Assistant env above,
+      # inside the sandbox. Its results only inform Claude: the verify job below
+      # produces the results the PR reports.
       - name: Claude fix
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -173,7 +203,13 @@ jobs:
           "$RUNNER_TEMP/fix-venv/bin/python" scripts/ci/ha_fix.py \
             --issue "$RUNNER_TEMP/issue.json" --ha-src "$HA_SRC" --pytest-python "$PYTEST_PYTHON" \
             --source-version "$SOURCE_VERSION" --tests-version "$TESTS_VERSION" \
-            --summary-out "$RUNNER_TEMP/ha-fix-summary.md"
+            --summary-out "$RUNNER_TEMP/ha-fix-summary.md" \
+            --sandbox "$RUNNER_TEMP/ci/sandbox.sh run"
+
+      - name: Stop sandbox processes
+        if: always()
+        run: |
+          if [ -x "$RUNNER_TEMP/ci/sandbox.sh" ]; then "$RUNNER_TEMP/ci/sandbox.sh" cleanup; fi
 
       - name: Read result
         id: result
@@ -186,38 +222,11 @@ jobs:
           "$RUNNER_TEMP/fix-venv/bin/black" --quiet custom_components/csnet_home tests
           "$RUNNER_TEMP/fix-venv/bin/isort" --quiet custom_components/csnet_home tests
 
-      # Re-run the tests here rather than trusting Claude's own run. The tests
-      # include code Claude wrote: run them with a minimal environment so they
-      # cannot reach tokens or write $GITHUB_OUTPUT / $GITHUB_ENV, and take the
-      # result only from the exit code.
-      - name: Verify tests
-        id: verify
-        run: |
-          set +e
-          env -i PATH="$PATH" HOME="$HOME" LANG=C.UTF-8 \
-            python -m pytest tests/ -q --tb=short -p no:cacheprovider > "$RUNNER_TEMP/pytest.log" 2>&1
-          STATUS=$?
-          set -e
-          if [ "$STATUS" -eq 0 ]; then
-            echo "tests=passed" >> "$GITHUB_OUTPUT"
-          else
-            echo "tests=failed" >> "$GITHUB_OUTPUT"
-            echo "::warning::Tests fail with Claude's changes; the PR will say so"
-          fi
-          tail -3 "$RUNNER_TEMP/pytest.log"
-          # Only a line that looks like pytest's own summary goes into the PR.
-          LAST=$(tail -1 "$RUNNER_TEMP/pytest.log" | tr -d '=' | sed 's/^ *//;s/ *$//')
-          if [[ "$LAST" =~ ^[0-9]+\ (passed|failed|error)(,\ [0-9]+\ [a-z]+)*\ in\ [0-9.]+s$ ]]; then
-            echo "$LAST" > "$RUNNER_TEMP/pytest-summary.txt"
-          else
-            echo "see the workflow log" > "$RUNNER_TEMP/pytest-summary.txt"
-          fi
-
       - name: Build patch
         id: patch
         run: |
           git add -A
-          scripts/ci/check_patch_paths.sh
+          "$RUNNER_TEMP/ci/check_patch_paths.sh"
           git diff --cached --binary > "$RUNNER_TEMP/ha-fix.patch"
           if [ -s "$RUNNER_TEMP/ha-fix.patch" ]; then
             echo "has_patch=true" >> "$GITHUB_OUTPUT"
@@ -226,7 +235,7 @@ jobs:
             echo "has_patch=false" >> "$GITHUB_OUTPUT"
             echo "No changes."
           fi
-          cp "$RUNNER_TEMP/ha-fix.patch" "$RUNNER_TEMP/ha-fix-summary.md" "$RUNNER_TEMP/pytest-summary.txt" .
+          cp "$RUNNER_TEMP/ha-fix.patch" "$RUNNER_TEMP/ha-fix-summary.md" .
 
       - name: Upload fix
         uses: actions/upload-artifact@v7
@@ -236,20 +245,120 @@ jobs:
           path: |
             ha-fix.patch
             ha-fix-summary.md
-            pytest-summary.txt
+
+  # The test result the PR reports comes from here, not from the job where
+  # Claude worked: a fresh runner without secrets, the base commit plus the
+  # path-checked patch, and the tests run in the sandbox, so they cannot write
+  # this job's $GITHUB_OUTPUT. The result is taken only from pytest's exit code.
+  verify:
+    name: Verify the patch on HA ${{ needs.fix.outputs.tests_version }}
+    runs-on: ubuntu-latest
+    needs: [gate, fix]
+    if: needs.fix.outputs.has_patch == 'true'
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      tests: ${{ steps.tests.outputs.tests }}
+      pytest_summary: ${{ steps.tests.outputs.summary }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Save trusted CI scripts
+        run: cp -r scripts/ci "$RUNNER_TEMP/ci"
+
+      - name: Set up Python ${{ needs.fix.outputs.python }}
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ needs.fix.outputs.python }}
+
+      # Before the patch is applied, from the base commit; same HA and harness
+      # as the fix job.
+      - name: Install Home Assistant ${{ needs.fix.outputs.tests_version }}
+        id: install
+        env:
+          VERSION: ${{ needs.fix.outputs.tests_version }}
+        run: scripts/ci/install_ha.sh "$VERSION" tests
+
+      - name: Download fix
+        uses: actions/download-artifact@v8
+        with:
+          name: ha-fix
+          path: ${{ runner.temp }}/ha-fix
+
+      - name: Check and apply the patch
+        run: |
+          "$RUNNER_TEMP/ci/check_patch_paths.sh" --patch "$RUNNER_TEMP/ha-fix/ha-fix.patch"
+          git apply --index "$RUNNER_TEMP/ha-fix/ha-fix.patch"
+          "$RUNNER_TEMP/ci/check_patch_paths.sh"
+
+      - name: Set up the sandbox
+        if: steps.install.outputs.harness == 'ready'
+        run: |
+          "$RUNNER_TEMP/ci/sandbox.sh" setup
+          "$RUNNER_TEMP/ci/sandbox.sh" run "$(command -v python)" -c \
+            'import homeassistant, pytest_homeassistant_custom_component'
+
+      - name: Unit tests
+        id: tests
+        env:
+          HARNESS: ${{ steps.install.outputs.harness }}
+        run: |
+          if [ "$HARNESS" != "ready" ]; then
+            echo "tests=not run" >> "$GITHUB_OUTPUT"
+            echo "summary=no test harness for this Home Assistant version yet" >> "$GITHUB_OUTPUT"
+            echo "::warning::No test harness for this Home Assistant version; tests not run"
+            exit 0
+          fi
+          set +e
+          "$RUNNER_TEMP/ci/sandbox.sh" run "$(command -v python)" -m pytest tests/ -q --tb=short -p no:cacheprovider \
+            > "$RUNNER_TEMP/pytest.log" 2>&1
+          STATUS=$?
+          set -e
+          tail -3 "$RUNNER_TEMP/pytest.log"
+          if [ "$STATUS" -eq 0 ]; then
+            echo "tests=passed" >> "$GITHUB_OUTPUT"
+          else
+            echo "tests=failed" >> "$GITHUB_OUTPUT"
+            echo "::warning::Tests fail with Claude's changes; the PR will say so"
+          fi
+          # Only a line that looks like pytest's own summary goes into the PR.
+          LAST=$(tail -1 "$RUNNER_TEMP/pytest.log" | tr -d '=' | sed 's/^ *//;s/ *$//')
+          if [[ "$LAST" =~ ^[0-9]+\ (passed|failed|error)(,\ [0-9]+\ [a-z]+)*\ in\ [0-9.]+s$ ]]; then
+            echo "summary=$LAST" >> "$GITHUB_OUTPUT"
+          else
+            echo "summary=see the workflow log" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Stop sandbox processes
+        if: always()
+        run: |
+          if [ -x "$RUNNER_TEMP/ci/sandbox.sh" ]; then "$RUNNER_TEMP/ci/sandbox.sh" cleanup; fi
 
   pr:
     name: Open pull request
     runs-on: ubuntu-latest
-    needs: [gate, fix]
-    if: needs.fix.outputs.has_patch == 'true'
+    needs: [gate, fix, verify]
+    if: needs.fix.outputs.has_patch == 'true' && needs.verify.result == 'success'
     permissions:
       contents: write
       pull-requests: write
       issues: write
     steps:
+      # No credentials in .git/config: the token is used once, for the push,
+      # after the patch has passed the path check.
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Save trusted CI scripts
+        run: cp -r scripts/ci "$RUNNER_TEMP/ci"
 
       - name: Download fix
         uses: actions/download-artifact@v8
@@ -263,28 +372,36 @@ jobs:
           GH_REPO: ${{ github.repository }}
           ISSUE: ${{ needs.gate.outputs.issue }}
           RESULT: ${{ needs.fix.outputs.result }}
-          TESTS: ${{ needs.fix.outputs.tests }}
+          TESTS_VERSION: ${{ needs.fix.outputs.tests_version }}
+          TESTS: ${{ needs.verify.outputs.tests }}
+          PYTEST_SUMMARY: ${{ needs.verify.outputs.pytest_summary }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           FIX_DIR: ${{ runner.temp }}/ha-fix
         run: |
+          CI="$RUNNER_TEMP/ci"
+          # Check the patch before it touches the work tree, then the result.
+          "$CI/check_patch_paths.sh" --patch "$FIX_DIR/ha-fix.patch"
           git apply --index "$FIX_DIR/ha-fix.patch"
-          # Same path check as the fix job, in case the artifact was altered.
-          scripts/ci/check_patch_paths.sh
+          "$CI/check_patch_paths.sh"
 
-          scripts/ci/sanitize_report.sh "$FIX_DIR/ha-fix-summary.md"
+          "$CI/sanitize_report.sh" "$FIX_DIR/ha-fix-summary.md"
           BRANCH="claude/ha-fix-${ISSUE}-${GITHUB_RUN_ID}"
           git switch -c "$BRANCH"
           git -c user.name="github-actions[bot]" \
               -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
               commit -q -m "fix: address HA release review #${ISSUE}" \
               -m "Generated by Claude (${HA_REVIEW_MODEL}) from the findings in #${ISSUE}."
-          git push -q origin "$BRANCH"
+          AUTH=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          echo "::add-mask::${AUTH}"
+          git -c "http.${GITHUB_SERVER_URL}/.extraheader=AUTHORIZATION: basic ${AUTH}" \
+            push -q "${GITHUB_SERVER_URL}/${GH_REPO}.git" "HEAD:refs/heads/${BRANCH}"
 
           {
             cat "$FIX_DIR/ha-fix-summary.md"
             echo ""
             echo "## Checks"
-            echo "- Tests re-run by the workflow after formatting: **${TESTS}** ($(cat "$FIX_DIR/pytest-summary.txt"))"
+            echo "Re-run by a separate job without secrets, on the base commit plus this patch:"
+            echo "- Tests on Home Assistant ${TESTS_VERSION}: **${TESTS}** (${PYTEST_SUMMARY})"
             echo "- Opened by the workflow token, so CI does not start on its own: close and reopen the PR to run it."
             echo ""
             echo "---"
@@ -297,10 +414,12 @@ jobs:
           gh issue edit "$ISSUE" --remove-label ha-review:fix || true
 
   report:
-    name: Report without changes
+    name: Report without a pull request
     runs-on: ubuntu-latest
-    needs: [gate, fix]
-    if: always() && needs.gate.result == 'success' && needs.fix.outputs.has_patch != 'true'
+    needs: [gate, fix, verify]
+    if: >-
+      always() && needs.gate.result == 'success' &&
+      (needs.fix.outputs.has_patch != 'true' || needs.verify.result != 'success')
     permissions:
       issues: write
     steps:
@@ -323,10 +442,16 @@ jobs:
           GH_REPO: ${{ github.repository }}
           ISSUE: ${{ needs.gate.outputs.issue }}
           FIX_RESULT: ${{ needs.fix.result }}
+          HAS_PATCH: ${{ needs.fix.outputs.has_patch }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           SUMMARY: ${{ runner.temp }}/ha-fix/ha-fix-summary.md
         run: |
-          if [ "$FIX_RESULT" = "success" ]; then
+          if [ "$FIX_RESULT" = "success" ] && [ "$HAS_PATCH" = "true" ]; then
+            {
+              echo "Claude prepared changes, but the job verifying them failed,"
+              echo "so no pull request was opened: see the [workflow run](${RUN_URL})."
+            } > body.md
+          elif [ "$FIX_RESULT" = "success" ]; then
             scripts/ci/sanitize_report.sh "$SUMMARY"
             case "$(head -1 "$SUMMARY")" in
               "Result: NEEDS_HUMAN") HEADLINE="Claude made no changes: some findings need a maintainer's decision." ;;

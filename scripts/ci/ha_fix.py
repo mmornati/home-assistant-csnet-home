@@ -13,6 +13,13 @@ Tools are confined to this repository:
 - ``run_tests``: pytest inside the Home Assistant environment (``--pytest-python``)
 No shell, no network, no git.
 
+``run_tests`` runs code Claude wrote. It gets a minimal environment without the
+API key and, with ``--sandbox`` (set by the workflow to
+``scripts/ci/sandbox.sh run``), runs as a separate unprivileged user with no
+network, so that code cannot read this process's environment from
+/proc/<pid>/environ, write the runner's files or reach the internet. Locally,
+without ``--sandbox``, it runs as the current user.
+
 Writes Claude's summary to ``--summary-out``; its first line is
 ``Result: FIXED``, ``Result: NO_CHANGE`` or ``Result: NEEDS_HUMAN``.
 Needs ``ANTHROPIC_API_KEY``.
@@ -22,6 +29,7 @@ import argparse
 import json
 import os
 import re
+import shlex
 import subprocess  # nosec B404
 import sys
 from pathlib import Path
@@ -79,10 +87,23 @@ you skipped it. Then the final test result."""
 class Workspace:
     """File and test tools for Claude, confined to the allowed paths."""
 
-    def __init__(self, ha_src: Path | None, pytest_python: str):
+    def __init__(self, ha_src: Path | None, pytest_python: str, sandbox: list[str] | None = None):
         self.ha_src = ha_src.resolve() if ha_src else None
         self.pytest_python = pytest_python
+        self.sandbox = sandbox or []
         self.changed: set[str] = set()
+
+    def run_untrusted(self, command: list[str], timeout: int) -> subprocess.CompletedProcess:
+        """Run a command that executes Claude-written code, in the sandbox if any."""
+        return subprocess.run(  # nosec B603
+            self.sandbox + command,
+            cwd=ROOT,
+            env=test_environment(),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
 
     # -- path handling -------------------------------------------------------
 
@@ -213,14 +234,9 @@ class Workspace:
             if not target.is_relative_to(TESTS):
                 raise ToolError("run_tests only runs files under tests/.")
             try:
-                result = subprocess.run(  # nosec B603
+                result = workspace.run_untrusted(
                     [workspace.pytest_python, "-m", "pytest", "-q", "--tb=short", "-p", "no:cacheprovider", str(target)],
-                    cwd=ROOT,
-                    env=test_environment(),
-                    capture_output=True,
-                    text=True,
                     timeout=900,
-                    check=False,
                 )
             except subprocess.TimeoutExpired as err:
                 raise ToolError("pytest timed out after 15 minutes.") from err
@@ -238,6 +254,11 @@ def main():
     parser.add_argument("--summary-out", type=Path, default=Path("ha-fix-summary.md"))
     parser.add_argument("--source-version", default="", help="HA version of --ha-src")
     parser.add_argument("--tests-version", default="", help="HA version run_tests uses")
+    parser.add_argument(
+        "--sandbox",
+        default=os.environ.get("HA_FIX_SANDBOX", ""),
+        help="command prefix that runs the tests as an unprivileged user (default: $HA_FIX_SANDBOX)",
+    )
     parser.add_argument("--max-iterations", type=int, default=40)
     parser.add_argument("--model", default=os.environ.get("HA_REVIEW_MODEL") or DEFAULT_MODEL)
     args = parser.parse_args()
@@ -247,7 +268,10 @@ def main():
         sys.exit(1)
 
     issue = json.loads(args.issue.read_text(encoding="utf-8"))
-    workspace = Workspace(args.ha_src, args.pytest_python)
+    sandbox = shlex.split(args.sandbox)
+    if not sandbox:
+        print("::warning::No --sandbox: run_tests runs as this user, which holds the API key")
+    workspace = Workspace(args.ha_src, args.pytest_python, sandbox)
     print(f"Model: {args.model}; fixing issue #{issue['number']}: {issue['title']}")
 
     request = {
