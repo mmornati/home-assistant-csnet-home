@@ -23,6 +23,7 @@ from homeassistant.const import (
 from homeassistant.core import callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
@@ -1659,7 +1660,8 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
             except (TypeError, ValueError):
                 return None
             factor = {"W": 1.0, "kW": 1000.0}.get(state.attributes.get("unit_of_measurement"))
-            return value * factor if factor is not None and value >= 0 else None
+            # as the sensor reports it, decimals included (kW only converted)
+            return round(value * factor, 3) if factor is not None and value >= 0 else None
         samples = self._meter_samples
         if not samples or len(samples) < 2:
             return None
@@ -1668,6 +1670,17 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
         if hours * 60 < METER_POWER_MIN_MINUTES or counted < 0:
             return None
         return counted * 1000.0 / hours
+
+    async def async_added_to_hass(self) -> None:
+        """Follow the meter's power sensor whenever it changes, not only at each poll of CSNet."""
+        await super().async_added_to_hass()
+        if self._key == "instant_consumption" and self.energy_meter and self.energy_meter_power:
+            self.async_on_remove(async_track_state_change_event(self.hass, [self.energy_meter_power], self._handle_meter_power_change))
+
+    @callback
+    def _handle_meter_power_change(self, _event) -> None:
+        """Show the meter's new power right away."""
+        self.async_write_ha_state()
 
     def _follow_meter(self, now) -> None:
         """Keep the meter readings the power is worked out from."""
@@ -1992,7 +2005,8 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
             # what the user's meter measures, when it can tell
             metered = self._meter_power_w()
             if metered is not None:
-                return round(metered)
+                # the power sensor's reading as it is; a figure worked out from the energy, in whole Watts
+                return metered if self.energy_meter_power else round(metered)
             return instant_consumption
 
         # 2. Heating / Thermal Power (Watts)

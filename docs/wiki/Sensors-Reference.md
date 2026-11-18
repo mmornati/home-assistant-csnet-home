@@ -499,7 +499,7 @@ With an electricity meter chosen in the integration's settings (Reconfigure → 
 
 ### Instant Consumption
 
-With a meter, the power it measures: the power sensor on the same device as the meter (for example `…_total_active_power` next to `…_total_active_energy`), or else what the meter counted over the last 10 minutes, once its readings span 2 minutes.
+With a meter, the power it measures: the power sensor on the same device as the meter (for example `…_total_active_power` next to `…_total_active_energy`), shown as that sensor reports it, decimals included, and updated whenever it changes. A meter without a power sensor gives what it counted over the last 10 minutes instead, once its readings span 2 minutes, in whole Watts.
 
 Without a meter, the estimate, the sum of these parts:
 
