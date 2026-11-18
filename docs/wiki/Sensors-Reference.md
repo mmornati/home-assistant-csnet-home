@@ -491,7 +491,8 @@ With an electricity meter chosen in the integration's settings (Reconfigure → 
 | Output Power | `sensor.system_controller_output_power` | W | Thermal output (heating **or** cooling) |
 | Instant COP | `sensor.system_controller_instant_cop` | – | Output Power ÷ Instant Consumption |
 | Daily Consumption | `sensor.system_controller_daily_consumption` | kWh | Electrical energy today: metered, or estimated |
-| Electricity consumed today / yesterday / this month | `sensor.…_electricity_consumed_today`, … | kWh | With a meter: what it counted (unknown until a whole day or month has been read). Without one: what CSNet records, only for units with a pulse meter |
+| Electricity yesterday / this month (metered) | `sensor.…_electricity_yesterday_metered`, … | kWh | With a meter: what it counted (unknown until a whole day or month has been read). Today's is Daily Consumption |
+| Electricity consumed today / yesterday / this month | `sensor.…_electricity_consumed_today`, … | kWh | Without a meter: what CSNet records, only for units with a pulse meter |
 | Daily Output Energy | `sensor.system_controller_daily_output_energy` | kWh | Thermal energy today (heating and cooling) |
 | Daily HVAC COP | `sensor.system_controller_daily_hvac_cop` | – | Today's COP for space heating/cooling |
 | DHW Daily COP | `sensor.system_controller_dhw_daily_cop` | – | Today's COP for DHW production |

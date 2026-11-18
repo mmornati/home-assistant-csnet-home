@@ -185,7 +185,9 @@ def server_energy_descriptions(energy, metered_electricity: bool = False) -> lis
     """Return the sensors this unit gets, from what the server has recorded for it.
 
     With ``metered_electricity`` the electricity is what the user's meter
-    counted: its sensors exist whatever the server recorded.
+    counted: its sensors exist whatever the server recorded, named
+    "(metered)", and today's is left to Daily Consumption, which is the
+    meter too.
     """
     common = {
         "device_class": SensorDeviceClass.ENERGY,
@@ -209,13 +211,22 @@ def server_energy_descriptions(energy, metered_electricity: bool = False) -> lis
                 ServerEnergyDescription(key=f"server_heat_today_{use.lower()}", name=f"Heat produced today ({USES[use]})", use=use, **increasing)
                 for use in used
             ]
-    if metered_electricity or has_pulse_meter(energy):
+    if metered_electricity:
+        descriptions += [
+            ServerEnergyDescription(key="server_electricity_yesterday", name="Electricity yesterday (metered)", kind=ELECTRICITY, span="yesterday", **common),
+            ServerEnergyDescription(key="server_electricity_month", name="Electricity this month (metered)", kind=ELECTRICITY, span="month", **increasing),
+        ]
+    elif has_pulse_meter(energy):
         descriptions += [
             ServerEnergyDescription(key="server_electricity_today", name="Electricity consumed today", kind=ELECTRICITY, **increasing),
             ServerEnergyDescription(key="server_electricity_yesterday", name="Electricity consumed yesterday", kind=ELECTRICITY, span="yesterday", **common),
             ServerEnergyDescription(key="server_electricity_month", name="Electricity consumed this month", kind=ELECTRICITY, span="month", **increasing),
         ]
     return descriptions
+
+
+# With a meter, today's electricity is Daily Consumption: this one would repeat it
+METERED_REMOVED_ENERGY_KEYS = ("server_electricity_today",)
 
 
 def read_span(energy, span: str, kind: str, use: str | None, now: datetime) -> float | None:

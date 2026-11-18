@@ -974,6 +974,7 @@ def _server_energy_sensors(hass, entry, coordinator) -> list:
         ESTIMATED_COP_DESCRIPTIONS,
         HEAT,
         METERED_COP_DESCRIPTIONS,
+        METERED_REMOVED_ENERGY_KEYS,
         CSNetHomeMeteredCopSensor,
         CSNetHomeServerEnergySensor,
         MeterTracker,
@@ -997,11 +998,13 @@ def _server_energy_sensors(hass, entry, coordinator) -> list:
     ]
 
     if meter:
-        unused = ESTIMATED_COP_DESCRIPTIONS
+        unused = list(ESTIMATED_COP_DESCRIPTIONS)
+        removed = list(METERED_REMOVED_ENERGY_KEYS)
         if has_energy(energy, HEAT):
             sensors += [CSNetHomeMeteredCopSensor(coordinator, description, device_info, meter_tracker) for description in METERED_COP_DESCRIPTIONS]
     else:
-        unused = METERED_COP_DESCRIPTIONS
+        unused = list(METERED_COP_DESCRIPTIONS)
+        removed = []
         if counter is not None and has_energy(energy, HEAT):
             tracker = _shared(
                 coordinator,
@@ -1011,8 +1014,8 @@ def _server_energy_sensors(hass, entry, coordinator) -> list:
             sensors += [CSNetHomeMeteredCopSensor(coordinator, description, device_info, tracker, counter) for description in ESTIMATED_COP_DESCRIPTIONS]
     # the other set goes: the meter was added to or removed from the settings
     entity_registry = er.async_get(hass)
-    for description in unused:
-        entity_id = entity_registry.async_get_entity_id("sensor", DOMAIN, f"{DOMAIN}-{description.key}")
+    for key in [description.key for description in unused] + removed:
+        entity_id = entity_registry.async_get_entity_id("sensor", DOMAIN, f"{DOMAIN}-{key}")
         if entity_id:
             entity_registry.async_remove(entity_id)
     return sensors
