@@ -950,6 +950,15 @@ def _power_reading_follower(coordinator, observer):
     return _follow
 
 
+def _shared(coordinator, name: str, make):
+    """Return the object kept on the coordinator under that name, made on first use."""
+    found = vars(coordinator).get(name)
+    if found is None:
+        found = make()
+        setattr(coordinator, name, found)
+    return found
+
+
 def _server_energy_sensors(hass, entry, coordinator) -> list:
     """Return the sensors for the server's energy records, and the COP of each period.
 
@@ -973,19 +982,30 @@ def _server_energy_sensors(hass, entry, coordinator) -> list:
 
     energy = coordinator.get_server_energy()
     device_info = unit_device_info(coordinator)
-    sensors: list = [CSNetHomeServerEnergySensor(coordinator, description, device_info) for description in server_energy_descriptions(energy)]
-
     meter = entry.data.get(CONF_ENERGY_METER)
     counter = getattr(coordinator, "estimated_energy", None)
+    # one tracker of the meter's period readings, shared by every sensor that
+    # uses them, also when sensors are added later on
+    meter_tracker = _shared(coordinator, "meter_tracker", lambda: MeterTracker(hass, entry.entry_id, meter)) if meter else None
+
+    # with a meter, the electricity of today, yesterday and the month is what it counted
+    sensors: list = [
+        CSNetHomeServerEnergySensor(coordinator, description, device_info, meter_tracker)
+        for description in server_energy_descriptions(energy, metered_electricity=meter_tracker is not None)
+    ]
+
     if meter:
         unused = ESTIMATED_COP_DESCRIPTIONS
         if has_energy(energy, HEAT):
-            tracker = MeterTracker(hass, entry.entry_id, meter)
-            sensors += [CSNetHomeMeteredCopSensor(coordinator, description, device_info, tracker) for description in METERED_COP_DESCRIPTIONS]
+            sensors += [CSNetHomeMeteredCopSensor(coordinator, description, device_info, meter_tracker) for description in METERED_COP_DESCRIPTIONS]
     else:
         unused = METERED_COP_DESCRIPTIONS
         if counter is not None and has_energy(energy, HEAT):
-            tracker = MeterTracker(hass, entry.entry_id, "estimate", reader=counter.reading_kwh, storage_key=estimated_meter_storage_key(entry.entry_id))
+            tracker = _shared(
+                coordinator,
+                "estimate_tracker",
+                lambda: MeterTracker(hass, entry.entry_id, "estimate", reader=counter.reading_kwh, storage_key=estimated_meter_storage_key(entry.entry_id)),
+            )
             sensors += [CSNetHomeMeteredCopSensor(coordinator, description, device_info, tracker, counter) for description in ESTIMATED_COP_DESCRIPTIONS]
     # the other set goes: the meter was added to or removed from the settings
     entity_registry = er.async_get(hass)

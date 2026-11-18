@@ -181,8 +181,12 @@ class ServerEnergyDescription(SensorEntityDescription):
     use: str | None = None
 
 
-def server_energy_descriptions(energy) -> list[ServerEnergyDescription]:
-    """Return the sensors this unit gets, from what the server has recorded for it."""
+def server_energy_descriptions(energy, metered_electricity: bool = False) -> list[ServerEnergyDescription]:
+    """Return the sensors this unit gets, from what the server has recorded for it.
+
+    With ``metered_electricity`` the electricity is what the user's meter
+    counted: its sensors exist whatever the server recorded.
+    """
     common = {
         "device_class": SensorDeviceClass.ENERGY,
         "native_unit_of_measurement": UnitOfEnergy.KILO_WATT_HOUR,
@@ -205,7 +209,7 @@ def server_energy_descriptions(energy) -> list[ServerEnergyDescription]:
                 ServerEnergyDescription(key=f"server_heat_today_{use.lower()}", name=f"Heat produced today ({USES[use]})", use=use, **increasing)
                 for use in used
             ]
-    if has_pulse_meter(energy):
+    if metered_electricity or has_pulse_meter(energy):
         descriptions += [
             ServerEnergyDescription(key="server_electricity_today", name="Electricity consumed today", kind=ELECTRICITY, **increasing),
             ServerEnergyDescription(key="server_electricity_yesterday", name="Electricity consumed yesterday", kind=ELECTRICITY, span="yesterday", **common),
@@ -223,23 +227,56 @@ def read_span(energy, span: str, kind: str, use: str | None, now: datetime) -> f
 
 
 class CSNetHomeServerEnergySensor(CoordinatorEntity, SensorEntity):
-    """Energy the CSNet server has recorded for the unit."""
+    """Energy of the unit: what the CSNet server recorded, or for the electricity what the user's meter counted."""
 
     _attr_has_entity_name = True
     entity_description: ServerEnergyDescription
 
-    def __init__(self, coordinator, description: ServerEnergyDescription, device_info) -> None:
-        """Initialize the sensor."""
+    def __init__(self, coordinator, description: ServerEnergyDescription, device_info, tracker: MeterTracker | None = None) -> None:
+        """Initialize the sensor; with ``tracker`` its electricity is what the user's meter counted."""
         super().__init__(coordinator)
         self.entity_description = description
         self._attr_unique_id = f"{DOMAIN}-{description.key}"
         self._attr_device_info = device_info
+        self._tracker = tracker if description.kind == ELECTRICITY else None
+        if self._tracker is not None:
+            # a meter counts in Wh: its figures are worth more than whole kWh
+            self._attr_suggested_display_precision = 2
+
+    async def async_added_to_hass(self) -> None:
+        """Load the meter's period readings before the first state is written."""
+        if self._tracker is not None:
+            await self._tracker.async_load()
+            self._tracker.async_update(dt_util.now())
+        await super().async_added_to_hass()
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Take the meter's reading at every poll."""
+        if self._tracker is not None:
+            self._tracker.async_update(dt_util.now())
+        super()._handle_coordinator_update()
 
     @property
     def native_value(self) -> float | None:
         """Return the kWh of the sensor's span."""
         description = self.entity_description
-        return read_span(self.coordinator.get_server_energy(), description.span, description.kind, description.use, dt_util.now())
+        now = dt_util.now()
+        if self._tracker is not None:
+            value = {
+                "today": lambda: self._tracker.electricity("day", now),
+                "yesterday": lambda: self._tracker.electricity_yesterday(now),
+                "month": lambda: self._tracker.electricity("month", now),
+            }[description.span]()
+            return round(value, 3) if value is not None else None
+        return read_span(self.coordinator.get_server_energy(), description.span, description.kind, description.use, now)
+
+    @property
+    def extra_state_attributes(self):
+        """Say where the electricity comes from."""
+        if self.entity_description.kind != ELECTRICITY:
+            return None
+        return {"electricity_source": "meter" if self._tracker is not None else "csnet"}
 
     @property
     def last_reset(self) -> datetime | None:
