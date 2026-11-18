@@ -727,6 +727,9 @@ MIN_METERED_COP_KWH = 0.02
 # once its readings span at least METER_POWER_MIN_MINUTES
 METER_POWER_WINDOW = timedelta(minutes=10)
 METER_POWER_MIN_MINUTES = 2
+# How long the meter's last power stands in while its power sensor has no
+# reading (a restart of the meter), before the estimate takes over
+METER_POWER_GRACE = timedelta(minutes=2)
 
 # Yutaki outdoor capacity codes (ouCapacityCode & 0x7F, as decoded by CSNet
 # Manager's getUnitCapacitiText): 64 = 8 HP, 80 = 10 HP. These sizes only
@@ -1642,6 +1645,8 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
     energy_meter_power: str | None = None
     # Meter readings (time, kWh) the power is worked out from, without a power sensor
     _meter_samples: deque | None = None
+    # The power sensor's last reading: (time, W)
+    _last_meter_power: tuple | None = None
 
     def _max_integration_hours(self) -> float:
         """Return the longest time one reading may stand for.
@@ -1662,6 +1667,19 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
 
         return meter_reading_kwh(self.hass, self.energy_meter)
 
+    def _meter_power_sensor_w(self) -> float | None:
+        """Return the reading of the meter's power sensor in W, or None when it has none."""
+        state = self.hass.states.get(self.energy_meter_power)
+        if state is None:
+            return None
+        try:
+            value = float(state.state)
+        except (TypeError, ValueError):
+            return None
+        factor = {"W": 1.0, "kW": 1000.0}.get(state.attributes.get("unit_of_measurement"))
+        # as the sensor reports it, decimals included (kW only converted)
+        return round(value * factor, 3) if factor is not None and value >= 0 else None
+
     def _meter_power_w(self) -> float | None:
         """Return the power the meter measures, or None when it cannot tell.
 
@@ -1671,16 +1689,16 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
         if not self.energy_meter or not self.hass:
             return None
         if self.energy_meter_power:
-            state = self.hass.states.get(self.energy_meter_power)
-            if state is None:
-                return None
-            try:
-                value = float(state.state)
-            except (TypeError, ValueError):
-                return None
-            factor = {"W": 1.0, "kW": 1000.0}.get(state.attributes.get("unit_of_measurement"))
-            # as the sensor reports it, decimals included (kW only converted)
-            return round(value * factor, 3) if factor is not None and value >= 0 else None
+            now = dt_util.now()
+            value = self._meter_power_sensor_w()
+            if value is not None:
+                self._last_meter_power = (now, value)
+                return value
+            # a meter restarting: its last power stands in for a moment
+            last = self._last_meter_power
+            if last is not None and timedelta(0) <= now - last[0] <= METER_POWER_GRACE:
+                return last[1]
+            return None
         samples = self._meter_samples
         if not samples or len(samples) < 2:
             return None

@@ -775,6 +775,22 @@ def test_instant_consumption_takes_the_power_sensor_at_each_update():
     assert written == [405.38]
 
 
+def test_instant_consumption_keeps_the_meter_power_through_a_short_gap():
+    """A meter restarting does not switch the source to the estimate and back."""
+    states = {"sensor.heat_pump_power": ("812.43", "W")}
+    sensor = _consumption_sensor(states, "sensor.heat_pump_power")
+    start = dt_util.now()
+    with patch("custom_components.csnet_home.sensor.dt_util.now", return_value=start):
+        assert sensor.native_value == 812.43
+    states["sensor.heat_pump_power"] = ("unavailable", "W")
+    with patch("custom_components.csnet_home.sensor.dt_util.now", return_value=start + timedelta(minutes=1)):
+        assert sensor.native_value == 812.43
+        assert sensor.extra_state_attributes["electricity_source"] == "meter"
+    with patch("custom_components.csnet_home.sensor.dt_util.now", return_value=start + timedelta(minutes=3)):
+        assert sensor.native_value == sensor._calculate_complex_power(sensor._get_heating_status())
+        assert sensor.extra_state_attributes["electricity_source"] == "estimate"
+
+
 def test_instant_consumption_falls_back_to_the_estimate_without_a_meter_reading():
     """A meter power sensor that is unavailable leaves the estimate."""
     sensor = _consumption_sensor({"sensor.heat_pump_power": ("unavailable", "W")}, "sensor.heat_pump_power")
