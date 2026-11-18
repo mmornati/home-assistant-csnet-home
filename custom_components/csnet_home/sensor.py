@@ -673,9 +673,13 @@ SUCTION_PRESSURE_KEYS = ("suction_pressure", "suction_pressure_correction")
 # Yutaki S 2.0 with a meter, over a hot water run and a heating run.
 # Three phase uses 400 V * sqrt(3) * cos(phi), with cos(phi) assumed to be 0.95.
 WATTS_PER_AMP_SINGLE_PHASE = 220.0
-# Below this compressor frequency the reported current is not taken as a
-# floor: at the minimum speed the unit reports 2 A for under 400 W.
+# Below this compressor frequency a single-phase unit's reported current is not
+# taken as a floor while the pressure model runs: at its minimum speed a Yutaki
+# S 2.0 reports 2 A for under 400 W. Three-phase units can under-read instead
+# (2 A for 1.7 kW), and without the pressure model the current is all there is.
 CURRENT_FLOOR_MIN_HZ = 40
+# Suction pressure of a unit without that sensor: no pressure difference to model with
+SUCTION_PRESSURE_MISSING = 128
 # Watts of the compressor per Hz and per bar of pressure difference. With the
 # fixed and auxiliary consumption counted apart, a metered Yutaki S 2.0 fits
 # 1.0 from its minimum speed (31 Hz) to 65 Hz.
@@ -1635,7 +1639,7 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
 
         # The pressure model needs both pressures and no defrost
         delta_p = p_high - p_low
-        uses_pressures = not heating_status.get("defrosting") and delta_p > 0
+        uses_pressures = not heating_status.get("defrosting") and p_low != SUCTION_PRESSURE_MISSING and delta_p > 0
 
         compressor_power = None
         if hz > 0 and uses_pressures:
@@ -1647,9 +1651,10 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
             compressor_power = COMPRESSOR_FACTOR * hz * delta_p * factor_rpm * factor_temp
 
         # Range the reported current allows. It is truncated to whole Amps: 6 A
-        # means 6.0 to 6.99 A (1320 to 1538 W single phase). At low speed the
-        # current over-reads: there it only caps.
-        floor = hz >= CURRENT_FLOOR_MIN_HZ
+        # means 6.0 to 6.99 A (1320 to 1538 W single phase). A single-phase unit
+        # over-reads at low speed: there, with the pressure model, it only caps.
+        single_phase = watts_per_amp == WATTS_PER_AMP_SINGLE_PHASE
+        floor = hz >= CURRENT_FLOOR_MIN_HZ or not (single_phase and uses_pressures)
         return {
             "hz": hz,
             "discharge_temperature": t_discharge,
@@ -1681,8 +1686,8 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
         base_power = terms["base_power"]
         min_watts, max_watts = terms["min_watts"], terms["max_watts"]
         if terms["compressor_power"] is None:
-            # A defrost, by the unit's own flag, or crossed pressures: the
-            # current's range carries it
+            # A defrost, by the unit's own flag, or no usable pressures
+            # (crossed, or no suction sensor): the current's range carries it
             calculated_power = base_power + (hz * 15)
         else:
             calculated_power = base_power + terms["compressor_power"] * self._power_calibration().factor(hz)

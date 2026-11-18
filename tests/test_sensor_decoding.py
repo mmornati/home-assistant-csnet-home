@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from homeassistant.util import dt as dt_util
 
+from custom_components.csnet_home.const import POWER_SUPPLY_THREE_PHASE
 from custom_components.csnet_home.coordinator import CSNetHomeCoordinator
 from custom_components.csnet_home.helpers import extract_heating_status
 from custom_components.csnet_home.power_calibration import MAX_FACTOR, PowerCalibration
@@ -23,7 +24,9 @@ from custom_components.csnet_home.sensor import (
     PUMP_MAX_POWER_W,
     PUMP_MIN_POWER_W,
     STANDBY_POWER_W,
+    SUCTION_PRESSURE_MISSING,
     WATTS_PER_AMP_SINGLE_PHASE,
+    WATTS_PER_AMP_THREE_PHASE,
     CSNetHomeCalculatedSensor,
     CSNetHomeCompressorSensor,
     CSNetHomeDailySensor,
@@ -324,10 +327,48 @@ MINIMUM_SPEED = {"ouHz": 31, "ouCurrent": 2, "ouDischargePress": 18, "ouSuctionP
 
 
 def test_reported_current_is_no_floor_at_low_speed():
-    """At the minimum speed the unit reports 2 A for under 400 W: the current only caps the estimate."""
+    """A single-phase unit at its minimum speed reports 2 A for under 400 W: with the pressure model the current only caps."""
     auxiliary = STANDBY_POWER_W + PUMP_MAX_POWER_W * 0.76**2
     assert _electric_power(MINIMUM_SPEED) == round(OUTDOOR_ELECTRONICS_POWER_W + FAN_DEFAULT_POWER_W + 31 * 9 + auxiliary)
     assert _electric_power(MINIMUM_SPEED | {"ouHz": 41}) >= 2 * WATTS_PER_AMP_SINGLE_PHASE
+
+
+def _three_phase_power(heating_status):
+    sensor = CSNetHomeCalculatedSensor(_coordinator(heating_status), DEVICE_DATA, {}, CALCULATED_SENSOR_DESCRIPTIONS["instant_consumption"])
+    sensor.power_supply = POWER_SUPPLY_THREE_PHASE
+    return sensor._calculate_complex_power(heating_status)
+
+
+def test_three_phase_unit_without_a_suction_sensor_keeps_the_current_floor():
+    """A three-phase unit with no suction sensor (128) at 32 Hz and 2 A: the current is all there is."""
+    reading = MINIMUM_SPEED | {"ouHz": 32, "ouSuctionPress": SUCTION_PRESSURE_MISSING, "ouDischargePress": 30}
+    assert _three_phase_power(reading) >= 2 * WATTS_PER_AMP_THREE_PHASE
+
+
+def test_three_phase_unit_keeps_the_current_floor_at_low_speed():
+    """A three-phase unit can under-read its current: it stays a floor below 40 Hz too."""
+    assert _three_phase_power(dict(MINIMUM_SPEED)) >= 2 * WATTS_PER_AMP_THREE_PHASE
+
+
+@pytest.mark.parametrize(
+    "reading",
+    [
+        MINIMUM_SPEED | {"ouSuctionPress": SUCTION_PRESSURE_MISSING},  # no suction sensor
+        MINIMUM_SPEED | {"ouSuctionPress": 20},  # crossed pressures
+        MINIMUM_SPEED | {"defrosting": 1},  # a defrost
+    ],
+    ids=["no suction sensor", "crossed pressures", "defrost"],
+)
+def test_without_the_pressure_model_the_current_is_a_floor_at_low_speed(reading):
+    """Without the pressure model a single-phase unit keeps the current's floor below 40 Hz."""
+    assert _electric_power(reading) >= 2 * WATTS_PER_AMP_SINGLE_PHASE
+
+
+def test_no_suction_sensor_teaches_nothing():
+    """Without the pressure model there is no model to correct."""
+    sensor, coordinator = _calibrated_sensor()
+    sensor.observe_power_reading(LOW_MODEL | {"ouSuctionPress": SUCTION_PRESSURE_MISSING})
+    assert sensor._power_calibration().factors == {}
 
 
 def test_the_power_model_learns_once_per_update_of_the_coordinator():
