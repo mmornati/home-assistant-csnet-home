@@ -763,40 +763,16 @@ def test_instant_consumption_is_the_meter_power_sensor(state, unit, expected):
     assert sensor.extra_state_attributes["electricity_source"] == "meter"
 
 
-async def test_instant_consumption_follows_every_change_of_the_power_sensor():
-    """The state is written whenever the meter's power sensor changes, not only at each poll."""
+def test_instant_consumption_takes_the_power_sensor_at_each_update():
+    """The meter's power is read when the integration updates, once a poll, with its decimals."""
     states = {"sensor.heat_pump_power": ("400.12", "W")}
     sensor = _consumption_sensor(states, "sensor.heat_pump_power")
     written = []
     sensor.async_write_ha_state = lambda: written.append(sensor.native_value)
-    sensor.async_on_remove = lambda remove: None
-    followed = {}
-
-    def track(hass, entity_ids, action):
-        followed["entity_ids"] = entity_ids
-        followed["action"] = action
-        return lambda: None
-
-    with (
-        patch("custom_components.csnet_home.sensor.async_track_state_change_event", track),
-        patch.object(CSNetHomeInstallationSensor, "async_added_to_hass", AsyncMock(), create=True),
-    ):
-        await sensor.async_added_to_hass()
-    assert followed["entity_ids"] == ["sensor.heat_pump_power"]
     states["sensor.heat_pump_power"] = ("405.38", "W")
-    followed["action"](None)
+    assert written == []  # a change of the power sensor alone writes nothing
+    sensor._handle_coordinator_update()
     assert written == [405.38]
-
-
-async def test_instant_consumption_follows_nothing_without_a_power_sensor():
-    """Without a power sensor beside the meter there is nothing to follow between polls."""
-    sensor = _consumption_sensor({})
-    with (
-        patch("custom_components.csnet_home.sensor.async_track_state_change_event") as track,
-        patch.object(CSNetHomeInstallationSensor, "async_added_to_hass", AsyncMock(), create=True),
-    ):
-        await sensor.async_added_to_hass()
-    track.assert_not_called()
 
 
 def test_instant_consumption_falls_back_to_the_estimate_without_a_meter_reading():

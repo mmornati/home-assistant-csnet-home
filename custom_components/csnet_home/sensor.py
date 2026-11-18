@@ -23,7 +23,6 @@ from homeassistant.const import (
 from homeassistant.core import callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
@@ -1690,17 +1689,6 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
         if hours * 60 < METER_POWER_MIN_MINUTES or counted < 0:
             return None
         return counted * 1000.0 / hours
-
-    async def async_added_to_hass(self) -> None:
-        """Follow the meter's power sensor whenever it changes, not only at each poll of CSNet."""
-        await super().async_added_to_hass()
-        if self._key == "instant_consumption" and self.energy_meter and self.energy_meter_power:
-            self.async_on_remove(async_track_state_change_event(self.hass, [self.energy_meter_power], self._handle_meter_power_change))
-
-    @callback
-    def _handle_meter_power_change(self, _event) -> None:
-        """Show the meter's new power right away."""
-        self.async_write_ha_state()
 
     def _follow_meter(self, now) -> None:
         """Keep the meter readings the power is worked out from."""
