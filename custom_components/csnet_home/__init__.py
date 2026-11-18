@@ -32,7 +32,7 @@ from custom_components.csnet_home.migration import async_migrate_zone_identifier
 from custom_components.csnet_home.power_calibration import POWER_CALIBRATION_STORAGE_VERSION, power_calibration_storage_key
 from custom_components.csnet_home.sample_recorder import SHARE_URL, SampleRecorder, sample_header, sample_path
 from custom_components.csnet_home.sensor import DEVICE_SENSOR_DESCRIPTIONS, ZONE_SENSOR_DESCRIPTIONS
-from custom_components.csnet_home.server_energy import METER_STORAGE_VERSION, meter_storage_key
+from custom_components.csnet_home.server_energy import METER_STORAGE_VERSION, estimated_energy_storage_key, estimated_meter_storage_key, meter_storage_key
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -255,6 +255,8 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Delete what the removed entry kept in storage."""
     await Store(hass, ALARM_STORAGE_VERSION, alarm_storage_key(entry.entry_id)).async_remove()
     await Store(hass, METER_STORAGE_VERSION, meter_storage_key(entry.entry_id)).async_remove()
+    await Store(hass, METER_STORAGE_VERSION, estimated_meter_storage_key(entry.entry_id)).async_remove()
+    await Store(hass, METER_STORAGE_VERSION, estimated_energy_storage_key(entry.entry_id)).async_remove()
     await Store(hass, POWER_CALIBRATION_STORAGE_VERSION, power_calibration_storage_key(entry.entry_id)).async_remove()
 
 

@@ -723,6 +723,10 @@ FAN_DEFAULT_POWER_W = 40.0  # for units that do not report the speed
 INSTANT_COP_WINDOW = timedelta(minutes=15)
 # Electricity a meter has to count in that window before the instant COP uses it
 MIN_METERED_COP_KWH = 0.02
+# Without a power sensor, the meter's power is what it counted over this window,
+# once its readings span at least METER_POWER_MIN_MINUTES
+METER_POWER_WINDOW = timedelta(minutes=10)
+METER_POWER_MIN_MINUTES = 2
 
 # Yutaki outdoor capacity codes (ouCapacityCode & 0x7F, as decoded by CSNet
 # Manager's getUnitCapacitiText): 64 = 8 HP, 80 = 10 HP. These sizes only
@@ -946,14 +950,22 @@ def _power_reading_follower(coordinator, observer):
 
 
 def _server_energy_sensors(hass, entry, coordinator) -> list:
-    """Return the sensors for the server's energy records, and for the COP when a meter is configured."""
+    """Return the sensors for the server's energy records, and the COP of each period.
+
+    The period COPs divide the heat the server recorded by the electricity of
+    the same period: the user's meter when one is configured ("metered"), or
+    else the integration's estimate ("estimated"). Only one of the two sets
+    exists at a time.
+    """
     # imported here: that module is only needed by this platform's setup
     from .server_energy import (  # pylint: disable=import-outside-toplevel
+        ESTIMATED_COP_DESCRIPTIONS,
         HEAT,
         METERED_COP_DESCRIPTIONS,
         CSNetHomeMeteredCopSensor,
         CSNetHomeServerEnergySensor,
         MeterTracker,
+        estimated_meter_storage_key,
         has_energy,
         server_energy_descriptions,
     )
@@ -963,16 +975,23 @@ def _server_energy_sensors(hass, entry, coordinator) -> list:
     sensors: list = [CSNetHomeServerEnergySensor(coordinator, description, device_info) for description in server_energy_descriptions(energy)]
 
     meter = entry.data.get(CONF_ENERGY_METER)
-    if meter and has_energy(energy, HEAT):
-        tracker = MeterTracker(hass, entry.entry_id, meter)
-        sensors += [CSNetHomeMeteredCopSensor(coordinator, description, device_info, tracker) for description in METERED_COP_DESCRIPTIONS]
-    elif not meter:
-        # the meter was removed from the settings: its COP sensors go with it
-        entity_registry = er.async_get(hass)
-        for description in METERED_COP_DESCRIPTIONS:
-            entity_id = entity_registry.async_get_entity_id("sensor", DOMAIN, f"{DOMAIN}-{description.key}")
-            if entity_id:
-                entity_registry.async_remove(entity_id)
+    counter = getattr(coordinator, "estimated_energy", None)
+    if meter:
+        unused = ESTIMATED_COP_DESCRIPTIONS
+        if has_energy(energy, HEAT):
+            tracker = MeterTracker(hass, entry.entry_id, meter)
+            sensors += [CSNetHomeMeteredCopSensor(coordinator, description, device_info, tracker) for description in METERED_COP_DESCRIPTIONS]
+    else:
+        unused = METERED_COP_DESCRIPTIONS
+        if counter is not None and has_energy(energy, HEAT):
+            tracker = MeterTracker(hass, entry.entry_id, "estimate", reader=counter.reading_kwh, storage_key=estimated_meter_storage_key(entry.entry_id))
+            sensors += [CSNetHomeMeteredCopSensor(coordinator, description, device_info, tracker, counter) for description in ESTIMATED_COP_DESCRIPTIONS]
+    # the other set goes: the meter was added to or removed from the settings
+    entity_registry = er.async_get(hass)
+    for description in unused:
+        entity_id = entity_registry.async_get_entity_id("sensor", DOMAIN, f"{DOMAIN}-{description.key}")
+        if entity_id:
+            entity_registry.async_remove(entity_id)
     return sensors
 
 
@@ -1068,6 +1087,29 @@ async def async_setup_entry(hass, entry, async_add_entities):
         follow()
         entry.async_on_unload(coordinator.async_add_listener(follow))
 
+        # Where the electricity comes from: the user's meter (and the power
+        # sensor of the same device), or else the estimate
+        energy_meter = entry.data.get(CONF_ENERGY_METER)
+        energy_meter_power = None
+        if energy_meter:
+            from .dashboard import meter_power_entity  # pylint: disable=import-outside-toplevel
+
+            energy_meter_power = meter_power_entity(er.async_get(hass), energy_meter)
+        else:
+            from .server_energy import EstimatedEnergyCounter  # pylint: disable=import-outside-toplevel
+
+            estimator = CSNetHomeCalculatedSensor(coordinator, global_device_data, common_data, CALCULATED_SENSOR_DESCRIPTIONS["instant_consumption"])
+            estimator.power_supply = power_supply
+
+            def _estimated_power():
+                heating_status = estimator._get_heating_status()  # pylint: disable=protected-access
+                if not heating_status or getattr(coordinator, "last_update_success", True) is False:
+                    return None
+                return heating_status, estimator._calculate_complex_power(heating_status)  # pylint: disable=protected-access
+
+            max_hours = estimator._max_integration_hours()  # pylint: disable=protected-access
+            coordinator.estimated_energy = EstimatedEnergyCounter(hass, entry.entry_id, _estimated_power, max_hours=max_hours)
+
         for description in INSTALLATION_SENSOR_DESCRIPTIONS:
             sensors.append(
                 CSNetHomeInstallationSensor(
@@ -1089,7 +1131,8 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 description,
             )
             calculated_sensor.power_supply = power_supply
-            calculated_sensor.energy_meter = entry.data.get(CONF_ENERGY_METER)
+            calculated_sensor.energy_meter = energy_meter
+            calculated_sensor.energy_meter_power = energy_meter_power
             sensors.append(calculated_sensor)
 
         # ----------------------------------------------------------------------
@@ -1103,6 +1146,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 description,
             )
             calculated_sensor.power_supply = power_supply
+            calculated_sensor.energy_meter = energy_meter
             sensors.append(calculated_sensor)
 
     # Energy the server recorded for the unit, and COP from the user's own meter
@@ -1574,6 +1618,70 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
 
     # The user's electricity meter (an energy sensor), when one is configured
     energy_meter: str | None = None
+    # The power sensor of the meter's device, when it has one
+    energy_meter_power: str | None = None
+    # Meter readings (time, kWh) the power is worked out from, without a power sensor
+    _meter_samples: deque | None = None
+
+    def _max_integration_hours(self) -> float:
+        """Return the longest time one reading may stand for.
+
+        Two polling intervals, and never less than five minutes, so a slow
+        polling interval is integrated in full while an outage is not.
+        """
+        interval = getattr(self.coordinator, "update_interval", None)
+        if interval is None:
+            return MAX_ENERGY_INTEGRATION_HOURS
+        return max(MAX_ENERGY_INTEGRATION_HOURS, 2 * interval.total_seconds() / 3600.0)
+
+    def _meter_kwh(self) -> float | None:
+        """Return the meter's running total in kWh, or None without a meter or a reading."""
+        if not self.energy_meter or not self.hass:
+            return None
+        from .server_energy import meter_reading_kwh  # pylint: disable=import-outside-toplevel
+
+        return meter_reading_kwh(self.hass, self.energy_meter)
+
+    def _meter_power_w(self) -> float | None:
+        """Return the power the meter measures, or None when it cannot tell.
+
+        From the power sensor of the meter's device when there is one, else
+        from what the meter counted over the last minutes.
+        """
+        if not self.energy_meter or not self.hass:
+            return None
+        if self.energy_meter_power:
+            state = self.hass.states.get(self.energy_meter_power)
+            if state is None:
+                return None
+            try:
+                value = float(state.state)
+            except (TypeError, ValueError):
+                return None
+            factor = {"W": 1.0, "kW": 1000.0}.get(state.attributes.get("unit_of_measurement"))
+            return value * factor if factor is not None and value >= 0 else None
+        samples = self._meter_samples
+        if not samples or len(samples) < 2:
+            return None
+        hours = (samples[-1][0] - samples[0][0]).total_seconds() / 3600.0
+        counted = samples[-1][1] - samples[0][1]
+        if hours * 60 < METER_POWER_MIN_MINUTES or counted < 0:
+            return None
+        return counted * 1000.0 / hours
+
+    def _follow_meter(self, now) -> None:
+        """Keep the meter readings the power is worked out from."""
+        if self._meter_samples is None:
+            self._meter_samples = deque()
+        reading = self._meter_kwh()
+        if reading is None or (self._meter_samples and reading < self._meter_samples[-1][1]):
+            # no reading, or the meter was reset: start over
+            self._meter_samples.clear()
+            if reading is None:
+                return
+        self._meter_samples.append((now, reading))
+        while len(self._meter_samples) > 2 and now - self._meter_samples[1][0] >= METER_POWER_WINDOW:
+            self._meter_samples.popleft()
 
     # Readings the instant COP is averaged over: (time, heat W, estimated
     # electricity W, meter reading kWh or None), taken at each poll while the
@@ -1628,6 +1736,8 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Keep the readings of the averaged instant COP, then write the state."""
+        if self._key == "instant_consumption" and self.energy_meter and not self.energy_meter_power:
+            self._follow_meter(dt_util.now())
         if self._key == "instant_cop" and getattr(self.coordinator, "last_update_success", True) is not False:
             if self._cop_samples is None:
                 self._cop_samples = deque()
@@ -1683,7 +1793,10 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
         """Show the learnt correction factors on the consumption sensor."""
         if self._key != "instant_consumption":
             return None
-        return {"power_calibration": self._power_calibration().as_attributes()}
+        return {
+            "electricity_source": "meter" if self._meter_power_w() is not None else "estimate",
+            "power_calibration": self._power_calibration().as_attributes(),
+        }
 
     @staticmethod
     def _pump_power(heating_status, compressor_running: bool) -> float:
@@ -1876,6 +1989,10 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
         instant_consumption = self._calculate_complex_power(heating_status)
 
         if self._key == "instant_consumption":
+            # what the user's meter measures, when it can tell
+            metered = self._meter_power_w()
+            if metered is not None:
+                return round(metered)
             return instant_consumption
 
         # 2. Heating / Thermal Power (Watts)
@@ -1948,6 +2065,9 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
         self._energy_in = 0.0  # Input energy (Electricity)
         self._energy_out = 0.0  # Output energy (Heat)
         self._last_update_time = None
+        # the meter's reading at the last poll, to count what it measured since
+        self._last_meter_kwh: float | None = None
+        self._electricity_source: str | None = None
 
     async def async_added_to_hass(self):
         """Restore state and set up initial values."""
@@ -1982,25 +2102,21 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
     @property
     def extra_state_attributes(self):
         """Show the day's totals a daily COP comes from, which are also kept across restarts."""
+        source = self._electricity_source or ("meter" if self.energy_meter else "estimate")
+        if self._key == "daily_consumption":
+            return {"electricity_source": source}
         if self._key not in DAILY_COP_KEYS:
             return None
-        return {ATTR_ELECTRICITY_KWH: round(self._energy_in, 4), ATTR_HEAT_KWH: round(self._energy_out, 4)}
+        return {
+            ATTR_ELECTRICITY_KWH: round(self._energy_in, 4),
+            ATTR_HEAT_KWH: round(self._energy_out, 4),
+            "electricity_source": source,
+        }
 
     @property
     def native_value(self):
         """Return the accumulated state."""
         return round(self._state, 2)
-
-    def _max_integration_hours(self) -> float:
-        """Return the longest time one reading may stand for.
-
-        Two polling intervals, and never less than five minutes, so a slow
-        polling interval is integrated in full while an outage is not.
-        """
-        interval = getattr(self.coordinator, "update_interval", None)
-        if interval is None:
-            return MAX_ENERGY_INTEGRATION_HOURS
-        return max(MAX_ENERGY_INTEGRATION_HOURS, 2 * interval.total_seconds() / 3600.0)
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -2046,6 +2162,22 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
         # Calculate incremental Energy (kWh) -> Watts * Hours / 1000
         energy_consumption_kwh = (power_consumption_w * time_diff) / 1000.0
         energy_heating_kwh = (heating_power_w * time_diff) / 1000.0
+
+        # With a meter, the electricity is what it counted since the last poll
+        if self.energy_meter:
+            reading = self._meter_kwh()
+            if reading is not None:
+                previous = self._last_meter_kwh
+                self._last_meter_kwh = reading
+                if previous is not None and reading >= previous:
+                    energy_consumption_kwh = reading - previous
+                    self._electricity_source = "meter"
+                # the first reading, or one after a reset, only sets the start:
+                # the estimate stands in for that interval, as for the heat
+            else:
+                # no reading: the estimate stands in, and the next reading starts over
+                self._last_meter_kwh = None
+                self._electricity_source = "estimate"
 
         if self._key == "daily_consumption":
             self._state += energy_consumption_kwh

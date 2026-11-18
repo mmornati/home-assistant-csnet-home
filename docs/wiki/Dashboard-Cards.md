@@ -172,7 +172,7 @@ The dots are the unit's water target, averaged per hour, against the average out
 
 ## Performance card
 
-The COP needs an electricity figure. With an electricity meter chosen in the integration settings (Reconfigure → Electricity meter of the heat pump), the card shows the metered COP. Without one, it uses the electricity CSNet records when your unit has a pulse meter; otherwise it shows the heat produced only.
+The COP needs an electricity figure. With an electricity meter chosen in the integration settings (Reconfigure → Electricity meter of the heat pump), the card shows the metered COP. Without one, it uses the electricity CSNet records when your unit has a pulse meter; otherwise the estimated COP. A period with neither shows the heat produced only.
 
 ## Troubleshooting
 

@@ -463,7 +463,7 @@ The pool zone also gets the usual zone sensors (`sensor.{device}_{zone}_current_
 
 ## Energy and COP Estimates
 
-The integration calculates electrical consumption, thermal output (heating and cooling) and COP from the unit's telemetry, and accumulates daily energy and COP values that reset at midnight. These are estimates — CSNet Manager does not report metered power.
+The integration calculates electrical consumption, thermal output (heating and cooling) and COP from the unit's telemetry, and accumulates daily energy and COP values that reset at midnight. CSNet Manager does not report power, so without an electricity meter these are estimates; with one chosen in the settings, they use what the meter measures.
 
 See [Energy and Performance Sensors](Sensors-Reference.md#energy-and-performance-sensors) for the formulas and the list of sensors.
 

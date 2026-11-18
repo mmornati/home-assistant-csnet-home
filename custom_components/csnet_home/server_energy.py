@@ -42,6 +42,10 @@ METER_STORAGE_VERSION = 1
 PERIOD_START_TOLERANCE = timedelta(minutes=20)
 # Below this much electricity a ratio says nothing (the server counts heat in whole kWh)
 MIN_ELECTRICITY_FOR_COP_KWH = 0.5
+# Longest time one reading of the estimated power may stand for
+ESTIMATE_MAX_INTEGRATION_HOURS = 10 / 60
+# The running total of the estimate is written at most this often (and on shutdown)
+ESTIMATE_SAVE_DELAY_S = 60
 # Electricity recorded by the server counts as metered from this share of the recorded heat
 MIN_ELECTRICITY_SHARE = 0.05
 RECENT_MONTHS = 3
@@ -50,6 +54,16 @@ RECENT_MONTHS = 3
 def meter_storage_key(entry_id: str) -> str:
     """Return the storage key of the meter readings kept for an entry."""
     return f"{DOMAIN}.energy_meter.{entry_id}"
+
+
+def estimated_meter_storage_key(entry_id: str) -> str:
+    """Return the storage key of the period readings of the estimated electricity."""
+    return f"{DOMAIN}.estimated_meter.{entry_id}"
+
+
+def estimated_energy_storage_key(entry_id: str) -> str:
+    """Return the storage key of the running total of the estimated electricity."""
+    return f"{DOMAIN}.estimated_energy.{entry_id}"
 
 
 def _amount(record, kind: str, use: str | None) -> float:
@@ -273,11 +287,16 @@ class MeterTracker:
     figure instead of a partial one.
     """
 
-    def __init__(self, hass: HomeAssistant, entry_id: str, entity_id: str) -> None:
-        """Initialize the tracker for one meter entity."""
+    def __init__(self, hass: HomeAssistant, entry_id: str, entity_id: str, reader=None, storage_key: str | None = None) -> None:
+        """Initialize the tracker for one meter entity.
+
+        ``reader`` returns the running total in kWh in place of the entity's
+        state: the estimated electricity is followed the same way as a meter.
+        """
         self.hass = hass
         self.entity_id = entity_id
-        self._store = Store(hass, METER_STORAGE_VERSION, meter_storage_key(entry_id))
+        self._reader = reader or (lambda: meter_reading_kwh(hass, entity_id))
+        self._store = Store(hass, METER_STORAGE_VERSION, storage_key or meter_storage_key(entry_id))
         self._state: dict = {}
         self._loaded = False
 
@@ -297,7 +316,7 @@ class MeterTracker:
     @callback
     def async_update(self, now: datetime) -> None:
         """Take the meter's current reading into account."""
-        reading = meter_reading_kwh(self.hass, self.entity_id)
+        reading = self._reader()
         if reading is None:
             return
         changed = False
@@ -341,7 +360,7 @@ class MeterTracker:
         period, _began = _period_ids(now)[scope]
         if not isinstance(current, dict) or current.get("period") != period or not current.get("from_start"):
             return None
-        reading = meter_reading_kwh(self.hass, self.entity_id)
+        reading = self._reader()
         if reading is None or reading < current["start"]:
             return None
         return reading - current["start"]
@@ -381,9 +400,64 @@ class MeterTracker:
         return self._closed("month", (now.replace(day=1) - timedelta(days=1)).strftime("%Y-%m"))
 
 
+class EstimatedEnergyCounter:
+    """A running total of the estimated electricity, kept across restarts.
+
+    It stands in for a meter where the user has none, so the COP of the day
+    and of the month can be worked out the same way: heat the server recorded
+    over the electricity of the same period.
+    """
+
+    def __init__(self, hass: HomeAssistant, entry_id: str, power, max_hours: float = ESTIMATE_MAX_INTEGRATION_HOURS) -> None:
+        """Initialize; ``power`` returns (the reading it comes from, Watts), or None without a reading."""
+        self.hass = hass
+        self._power = power
+        self._max_hours = max_hours
+        self._store = Store(hass, METER_STORAGE_VERSION, estimated_energy_storage_key(entry_id))
+        self.total_kwh = 0.0
+        self._last_time: datetime | None = None
+        self._last_reading = None
+        self._loaded = False
+
+    async def async_load(self) -> None:
+        """Load the total kept before the last restart."""
+        if self._loaded:
+            return
+        self._loaded = True
+        try:
+            stored = await self._store.async_load()
+        except Exception as exc:  # pylint: disable=broad-except
+            _LOGGER.debug("Could not load the estimated electricity: %s", exc)
+            return
+        if isinstance(stored, dict) and isinstance(stored.get("total_kwh"), (int, float)) and stored["total_kwh"] >= 0:
+            self.total_kwh = float(stored["total_kwh"])
+
+    def reading_kwh(self) -> float:
+        """Return the running total, as a meter would."""
+        return self.total_kwh
+
+    @callback
+    def async_update(self, now: datetime) -> None:
+        """Add the estimated power of a new reading for the time since the last one."""
+        figure = self._power()
+        if figure is None:
+            return
+        reading, watts = figure
+        if reading is self._last_reading:
+            return
+        self._last_reading = reading
+        if self._last_time is not None and watts > 0:
+            # after an outage the last reading says nothing about the gap
+            hours = min((now - self._last_time).total_seconds() / 3600.0, self._max_hours)
+            if hours > 0:
+                self.total_kwh += watts * hours / 1000.0
+                self._store.async_delay_save(lambda: {"total_kwh": self.total_kwh}, ESTIMATE_SAVE_DELAY_S)
+        self._last_time = now
+
+
 @dataclass(frozen=True, kw_only=True)
 class MeteredCopDescription(SensorEntityDescription):
-    """A COP from server heat and metered electricity."""
+    """A COP from server heat and metered (or estimated) electricity."""
 
     span: str = "today"
 
@@ -395,33 +469,57 @@ METERED_COP_DESCRIPTIONS = (
     MeteredCopDescription(key="metered_cop_last_month", name="COP last month (metered)", span="last_month"),
 )
 
+# The same COPs with the estimated electricity, for an installation without a meter
+ESTIMATED_COP_DESCRIPTIONS = (
+    MeteredCopDescription(key="estimated_cop_today", name="COP today (estimated)"),
+    MeteredCopDescription(key="estimated_cop_yesterday", name="COP yesterday (estimated)", span="yesterday"),
+    MeteredCopDescription(key="estimated_cop_month", name="COP this month (estimated)", span="month"),
+    MeteredCopDescription(key="estimated_cop_last_month", name="COP last month (estimated)", span="last_month"),
+)
+
 
 class CSNetHomeMeteredCopSensor(CoordinatorEntity, SensorEntity):
-    """Heat the server recorded divided by the electricity a meter of the user counted."""
+    """Heat the server recorded divided by the electricity of the same period.
+
+    The electricity is what a meter of the user counted, or, without one, the
+    integration's estimate (``counter``).
+    """
 
     _attr_has_entity_name = True
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_suggested_display_precision = 2
     entity_description: MeteredCopDescription
 
-    def __init__(self, coordinator, description: MeteredCopDescription, device_info, tracker: MeterTracker) -> None:
+    def __init__(
+        self, coordinator, description: MeteredCopDescription, device_info, tracker: MeterTracker, counter: EstimatedEnergyCounter | None = None
+    ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
         self.entity_description = description
         self._attr_unique_id = f"{DOMAIN}-{description.key}"
         self._attr_device_info = device_info
         self._tracker = tracker
+        self._counter = counter
+
+    def _follow(self) -> None:
+        """Bring the estimate up to date first, then take the period readings."""
+        now = dt_util.now()
+        if self._counter is not None:
+            self._counter.async_update(now)
+        self._tracker.async_update(now)
 
     async def async_added_to_hass(self) -> None:
         """Load the kept meter readings before the first state is written."""
+        if self._counter is not None:
+            await self._counter.async_load()
         await self._tracker.async_load()
-        self._tracker.async_update(dt_util.now())
+        self._follow()
         await super().async_added_to_hass()
 
     @callback
     def _handle_coordinator_update(self) -> None:
         """Follow the meter at every poll."""
-        self._tracker.async_update(dt_util.now())
+        self._follow()
         super()._handle_coordinator_update()
 
     def _figures(self) -> tuple[float | None, float | None]:
@@ -460,5 +558,6 @@ class CSNetHomeMeteredCopSensor(CoordinatorEntity, SensorEntity):
         return {
             "heat_kwh": heat,
             "electricity_kwh": round(electricity, 3) if electricity is not None else None,
-            "meter": self._tracker.entity_id,
+            "meter": None if self._counter is not None else self._tracker.entity_id,
+            "electricity_source": "estimate" if self._counter is not None else "meter",
         }

@@ -735,6 +735,132 @@ def test_instant_cop_uses_the_estimate_when_the_meter_cannot_tell(reading):
     assert cop == round(2.5 * 1160 * 5 / electricity, 2)
 
 
+def _meter_hass(states):
+    """A hass whose states the test sets: entity id -> (state, unit)."""
+    return SimpleNamespace(
+        states=SimpleNamespace(
+            get=lambda entity_id: (
+                SimpleNamespace(state=states[entity_id][0], attributes={"unit_of_measurement": states[entity_id][1]}) if entity_id in states else None
+            )
+        )
+    )
+
+
+def _consumption_sensor(states, power_entity=None):
+    sensor = CSNetHomeCalculatedSensor(_coordinator(dict(COP_RUN)), DEVICE_DATA, {}, CALCULATED_SENSOR_DESCRIPTIONS["instant_consumption"])
+    sensor.energy_meter = "sensor.heat_pump_energy"
+    sensor.energy_meter_power = power_entity
+    sensor.hass = _meter_hass(states)
+    sensor.async_write_ha_state = lambda: None
+    return sensor
+
+
+@pytest.mark.parametrize(("state", "unit", "expected"), [("812.4", "W", 812), ("0.8124", "kW", 812)])
+def test_instant_consumption_is_the_meter_power_sensor(state, unit, expected):
+    """With a power sensor beside the meter, the consumption is what it measures."""
+    sensor = _consumption_sensor({"sensor.heat_pump_power": (state, unit)}, "sensor.heat_pump_power")
+    assert sensor.native_value == expected
+    assert sensor.extra_state_attributes["electricity_source"] == "meter"
+
+
+def test_instant_consumption_falls_back_to_the_estimate_without_a_meter_reading():
+    """A meter power sensor that is unavailable leaves the estimate."""
+    sensor = _consumption_sensor({"sensor.heat_pump_power": ("unavailable", "W")}, "sensor.heat_pump_power")
+    assert sensor.native_value == sensor._calculate_complex_power(sensor._get_heating_status())
+    assert sensor.extra_state_attributes["electricity_source"] == "estimate"
+
+
+def test_instant_consumption_from_what_the_meter_counted():
+    """Without a power sensor: the energy the meter counted over the last minutes."""
+    states = {"sensor.heat_pump_energy": ("100.0", UnitOfEnergy.KILO_WATT_HOUR)}
+    sensor = _consumption_sensor(states)
+    start = dt_util.now().replace(hour=12, minute=0, second=0, microsecond=0)
+    for minutes, reading in ((0, "100.0"), (1, "100.01"), (6, "100.1")):
+        states["sensor.heat_pump_energy"] = (reading, UnitOfEnergy.KILO_WATT_HOUR)
+        with patch("custom_components.csnet_home.sensor.dt_util.now", return_value=start + timedelta(minutes=minutes)):
+            sensor._handle_coordinator_update()
+    assert sensor.native_value == 1000  # 0.1 kWh in six minutes
+
+
+def test_instant_consumption_needs_two_minutes_of_meter_readings():
+    """One minute of a meter that counts in steps of a few Wh says too little: the estimate stands in."""
+    states = {"sensor.heat_pump_energy": ("100.0", UnitOfEnergy.KILO_WATT_HOUR)}
+    sensor = _consumption_sensor(states)
+    start = dt_util.now().replace(hour=12, minute=0, second=0, microsecond=0)
+    for minutes, reading in ((0, "100.0"), (1, "100.01")):
+        states["sensor.heat_pump_energy"] = (reading, UnitOfEnergy.KILO_WATT_HOUR)
+        with patch("custom_components.csnet_home.sensor.dt_util.now", return_value=start + timedelta(minutes=minutes)):
+            sensor._handle_coordinator_update()
+    assert sensor.native_value == sensor._calculate_complex_power(sensor._get_heating_status())
+
+
+def _metered_daily_sensor(key, states):
+    sensor = _daily_sensor(key)
+    sensor.energy_meter = "sensor.heat_pump_energy"
+    sensor.hass = _meter_hass(states)
+    return sensor
+
+
+def _daily_poll(sensor, states, when, reading):
+    states["sensor.heat_pump_energy"] = (reading, UnitOfEnergy.KILO_WATT_HOUR)
+    with patch("custom_components.csnet_home.sensor.dt_util.now", return_value=when):
+        sensor._handle_coordinator_update()
+
+
+def test_daily_consumption_counts_what_the_meter_counted():
+    """The first reading sets the start; then the day adds what the meter counted; after a reset it starts over."""
+    states = {}
+    sensor = _metered_daily_sensor("daily_consumption", states)
+    sensor._get_heating_status().update(STOPPED | {"operationStatus": 4})
+    start = dt_util.now().replace(hour=12, minute=0, second=0, microsecond=0)
+    sensor._last_update_time = start - timedelta(minutes=1)
+    _daily_poll(sensor, states, start, "50.0")
+    first = sensor._state  # the estimate of the minute before the first reading
+    assert first < 0.01
+    _daily_poll(sensor, states, start + timedelta(minutes=1), "50.3")
+    assert sensor._state == pytest.approx(first + 0.3)
+    assert sensor.extra_state_attributes == {"electricity_source": "meter"}
+    _daily_poll(sensor, states, start + timedelta(minutes=2), "0.1")  # the meter was reset
+    after_reset = sensor._state
+    assert after_reset - first - 0.3 < 0.01
+    _daily_poll(sensor, states, start + timedelta(minutes=3), "0.2")
+    assert sensor._state == pytest.approx(after_reset + 0.1)
+
+
+def test_daily_consumption_estimates_while_the_meter_has_no_reading():
+    """No reading: the estimate stands in, also for the interval up to the next reading."""
+    states = {}
+    sensor = _metered_daily_sensor("daily_consumption", states)
+    sensor._get_heating_status().update(STOPPED | {"operationStatus": 4})
+    start = dt_util.now().replace(hour=12, minute=0, second=0, microsecond=0)
+    sensor._last_update_time = start - timedelta(minutes=1)
+    _daily_poll(sensor, states, start, "50.0")
+    _daily_poll(sensor, states, start + timedelta(minutes=1), "unavailable")
+    # two minutes of a stopped unit estimated: the one before the first reading, and the unread one
+    assert 0 < sensor._state <= 2 * IDLE_W / 60 / 1000 + 1e-9
+    assert sensor.extra_state_attributes == {"electricity_source": "estimate"}
+    before = sensor._state
+    _daily_poll(sensor, states, start + timedelta(minutes=2), "80.0")
+    assert sensor._state - before < 0.01  # not the 30 kWh the meter moved while unread
+
+
+def test_daily_cop_divides_by_what_the_meter_counted():
+    """The day's heat over the electricity the meter counted in the same mode."""
+    states = {}
+    sensor = _metered_daily_sensor("daily_cop_hvac", states)
+    sensor._get_heating_status().update(COP_RUN)
+    start = dt_util.now().replace(hour=12, minute=0, second=0, microsecond=0)
+    sensor._last_update_time = start - timedelta(minutes=1)
+    _daily_poll(sensor, states, start, "50.0")
+    first_in, first_out = sensor._energy_in, sensor._energy_out  # the minute before, estimated
+    _daily_poll(sensor, states, start + timedelta(minutes=5), "50.1")
+    heat_w = sensor._get_thermal_power_values(sensor._get_heating_status())[0]
+    assert first_out == pytest.approx(heat_w / 60 / 1000)
+    assert sensor._energy_in == pytest.approx(first_in + 0.1)
+    assert sensor._energy_out == pytest.approx(heat_w * 6 / 60 / 1000)
+    assert sensor.extra_state_attributes["electricity_source"] == "meter"
+
+
 def test_daily_cop_counts_the_standby_between_compressor_runs():
     """With the compressor stopped the controllers and the crankcase heater still draw: the daily COP counts it."""
     sensor = _daily_sensor("daily_cop_hvac")
@@ -819,7 +945,7 @@ async def test_daily_cop_keeps_its_totals_across_a_restart():
     sensor = _daily_sensor("daily_cop_hvac")
     await _restore_with(sensor, "4.0", dt_util.now(), {"electricity_kwh": 2.0, "heat_kwh": 8.0})
     assert sensor.native_value == 4.0
-    assert sensor.extra_state_attributes == {"electricity_kwh": 2.0, "heat_kwh": 8.0}
+    assert sensor.extra_state_attributes == {"electricity_kwh": 2.0, "heat_kwh": 8.0, "electricity_source": "estimate"}
 
     # a minute of standby is added to the day's totals, not to new ones
     sensor._get_heating_status().update(STOPPED | {"operationStatus": 4})
@@ -836,7 +962,7 @@ async def test_daily_cop_totals_from_yesterday_are_not_restored():
     """Yesterday's totals belong to yesterday."""
     sensor = _daily_sensor("daily_cop_dhw")
     await _restore_with(sensor, "4.0", dt_util.now() - timedelta(days=1), {"electricity_kwh": 2.0, "heat_kwh": 8.0})
-    assert sensor.extra_state_attributes == {"electricity_kwh": 0.0, "heat_kwh": 0.0}
+    assert sensor.extra_state_attributes == {"electricity_kwh": 0.0, "heat_kwh": 0.0, "electricity_source": "estimate"}
 
 
 def test_daily_energy_sensors_show_no_totals():
