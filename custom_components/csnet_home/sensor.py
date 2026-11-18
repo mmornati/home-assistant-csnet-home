@@ -899,6 +899,25 @@ def _heating_curve_sensors(hass, entry, coordinator, remove_stale: bool = True) 
     return sensors
 
 
+def _power_reading_follower(coordinator, observer):
+    """Return the listener that lets the power model learn from each update of the coordinator.
+
+    Added before the sensors' own listeners, it runs first at every update:
+    the crankcase heater's state and the model's correction factor are then
+    up to date when the sensors ask for the power.
+    """
+
+    @callback
+    def _follow() -> None:
+        if getattr(coordinator, "last_update_success", True) is False:
+            return
+        heating_status = observer._get_heating_status()  # pylint: disable=protected-access
+        if heating_status:
+            observer.observe_power_reading(heating_status)
+
+    return _follow
+
+
 def _server_energy_sensors(hass, entry, coordinator) -> list:
     """Return the sensors for the server's energy records, and for the COP when a meter is configured."""
     # imported here: that module is only needed by this platform's setup
@@ -1015,6 +1034,12 @@ async def async_setup_entry(hass, entry, async_add_entities):
         calibration = PowerCalibration(hass, entry.entry_id)
         await calibration.async_load()
         coordinator.power_calibration = calibration
+        # The power model learns from each reading once, before the sensors ask for the power
+        observer = CSNetHomeCalculatedSensor(coordinator, global_device_data, common_data, CALCULATED_SENSOR_DESCRIPTIONS["instant_consumption"])
+        observer.power_supply = power_supply
+        follow = _power_reading_follower(coordinator, observer)
+        follow()
+        entry.async_on_unload(coordinator.async_add_listener(follow))
 
         for description in INSTALLATION_SENSOR_DESCRIPTIONS:
             sensors.append(
@@ -1581,74 +1606,86 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
         # no speed reported: the fan stops during a defrost
         return 0.0 if heating_status.get("defrosting") else FAN_DEFAULT_POWER_W
 
+    def observe_power_reading(self, heating_status) -> None:
+        """Learn from a new reading of the unit: once per update of the coordinator.
+
+        The crankcase heater's state follows the discharge temperature, and
+        the model's correction factor follows the reported current. The power
+        itself is then a plain calculation, however many sensors ask for it.
+        """
+        terms = self._power_terms(heating_status)
+        self._crankcase_heater().update(terms["hz"] > 0, terms["discharge_temperature"])
+        if terms["compressor_power"] is not None:
+            base = terms["base_power"]
+            self._power_calibration().learn(terms["hz"], terms["compressor_power"], terms["min_watts"] - base, terms["max_watts"] - base)
+
+    def _power_terms(self, heating_status) -> dict:
+        """Return the parts of the power model for a reading, changing nothing.
+
+        ``compressor_power`` is the pressure model's uncorrected figure, or
+        None when it cannot be used (a defrost, or no usable pressures).
+        ``min_watts`` and ``max_watts`` are the range of the reported current.
+        """
+        hz = heating_status.get("ouHz", 0) or 0
+        p_high = heating_status.get("ouDischargePress", 0) or 0
+        p_low = heating_status.get("ouSuctionPress", 0) or 0
+        t_discharge = _convert_unsigned_to_signed_byte(heating_status.get("ouDischargeTemperature"))
+        current_amps = heating_status.get("ouCurrent", 0) or 0
+        watts_per_amp = self._watts_per_amp(heating_status)
+
+        # The pressure model needs both pressures and no defrost
+        delta_p = p_high - p_low
+        uses_pressures = not heating_status.get("defrosting") and delta_p > 0
+
+        compressor_power = None
+        if hz > 0 and uses_pressures:
+            # A. RPM Saturation (>115 Hz)
+            factor_rpm = 1.0 - (hz - 115) * 0.008 if hz > 115 else 1.0
+            # B. Temperature Correction (>90°C)
+            t = t_discharge or 0
+            factor_temp = 1.0 - (t - 90) * 0.025 if t > 90 else 1.0
+            compressor_power = COMPRESSOR_FACTOR * hz * delta_p * factor_rpm * factor_temp
+
+        # Range the reported current allows. It is truncated to whole Amps: 6 A
+        # means 6.0 to 6.99 A (1320 to 1538 W single phase). At low speed the
+        # current over-reads: there it only caps.
+        floor = hz >= CURRENT_FLOOR_MIN_HZ
+        return {
+            "hz": hz,
+            "discharge_temperature": t_discharge,
+            "auxiliary_power": STANDBY_POWER_W + self._pump_power(heating_status, hz > 0),
+            "base_power": OUTDOOR_ELECTRONICS_POWER_W + self._fan_power(heating_status),
+            "compressor_power": compressor_power,
+            "min_watts": current_amps * watts_per_amp if floor else 0.0,
+            "max_watts": (current_amps + 0.99) * watts_per_amp,
+        }
+
     def _calculate_complex_power(self, heating_status):
         """Calculate power using the complex physical model with guardrails.
 
         The outdoor unit (compressor, inverter, fan) is kept inside the range
         of its reported current. The pump and the controllers are fed apart
-        from that current and are added on top.
+        from that current and are added on top. It only reads what
+        observe_power_reading learnt: asking for it changes nothing.
         """
-        # 1. Inputs
-        hz = heating_status.get("ouHz", 0) or 0
-        p_high = heating_status.get("ouDischargePress", 0)
-        p_low = heating_status.get("ouSuctionPress", 0)
-
-        # Get temp using the module-level helper function
-        t_discharge = _convert_unsigned_to_signed_byte(heating_status.get("ouDischargeTemperature"))
-        # The crankcase heater shows in the discharge temperature of a stopped compressor
-        crankcase_heating = self._crankcase_heater().update(heating_status, hz > 0, t_discharge)
-        if t_discharge is None:
-            t_discharge = 0
-
-        current_amps = heating_status.get("ouCurrent", 0)
-        watts_per_amp = self._watts_per_amp(heating_status)
-
+        terms = self._power_terms(heating_status)
+        hz = terms["hz"]
         # Controllers and pump: drawn whether or not the compressor runs
-        auxiliary_power = STANDBY_POWER_W + self._pump_power(heating_status, hz > 0)
+        auxiliary_power = terms["auxiliary_power"]
 
         # Compressor OFF (0 Hz): the auxiliary consumption, and the crankcase
         # heater during the part of its cycle it is heating
         if hz == 0:
-            return round(auxiliary_power + (CRANKCASE_HEATER_POWER_W if crankcase_heating else 0.0))
+            return round(auxiliary_power + (CRANKCASE_HEATER_POWER_W if self._crankcase_heater().heating else 0.0))
 
-        # 2. Efficiency Model (Base)
-        k_dynamic = COMPRESSOR_FACTOR
-
-        # 3. Red Zone Corrections
-
-        # A. RPM Saturation (>115 Hz)
-        factor_rpm = 1.0
-        if hz > 115:
-            excess_hz = hz - 115
-            factor_rpm = 1.0 - (excess_hz * 0.008)
-
-        # B. Temperature Correction (>90°C)
-        factor_temp = 1.0
-        if t_discharge > 90:
-            excess_temp = t_discharge - 90
-            factor_temp = 1.0 - (excess_temp * 0.025)
-
-        # 4. Range the reported current allows. It is truncated to whole Amps:
-        # 6 A means 6.0 to 6.99 A (1320 to 1538 W single phase). At low speed
-        # the current over-reads, so it only caps the estimate there.
-        min_watts = current_amps * watts_per_amp if hz >= CURRENT_FLOOR_MIN_HZ else 0.0
-        max_watts = (current_amps + 0.99) * watts_per_amp
-
-        # 5. Preliminary Calculation
-        base_power = OUTDOOR_ELECTRONICS_POWER_W + self._fan_power(heating_status)
-        delta_p = p_high - p_low
-
-        if heating_status.get("defrosting") or delta_p <= 0:
-            # A defrost, by the unit's own flag, or pressures that give no
-            # usable difference (crossed, or no suction sensor)
+        base_power = terms["base_power"]
+        min_watts, max_watts = terms["min_watts"], terms["max_watts"]
+        if terms["compressor_power"] is None:
+            # A defrost, by the unit's own flag, or crossed pressures: the
+            # current's range carries it
             calculated_power = base_power + (hz * 15)
         else:
-            compressor_power = k_dynamic * hz * delta_p * factor_rpm * factor_temp
-            # The model corrects itself: outside the current's range it is
-            # wrong in a known direction, and its factor follows
-            calibration = self._power_calibration()
-            calibration.learn(heating_status, hz, compressor_power, min_watts - base_power, max_watts - base_power)
-            calculated_power = base_power + compressor_power * calibration.factor(hz)
+            calculated_power = base_power + terms["compressor_power"] * self._power_calibration().factor(hz)
 
         # 6. Guardrail System (Protection)
         outdoor_power = calculated_power

@@ -47,7 +47,6 @@ class PowerCalibration:
         self.factors: dict[int, float] = {}
         self._saved: dict[int, float] = {}
         self._store = Store(hass, POWER_CALIBRATION_STORAGE_VERSION, power_calibration_storage_key(entry_id)) if hass and entry_id else None
-        self._last_reading = None
 
     @staticmethod
     def band(hz: float) -> int:
@@ -58,16 +57,12 @@ class PowerCalibration:
         """Return the correction factor for a compressor speed."""
         return self.factors.get(self.band(hz), 1.0)
 
-    def learn(self, reading, hz: float, compressor_power: float, low: float, high: float) -> None:
+    def learn(self, hz: float, compressor_power: float, low: float, high: float) -> None:
         """Move the factor towards the range the reported current allows.
 
         ``compressor_power`` is the model's uncorrected figure, ``low`` and
-        ``high`` the range for it. Each reading is learnt from once, however
-        many sensors ask for the power.
+        ``high`` the range for it. Called once per reading of the unit.
         """
-        if reading is self._last_reading:
-            return
-        self._last_reading = reading
         if compressor_power <= 0 or high <= 0:
             return
         band = self.band(hz)
@@ -133,13 +128,9 @@ class CrankcaseHeaterTracker:
         """Start as heating: nothing is known until the temperature moves."""
         self.heating = True
         self._temperature = None
-        self._last_reading = None
 
-    def update(self, reading, compressor_running: bool, discharge_temperature) -> bool:
-        """Take a reading into account, once, and return whether the heater is on."""
-        if reading is self._last_reading:
-            return self.heating
-        self._last_reading = reading
+    def update(self, compressor_running: bool, discharge_temperature) -> bool:
+        """Take a new reading into account, once per reading, and return whether the heater is on."""
         if compressor_running:
             # A compressor that has just run is hot: no heating until it has
             # cooled down and the temperature climbs again

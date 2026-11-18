@@ -28,6 +28,7 @@ from custom_components.csnet_home.sensor import (
     CSNetHomeCompressorSensor,
     CSNetHomeDailySensor,
     CSNetHomeInstallationSensor,
+    _power_reading_follower,
 )
 
 DEVICE_DATA = {"device_name": "System", "device_id": "global", "room_name": "Controller", "parent_id": "global", "room_id": "global"}
@@ -265,11 +266,17 @@ def test_stopped_unit_draws_its_standby():
     assert _electric_power(STOPPED) == IDLE_W
 
 
+def _observed(sensor, reading):
+    """A new reading, as the coordinator brings it: the model learns once, then the power is asked for."""
+    sensor.observe_power_reading(reading)
+    return sensor._calculate_complex_power(reading)
+
+
 def _stopped_readings(sensor, *temperatures):
     """Feed the sensor one reading per discharge temperature and return the last power."""
     power = None
     for temperature in temperatures:
-        power = sensor._calculate_complex_power(STOPPED | {"ouDischargeTemperature": temperature})
+        power = _observed(sensor, STOPPED | {"ouDischargeTemperature": temperature})
     return power
 
 
@@ -290,7 +297,7 @@ def test_crankcase_heater_state_holds_between_whole_degrees():
 def test_crankcase_heater_is_not_counted_right_after_a_run():
     """A compressor that has just stopped is hot and cooling: no heating until it warms again."""
     sensor, _ = _calibrated_sensor()
-    sensor._calculate_complex_power(dict(LOW_MODEL))
+    _observed(sensor, dict(LOW_MODEL))
     assert _stopped_readings(sensor, 70, 68, 60) == STANDBY_POWER_W
     assert _stopped_readings(sensor, 61) == IDLE_W
 
@@ -301,23 +308,48 @@ def test_crankcase_heater_keeps_its_state_without_a_temperature():
     assert _stopped_readings(sensor, 33, 32, None) == STANDBY_POWER_W
 
 
-def test_crankcase_heater_takes_one_reading_once():
-    """Several sensors ask for the power of the same reading: the tracker moves once."""
+def test_asking_for_the_power_changes_nothing():
+    """Several sensors ask for the power of a reading: only the coordinator's update moves the state."""
     sensor, coordinator = _calibrated_sensor()
     _stopped_readings(sensor, 33, 32)
-    reading = STOPPED | {"ouDischargeTemperature": 33}
-    sensor._calculate_complex_power(reading)
-    reading["ouDischargeTemperature"] = 20  # the same reading, asked for again
-    assert sensor._calculate_complex_power(reading) == IDLE_W
-    assert coordinator.crankcase_heater.heating is True
+    for temperature in (40, 50, 60):
+        assert sensor._calculate_complex_power(STOPPED | {"ouDischargeTemperature": temperature}) == STANDBY_POWER_W
+    assert coordinator.crankcase_heater.heating is False
+    for _ in range(3):
+        sensor._calculate_complex_power(dict(LOW_MODEL))
+    assert coordinator.power_calibration.factors == {}
+
+
+MINIMUM_SPEED = {"ouHz": 31, "ouCurrent": 2, "ouDischargePress": 18, "ouSuctionPress": 9, "waterFlow": 20, "pumpSpeed": 76, "fanRPM": -1}
 
 
 def test_reported_current_is_no_floor_at_low_speed():
     """At the minimum speed the unit reports 2 A for under 400 W: the current only caps the estimate."""
-    minimum = {"ouHz": 31, "ouCurrent": 2, "ouDischargePress": 18, "ouSuctionPress": 9, "waterFlow": 20, "pumpSpeed": 76, "fanRPM": -1}
     auxiliary = STANDBY_POWER_W + PUMP_MAX_POWER_W * 0.76**2
-    assert _electric_power(minimum) == round(OUTDOOR_ELECTRONICS_POWER_W + FAN_DEFAULT_POWER_W + 31 * 9 + auxiliary)
-    assert _electric_power(minimum | {"ouHz": 41}) >= 2 * WATTS_PER_AMP_SINGLE_PHASE
+    assert _electric_power(MINIMUM_SPEED) == round(OUTDOOR_ELECTRONICS_POWER_W + FAN_DEFAULT_POWER_W + 31 * 9 + auxiliary)
+    assert _electric_power(MINIMUM_SPEED | {"ouHz": 41}) >= 2 * WATTS_PER_AMP_SINGLE_PHASE
+
+
+def test_the_power_model_learns_once_per_update_of_the_coordinator():
+    """The listener learns from every update, even when the coordinator updates its data in place."""
+    reading = dict(LOW_MODEL)
+    coordinator = _coordinator(reading)
+    observer = CSNetHomeCalculatedSensor(coordinator, DEVICE_DATA, {}, CALCULATED_SENSOR_DESCRIPTIONS["instant_consumption"])
+    follow = _power_reading_follower(coordinator, observer)
+    follow()
+    first = coordinator.power_calibration.factor(41)
+    observer._get_heating_status()["ouCurrent"] = 7  # the same dict, changed in place
+    follow()
+    assert 1.0 < first < coordinator.power_calibration.factor(41)
+
+
+def test_the_power_model_learns_nothing_from_a_failed_update():
+    """A failed poll leaves the last reading in place: nothing new to learn from."""
+    coordinator = _coordinator(dict(LOW_MODEL))
+    coordinator.last_update_success = False
+    observer = CSNetHomeCalculatedSensor(coordinator, DEVICE_DATA, {}, CALCULATED_SENSOR_DESCRIPTIONS["instant_consumption"])
+    _power_reading_follower(coordinator, observer)()
+    assert observer._power_calibration().factors == {}
 
 
 def test_crankcase_heater_is_off_while_the_compressor_runs():
@@ -389,9 +421,9 @@ def _calibrated_sensor():
 def test_model_below_the_current_range_raises_its_factor():
     """Each new reading under the range moves the factor of that frequency band up."""
     sensor, coordinator = _calibrated_sensor()
-    sensor._calculate_complex_power(dict(LOW_MODEL))
+    sensor.observe_power_reading(dict(LOW_MODEL))
     first = coordinator.power_calibration.factor(41)
-    sensor._calculate_complex_power(dict(LOW_MODEL))
+    sensor.observe_power_reading(dict(LOW_MODEL))
     assert 1.0 < first < coordinator.power_calibration.factor(41)
     assert coordinator.power_calibration.factor(80) == 1.0  # another band is left alone
 
@@ -399,25 +431,15 @@ def test_model_below_the_current_range_raises_its_factor():
 def test_model_above_the_current_range_lowers_its_factor():
     """A model over the range of 1 A is brought down."""
     sensor, coordinator = _calibrated_sensor()
-    sensor._calculate_complex_power(LOW_MODEL | {"ouCurrent": 1})
+    sensor.observe_power_reading(LOW_MODEL | {"ouCurrent": 1})
     assert coordinator.power_calibration.factor(41) < 1.0
 
 
 def test_model_inside_the_current_range_keeps_its_factor():
     """Nothing to learn while the model agrees with the current."""
     sensor, coordinator = _calibrated_sensor()
-    sensor._calculate_complex_power(SIX_AMPS | {"pumpSpeed": 100, "fanRPM": 0})
+    sensor.observe_power_reading(SIX_AMPS | {"pumpSpeed": 100, "fanRPM": 0})
     assert coordinator.power_calibration.factors == {}
-
-
-def test_one_reading_is_learnt_from_once():
-    """Several sensors ask for the power of the same reading: it counts once."""
-    sensor, coordinator = _calibrated_sensor()
-    reading = dict(LOW_MODEL)
-    sensor._calculate_complex_power(reading)
-    first = coordinator.power_calibration.factor(31)
-    sensor._calculate_complex_power(reading)
-    assert coordinator.power_calibration.factor(31) == first
 
 
 def test_calibrated_model_reaches_the_current_range():
@@ -427,7 +449,7 @@ def test_calibrated_model_reaches_the_current_range():
     assert sensor._calculate_complex_power(dict(reading)) == round(35 + 41 * 17 + STANDBY_POWER_W + PUMP_MAX_POWER_W)
     reading = LOW_MODEL | {"ouCurrent": 4}  # 880 to 1098 W: the model is under it
     for _ in range(200):
-        sensor._calculate_complex_power(dict(reading))
+        sensor.observe_power_reading(dict(reading))
     factor = coordinator.power_calibration.factor(41)
     assert 35 + 41 * 17 * factor == pytest.approx(4 * WATTS_PER_AMP_SINGLE_PHASE, abs=1)
 
@@ -436,21 +458,21 @@ def test_factor_stays_within_its_limits():
     """A model far from the range is not stretched without limit."""
     sensor, coordinator = _calibrated_sensor()
     for _ in range(500):
-        sensor._calculate_complex_power(LOW_MODEL | {"ouCurrent": 12})
+        sensor.observe_power_reading(LOW_MODEL | {"ouCurrent": 12})
     assert coordinator.power_calibration.factor(41) == MAX_FACTOR
 
 
 def test_defrost_teaches_nothing():
     """The defrost estimate is not the model: the current says nothing about the model then."""
     sensor, coordinator = _calibrated_sensor()
-    sensor._calculate_complex_power(LOW_MODEL | {"defrosting": 1})
+    sensor.observe_power_reading(LOW_MODEL | {"defrosting": 1})
     assert sensor._power_calibration().factors == {}
 
 
 def test_consumption_sensor_shows_the_learnt_factors():
     """The factors are visible, by frequency band, on the consumption sensor only."""
     sensor, coordinator = _calibrated_sensor()
-    sensor._calculate_complex_power(dict(LOW_MODEL))
+    sensor.observe_power_reading(dict(LOW_MODEL))
     attributes = sensor.extra_state_attributes["power_calibration"]
     assert list(attributes) == ["40-59 Hz"]
     assert attributes["40-59 Hz"] == round(coordinator.power_calibration.factor(41), 3)
@@ -473,10 +495,10 @@ def test_learnt_factor_is_saved_once_it_has_moved_enough():
     hass = MagicMock()
     calibration = PowerCalibration(hass, "entry")
     calibration._async_save = MagicMock()
-    calibration.learn(object(), 31, 669, 669 * 1.1, 2000)  # 5 % of the way to 1.1: 1.005
+    calibration.learn(31, 669, 669 * 1.1, 2000)  # 5 % of the way to 1.1: 1.005
     assert hass.async_create_task.call_count == 0
     for _ in range(5):
-        calibration.learn(object(), 31, 669, 669 * 1.5, 2000)
+        calibration.learn(31, 669, 669 * 1.5, 2000)
     assert hass.async_create_task.call_count >= 1
 
 
