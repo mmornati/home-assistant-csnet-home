@@ -497,7 +497,7 @@ Installation-wide sensors on the **System-Controller** device. The CSNet API doe
 
 The sum of two parts:
 
-- **Outdoor unit**, while the compressor runs: estimated as 1.0 W per Hz and per bar of pressure difference (with corrections above 115 Hz and above 90 °C of discharge temperature), plus 35 W for its electronics and the outdoor fan. The result is clamped to the range given by the reported compressor current (current × 220 W up to (current + 0.99) × 220 W in single phase: the mains voltage times the power factor, fitted on a metered Yutaki S 2.0). Below 40 Hz the current only caps the estimate: at the minimum speed the unit reports 2 A for under 400 W.
+- **Outdoor unit**, while the compressor runs: estimated as 1.0 W per Hz and per bar of pressure difference (with corrections above 115 Hz and above 90 °C of discharge temperature), plus 35 W for its electronics, plus the outdoor fan (up to 90 W, following its speed; 40 W when the unit does not report it). Without a usable pressure difference (a defrost, crossed pressures, or a suction pressure of 128 from a unit without that sensor) the compressor is taken as 15 W per Hz. The result is clamped to the range given by the reported compressor current (current × 220 W up to (current + 0.99) × 220 W in single phase: the mains voltage times the power factor, fitted on a metered Yutaki S 2.0; about 658 W per A in three phase). On a single-phase unit using the pressure model, below 40 Hz the current only caps the estimate: at its minimum speed a Yutaki S 2.0 reports 2 A for under 400 W. Three-phase units, and units without the pressure model, keep the current as a floor at every speed.
 - **Auxiliary consumption**, which that current does not feed: 15 W for the controllers at all times, and the circulation pump while water flows.
 - **Crankcase heater**, 30 W while it heats the stopped compressor.
 
@@ -514,7 +514,8 @@ The unit reports its current in whole Amps, truncated: 6 A means 6.0 to 6.99 A. 
 
 - One factor per 20 Hz band of compressor frequency, each starting at 1.0 and kept between 0.6 and 1.6.
 - The factors are kept across restarts and shown in the `power_calibration` attribute of Instant Consumption.
-- Nothing is learnt during a defrost, which uses a separate estimate (35 W + fan + 15 W per Hz). A defrost is taken from the unit's own defrost flag.
+- Nothing is learnt during a defrost or without a usable pressure difference, which use a separate estimate (35 W + fan + 15 W per Hz). A defrost is taken from the unit's own defrost flag.
+- The learning happens once per update of the integration, whatever number of sensors show the power.
 
 With the compressor stopped the sensor shows 15 W, or 45 W while the crankcase heater is on, and more while the pump runs. Backup and tank heaters are not counted.
 
