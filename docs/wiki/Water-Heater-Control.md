@@ -41,7 +41,7 @@ The water heater supports three operation modes. They map to the unit's DHW run/
 
 The current mode is read back from the unit: `off` when DHW is stopped, `performance` while the unit reports a boost in progress (`doingBoost`), `eco` otherwise.
 
-`performance` is offered only where the unit reports a hot water boost (`hasBoost`). Some units report `hasBoost: false` although their boost works: turn on **Always offer hot water boost** in the integration's settings (Reconfigure) and `performance` is always offered.
+`performance` is offered only where the unit reports a hot water boost (`hasBoost`). Some units report `hasBoost: false` although their boost works: turn on **Enable DHW boost** in the integration's settings (Reconfigure) and `performance` is always offered.
 
 ### Off Mode
 
