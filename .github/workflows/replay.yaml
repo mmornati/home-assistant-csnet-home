@@ -31,18 +31,20 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Resolve latest Home Assistant
-        id: ha
-        run: python3 scripts/ci/ha_versions.py --months 1
-
       - name: Setup Python
         uses: actions/setup-python@v7
         with:
-          python-version: ${{ steps.ha.outputs.latest_python }}
+          python-version: "3.14"
           cache: 'pip'
 
-      - name: Install Home Assistant ${{ steps.ha.outputs.latest }}
-        run: scripts/ci/install_ha.sh "${{ steps.ha.outputs.latest }}" tests
+      # The replay needs the test harness, which is published a few days after
+      # each Home Assistant release: take the newest harness and the Home
+      # Assistant version it pins, not the newest Home Assistant.
+      - name: Install Home Assistant and its test harness
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest-homeassistant-custom-component pytest-asyncio
+          python -c 'from homeassistant.const import __version__; print("Home Assistant", __version__)'
 
       - name: Fetch the samples
         run: python3 scripts/fetch_samples.py --all
