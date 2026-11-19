@@ -657,6 +657,27 @@ def test_instant_cop_is_zero_while_the_compressor_is_stopped_and_starts_anew():
     assert restarted == round(2.5 * 1160 * 5 / electricity, 2)
 
 
+def test_instant_cop_skips_the_poll_a_compressor_starts_up():
+    """A few Hz and 0 A, with the water still warm from the last run: no ratio from that poll."""
+    sensor = _cop_sensor(COP_RUN)
+    start = dt_util.now().replace(hour=12, minute=0, second=0, microsecond=0)
+    _poll(sensor, start, ouHz=0)
+    assert _poll(sensor, start + timedelta(minutes=1), ouHz=1, ouCurrent=0, waterOutletTemp=41) == 0.0
+    assert not sensor._cop_samples
+    running = _poll(sensor, start + timedelta(minutes=2), ouHz=41, ouCurrent=6, waterOutletTemp=45)
+    electricity = sensor._calculate_complex_power(sensor._get_heating_status())
+    assert running == round(2.5 * 1160 * 5 / electricity, 2)
+
+
+def test_instant_cop_keeps_its_average_through_a_poll_without_current():
+    """A poll at 0 A in the middle of a run neither counts nor restarts the average."""
+    sensor = _cop_sensor(COP_RUN)
+    start = dt_util.now().replace(hour=12, minute=0, second=0, microsecond=0)
+    first = _poll(sensor, start, waterOutletTemp=43)
+    assert _poll(sensor, start + timedelta(minutes=1), ouCurrent=0) == first
+    assert len(sensor._cop_samples) == 1
+
+
 def test_instant_cop_ignores_a_failed_poll():
     """A failed poll brings no new reading into the average."""
     sensor = _cop_sensor(COP_RUN)

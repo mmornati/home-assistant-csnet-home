@@ -657,6 +657,21 @@ SYSTEM_STATUS_FLAG_BITS = {
     "c2_demand": 14,
 }
 
+
+def _compressor_drawing(heating_status) -> bool:
+    """Return True when the compressor runs and draws current.
+
+    A compressor starting up reports a few Hz and 0 A for a poll: the
+    electricity is then next to nothing while the water still carries the
+    last run's heat, a ratio that means nothing. A unit that does not report
+    the current is taken at its frequency.
+    """
+    if (heating_status.get("ouHz") or 0) <= 0:
+        return False
+    current = heating_status.get("ouCurrent")
+    return current is None or current > 0
+
+
 # Heat sources after the heat pump's exchanger: while one runs, the heat is
 # measured at the exchanger outlet so its heat is not counted as the heat pump's
 OTHER_HEAT_SOURCE_FLAGS = ("space_heater_on", "boiler_on")
@@ -1617,7 +1632,7 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
             if self._cop_samples is None:
                 self._cop_samples = deque()
             heating_status = self._get_heating_status()
-            if heating_status and (heating_status.get("ouHz") or 0) > 0:
+            if heating_status and _compressor_drawing(heating_status):
                 now = dt_util.now()
                 self._drop_old_cop_samples(now)
                 heat = self._get_thermal_power_values(heating_status)[0]
@@ -1627,7 +1642,7 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
 
                     meter = meter_reading_kwh(self.hass, self.energy_meter)
                 self._cop_samples.append((now, heat, self._calculate_complex_power(heating_status), meter))
-            else:
+            elif not heating_status or (heating_status.get("ouHz") or 0) <= 0:
                 # the compressor stopped: the next run starts a new average
                 self._cop_samples.clear()
         super()._handle_coordinator_update()
@@ -1877,6 +1892,9 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
                 return 0.0
             if self._cop_samples:
                 self._drop_old_cop_samples(dt_util.now())
+            if not self._cop_samples and not _compressor_drawing(heating_status):
+                # starting up: no current drawn yet, the water still warm from before
+                return 0.0
             if self._cop_samples and self.energy_meter:
                 # the electricity the user's meter counted, when it has counted enough
                 metered = self._metered_cop()
