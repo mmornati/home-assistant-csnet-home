@@ -98,6 +98,21 @@ pytest --cov=custom_components/csnet_home --cov-report=html
 make test-unit
 ```
 
+### Replay real units
+
+A change to the readings, the estimates or the energy figures should be replayed
+against the [shared samples](https://mmornati.github.io/csnet-home-samples/) of
+real units: one unit's improvement can be another one's regression.
+
+```bash
+python scripts/fetch_samples.py --all
+pytest -m replay
+```
+
+The pull request workflow does the same and shows each day's figures before →
+after in its summary. See [Sample Data](docs/wiki/Sample-Data.md) to record and
+share your own unit.
+
 ### Manual Docker Setup (Alternative)
 
 If you prefer manual setup:

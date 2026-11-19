@@ -71,4 +71,4 @@ These come from how the integration works today. They are tracked on GitHub and 
 
 ## Contributing
 
-The best way to make the integration more robust is to share what you see. If a value is wrong or missing for your unit, open an issue with your model and the diagnostics file (see [Troubleshooting](Troubleshooting.md#download-diagnostics)), or add your setup to the [compatibility matrix](../SUPPORTED_DEVICES.md).
+The best way to make the integration more robust is to share what you see. If a value is wrong or missing for your unit, open an issue with your model and the diagnostics file (see [Troubleshooting](Troubleshooting.md#download-diagnostics)), or add your setup to the [compatibility matrix](../SUPPORTED_DEVICES.md). You can also [record a sample](Sample-Data.md) of your unit, so that changes are tested against it before they ship.

@@ -284,6 +284,8 @@ class CSNetHomeAPI:
         self.xsrf_token = None
         self.translations = {}
         self.installation_id = None
+        # Set while the replies are recorded as a sample (see sample_recorder.py)
+        self.sample_recorder = None
         # Serialise logins so parallel reads/writes never sign in twice
         self._login_lock = asyncio.Lock()
         # One order at a time, as the CSNet web app sends them, and not back
@@ -507,7 +509,10 @@ class CSNetHomeAPI:
                             if response.status != 200:
                                 _LOGGER.warning("CSNet Manager answered the %s request with HTTP %s", description, response.status)
                                 return None
-                            return await response.json()
+                            data = await response.json()
+                            if self.sample_recorder is not None:
+                                self.sample_recorder.add(description, data)
+                            return data
             except aiohttp.ContentTypeError:
                 # 200 with a page that is not JSON: handled like the login page
                 pass

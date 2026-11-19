@@ -1,0 +1,87 @@
+---
+# Replays the shared samples of real units (https://github.com/mmornati/csnet-home-samples)
+# with this pull request and with its base branch, and shows each day's figures
+# before -> after in the job summary. A replay that logs an error or shows an
+# impossible figure fails the job.
+name: Replay samples
+
+"on":
+  pull_request:
+    paths:
+      - "custom_components/csnet_home/**"
+      - "tests/replay/**"
+      - ".github/workflows/replay.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: replay-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  replay:
+    name: Replay samples
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+          cache: 'pip'
+
+      # The replay needs the test harness, which is published a few days after
+      # each Home Assistant release: take the newest harness and the Home
+      # Assistant version it pins, not the newest Home Assistant.
+      - name: Install Home Assistant and its test harness
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest-homeassistant-custom-component pytest-asyncio
+          python -c 'from homeassistant.const import __version__; print("Home Assistant", __version__)'
+
+      - name: Fetch the samples
+        run: python3 scripts/fetch_samples.py --all
+
+      - name: Replay with this change
+        env:
+          CSNET_REPLAY_REPORT: ${{ runner.temp }}/head.json
+        run: pytest tests/replay -m replay -q -p no:cacheprovider
+
+      - name: Replay with the base branch
+        if: always() && github.event_name == 'pull_request'
+        continue-on-error: true
+        env:
+          CSNET_REPLAY_REPORT: ${{ runner.temp }}/base.json
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          git worktree add "$RUNNER_TEMP/base" "origin/$BASE_REF"
+          # the base branch is replayed with this branch's harness and samples
+          rm -rf "$RUNNER_TEMP/base/tests/replay" "$RUNNER_TEMP/base/tests/samples"
+          cp -r tests/replay tests/samples "$RUNNER_TEMP/base/tests/"
+          cp setup.cfg "$RUNNER_TEMP/base/setup.cfg"
+          cd "$RUNNER_TEMP/base"
+          pytest tests/replay -m replay -q -p no:cacheprovider || true
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Replay of the shared samples"
+            echo
+            if [ -f "$RUNNER_TEMP/head.json" ] && [ -f "$RUNNER_TEMP/base.json" ]; then
+              echo "Figures of each complete day, base branch → this change."
+              echo
+              python3 -m tests.replay.report "$RUNNER_TEMP/base.json" "$RUNNER_TEMP/head.json"
+            elif [ -f "$RUNNER_TEMP/head.json" ]; then
+              python3 -m tests.replay.report "$RUNNER_TEMP/head.json" "$RUNNER_TEMP/head.json"
+            else
+              echo "No report was written."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
