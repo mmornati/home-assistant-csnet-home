@@ -3033,8 +3033,8 @@ def test_issue_199_daily_cop_sensors_use_measurement_state_class():
         assert s.unit_of_measurement in (None, "")
 
 
-def test_calculated_sensor_instant_consumption_zero_when_compressor_off():
-    """When the compressor is off (0 Hz) the instant consumption must be 0 W."""
+def test_calculated_sensor_instant_consumption_is_the_standby_when_compressor_off():
+    """When the compressor and the pump are off the controllers (15 W) and the crankcase heater (30 W) are left."""
     coordinator = _build_installation_coordinator(
         {
             "ouHz": 0,
@@ -3049,14 +3049,14 @@ def test_calculated_sensor_instant_consumption_zero_when_compressor_off():
     )
     description = CALCULATED_SENSOR_DESCRIPTIONS["instant_consumption"]
     s = CSNetHomeCalculatedSensor(coordinator, _global_device_data(), {}, description)
-    assert s.state == 0
+    assert s.state == 45
 
 
 def test_calculated_sensor_instant_consumption_uses_amps_guardrail():
     """Final power is clamped to the reported amperage window."""
     coordinator = _build_installation_coordinator(
         {
-            # 6A @ 230V -> legal range [1380, 1607] W
+            # 6A @ 220 W/A -> legal range [1320, 1538] W
             "ouHz": 80,
             "ouDischargePress": 25,
             "ouSuctionPress": 8,
@@ -3071,7 +3071,8 @@ def test_calculated_sensor_instant_consumption_uses_amps_guardrail():
     s = CSNetHomeCalculatedSensor(coordinator, _global_device_data(), {}, description)
     result = s.state
     assert isinstance(result, int)
-    assert 1380 <= result <= 1607
+    # plus the controllers and the pump, which that current does not feed
+    assert 1320 <= result <= 1538 + 62
 
 
 def _issue_229_status(capacity_code):
@@ -3100,11 +3101,11 @@ THREE_PHASE_W_PER_A = 400 * 1.732 * 0.95
         (80, "auto", THREE_PHASE_W_PER_A),
         (64 | 0x80, "auto", THREE_PHASE_W_PER_A),
         # Auto: smaller units stay on the single phase model
-        (40, "auto", 230),
-        (None, "auto", 230),
+        (40, "auto", 220),
+        (None, "auto", 220),
         # Manual override wins over detection
         (40, "three_phase", THREE_PHASE_W_PER_A),
-        (64, "single_phase", 230),
+        (64, "single_phase", 220),
     ],
 )
 def test_issue_229_instant_consumption_power_supply(capacity_code, power_supply, watts_per_amp):
@@ -3113,7 +3114,8 @@ def test_issue_229_instant_consumption_power_supply(capacity_code, power_supply,
     description = CALCULATED_SENSOR_DESCRIPTIONS["instant_consumption"]
     s = CSNetHomeCalculatedSensor(coordinator, _global_device_data(), {}, description)
     s.power_supply = power_supply
-    assert round(6 * watts_per_amp) <= s.state <= round(6.99 * watts_per_amp)
+    # plus the controllers and the pump, which that current does not feed
+    assert round(6 * watts_per_amp) <= s.state <= round(6.99 * watts_per_amp) + 62
 
 
 def test_issue_229_default_power_supply_is_auto():

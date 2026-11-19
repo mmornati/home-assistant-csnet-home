@@ -12,6 +12,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.csnet_home import async_remove_entry, async_setup_entry, async_unload_entry
 from custom_components.csnet_home.const import DOMAIN
 from custom_components.csnet_home.coordinator import CSNetHomeData, alarm_storage_key
+from custom_components.csnet_home.power_calibration import power_calibration_storage_key
 
 
 async def test_setup_entry_registers_no_update_listener(hass):
@@ -190,6 +191,17 @@ async def test_removing_the_entry_deletes_its_stored_alarms(hass, hass_storage):
     entry = MockConfigEntry(domain=DOMAIN, data={CONF_USERNAME: "user", CONF_PASSWORD: "pass"})
     key = alarm_storage_key(entry.entry_id)
     hass_storage[key] = {"version": 1, "minor_version": 1, "key": key, "data": {"installation_alarm_ids": [1]}}
+
+    await async_remove_entry(hass, entry)
+
+    assert key not in hass_storage
+
+
+async def test_removing_the_entry_deletes_its_power_calibration(hass, hass_storage):
+    """What the power model learnt about the unit goes with the entry."""
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_USERNAME: "user", CONF_PASSWORD: "pass"})
+    key = power_calibration_storage_key(entry.entry_id)
+    hass_storage[key] = {"version": 1, "minor_version": 1, "key": key, "data": {"factors": {"1": 1.2}}}
 
     await async_remove_entry(hass, entry)
 

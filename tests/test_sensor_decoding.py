@@ -7,18 +7,31 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from homeassistant.util import dt as dt_util
 
+from custom_components.csnet_home.const import POWER_SUPPLY_THREE_PHASE
 from custom_components.csnet_home.coordinator import CSNetHomeCoordinator
 from custom_components.csnet_home.helpers import extract_heating_status
+from custom_components.csnet_home.power_calibration import MAX_FACTOR, PowerCalibration
 from custom_components.csnet_home.sensor import (
     CALCULATED_SENSOR_DESCRIPTIONS,
     COMPRESSOR_SENSOR_DESCRIPTIONS,
+    CRANKCASE_HEATER_POWER_W,
     DAILY_SENSOR_DESCRIPTIONS,
+    FAN_DEFAULT_POWER_W,
+    FAN_MAX_POWER_W,
     INSTALLATION_SENSOR_DESCRIPTIONS,
     MAX_ENERGY_INTEGRATION_HOURS,
+    OUTDOOR_ELECTRONICS_POWER_W,
+    PUMP_MAX_POWER_W,
+    PUMP_MIN_POWER_W,
+    STANDBY_POWER_W,
+    SUCTION_PRESSURE_MISSING,
+    WATTS_PER_AMP_SINGLE_PHASE,
+    WATTS_PER_AMP_THREE_PHASE,
     CSNetHomeCalculatedSensor,
     CSNetHomeCompressorSensor,
     CSNetHomeDailySensor,
     CSNetHomeInstallationSensor,
+    _power_reading_follower,
 )
 
 DEVICE_DATA = {"device_name": "System", "device_id": "global", "room_name": "Controller", "parent_id": "global", "room_id": "global"}
@@ -232,6 +245,323 @@ def test_hot_water_falls_back_to_the_circuit_outlet_probe():
     """Status 8 uses the exchanger outlet, or the normal outlet when that probe is missing."""
     assert _thermal_power(RUNNING | {"operationStatus": 8, "waterOutletHPTemp": 45}) == 2.5 * 1160 * 5
     assert _thermal_power(RUNNING | {"operationStatus": 8, "waterOutletHPTemp": -127}) == EXPECTED_W
+
+
+# --------------------------------------------------------------------------
+# Estimated electricity: auxiliary consumption
+# --------------------------------------------------------------------------
+
+STOPPED = {"ouHz": 0, "ouCurrent": 0, "ouDischargePress": 0, "ouSuctionPress": 0, "waterFlow": 0}
+# 6 A single phase: the outdoor unit is held between 1320 and 1538 W
+SIX_AMPS = {"ouHz": 80, "ouCurrent": 6, "ouDischargePress": 25, "ouSuctionPress": 8, "ouDischargeTemperature": 70, "waterFlow": 20}
+
+
+def _electric_power(heating_status):
+    sensor = CSNetHomeCalculatedSensor(_coordinator(heating_status), DEVICE_DATA, {}, CALCULATED_SENSOR_DESCRIPTIONS["instant_consumption"])
+    return sensor._calculate_complex_power(heating_status)
+
+
+IDLE_W = STANDBY_POWER_W + CRANKCASE_HEATER_POWER_W
+
+
+def test_stopped_unit_draws_its_standby():
+    """With the compressor and the pump stopped the controllers and the crankcase heater are left."""
+    assert _electric_power(STOPPED) == IDLE_W
+
+
+def _observed(sensor, reading):
+    """A new reading, as the coordinator brings it: the model learns once, then the power is asked for."""
+    sensor.observe_power_reading(reading)
+    return sensor._calculate_complex_power(reading)
+
+
+def _stopped_readings(sensor, *temperatures):
+    """Feed the sensor one reading per discharge temperature and return the last power."""
+    power = None
+    for temperature in temperatures:
+        power = _observed(sensor, STOPPED | {"ouDischargeTemperature": temperature})
+    return power
+
+
+def test_crankcase_heater_counts_while_the_discharge_temperature_climbs():
+    """A stopped compressor getting warmer is being heated; getting cooler, it is not."""
+    sensor, _ = _calibrated_sensor()
+    assert _stopped_readings(sensor, 31, 32) == IDLE_W
+    assert _stopped_readings(sensor, 33, 32) == STANDBY_POWER_W
+
+
+def test_crankcase_heater_state_holds_between_whole_degrees():
+    """The temperature moves a degree every few minutes: the state holds meanwhile."""
+    sensor, _ = _calibrated_sensor()
+    assert _stopped_readings(sensor, 35, 34, 34, 34) == STANDBY_POWER_W
+    assert _stopped_readings(sensor, 35, 35, 35) == IDLE_W
+
+
+def test_crankcase_heater_is_not_counted_right_after_a_run():
+    """A compressor that has just stopped is hot and cooling: no heating until it warms again."""
+    sensor, _ = _calibrated_sensor()
+    _observed(sensor, dict(LOW_MODEL))
+    assert _stopped_readings(sensor, 70, 68, 60) == STANDBY_POWER_W
+    assert _stopped_readings(sensor, 61) == IDLE_W
+
+
+def test_crankcase_heater_keeps_its_state_without_a_temperature():
+    """A reading with no discharge temperature changes nothing."""
+    sensor, _ = _calibrated_sensor()
+    assert _stopped_readings(sensor, 33, 32, None) == STANDBY_POWER_W
+
+
+def test_asking_for_the_power_changes_nothing():
+    """Several sensors ask for the power of a reading: only the coordinator's update moves the state."""
+    sensor, coordinator = _calibrated_sensor()
+    _stopped_readings(sensor, 33, 32)
+    for temperature in (40, 50, 60):
+        assert sensor._calculate_complex_power(STOPPED | {"ouDischargeTemperature": temperature}) == STANDBY_POWER_W
+    assert coordinator.crankcase_heater.heating is False
+    for _ in range(3):
+        sensor._calculate_complex_power(dict(LOW_MODEL))
+    assert coordinator.power_calibration.factors == {}
+
+
+MINIMUM_SPEED = {"ouHz": 31, "ouCurrent": 2, "ouDischargePress": 18, "ouSuctionPress": 9, "waterFlow": 20, "pumpSpeed": 76, "fanRPM": -1}
+
+
+def test_reported_current_is_no_floor_at_low_speed():
+    """A single-phase unit at its minimum speed reports 2 A for under 400 W: with the pressure model the current only caps."""
+    auxiliary = STANDBY_POWER_W + PUMP_MAX_POWER_W * 0.76**2
+    assert _electric_power(MINIMUM_SPEED) == round(OUTDOOR_ELECTRONICS_POWER_W + FAN_DEFAULT_POWER_W + 31 * 9 + auxiliary)
+    assert _electric_power(MINIMUM_SPEED | {"ouHz": 41}) >= 2 * WATTS_PER_AMP_SINGLE_PHASE
+
+
+def _three_phase_power(heating_status):
+    sensor = CSNetHomeCalculatedSensor(_coordinator(heating_status), DEVICE_DATA, {}, CALCULATED_SENSOR_DESCRIPTIONS["instant_consumption"])
+    sensor.power_supply = POWER_SUPPLY_THREE_PHASE
+    return sensor._calculate_complex_power(heating_status)
+
+
+def test_three_phase_unit_without_a_suction_sensor_keeps_the_current_floor():
+    """A three-phase unit with no suction sensor (128) at 32 Hz and 2 A: the current is all there is."""
+    reading = MINIMUM_SPEED | {"ouHz": 32, "ouSuctionPress": SUCTION_PRESSURE_MISSING, "ouDischargePress": 30}
+    assert _three_phase_power(reading) >= 2 * WATTS_PER_AMP_THREE_PHASE
+
+
+def test_three_phase_unit_keeps_the_current_floor_at_low_speed():
+    """A three-phase unit can under-read its current: it stays a floor below 40 Hz too."""
+    assert _three_phase_power(dict(MINIMUM_SPEED)) >= 2 * WATTS_PER_AMP_THREE_PHASE
+
+
+@pytest.mark.parametrize(
+    "reading",
+    [
+        MINIMUM_SPEED | {"ouSuctionPress": SUCTION_PRESSURE_MISSING},  # no suction sensor
+        MINIMUM_SPEED | {"ouSuctionPress": 20},  # crossed pressures
+        MINIMUM_SPEED | {"defrosting": 1},  # a defrost
+    ],
+    ids=["no suction sensor", "crossed pressures", "defrost"],
+)
+def test_without_the_pressure_model_the_current_is_a_floor_at_low_speed(reading):
+    """Without the pressure model a single-phase unit keeps the current's floor below 40 Hz."""
+    assert _electric_power(reading) >= 2 * WATTS_PER_AMP_SINGLE_PHASE
+
+
+def test_no_suction_sensor_teaches_nothing():
+    """Without the pressure model there is no model to correct."""
+    sensor, coordinator = _calibrated_sensor()
+    sensor.observe_power_reading(LOW_MODEL | {"ouSuctionPress": SUCTION_PRESSURE_MISSING})
+    assert sensor._power_calibration().factors == {}
+
+
+def test_the_power_model_learns_once_per_update_of_the_coordinator():
+    """The listener learns from every update, even when the coordinator updates its data in place."""
+    reading = dict(LOW_MODEL)
+    coordinator = _coordinator(reading)
+    observer = CSNetHomeCalculatedSensor(coordinator, DEVICE_DATA, {}, CALCULATED_SENSOR_DESCRIPTIONS["instant_consumption"])
+    follow = _power_reading_follower(coordinator, observer)
+    follow()
+    first = coordinator.power_calibration.factor(41)
+    observer._get_heating_status()["ouCurrent"] = 7  # the same dict, changed in place
+    follow()
+    assert 1.0 < first < coordinator.power_calibration.factor(41)
+
+
+def test_the_power_model_learns_nothing_from_a_failed_update():
+    """A failed poll leaves the last reading in place: nothing new to learn from."""
+    coordinator = _coordinator(dict(LOW_MODEL))
+    coordinator.last_update_success = False
+    observer = CSNetHomeCalculatedSensor(coordinator, DEVICE_DATA, {}, CALCULATED_SENSOR_DESCRIPTIONS["instant_consumption"])
+    _power_reading_follower(coordinator, observer)()
+    assert observer._power_calibration().factors == {}
+
+
+def test_crankcase_heater_is_off_while_the_compressor_runs():
+    """During a defrost with no fan: electronics, compressor, pump and controllers, no heater."""
+    running = {"ouHz": 60, "ouCurrent": 4, "ouDischargePress": 5, "ouSuctionPress": 8, "waterFlow": 20, "pumpSpeed": 100, "fanRPM": 0}
+    assert _electric_power(running) == round(OUTDOOR_ELECTRONICS_POWER_W + 60 * 15 + STANDBY_POWER_W + PUMP_MAX_POWER_W)
+
+
+def test_pump_running_without_the_compressor_is_counted():
+    """Water flowing means the pump runs: 10 W plus 65 W by the square of its speed."""
+    assert _electric_power(STOPPED | {"waterFlow": 12, "pumpSpeed": 100}) == IDLE_W + PUMP_MAX_POWER_W
+    assert _electric_power(STOPPED | {"waterFlow": 12, "pumpSpeed": 50}) == round(IDLE_W + PUMP_MIN_POWER_W + (PUMP_MAX_POWER_W - PUMP_MIN_POWER_W) * 0.25)
+
+
+def test_pump_speed_alone_does_not_mean_the_pump_runs():
+    """The unit keeps reporting the last speed after the pump stops: no flow, no pump power."""
+    assert _electric_power(STOPPED | {"pumpSpeed": 75}) == IDLE_W
+
+
+def test_pump_at_zero_speed_draws_nothing():
+    """A pump the unit reports at 0 % is not counted."""
+    assert _electric_power(STOPPED | {"waterFlow": 12, "pumpSpeed": 0}) == IDLE_W
+
+
+def test_pump_and_controllers_are_added_to_the_current_range():
+    """The reported current is the outdoor unit's: the pump and the controllers come on top."""
+    auxiliary = STANDBY_POWER_W + PUMP_MAX_POWER_W
+    power = _electric_power(SIX_AMPS | {"pumpSpeed": 100})
+    assert 6 * WATTS_PER_AMP_SINGLE_PHASE + auxiliary <= power <= 6.99 * WATTS_PER_AMP_SINGLE_PHASE + auxiliary + 1
+
+
+def test_outdoor_fan_follows_its_speed():
+    """A faster fan draws more, inside the range of the reported current."""
+    free = SIX_AMPS | {"pumpSpeed": 100}  # the model lands inside the 6 A range
+    slow = _electric_power(free | {"fanRPM": 300})
+    fast = _electric_power(free | {"fanRPM": 900})
+    assert fast - slow == round(FAN_MAX_POWER_W * (1 - (300 / 900) ** 3))
+
+
+def test_fan_without_a_speed_reading_stops_during_a_defrost():
+    """No fanRPM: a default while the compressor runs, nothing during a defrost."""
+    defrost = {"ouHz": 60, "ouCurrent": 0, "ouDischargePress": 5, "ouSuctionPress": 8, "waterFlow": 20, "pumpSpeed": 100, "fanRPM": -1}
+    auxiliary = STANDBY_POWER_W + PUMP_MAX_POWER_W
+    assert _electric_power(defrost | {"ouCurrent": 4, "defrosting": 1}) == round(OUTDOOR_ELECTRONICS_POWER_W + 60 * 15 + auxiliary)
+    assert _electric_power(defrost | {"ouCurrent": 4, "defrosting": 0}) == round(OUTDOOR_ELECTRONICS_POWER_W + FAN_DEFAULT_POWER_W + 60 * 15 + auxiliary)
+
+
+def test_defrost_is_taken_from_the_unit_flag():
+    """With the flag set the defrost estimate is used, whatever the pressures say."""
+    normal = {"ouHz": 60, "ouCurrent": 4, "ouDischargePress": 25, "ouSuctionPress": 8, "waterFlow": 20, "pumpSpeed": 100, "fanRPM": 0}
+    auxiliary = STANDBY_POWER_W + PUMP_MAX_POWER_W
+    assert _electric_power(normal | {"defrosting": 1}) == round(OUTDOOR_ELECTRONICS_POWER_W + 60 * 15 + auxiliary)
+    assert _electric_power(normal | {"defrosting": 0}) != _electric_power(normal | {"defrosting": 1})
+
+
+# --------------------------------------------------------------------------
+# Estimated electricity: self-calibration from the reported current
+# --------------------------------------------------------------------------
+
+# 41 Hz and 17 bar apart: the model says 697 W for the compressor, well under the 1320 W of 6 A
+LOW_MODEL = {"ouHz": 41, "ouCurrent": 6, "ouDischargePress": 25, "ouSuctionPress": 8, "waterFlow": 20, "pumpSpeed": 100, "fanRPM": 0}
+
+
+def _calibrated_sensor():
+    coordinator = _coordinator({})
+    return CSNetHomeCalculatedSensor(coordinator, DEVICE_DATA, {}, CALCULATED_SENSOR_DESCRIPTIONS["instant_consumption"]), coordinator
+
+
+def test_model_below_the_current_range_raises_its_factor():
+    """Each new reading under the range moves the factor of that frequency band up."""
+    sensor, coordinator = _calibrated_sensor()
+    sensor.observe_power_reading(dict(LOW_MODEL))
+    first = coordinator.power_calibration.factor(41)
+    sensor.observe_power_reading(dict(LOW_MODEL))
+    assert 1.0 < first < coordinator.power_calibration.factor(41)
+    assert coordinator.power_calibration.factor(80) == 1.0  # another band is left alone
+
+
+def test_model_above_the_current_range_lowers_its_factor():
+    """A model over the range of 1 A is brought down."""
+    sensor, coordinator = _calibrated_sensor()
+    sensor.observe_power_reading(LOW_MODEL | {"ouCurrent": 1})
+    assert coordinator.power_calibration.factor(41) < 1.0
+
+
+def test_model_inside_the_current_range_keeps_its_factor():
+    """Nothing to learn while the model agrees with the current."""
+    sensor, coordinator = _calibrated_sensor()
+    sensor.observe_power_reading(SIX_AMPS | {"pumpSpeed": 100, "fanRPM": 0})
+    assert coordinator.power_calibration.factors == {}
+
+
+def test_calibrated_model_reaches_the_current_range():
+    """After enough readings the model lands on the range instead of being cut to it."""
+    sensor, coordinator = _calibrated_sensor()
+    reading = LOW_MODEL | {"ouCurrent": 3}  # 660 to 878 W: the model's 732 W of outdoor power is inside
+    assert sensor._calculate_complex_power(dict(reading)) == round(35 + 41 * 17 + STANDBY_POWER_W + PUMP_MAX_POWER_W)
+    reading = LOW_MODEL | {"ouCurrent": 4}  # 880 to 1098 W: the model is under it
+    for _ in range(200):
+        sensor.observe_power_reading(dict(reading))
+    factor = coordinator.power_calibration.factor(41)
+    assert 35 + 41 * 17 * factor == pytest.approx(4 * WATTS_PER_AMP_SINGLE_PHASE, abs=1)
+
+
+def test_factor_stays_within_its_limits():
+    """A model far from the range is not stretched without limit."""
+    sensor, coordinator = _calibrated_sensor()
+    for _ in range(500):
+        sensor.observe_power_reading(LOW_MODEL | {"ouCurrent": 12})
+    assert coordinator.power_calibration.factor(41) == MAX_FACTOR
+
+
+def test_defrost_teaches_nothing():
+    """The defrost estimate is not the model: the current says nothing about the model then."""
+    sensor, coordinator = _calibrated_sensor()
+    sensor.observe_power_reading(LOW_MODEL | {"defrosting": 1})
+    assert sensor._power_calibration().factors == {}
+
+
+def test_consumption_sensor_shows_the_learnt_factors():
+    """The factors are visible, by frequency band, on the consumption sensor only."""
+    sensor, coordinator = _calibrated_sensor()
+    sensor.observe_power_reading(dict(LOW_MODEL))
+    attributes = sensor.extra_state_attributes["power_calibration"]
+    assert list(attributes) == ["40-59 Hz"]
+    assert attributes["40-59 Hz"] == round(coordinator.power_calibration.factor(41), 3)
+    cop = CSNetHomeCalculatedSensor(coordinator, DEVICE_DATA, {}, CALCULATED_SENSOR_DESCRIPTIONS["instant_cop"])
+    assert cop.extra_state_attributes is None
+
+
+async def test_learnt_factors_survive_a_restart():
+    """Stored factors are loaded; anything unusable in storage is dropped."""
+    calibration = PowerCalibration(MagicMock(), "entry")
+    calibration._store = MagicMock()
+    calibration._store.async_load = AsyncMock(return_value={"factors": {"1": 1.2, "3": 9.0, "x": 1.1, "9": 1.1}})
+    await calibration.async_load()
+    assert calibration.factors == {1: 1.2}
+    assert calibration.factor(31) == 1.2
+
+
+def test_learnt_factor_is_saved_once_it_has_moved_enough():
+    """Small steps do not write to storage at every poll."""
+    hass = MagicMock()
+    calibration = PowerCalibration(hass, "entry")
+    calibration._async_save = MagicMock()
+    calibration.learn(31, 669, 669 * 1.1, 2000)  # 5 % of the way to 1.1: 1.005
+    assert hass.async_create_task.call_count == 0
+    for _ in range(5):
+        calibration.learn(31, 669, 669 * 1.5, 2000)
+    assert hass.async_create_task.call_count >= 1
+
+
+# --------------------------------------------------------------------------
+# Instant COP, averaged
+# --------------------------------------------------------------------------
+
+COP_RUN = SIX_AMPS | RUNNING | {"operationStatus": 6, "pumpSpeed": 100}
+
+
+def test_daily_cop_counts_the_standby_between_compressor_runs():
+    """With the compressor stopped the controllers and the crankcase heater still draw: the daily COP counts it."""
+    sensor = _daily_sensor("daily_cop_hvac")
+    sensor._get_heating_status().update(STOPPED | {"operationStatus": 4})
+    now = dt_util.now().replace(hour=12, minute=0, second=0, microsecond=0)
+    sensor._last_update_time = now - timedelta(minutes=1)
+
+    with patch("custom_components.csnet_home.sensor.dt_util.now", return_value=now):
+        sensor._handle_coordinator_update()
+
+    assert sensor._energy_in == pytest.approx(IDLE_W / 60 / 1000)
+    assert sensor._energy_out == 0
 
 
 @pytest.mark.parametrize("status", [1, 2])

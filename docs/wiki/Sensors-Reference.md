@@ -495,7 +495,31 @@ Installation-wide sensors on the **System-Controller** device. The CSNet API doe
 
 ### Instant Consumption
 
-Estimated from compressor frequency, discharge and suction pressures and discharge temperature, then clamped to the range given by the reported compressor current (current × 230 V up to (current + 0.99) × 230 V). It is `0` when the compressor runs at 0 Hz.
+The sum of two parts:
+
+- **Outdoor unit**, while the compressor runs: estimated as 1.0 W per Hz and per bar of pressure difference (with corrections above 115 Hz and above 90 °C of discharge temperature), plus 35 W for its electronics, plus the outdoor fan (up to 90 W, following its speed; 40 W when the unit does not report it). Without a usable pressure difference (a defrost, crossed pressures, or a suction pressure of 128 from a unit without that sensor) the compressor is taken as 15 W per Hz. The result is clamped to the range given by the reported compressor current (current × 220 W up to (current + 0.99) × 220 W in single phase: the mains voltage times the power factor, fitted on a metered Yutaki S 2.0; about 658 W per A in three phase). On a single-phase unit using the pressure model, below 40 Hz the current only caps the estimate: at its minimum speed a Yutaki S 2.0 reports 2 A for under 400 W. Three-phase units, and units without the pressure model, keep the current as a floor at every speed.
+- **Auxiliary consumption**, which that current does not feed: 15 W for the controllers at all times, and the circulation pump while water flows.
+- **Crankcase heater**, 30 W while it heats the stopped compressor.
+
+| Part | Estimate |
+|------|----------|
+| Controllers (standby) | 15 W, always |
+| Crankcase (oil) heater | 30 W while the discharge temperature of the stopped compressor climbs, 0 W while it falls |
+| Circulation pump | Up to 47 W with the square of Pump Speed, while water flows or the compressor runs |
+| Outdoor fan | Up to 90 W at 900 rpm, with the cube of Outdoor Fan RPM; 40 W when the unit reports no speed, 0 W during a defrost |
+
+#### Self-calibration
+
+The unit reports its current in whole Amps, truncated: 6 A means 6.0 to 6.99 A. Whenever the model's figure for the compressor falls outside that range, the model is wrong in a known direction, and a correction factor moves 5 % of the way towards the range. Over a few hours of running the model fits your unit, and the estimate lands inside the range instead of being cut to its edge.
+
+- One factor per 20 Hz band of compressor frequency, each starting at 1.0 and kept between 0.6 and 1.6.
+- The factors are kept across restarts and shown in the `power_calibration` attribute of Instant Consumption.
+- Nothing is learnt during a defrost or without a usable pressure difference, which use a separate estimate (35 W + fan + 15 W per Hz). A defrost is taken from the unit's own defrost flag.
+- The learning happens once per update of the integration, whatever number of sensors show the power.
+
+With the compressor stopped the sensor shows 15 W, or 45 W while the crankcase heater is on, and more while the pump runs. Backup and tank heaters are not counted.
+
+The crankcase heater runs in cycles: the discharge temperature of the stopped compressor climbs a few degrees while it heats and falls back while it rests. The integration follows the direction of that temperature. Right after a compressor run the heater is not counted until the temperature climbs again, and after a restart of Home Assistant it is counted until the temperature first moves.
 
 ### Output Power
 
@@ -512,7 +536,7 @@ Output is also 0 when ΔT is not positive or the flow is below 0.01 m³/h.
 
 ### Instant COP
 
-Output Power divided by Instant Consumption, rounded to 2 decimals. It reports `0` while consumption is below 50 W.
+Output Power divided by Instant Consumption, rounded to 2 decimals. It reports `0` while the compressor is stopped.
 
 ### Daily Sensors
 
@@ -520,6 +544,7 @@ Output Power divided by Instant Consumption, rounded to 2 decimals. It reports `
 - **Daily Consumption** and **Daily Output Energy** use state class `total_increasing`, so they can be added to the Energy dashboard (remember they are estimates).
 - **Daily HVAC COP** accumulates while the unit is heating or cooling, or defrosting outside DHW production.
 - **DHW Daily COP** accumulates while the unit is producing DHW, or defrosting outside space heating.
+- Both daily COPs include the auxiliary consumption between compressor runs, as a meter on the heat pump would.
 
 !!! note "Renamed sensor"
     The daily space-heating COP sensor was renamed from **Daily COP** to **Daily HVAC COP** when cooling support was added. It now has a new unique ID, so Home Assistant creates a new entity; the old one is left orphaned and can be deleted.
