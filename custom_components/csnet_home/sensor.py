@@ -1,8 +1,8 @@
 """Support for CSNet Home sensors."""
 
 import logging
-from collections import Counter
-from datetime import datetime, timezone
+from collections import Counter, deque
+from datetime import datetime, timedelta, timezone
 
 from homeassistant.components.climate.const import HVACMode
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorEntityDescription, SensorStateClass
@@ -657,6 +657,25 @@ SYSTEM_STATUS_FLAG_BITS = {
     "c2_demand": 14,
 }
 
+
+def _compressor_drawing(heating_status) -> bool:
+    """Return True when the compressor runs and draws current.
+
+    A compressor starting up reports a few Hz and 0 A for a poll: the
+    electricity is then next to nothing while the water still carries the
+    last run's heat, a ratio that means nothing. A unit that does not report
+    the current is taken at its frequency.
+    """
+    if (heating_status.get("ouHz") or 0) <= 0:
+        return False
+    current = heating_status.get("ouCurrent")
+    return current is None or current > 0
+
+
+# Heat sources after the heat pump's exchanger: while one runs, the heat is
+# measured at the exchanger outlet so its heat is not counted as the heat pump's
+OTHER_HEAT_SOURCE_FLAGS = ("space_heater_on", "boiler_on")
+
 # operationStatus values of the cooling states (demand off, thermostat off, thermostat on)
 COOLING_OPERATION_STATUSES = (1, 2, 3)
 
@@ -700,6 +719,10 @@ PUMP_MAX_POWER_W = 47.0
 FAN_MAX_POWER_W = 90.0
 FAN_MAX_RPM = 900.0
 FAN_DEFAULT_POWER_W = 40.0  # for units that do not report the speed
+# Window the instant COP is averaged over
+INSTANT_COP_WINDOW = timedelta(minutes=15)
+# Electricity a meter has to count in that window before the instant COP uses it
+MIN_METERED_COP_KWH = 0.02
 
 # Yutaki outdoor capacity codes (ouCapacityCode & 0x7F, as decoded by CSNet
 # Manager's getUnitCapacitiText): 64 = 8 HP, 80 = 10 HP. These sizes only
@@ -1066,6 +1089,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 description,
             )
             calculated_sensor.power_supply = power_supply
+            calculated_sensor.energy_meter = entry.data.get(CONF_ENERGY_METER)
             sensors.append(calculated_sensor)
 
         # ----------------------------------------------------------------------
@@ -1548,6 +1572,81 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
     # "three_phase"); set from the config entry in async_setup_entry.
     power_supply = DEFAULT_POWER_SUPPLY
 
+    # The user's electricity meter (an energy sensor), when one is configured
+    energy_meter: str | None = None
+
+    # Readings the instant COP is averaged over: (time, heat W, estimated
+    # electricity W, meter reading kWh or None), taken at each poll while the
+    # compressor runs
+    _cop_samples: deque | None = None
+    _outlet_probe_missing_logged = False
+
+    def _poll_seconds(self) -> float:
+        """Return the coordinator's poll interval in seconds."""
+        interval = getattr(self.coordinator, "update_interval", None)
+        return interval.total_seconds() if isinstance(interval, timedelta) and interval.total_seconds() > 0 else 60.0
+
+    def _estimated_cop(self) -> float | None:
+        """Return the heat over the estimated electricity across the window, or None.
+
+        Each reading counts for the time since the one before it (the first of
+        the window for one poll interval), so an extra refresh a few seconds
+        after a poll weighs a few seconds, not a whole poll.
+        """
+        heat = electricity = 0.0
+        previous = None
+        for when, sample_heat, sample_power, _meter in self._cop_samples or ():
+            seconds = (when - previous).total_seconds() if previous is not None else self._poll_seconds()
+            previous = when
+            heat += sample_heat * seconds
+            electricity += sample_power * seconds
+        if electricity <= 0:
+            return None
+        return round(heat / electricity, 2)
+
+    def _metered_cop(self) -> float | None:
+        """Return the heat over the meter's electricity across the window, or None.
+
+        The heat of each reading stands until the next one, so both cover the
+        same stretch: from the first reading with a meter value to the last.
+        """
+        samples = [sample for sample in self._cop_samples or () if sample[3] is not None]
+        if len(samples) < 2:
+            return None
+        electricity_kwh = samples[-1][3] - samples[0][3]
+        if electricity_kwh < MIN_METERED_COP_KWH:
+            # too little counted yet, or the meter was reset
+            return None
+        heat_kwh = sum(earlier[1] * (later[0] - earlier[0]).total_seconds() / 3_600_000 for earlier, later in zip(samples, samples[1:]))
+        return round(heat_kwh / electricity_kwh, 2)
+
+    def _drop_old_cop_samples(self, now) -> None:
+        """Forget the readings that have left the averaging window."""
+        while self._cop_samples and now - self._cop_samples[0][0] > INSTANT_COP_WINDOW:
+            self._cop_samples.popleft()
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Keep the readings of the averaged instant COP, then write the state."""
+        if self._key == "instant_cop" and getattr(self.coordinator, "last_update_success", True) is not False:
+            if self._cop_samples is None:
+                self._cop_samples = deque()
+            heating_status = self._get_heating_status()
+            if heating_status and _compressor_drawing(heating_status):
+                now = dt_util.now()
+                self._drop_old_cop_samples(now)
+                heat = self._get_thermal_power_values(heating_status)[0]
+                meter = None
+                if self.energy_meter and self.hass:
+                    from .server_energy import meter_reading_kwh  # pylint: disable=import-outside-toplevel
+
+                    meter = meter_reading_kwh(self.hass, self.energy_meter)
+                self._cop_samples.append((now, heat, self._calculate_complex_power(heating_status), meter))
+            elif not heating_status or (heating_status.get("ouHz") or 0) <= 0:
+                # the compressor stopped: the next run starts a new average
+                self._cop_samples.clear()
+        super()._handle_coordinator_update()
+
     def _watts_per_amp(self, heating_status):
         """Return the Watts drawn per reported compressor Amp."""
         power_supply = self.power_supply
@@ -1718,12 +1817,22 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
         op_status = heating_status.get("operationStatus")
         op_status_text = self._get_operation_status_text(op_status).lower()
 
-        # Logic: If DHW (Status 8) use Exchanger Outlet, else use Normal Outlet
-        temp_out = heating_status.get("waterOutletTemp", 0)
-        if op_status == 8:
-            temp_out_hp = heating_status.get("waterOutletHPTemp", 0)
-            if not _is_missing_probe(temp_out_hp):
-                temp_out = temp_out_hp
+        # The unit's water outlet, as its own heat figures do. The outlet of
+        # the heat pump's exchanger instead while the tank is heated (the water
+        # outlet is not in that flow), and while a backup heater or a boiler
+        # runs, so their heat is not counted as the heat pump's. A probe the
+        # unit does not send, or reports failed, gives way to the other one.
+        flags = heating_status.get("systemStatus2Flags") or 0
+        other_heat_source = isinstance(flags, int) and any(flags & (1 << SYSTEM_STATUS_FLAG_BITS[flag]) for flag in OTHER_HEAT_SOURCE_FLAGS)
+        probes = ("waterOutletTemp", "waterOutletHPTemp")
+        if op_status == 8 or other_heat_source:
+            probes = probes[::-1]
+        temp_out = heating_status.get(probes[0])
+        if temp_out is None or _is_missing_probe(temp_out):
+            if not self._outlet_probe_missing_logged:
+                _LOGGER.debug("No %s temperature (%s): measuring the heat at %s", probes[0], temp_out, probes[1])
+                self._outlet_probe_missing_logged = True
+            temp_out = heating_status.get(probes[1], 0)
 
         # Without both probes there is no temperature difference to measure
         if _is_missing_probe(temp_in) or _is_missing_probe(temp_out):
@@ -1775,14 +1884,34 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
         if self._key == "heating_power":
             return heating_power
 
-        # 3. Instant COP: 0 while the compressor is stopped (the standby
-        # consumption is never 0 now)
+        # 3. Instant COP: 0 while the compressor is stopped, else the heat over
+        # the electricity of the last minutes. A single reading swings widely,
+        # because the unit reports whole degrees.
         if self._key == "instant_cop":
             if (heating_status.get("ouHz") or 0) <= 0 or instant_consumption <= 0:
                 return 0.0
+            if self._cop_samples:
+                self._drop_old_cop_samples(dt_util.now())
+            if not self._cop_samples and not _compressor_drawing(heating_status):
+                # starting up: no current drawn yet, the water still warm from before
+                return 0.0
+            if self._cop_samples and self.energy_meter:
+                # the electricity the user's meter counted, when it has counted enough
+                metered = self._metered_cop()
+                if metered is not None:
+                    return metered
+            estimated = self._estimated_cop()
+            if estimated is not None:
+                return estimated
             return round(heating_power / instant_consumption, 2)
 
         return None
+
+
+# Daily COPs, and the attributes that keep the totals they are worked out from
+DAILY_COP_KEYS = ("daily_cop_hvac", "daily_cop_dhw")
+ATTR_ELECTRICITY_KWH = "electricity_kwh"
+ATTR_HEAT_KWH = "heat_kwh"
 
 
 class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
@@ -1837,9 +1966,25 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
                 self._state = float(clean_state)
             except (TypeError, ValueError):
                 self._state = 0.0
+            # A daily COP is a ratio of two totals: without them the day's
+            # COP would start over from the readings after the restart
+            if self._key in DAILY_COP_KEYS:
+                attributes = getattr(last_state, "attributes", None) or {}
+                try:
+                    self._energy_in = max(0.0, float(attributes.get(ATTR_ELECTRICITY_KWH, 0.0)))
+                    self._energy_out = max(0.0, float(attributes.get(ATTR_HEAT_KWH, 0.0)))
+                except (TypeError, ValueError):
+                    self._energy_in = self._energy_out = 0.0
         else:
             self._state = 0.0
         self._last_update_time = dt_util.now()
+
+    @property
+    def extra_state_attributes(self):
+        """Show the day's totals a daily COP comes from, which are also kept across restarts."""
+        if self._key not in DAILY_COP_KEYS:
+            return None
+        return {ATTR_ELECTRICITY_KWH: round(self._energy_in, 4), ATTR_HEAT_KWH: round(self._energy_out, 4)}
 
     @property
     def native_value(self):
@@ -1909,7 +2054,7 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
             self._state += energy_heating_kwh
 
         # Daily COPs
-        elif self._key in ["daily_cop_hvac", "daily_cop_dhw"]:
+        elif self._key in DAILY_COP_KEYS:
             defrost_active = heating_status.get("defrosting") == 1
 
             should_accumulate = False

@@ -237,7 +237,7 @@ Monitor hydraulic system operation (installation-wide). These sensors belong to 
 **Entity**: `sensor.system_controller_heat_exchanger_water_outlet_temperature`  
 **Unit**: °C  
 **Device Class**: `temperature`  
-**Description**: Water temperature at the heat pump's heat exchanger outlet (`waterOutletHPTemp`). This is the dedicated DHW tank supply reading: while the unit is producing DHW, the [Output Power](#output-power) calculation uses it instead of the normal outlet temperature.
+**Description**: Water temperature at the heat pump's heat exchanger outlet (`waterOutletHPTemp`). The [Output Power](#output-power) calculation uses it while the unit heats the DHW tank (the normal outlet is not in that flow), and while a backup heater or a boiler runs.
 
 !!! note
     The DHW tank's own temperature is the `current_temperature` of the water heater entity (read from `tempDHW`). See [Water Heater Control](Water-Heater-Control.md).
@@ -527,16 +527,22 @@ Thermal power = water flow (m³/h) × 1160 × ΔT, in watts.
 
 | Operation status | ΔT used | Outlet temperature used |
 |------------------|---------|-------------------------|
-| Heating Thermostat On (6) | outlet − inlet | Out Water Temperature |
+| Heating Thermostat On (6) | outlet − inlet | Water Outlet Temperature |
 | Domestic Hot Water On (8) | outlet − inlet | Heat Exchanger Water Outlet Temperature |
-| Cooling Thermostat On (3) | inlet − outlet | Out Water Temperature |
+| Cooling Thermostat On (3) | inlet − outlet | Water Outlet Temperature |
 | Anything else | – | Output is 0 |
+
+The unit's water outlet is used, as the unit's own heat figures are. The outlet of the heat pump's exchanger is used instead while the tank is heated, and while the unit reports a backup heater or a boiler running (the Backup heater and Boiler binary sensors), so their heat is not counted as the heat pump's. A probe the unit does not send, or reports failed, gives way to the other one.
+
+The unit reports whole degrees. With the usual ΔT of 2 to 5 °C, half a degree is 10 to 25 % of the heat, so treat the output power, and every COP built on it, as an estimate.
 
 Output is also 0 when ΔT is not positive or the flow is below 0.01 m³/h.
 
 ### Instant COP
 
-Output Power divided by Instant Consumption, rounded to 2 decimals. It reports `0` while the compressor is stopped.
+The heat delivered divided by the electricity used over the last 15 minutes of the current compressor run, rounded to 2 decimals. The unit reports whole degrees, so a single reading can be off by 20 % or more; the average evens that out. It reports `0` while the compressor is stopped, and each run starts a new average. With an electricity meter chosen in the integration's settings, the electricity is what that meter counted over the window instead of the estimate, once it has counted 20 Wh. Only readings with the compressor running and drawing current count: the poll a compressor starts up, at a few Hz and 0 A, is left out. Without a meter, each reading counts for the time since the previous one, so an extra update (after a command or a reload) weighs only the seconds it covers.
+
+A meter on the heat pump's whole circuit can also count other loads fed from it, such as the CSNet controller and the thermostats (around 100 W on some installations). The COPs that use it then come out somewhat lower than the heat pump's own.
 
 ### Daily Sensors
 
@@ -545,6 +551,7 @@ Output Power divided by Instant Consumption, rounded to 2 decimals. It reports `
 - **Daily HVAC COP** accumulates while the unit is heating or cooling, or defrosting outside DHW production.
 - **DHW Daily COP** accumulates while the unit is producing DHW, or defrosting outside space heating.
 - Both daily COPs include the auxiliary consumption between compressor runs, as a meter on the heat pump would.
+- Both daily COPs show the day's totals they come from in their `electricity_kwh` and `heat_kwh` attributes, and keep them across a restart of Home Assistant or a reload of the integration.
 
 !!! note "Renamed sensor"
     The daily space-heating COP sensor was renamed from **Daily COP** to **Daily HVAC COP** when cooling support was added. It now has a new unique ID, so Home Assistant creates a new entity; the old one is left orphaned and can be deleted.
