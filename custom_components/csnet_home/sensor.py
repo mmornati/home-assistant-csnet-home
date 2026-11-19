@@ -657,6 +657,10 @@ SYSTEM_STATUS_FLAG_BITS = {
     "c2_demand": 14,
 }
 
+# Heat sources after the heat pump's exchanger: while one runs, the heat is
+# measured at the exchanger outlet so its heat is not counted as the heat pump's
+OTHER_HEAT_SOURCE_FLAGS = ("space_heater_on", "boiler_on")
+
 # operationStatus values of the cooling states (demand off, thermostat off, thermostat on)
 COOLING_OPERATION_STATUSES = (1, 2, 3)
 
@@ -1560,7 +1564,7 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
     # electricity W, meter reading kWh or None), taken at each poll while the
     # compressor runs
     _cop_samples: deque | None = None
-    _exchanger_probe_missing_logged = False
+    _outlet_probe_missing_logged = False
 
     def _poll_seconds(self) -> float:
         """Return the coordinator's poll interval in seconds."""
@@ -1798,16 +1802,22 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
         op_status = heating_status.get("operationStatus")
         op_status_text = self._get_operation_status_text(op_status).lower()
 
-        # The outlet of the heat pump's exchanger, in every mode: the unit's
-        # water outlet sits after the backup heater and would count its heat
-        # as the heat pump's. A unit that does not send that probe, or reports
-        # it failed, is measured at its water outlet instead.
-        temp_out = heating_status.get("waterOutletHPTemp")
+        # The unit's water outlet, as its own heat figures do. The outlet of
+        # the heat pump's exchanger instead while the tank is heated (the water
+        # outlet is not in that flow), and while a backup heater or a boiler
+        # runs, so their heat is not counted as the heat pump's. A probe the
+        # unit does not send, or reports failed, gives way to the other one.
+        flags = heating_status.get("systemStatus2Flags") or 0
+        other_heat_source = isinstance(flags, int) and any(flags & (1 << SYSTEM_STATUS_FLAG_BITS[flag]) for flag in OTHER_HEAT_SOURCE_FLAGS)
+        probes = ("waterOutletTemp", "waterOutletHPTemp")
+        if op_status == 8 or other_heat_source:
+            probes = probes[::-1]
+        temp_out = heating_status.get(probes[0])
         if temp_out is None or _is_missing_probe(temp_out):
-            if not self._exchanger_probe_missing_logged:
-                _LOGGER.debug("No heat exchanger outlet temperature (waterOutletHPTemp=%s): measuring the heat at the water outlet", temp_out)
-                self._exchanger_probe_missing_logged = True
-            temp_out = heating_status.get("waterOutletTemp", 0)
+            if not self._outlet_probe_missing_logged:
+                _LOGGER.debug("No %s temperature (%s): measuring the heat at %s", probes[0], temp_out, probes[1])
+                self._outlet_probe_missing_logged = True
+            temp_out = heating_status.get(probes[1], 0)
 
         # Without both probes there is no temperature difference to measure
         if _is_missing_probe(temp_in) or _is_missing_probe(temp_out):

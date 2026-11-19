@@ -3303,7 +3303,7 @@ def test_daily_sensor_daily_cop_hvac_accumulates_during_heating():
         "ouCurrent": 5,
         "waterFlow": 30,
         "waterInletTemp": 20,
-        "waterOutletHPTemp": 25,
+        "waterOutletTemp": 25,
         "operationStatus": 6,  # Heating -> heating COP SHOULD accumulate
         "defrosting": 0,
     }
@@ -3328,7 +3328,7 @@ def test_daily_sensor_daily_cop_dhw_accumulates_only_during_dhw():
         "ouCurrent": 5,
         "waterFlow": 30,
         "waterInletTemp": 20,
-        "waterOutletHPTemp": 25,
+        "waterOutletTemp": 25,
         "operationStatus": 6,  # Heating -> DHW COP should NOT accumulate
         "defrosting": 0,
     }

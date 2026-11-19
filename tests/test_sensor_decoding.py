@@ -210,8 +210,8 @@ def _thermal_power(heating_status):
     return sensor._get_thermal_power_values(heating_status)[0]
 
 
-# The unit outlet (after the backup heater) differs on purpose: it is not used
-RUNNING = {"waterFlow": 25, "waterInletTemp": 40, "waterOutletHPTemp": 43, "waterOutletTemp": 50, "ouHz": 31, "defrosting": 0}
+# The exchanger outlet differs on purpose: it is not used in space heating
+RUNNING = {"waterFlow": 25, "waterInletTemp": 40, "waterOutletTemp": 43, "waterOutletHPTemp": 50, "ouHz": 31, "defrosting": 0}
 EXPECTED_W = 2.5 * 1160 * 3
 
 
@@ -245,22 +245,48 @@ def test_no_heat_from_a_missing_probe(probe):
     assert _thermal_power(RUNNING | {"operationStatus": 5, "waterInletTemp": -127}) == 0
 
 
-def test_heat_is_measured_at_the_water_outlet_without_an_exchanger_probe():
-    """A unit that does not send the exchanger outlet, or reports it failed, is measured at its water outlet."""
-    without = {key: value for key, value in RUNNING.items() if key != "waterOutletHPTemp"}
-    assert _thermal_power(without | {"operationStatus": 6}) == 2.5 * 1160 * 10
-    assert _thermal_power(RUNNING | {"operationStatus": 6, "waterOutletHPTemp": -127}) == 2.5 * 1160 * 10
+@pytest.mark.parametrize("status", [5, 6])
+def test_space_heating_is_measured_at_the_water_outlet(status):
+    """Space heating is measured at the unit's water outlet, as its own heat figures are."""
+    assert _thermal_power(RUNNING | {"operationStatus": status}) == EXPECTED_W
 
 
-@pytest.mark.parametrize("status", [5, 6, 8])
-def test_heat_is_measured_at_the_exchanger_outlet(status):
-    """The exchanger outlet is used in every mode, not the water outlet after the backup heater."""
-    assert _thermal_power(RUNNING | {"operationStatus": status, "waterOutletHPTemp": 45}) == 2.5 * 1160 * 5
+def test_cooling_is_measured_at_the_water_outlet():
+    """In cooling the water outlet is the cold side: 40 in, 36 out."""
+    assert _thermal_power(RUNNING | {"operationStatus": 3, "waterOutletTemp": 36}) == 2.5 * 1160 * 4
 
 
-def test_cooling_is_measured_at_the_exchanger_outlet():
-    """In cooling the exchanger outlet is the cold side: 40 in, 36 out."""
-    assert _thermal_power(RUNNING | {"operationStatus": 3, "waterOutletHPTemp": 36}) == 2.5 * 1160 * 4
+def test_hot_water_is_measured_at_the_exchanger_outlet():
+    """While the tank is heated the water outlet is not in the flow: the exchanger outlet is used."""
+    assert _thermal_power(RUNNING | {"operationStatus": 8, "waterOutletHPTemp": 45}) == 2.5 * 1160 * 5
+
+
+@pytest.mark.parametrize("bit", [6, 8], ids=["boiler", "backup heater"])
+def test_another_heat_source_is_left_out(bit):
+    """While a boiler or a backup heater runs, the heat is taken at the exchanger outlet, before them."""
+    reading = RUNNING | {"operationStatus": 6, "waterOutletHPTemp": 45, "systemStatus2Flags": (1 << bit) | (1 << 5)}
+    assert _thermal_power(reading) == 2.5 * 1160 * 5
+
+
+def test_other_flags_keep_the_water_outlet():
+    """The pumps, the compressor or a circuit's demand do not change the probe."""
+    reading = RUNNING | {"operationStatus": 6, "systemStatus2Flags": (1 << 2) | (1 << 5) | (1 << 13) | (1 << 14)}
+    assert _thermal_power(reading) == EXPECTED_W
+
+
+@pytest.mark.parametrize(
+    "reading, expected_k",
+    [
+        ({"operationStatus": 6, "waterOutletTemp": -127}, 10),  # water outlet failed: exchanger outlet
+        ({"operationStatus": 6, "waterOutletTemp": None}, 10),  # not sent at all
+        ({"operationStatus": 8, "waterOutletHPTemp": -127}, 3),  # tank, no exchanger outlet: water outlet
+        ({"operationStatus": 8, "waterOutletHPTemp": None}, 3),
+    ],
+)
+def test_a_missing_outlet_probe_gives_way_to_the_other(reading, expected_k):
+    """A probe the unit does not send, or reports failed, gives way to the other outlet."""
+    heating_status = {key: value for key, value in (RUNNING | reading).items() if value is not None}
+    assert _thermal_power(heating_status) == 2.5 * 1160 * expected_k
 
 
 # --------------------------------------------------------------------------
@@ -591,8 +617,8 @@ def test_instant_cop_is_averaged_over_the_window():
     """Two readings 3 K and 5 K apart give the COP of 4 K, not of the last one."""
     sensor = _cop_sensor(COP_RUN)
     start = dt_util.now().replace(hour=12, minute=0, second=0, microsecond=0)
-    low = _poll(sensor, start, waterOutletHPTemp=43)
-    averaged = _poll(sensor, start + timedelta(minutes=1), waterOutletHPTemp=45)
+    low = _poll(sensor, start, waterOutletTemp=43)
+    averaged = _poll(sensor, start + timedelta(minutes=1), waterOutletTemp=45)
     electricity = sensor._calculate_complex_power(sensor._get_heating_status())
     assert low == round(2.5 * 1160 * 3 / electricity, 2)
     assert averaged == round(2.5 * 1160 * 4 / electricity, 2)
@@ -602,9 +628,9 @@ def test_instant_cop_weighs_each_reading_by_its_time():
     """An extra refresh a few seconds after a poll weighs those seconds, not a whole poll."""
     sensor = _cop_sensor(COP_RUN)
     start = dt_util.now().replace(hour=12, minute=0, second=0, microsecond=0)
-    _poll(sensor, start, waterOutletHPTemp=43)
-    _poll(sensor, start + timedelta(minutes=1), waterOutletHPTemp=43)
-    averaged = _poll(sensor, start + timedelta(minutes=1, seconds=6), waterOutletHPTemp=53)
+    _poll(sensor, start, waterOutletTemp=43)
+    _poll(sensor, start + timedelta(minutes=1), waterOutletTemp=43)
+    averaged = _poll(sensor, start + timedelta(minutes=1, seconds=6), waterOutletTemp=53)
     electricity = sensor._calculate_complex_power(sensor._get_heating_status())
     # 3 K for two minutes, 13 K for six seconds
     assert averaged == round(2.5 * 1160 * (3 * 120 + 13 * 6) / 126 / electricity, 2)
@@ -614,8 +640,8 @@ def test_instant_cop_forgets_readings_older_than_the_window():
     """A reading from before the window no longer weighs."""
     sensor = _cop_sensor(COP_RUN)
     start = dt_util.now().replace(hour=12, minute=0, second=0, microsecond=0)
-    _poll(sensor, start, waterOutletHPTemp=43)
-    later = _poll(sensor, start + INSTANT_COP_WINDOW + timedelta(minutes=1), waterOutletHPTemp=45)
+    _poll(sensor, start, waterOutletTemp=43)
+    later = _poll(sensor, start + INSTANT_COP_WINDOW + timedelta(minutes=1), waterOutletTemp=45)
     electricity = sensor._calculate_complex_power(sensor._get_heating_status())
     assert later == round(2.5 * 1160 * 5 / electricity, 2)
 
@@ -624,9 +650,9 @@ def test_instant_cop_is_zero_while_the_compressor_is_stopped_and_starts_anew():
     """A stop empties the average: the next run does not inherit the last one."""
     sensor = _cop_sensor(COP_RUN)
     start = dt_util.now().replace(hour=12, minute=0, second=0, microsecond=0)
-    _poll(sensor, start, waterOutletHPTemp=43)
+    _poll(sensor, start, waterOutletTemp=43)
     assert _poll(sensor, start + timedelta(minutes=1), ouHz=0) == 0.0
-    restarted = _poll(sensor, start + timedelta(minutes=2), ouHz=31, waterOutletHPTemp=45)
+    restarted = _poll(sensor, start + timedelta(minutes=2), ouHz=31, waterOutletTemp=45)
     electricity = sensor._calculate_complex_power(sensor._get_heating_status())
     assert restarted == round(2.5 * 1160 * 5 / electricity, 2)
 
@@ -635,9 +661,9 @@ def test_instant_cop_ignores_a_failed_poll():
     """A failed poll brings no new reading into the average."""
     sensor = _cop_sensor(COP_RUN)
     start = dt_util.now().replace(hour=12, minute=0, second=0, microsecond=0)
-    _poll(sensor, start, waterOutletHPTemp=43)
+    _poll(sensor, start, waterOutletTemp=43)
     sensor.coordinator.last_update_success = False
-    _poll(sensor, start + timedelta(minutes=1), waterOutletHPTemp=45)
+    _poll(sensor, start + timedelta(minutes=1), waterOutletTemp=45)
     assert len(sensor._cop_samples) == 1
 
 
@@ -661,8 +687,8 @@ def test_instant_cop_uses_the_meter_when_one_is_configured():
     """Heat over what the meter counted between the first and the last reading of the window."""
     sensor, meter = _metered_cop_sensor(COP_RUN)
     start = dt_util.now().replace(hour=12, minute=0, second=0, microsecond=0)
-    _metered_poll(sensor, meter, start, "10.0", waterOutletHPTemp=45)
-    cop = _metered_poll(sensor, meter, start + timedelta(minutes=5), "10.1", waterOutletHPTemp=45)
+    _metered_poll(sensor, meter, start, "10.0", waterOutletTemp=45)
+    cop = _metered_poll(sensor, meter, start + timedelta(minutes=5), "10.1", waterOutletTemp=45)
     heat_kwh = 2.5 * 1160 * 5 * (5 / 60) / 1000  # 5 K for 5 minutes
     assert cop == round(heat_kwh / 0.1, 2)
 
@@ -671,8 +697,8 @@ def test_instant_cop_uses_the_estimate_until_the_meter_has_counted_enough():
     """Under 20 Wh in the window the meter's steps would make the COP jump."""
     sensor, meter = _metered_cop_sensor(COP_RUN)
     start = dt_util.now().replace(hour=12, minute=0, second=0, microsecond=0)
-    _metered_poll(sensor, meter, start, "10.0", waterOutletHPTemp=45)
-    cop = _metered_poll(sensor, meter, start + timedelta(minutes=1), "10.01", waterOutletHPTemp=45)
+    _metered_poll(sensor, meter, start, "10.0", waterOutletTemp=45)
+    cop = _metered_poll(sensor, meter, start + timedelta(minutes=1), "10.01", waterOutletTemp=45)
     electricity = sensor._calculate_complex_power(sensor._get_heating_status())
     assert cop == round(2.5 * 1160 * 5 / electricity, 2)
 
@@ -682,8 +708,8 @@ def test_instant_cop_uses_the_estimate_when_the_meter_cannot_tell(reading):
     """A meter with no reading, or one that was reset, says nothing about the window."""
     sensor, meter = _metered_cop_sensor(COP_RUN)
     start = dt_util.now().replace(hour=12, minute=0, second=0, microsecond=0)
-    _metered_poll(sensor, meter, start, "10.0", waterOutletHPTemp=45)
-    cop = _metered_poll(sensor, meter, start + timedelta(minutes=5), reading, waterOutletHPTemp=45)
+    _metered_poll(sensor, meter, start, "10.0", waterOutletTemp=45)
+    cop = _metered_poll(sensor, meter, start + timedelta(minutes=5), reading, waterOutletTemp=45)
     electricity = sensor._calculate_complex_power(sensor._get_heating_status())
     assert cop == round(2.5 * 1160 * 5 / electricity, 2)
 

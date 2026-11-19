@@ -237,7 +237,7 @@ Monitor hydraulic system operation (installation-wide). These sensors belong to 
 **Entity**: `sensor.system_controller_heat_exchanger_water_outlet_temperature`  
 **Unit**: °C  
 **Device Class**: `temperature`  
-**Description**: Water temperature at the heat pump's heat exchanger outlet (`waterOutletHPTemp`). The [Output Power](#output-power) calculation uses it in every mode, so a backup heater after the exchanger is not counted as the heat pump's.
+**Description**: Water temperature at the heat pump's heat exchanger outlet (`waterOutletHPTemp`). The [Output Power](#output-power) calculation uses it while the unit heats the DHW tank (the normal outlet is not in that flow), and while a backup heater or a boiler runs.
 
 !!! note
     The DHW tank's own temperature is the `current_temperature` of the water heater entity (read from `tempDHW`). See [Water Heater Control](Water-Heater-Control.md).
@@ -527,14 +527,14 @@ Thermal power = water flow (m³/h) × 1160 × ΔT, in watts.
 
 | Operation status | ΔT used | Outlet temperature used |
 |------------------|---------|-------------------------|
-| Heating Thermostat On (6) | outlet − inlet | Heat Exchanger Water Outlet Temperature |
+| Heating Thermostat On (6) | outlet − inlet | Water Outlet Temperature |
 | Domestic Hot Water On (8) | outlet − inlet | Heat Exchanger Water Outlet Temperature |
-| Cooling Thermostat On (3) | inlet − outlet | Heat Exchanger Water Outlet Temperature |
+| Cooling Thermostat On (3) | inlet − outlet | Water Outlet Temperature |
 | Anything else | – | Output is 0 |
 
-The outlet of the heat pump's exchanger is used in every mode, so the heat of a backup heater placed after it is not counted as the heat pump's. A unit that does not send that probe, or reports it failed, is measured at its water outlet (Water Outlet Temperature) instead.
+The unit's water outlet is used, as the unit's own heat figures are. The outlet of the heat pump's exchanger is used instead while the tank is heated, and while the unit reports a backup heater or a boiler running (the Backup heater and Boiler binary sensors), so their heat is not counted as the heat pump's. A probe the unit does not send, or reports failed, gives way to the other one.
 
-The two outlet probes do not always agree, even with the backup heater off: a difference of about 1 °C between them is common, in either direction depending on the unit. With the usual ΔT of 3 to 5 °C that is 20 to 30 % of the heat, so treat the output power, and every COP built on it, as an estimate. Comparing the two probes in the history while the backup heater is off shows how far apart they are on your unit.
+The unit reports whole degrees. With the usual ΔT of 2 to 5 °C, half a degree is 10 to 25 % of the heat, so treat the output power, and every COP built on it, as an estimate.
 
 Output is also 0 when ΔT is not positive or the flow is below 0.01 m³/h.
 
