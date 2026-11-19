@@ -143,5 +143,7 @@ nav:
       - Help:
           - 10 Troubleshooting: wiki/Troubleshooting.md
           - 11 FAQ: wiki/FAQ.md
+      - Contributing:
+          - Sample Data: wiki/Sample-Data.md
   - Supported Devices: SUPPORTED_DEVICES.md
   - Release notes: release-notes.md

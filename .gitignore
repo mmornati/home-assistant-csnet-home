@@ -177,3 +177,6 @@ actionlint
 /.impeccable/build/
 /.impeccable/questions/
 /.impeccable/hook.cache.json
+
+# Samples fetched with scripts/fetch_samples.py
+tests/samples/

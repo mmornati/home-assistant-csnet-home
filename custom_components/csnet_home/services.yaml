@@ -11,3 +11,49 @@ delete_alarm:
       required: true
       selector:
         text:
+
+start_sample_recording:
+  name: Start sample recording
+  description: >
+    Records what CSNet Manager sends, redacted like the diagnostics download,
+    to a file in the csnet_home_samples folder of the configuration directory.
+    Shared samples let changes to the integration be tested against your unit:
+    see https://github.com/mmornati/csnet-home-samples. A restart of Home
+    Assistant ends the recording; the file keeps what was recorded.
+  fields:
+    duration_hours:
+      name: Duration
+      description: How long to record. Two days or more cover the daily totals.
+      default: 48
+      selector:
+        number:
+          min: 0.1
+          max: 336
+          step: 0.5
+          unit_of_measurement: h
+    meter_energy_entity:
+      name: Meter energy
+      description: >
+        Energy sensor (kWh) of a meter on the heat pump's circuit. Defaults to
+        the meter in the integration's settings.
+      selector:
+        entity:
+          domain: sensor
+          device_class: energy
+    meter_power_entity:
+      name: Meter power
+      description: Power sensor (W) of the same meter, to compare the instant estimate.
+      selector:
+        entity:
+          domain: sensor
+          device_class: power
+    notes:
+      name: Notes
+      description: Anything worth knowing about the unit or the period (backup heater, holidays…).
+      selector:
+        text:
+          multiline: true
+
+stop_sample_recording:
+  name: Stop sample recording
+  description: Ends the sample recording now and saves the file.

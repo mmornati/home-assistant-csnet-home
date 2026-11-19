@@ -169,8 +169,8 @@ async def test_failed_platform_setup_closes_the_session(hass):
     close.assert_awaited_once()
 
 
-async def test_delete_alarm_service_is_registered_once(hass):
-    """A second entry, or a reload, does not register the service again."""
+async def test_services_are_registered_once(hass):
+    """A second entry, or a reload, does not register the services again."""
     with (
         patch("custom_components.csnet_home.CSNetHomeCoordinator") as coordinator_cls,
         patch.object(hass.config_entries, "async_forward_entry_setups", AsyncMock()),
@@ -182,7 +182,11 @@ async def test_delete_alarm_service_is_registered_once(hass):
             entry.add_to_hass(hass)
             assert await async_setup_entry(hass, entry)
 
-    assert [call.args[1:3] for call in register.call_args_list] == [(DOMAIN, "delete_alarm")]
+    assert [call.args[1:3] for call in register.call_args_list] == [
+        (DOMAIN, "delete_alarm"),
+        (DOMAIN, "start_sample_recording"),
+        (DOMAIN, "stop_sample_recording"),
+    ]
     assert hass.services.has_service(DOMAIN, "delete_alarm")
 
 
