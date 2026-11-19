@@ -16,6 +16,12 @@ DELETESPECIFICALARM_PATH = "/data/deletemyspecificalarm"
 HEAT_SETTINGS_PATH = "/data/indoor/heat_setting"
 CONF_MAX_TEMP_OVERRIDE = "max_temp_override"
 CONF_ENERGY_METER = "energy_meter"
+# Where the heat produced comes from: the heat CSNet records, or the integration's own calculation
+CONF_HEAT_SOURCE = "heat_source"
+HEAT_SOURCE_CSNET = "csnet"
+HEAT_SOURCE_CALCULATED = "calculated"
+HEAT_SOURCES = [HEAT_SOURCE_CSNET, HEAT_SOURCE_CALCULATED]
+DEFAULT_HEAT_SOURCE = HEAT_SOURCE_CSNET
 CONF_FAN_COIL_MODEL = "fan_coil_model"
 CONF_ENABLE_ALARM_NOTIFICATIONS = "enable_alarm_notifications"
 CONF_FILTERED_ALARM_CODES = "filtered_alarm_codes"

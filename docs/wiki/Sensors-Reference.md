@@ -237,7 +237,7 @@ Monitor hydraulic system operation (installation-wide). These sensors belong to 
 **Entity**: `sensor.system_controller_heat_exchanger_water_outlet_temperature`  
 **Unit**: °C  
 **Device Class**: `temperature`  
-**Description**: Water temperature at the heat pump's heat exchanger outlet (`waterOutletHPTemp`). The [Output Power](#output-power) calculation uses it while the unit heats the DHW tank (the normal outlet is not in that flow), and while a backup heater or a boiler runs.
+**Description**: Water temperature at the heat pump's heat exchanger outlet (`waterOutletHPTemp`). The [Heat power](#heat-power) calculation uses it while the unit heats the DHW tank (the normal outlet is not in that flow), and while a backup heater or a boiler runs.
 
 !!! note
     The DHW tank's own temperature is the `current_temperature` of the water heater entity (read from `tempDHW`). See [Water Heater Control](Water-Heater-Control.md).
@@ -323,12 +323,11 @@ sensor:
 Monitor equipment operation.
 
 ### Defrost
-**Entity**: `sensor.system_controller_defrost`  
-**Values**: `on`, `off`  
-**Device Class**: `enum`  
-**Description**: Indicates if defrost cycle is active
+**Entity**: `binary_sensor.system_controller_defrost`  
+**Values**: on / off  
+**Description**: Indicates if a defrost cycle is active
 
-**Note**: Heat pump enters defrost periodically in heating mode when outdoor coil ices up
+**Note**: Heat pump enters defrost periodically in heating mode when outdoor coil ices up. The former `sensor.system_controller_defrost` (an `on`/`off` enum sensor) repeated this binary sensor and is removed: use the binary sensor in automations and cards.
 
 ### Mix Valve Position
 **Entity**: `sensor.system_controller_mix_valve_position`  
@@ -483,23 +482,28 @@ Outdoor Temperature Compensation automatically adjusts water temperature based o
 
 Installation-wide sensors on the **System-Controller** device. The CSNet API does not report power, so the integration **estimates** the electricity from the unit's telemetry on every poll.
 
-With an electricity meter chosen in the integration's settings (Reconfigure → Electricity meter of the heat pump), every sensor that depends on the electricity uses that meter instead, Instant Consumption included. Each of them names the source it used in its `electricity_source` attribute: `meter` or `estimate`. While the meter has no reading, the estimate stands in.
+With an electricity meter chosen in the integration's settings (Reconfigure → Electricity meter of the heat pump), every sensor that depends on the electricity uses that meter instead. Each of them names the source it used in its `electricity_source` attribute: `meter` or `estimate`. While the meter has no reading, the estimate stands in.
 
-| Sensor | Entity (pattern) | Unit | What it is |
-|--------|------------------|------|------------|
-| Instant Consumption | `sensor.system_controller_instant_consumption` | W | Electrical input: metered, or estimated |
-| Output Power | `sensor.system_controller_output_power` | W | Thermal output (heating **or** cooling) |
-| Instant COP | `sensor.system_controller_instant_cop` | – | Output Power ÷ Instant Consumption |
-| Daily Consumption | `sensor.system_controller_daily_consumption` | kWh | Electrical energy today: metered, or estimated |
-| Electricity yesterday / this month (metered) | `sensor.…_electricity_yesterday_metered`, … | kWh | With a meter: what it counted (unknown until a whole day or month has been read). Today's is Daily Consumption |
-| Electricity consumed today / yesterday / this month | `sensor.…_electricity_consumed_today`, … | kWh | Without a meter: what CSNet records, only for units with a pulse meter |
-| Daily Output Energy | `sensor.system_controller_daily_output_energy` | kWh | Thermal energy today (heating and cooling) |
-| Daily HVAC COP | `sensor.system_controller_daily_hvac_cop` | – | Today's COP for space heating/cooling |
-| DHW Daily COP | `sensor.system_controller_dhw_daily_cop` | – | Today's COP for DHW production |
-| COP today / yesterday / this month / last month (metered) | `sensor.system_controller_cop_today_metered`, … | – | Heat CSNet recorded ÷ what the meter counted. Only with a meter |
-| COP today / yesterday / this month / last month (estimated) | `sensor.system_controller_cop_today_estimated`, … | – | Heat CSNet recorded ÷ the estimated electricity. Only without a meter |
+The heat produced comes from the source chosen in the settings (Heat produced): the heat **CSNet** Manager records for the unit (the default), or the integration's own measure, **calculated** from the heat power. The heat sensors and every daily or period COP use it, and show it in their `heat_source` attribute: `csnet` or `calculated`. A unit CSNet has answered for without any heat on record uses the calculated heat. The heat power and the instant COP are always calculated: CSNet records heat by the hour only.
 
-### Instant Consumption
+Every sensor is named the same way: what it is (*Electricity*, *Heat*, *COP*), the period, then where it comes from in brackets: *(metered)* or *(estimated)* for the electricity and the COPs, *(csnet)* or *(calculated)* for the heat. The unique IDs did not change with these names, so existing installations keep their entity IDs and history.
+
+| Sensor | Entity (pattern, new installation) | Unit | What it is |
+|--------|------------------------------------|------|------------|
+| Electricity power (metered / estimated) | `sensor.system_controller_electricity_power_metered` | W | Electrical input now |
+| Electricity today (metered / estimated) | `sensor.system_controller_electricity_today_metered` | kWh | Electricity since midnight; the one for the Energy dashboard |
+| Electricity yesterday / this month (metered / estimated) | `sensor.system_controller_electricity_this_month_metered`, … | kWh | Electricity of yesterday and of the month, once a whole day or month has been counted |
+| Heat power (calculated) | `sensor.system_controller_heat_power_calculated` | W | Thermal output now (heating **or** cooling) |
+| Heat today / yesterday / this month (csnet / calculated) | `sensor.system_controller_heat_today_csnet`, … | kWh | Heat produced in the period |
+| Heat today space heating / space cooling / hot water / pool (csnet / calculated) | `sensor.system_controller_heat_today_hot_water_csnet`, … | kWh | Today's heat by use, when there are several |
+| COP instant (metered / estimated) | `sensor.system_controller_cop_instant_metered` | – | Heat ÷ electricity of the last 15 minutes of the compressor run |
+| COP today heating/cooling (metered / estimated) | `sensor.system_controller_cop_today_heating_cooling_metered` | – | Today's COP for space heating and cooling |
+| COP today hot water (metered / estimated) | `sensor.system_controller_cop_today_hot_water_metered` | – | Today's COP for DHW production |
+| COP today / yesterday / this month / last month (metered / estimated) | `sensor.system_controller_cop_today_metered`, … | – | Heat produced ÷ electricity of the same period. One set: metered with a meter, estimated without |
+
+Without a meter, the electricity of yesterday and of the month is the integration's estimate, kept as a running total across restarts. Units with a pulse meter used to show CSNet's electricity there; *Electricity consumed today*, which repeated Electricity today, is removed.
+
+### Electricity power
 
 With a meter, the power it measures: the power sensor on the same device as the meter (for example `…_total_active_power` next to `…_total_active_energy`), shown as that sensor reports it, decimals included, and read at each update of the integration (once a minute by default). While that sensor has no reading, for example when the meter restarts, its last value stands in for up to 2 minutes before the estimate does. A meter without a power sensor gives what it counted over the last 10 minutes instead, once its readings span 2 minutes, in whole Watts.
 
@@ -521,7 +525,7 @@ Without a meter, the estimate, the sum of these parts:
 The unit reports its current in whole Amps, truncated: 6 A means 6.0 to 6.99 A. Whenever the model's figure for the compressor falls outside that range, the model is wrong in a known direction, and a correction factor moves 5 % of the way towards the range. Over a few hours of running the model fits your unit, and the estimate lands inside the range instead of being cut to its edge.
 
 - One factor per 20 Hz band of compressor frequency, each starting at 1.0 and kept between 0.6 and 1.6.
-- The factors are kept across restarts and shown in the `power_calibration` attribute of Instant Consumption.
+- The factors are kept across restarts and shown in the `power_calibration` attribute of Electricity power.
 - Nothing is learnt during a defrost or without a usable pressure difference, which use a separate estimate (35 W + fan + 15 W per Hz). A defrost is taken from the unit's own defrost flag.
 - The learning happens once per update of the integration, whatever number of sensors show the power.
 
@@ -529,7 +533,7 @@ With the compressor stopped the sensor shows 15 W, or 45 W while the crankcase h
 
 The crankcase heater runs in cycles: the discharge temperature of the stopped compressor climbs a few degrees while it heats and falls back while it rests. The integration follows the direction of that temperature. Right after a compressor run the heater is not counted until the temperature climbs again, and after a restart of Home Assistant it is counted until the temperature first moves.
 
-### Output Power
+### Heat power
 
 Thermal power = water flow (m³/h) × 1160 × ΔT, in watts.
 
@@ -542,11 +546,26 @@ Thermal power = water flow (m³/h) × 1160 × ΔT, in watts.
 
 The unit's water outlet is used, as the unit's own heat figures are. The outlet of the heat pump's exchanger is used instead while the tank is heated, and while the unit reports a backup heater or a boiler running (the Backup heater and Boiler binary sensors), so their heat is not counted as the heat pump's. A probe the unit does not send, or reports failed, gives way to the other one.
 
-The unit reports whole degrees. With the usual ΔT of 2 to 5 °C, half a degree is 10 to 25 % of the heat, so treat the output power, and every COP built on it, as an estimate.
+The unit reports whole degrees. With the usual ΔT of 2 to 5 °C, half a degree is 10 to 25 % of the heat, so treat the heat power, and every COP built on it, as an estimate.
 
 Output is also 0 when ΔT is not positive or the flow is below 0.01 m³/h.
 
-### Instant COP
+### Heat produced
+
+The heat of today, yesterday and this month, and today's heat split by use (space heating, space cooling, hot water, pool) when the unit has more than one. With **CSNet** as the source, it is what CSNet Manager recorded, by full hours: an hour appears a few minutes after it ends. With **calculated** as the source, the heat power is added up as it is produced, and each reading goes to the use of the operation status at that moment:
+
+| Operation status | Use |
+|------------------|-----|
+| Cooling (1, 2, 3) | Space cooling |
+| Domestic hot water (7, 8) | Hot water |
+| Swimming pool (9, 10) | Pool |
+| Anything else (space heating, defrost) | Space heating |
+
+The calculated heat is split by the uses CSNet has recorded for the unit, or else by those of the installation (space heating; hot water and pool where it has them; cooling where a zone reports it). It is kept across restarts. Today and this month count from when the counting started, so the first day and month (when the setting was chosen) are partial and have no figure as yesterday or last month. An outage of CSNet or a stop of Home Assistant only loses the heat of those minutes: the day and the month keep their figures.
+
+These sensors replace **Daily Output Energy**, which is removed. They were named *Heat produced today / yesterday / this month*.
+
+### COP instant
 
 The heat delivered divided by the electricity used over the last 15 minutes of the current compressor run, rounded to 2 decimals. The unit reports whole degrees, so a single reading can be off by 20 % or more; the average evens that out. It reports `0` while the compressor is stopped, and each run starts a new average. With an electricity meter chosen in the integration's settings, the electricity is what that meter counted over the window instead of the estimate, once it has counted 20 Wh. Only readings with the compressor running and drawing current count: the poll a compressor starts up, at a few Hz and 0 A, is left out. Without a meter, each reading counts for the time since the previous one, so an extra update (after a command or a reload) weighs only the seconds it covers.
 
@@ -556,23 +575,26 @@ A meter on the heat pump's whole circuit can also count other loads fed from it,
 
 - Integrated from the instant values on each update, reset at local midnight, and restored after a Home Assistant restart.
 - With a meter, the electricity of each update is what the meter counted since the previous one. The first reading, one after the meter was reset and any update without a reading use the estimate instead, so the heat and the electricity always cover the same time.
-- **Daily Consumption** and **Daily Output Energy** use state class `total_increasing`, so they can be added to the Energy dashboard (without a meter, remember they are estimates; with one, add the meter itself instead).
-- **Daily HVAC COP** accumulates while the unit is heating or cooling, or defrosting outside DHW production.
-- **DHW Daily COP** accumulates while the unit is producing DHW, or defrosting outside space heating.
+- **Electricity today** uses state class `total_increasing`, so it can be added to the Energy dashboard (without a meter, remember it is an estimate; with one, add the meter itself instead).
+- **COP today heating/cooling** accumulates while the unit is heating or cooling, or defrosting outside DHW production.
+- **COP today hot water** accumulates while the unit is producing DHW, or defrosting outside space heating.
 - Both daily COPs include the auxiliary consumption between compressor runs, as a meter on the heat pump would.
-- Both daily COPs show the day's totals they come from in their `electricity_kwh` and `heat_kwh` attributes, and keep them across a restart of Home Assistant or a reload of the integration.
+- With **calculated** heat, both daily COPs show the day's totals they come from in their `electricity_kwh` and `heat_kwh` attributes, and keep them across a restart of Home Assistant or a reload of the integration.
+- With **CSNet** heat, the HVAC COP divides CSNet's space heating and cooling heat, and the DHW COP its hot water heat, by the electricity of the same full hours: `heat_kwh` and `electricity_kwh` are those hours' figures, `hours_recorded` how many hours of today CSNet has recorded, and `electricity_today_kwh` the whole day's electricity. Just after a restart, the COP keeps its last value until the start of the next hour.
 
 ### COP per period
 
-The COP of today, yesterday, this month and last month: the heat CSNet Manager recorded for the unit, divided by the electricity of the same period. Only one set exists at a time:
+The COP of today, yesterday, this month and last month: the heat produced (CSNet's or calculated, see above), divided by the electricity of the same period. With CSNet heat, today counts up to the last hour CSNet has recorded. Only one set exists at a time:
 
 - **With a meter**: *COP … (metered)*, with what the meter counted.
 - **Without a meter**: *COP … (estimated)*, with the estimated electricity. The integration keeps a running total of the estimate, across restarts, and reads it like a meter.
 
-Choosing or removing a meter replaces one set with the other; the entities of the set no longer used are removed. The estimated set starts counting when it is created, so yesterday and last month fill in as the days go by. Both need the heat CSNet records for the unit.
+Choosing or removing a meter replaces one set with the other; the entities of the set no longer used are removed. The estimated set starts counting when it is created, so yesterday and last month fill in as the days go by.
 
-!!! note "Renamed sensor"
+!!! note "Renamed sensors"
     The daily space-heating COP sensor was renamed from **Daily COP** to **Daily HVAC COP** when cooling support was added. It now has a new unique ID, so Home Assistant creates a new entity; the old one is left orphaned and can be deleted.
+
+    **Instant COP**, **Daily HVAC COP** and **DHW Daily COP** are now named **COP instant**, **COP today heating/cooling** and **COP today hot water**, with *(metered)* or *(estimated)*. Their unique IDs are unchanged: existing installations keep their entity IDs and history, and only the displayed name changes.
 
 ---
 

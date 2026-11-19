@@ -305,10 +305,6 @@ def test_installation_sensor():
     )
     assert s.state == 4.48  # 224 / 50 = 4.48 bar
 
-    # Test defrost sensor
-    s = CSNetHomeInstallationSensor(coordinator, device_data, common_data, "defrost", "binary", None, "Defrost")
-    assert s.state == STATE_ON  # defrosting = 1
-
     # Test gas temperature sensor
     s = CSNetHomeInstallationSensor(
         coordinator,
@@ -423,10 +419,6 @@ def test_installation_sensor_edge_cases():
     )
     assert s.state == 3.2  # 160 / 50 = 3.2 bar
 
-    # Test defrost with 0 value (off)
-    s = CSNetHomeInstallationSensor(coordinator, device_data, common_data, "defrost", "binary", None, "Defrost")
-    assert s.state == STATE_OFF
-
     # Test mix valve position with conversion
     s = CSNetHomeInstallationSensor(
         coordinator,
@@ -531,10 +523,6 @@ def test_installation_sensor_nested_data():
         "Pump Speed",
     )
     assert s.state == 80  # 80%
-
-    # Test defrost from nested data
-    s = CSNetHomeInstallationSensor(coordinator, device_data, common_data, "defrost", "binary", None, "Defrost")
-    assert s.state == STATE_ON  # defrosting = 1
 
     # Test water flow from nested data
     s = CSNetHomeInstallationSensor(
@@ -2917,7 +2905,7 @@ def test_compressor_temperature_none_values():
 # ---------------------------------------------------------------------------
 # Regression tests for issue #199
 # ---------------------------------------------------------------------------
-# The "Daily Consumption" / "Daily Output Energy" sensors must expose
+# The "Daily Consumption" sensor must expose
 # ``device_class=energy`` and ``state_class=total_increasing`` so that the
 # Home Assistant Energy dashboard picks them up. The "Instant Consumption" /
 # "Output Power" sensors must expose ``device_class=power`` and
@@ -2987,17 +2975,6 @@ def test_issue_199_daily_consumption_state_class_for_energy_tab():
     assert s.device_class == SensorDeviceClass.ENERGY
     assert s.unit_of_measurement == UnitOfEnergy.KILO_WATT_HOUR
     assert s.entity_description is description
-
-
-def test_issue_199_daily_heating_state_class_for_energy_tab():
-    """Daily Output Energy must also be a ``total_increasing`` energy sensor."""
-    coordinator = _build_installation_coordinator()
-    description = DAILY_SENSOR_DESCRIPTIONS["daily_heating"]
-    s = CSNetHomeDailySensor(coordinator, _global_device_data(), {}, description)
-
-    assert s.state_class == SensorStateClass.TOTAL_INCREASING
-    assert s.device_class == SensorDeviceClass.ENERGY
-    assert s.unit_of_measurement == UnitOfEnergy.KILO_WATT_HOUR
 
 
 def test_issue_199_instant_consumption_state_class_for_energy_tab():

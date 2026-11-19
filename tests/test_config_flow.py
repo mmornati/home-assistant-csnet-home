@@ -668,6 +668,25 @@ async def test_energy_meter_can_be_set_and_removed_on_reconfigure(hass: HomeAssi
     assert entry.data["energy_meter"] is None
 
 
+async def test_heat_source_defaults_to_csnet_and_can_be_changed(hass: HomeAssistant):
+    """The heat produced comes from CSNet by default; the integration's own measure can be chosen on reconfigure."""
+    from custom_components.csnet_home.const import CONF_HEAT_SOURCE  # pylint: disable=import-outside-toplevel
+
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+    key = _schema_key(result, CONF_HEAT_SOURCE)
+    assert key.default() == "csnet"
+    assert result["data_schema"].schema[key].config["options"] == ["csnet", "calculated"]
+    with patch(VALIDATE, return_value=True):
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=TEST_CONFIG)
+    assert result["data"][CONF_HEAT_SOURCE] == "csnet"
+
+    entry, result = await _start_reconfigure(hass)
+    settings = {k: v for k, v in TEST_CONFIG.items() if k != CONF_PASSWORD}
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=settings | {CONF_HEAT_SOURCE: "calculated"})
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data[CONF_HEAT_SOURCE] == "calculated"
+
+
 async def test_reconfigure_sets_the_card_language(hass: HomeAssistant):
     """The cards' language is a setting; it defaults to following each user's profile."""
     from custom_components.csnet_home.const import CONF_CARD_LANGUAGE  # pylint: disable=import-outside-toplevel

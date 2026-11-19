@@ -157,7 +157,7 @@ Any entity a card uses can be replaced with `<role>_entity`, for example `outdoo
 | `power`, `heat_power`, `cop_now` | Power (your meter's power sensor when found, else the estimated consumption), output power, instant COP |
 | `meter_energy`, `meter_power` | The electricity meter chosen in the integration settings, and its power sensor |
 | `energy_today`, `heat_today` | Daily consumption and heat (estimated) |
-| `server_heat_today` / `_yesterday` / `_month`, `server_electricity_*` | Heat recorded by CSNet; electricity counted by your meter when one is set, else recorded by CSNet |
+| `server_heat_today` / `_yesterday` / `_month`, `server_electricity_yesterday` / `_month` | Heat today, yesterday and this month (recorded by CSNet or calculated, as chosen in the settings); electricity of yesterday and the month (your meter, or the estimate) |
 | `cop_today`, `cop_yesterday`, `cop_month`, `cop_last_month` | COP from your electricity meter |
 | `water_out`, `water_in`, `water_target`, `water_c2`, `water_flow`, `water_pressure`, `mix_valve` | Water side |
 | `outdoor`, `outdoor_average` | Outdoor temperature, and the average the unit uses for its curves |
@@ -172,7 +172,7 @@ The dots are the unit's water target, averaged per hour, against the average out
 
 ## Performance card
 
-The COP needs an electricity figure. With an electricity meter chosen in the integration settings (Reconfigure → Electricity meter of the heat pump), the card shows the metered COP. Without one, it uses the electricity CSNet records when your unit has a pulse meter; otherwise the estimated COP. A period with neither shows the heat produced only.
+The COP needs an electricity figure. With an electricity meter chosen in the integration settings (Reconfigure → Electricity meter of the heat pump), the card shows the metered COP. Without one, it shows the estimated COP. A period with neither shows the heat produced only.
 
 ## Troubleshooting
 

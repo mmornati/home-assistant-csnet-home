@@ -203,7 +203,7 @@ water_heater.remote_dhw:
 | DHW zone sensors | `sensor.{device}_{zone}_current_temperature`, `_setting_temperature`, `_on_off`, `_doingboost` | Same values as the water heater entity |
 | Heat Exchanger Water Outlet Temperature | `sensor.system_controller_heat_exchanger_water_outlet_temperature` | Water leaving the heat pump's exchanger; used for output power while producing DHW |
 | External Tank Temperature | `sensor.system_controller_external_tank_temperature` | Third outlet probe (TWO3), if fitted |
-| DHW Daily COP | `sensor.system_controller_dhw_daily_cop` | Estimated COP of DHW production today |
+| COP today hot water (metered / estimated) | `sensor.system_controller_cop_today_hot_water_metered` | COP of DHW production today |
 
 See [Sensors Reference](Sensors-Reference.md) for details.
 

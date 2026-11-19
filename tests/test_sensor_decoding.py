@@ -33,6 +33,9 @@ from custom_components.csnet_home.sensor import (
     CSNetHomeCompressorSensor,
     CSNetHomeDailySensor,
     CSNetHomeInstallationSensor,
+    _heat_use,
+    _heat_uses,
+    _named_for_its_electricity,
     _power_reading_follower,
 )
 
@@ -437,6 +440,16 @@ def test_the_estimated_electricity_moves_at_each_update_without_any_cop_sensor()
     assert coordinator.estimated_energy.async_update.call_count == 2
     _now, watts = coordinator.estimated_energy.async_update.call_args.args
     assert watts == observer._calculate_complex_power(observer._get_heating_status())
+
+
+def test_the_calculated_heat_moves_at_each_update_with_its_use():
+    """The listener counts the heat of each new reading to its use, without the heat sensors."""
+    coordinator = _coordinator(COP_RUN | {"operationStatus": 8, "waterOutletHPTemp": 45})
+    coordinator.produced_energy = MagicMock()
+    observer = CSNetHomeCalculatedSensor(coordinator, DEVICE_DATA, {}, CALCULATED_SENSOR_DESCRIPTIONS["instant_consumption"])
+    _power_reading_follower(coordinator, observer)()
+    _now, watts, use = coordinator.produced_energy.async_update.call_args.args
+    assert (watts, use) == (2.5 * 1160 * 5, "dhw")
 
 
 def test_the_power_model_learns_nothing_from_a_failed_update():
@@ -937,7 +950,7 @@ def test_units_without_compressor_frequency_keep_the_status_rule():
 POWERED = RUNNING | {"operationStatus": 6, "ouDischargePress": 20, "ouSuctionPress": 5, "ouDischargeTemperature": 80, "ouCurrent": 5}
 
 
-def _daily_sensor(key="daily_heating", last_update_success=True):
+def _daily_sensor(key="daily_cop_hvac", last_update_success=True):
     sensor = CSNetHomeDailySensor(_coordinator(dict(POWERED), last_update_success), DEVICE_DATA, {}, DAILY_SENSOR_DESCRIPTIONS[key])
     sensor.hass = SimpleNamespace()
     sensor.async_write_ha_state = lambda: None
@@ -986,7 +999,7 @@ async def test_daily_cop_keeps_its_totals_across_a_restart():
     sensor = _daily_sensor("daily_cop_hvac")
     await _restore_with(sensor, "4.0", dt_util.now(), {"electricity_kwh": 2.0, "heat_kwh": 8.0})
     assert sensor.native_value == 4.0
-    assert sensor.extra_state_attributes == {"electricity_kwh": 2.0, "heat_kwh": 8.0, "electricity_source": "estimate"}
+    assert sensor.extra_state_attributes == {"electricity_kwh": 2.0, "heat_kwh": 8.0, "heat_source": "calculated", "electricity_source": "estimate"}
 
     # a minute of standby is added to the day's totals, not to new ones
     sensor._get_heating_status().update(STOPPED | {"operationStatus": 4})
@@ -1003,12 +1016,12 @@ async def test_daily_cop_totals_from_yesterday_are_not_restored():
     """Yesterday's totals belong to yesterday."""
     sensor = _daily_sensor("daily_cop_dhw")
     await _restore_with(sensor, "4.0", dt_util.now() - timedelta(days=1), {"electricity_kwh": 2.0, "heat_kwh": 8.0})
-    assert sensor.extra_state_attributes == {"electricity_kwh": 0.0, "heat_kwh": 0.0, "electricity_source": "estimate"}
+    assert sensor.extra_state_attributes == {"electricity_kwh": 0.0, "heat_kwh": 0.0, "heat_source": "calculated", "electricity_source": "estimate"}
 
 
-def test_daily_energy_sensors_show_no_totals():
-    """Only the COPs carry their totals."""
-    assert _daily_sensor("daily_heating").extra_state_attributes is None
+def test_daily_output_energy_is_gone():
+    """The heat produced sensors took its place."""
+    assert "daily_heating" not in DAILY_SENSOR_DESCRIPTIONS
 
 
 def test_failed_poll_adds_no_energy():
@@ -1032,7 +1045,7 @@ def test_gap_after_an_outage_is_capped():
     with patch("custom_components.csnet_home.sensor.dt_util.now", return_value=now):
         sensor._handle_coordinator_update()
 
-    assert sensor.native_value == round(EXPECTED_W * MAX_ENERGY_INTEGRATION_HOURS / 1000, 2)
+    assert sensor._energy_out == pytest.approx(EXPECTED_W * MAX_ENERGY_INTEGRATION_HOURS / 1000)
 
 
 def test_slow_polling_interval_is_integrated_in_full():
@@ -1045,7 +1058,7 @@ def test_slow_polling_interval_is_integrated_in_full():
     with patch("custom_components.csnet_home.sensor.dt_util.now", return_value=now):
         sensor._handle_coordinator_update()
 
-    assert sensor.native_value == round(EXPECTED_W * (10 / 60) / 1000, 2)
+    assert sensor._energy_out == pytest.approx(EXPECTED_W * (10 / 60) / 1000)
 
 
 def test_failed_poll_across_midnight_resets_once_and_adds_nothing():
@@ -1086,7 +1099,107 @@ def test_normal_poll_interval_is_integrated_in_full():
     with patch("custom_components.csnet_home.sensor.dt_util.now", return_value=now):
         sensor._handle_coordinator_update()
 
-    assert sensor.native_value == round(EXPECTED_W / 60 / 1000, 2)
+    assert sensor._energy_out == pytest.approx(EXPECTED_W / 60 / 1000)
+
+
+def _hours_of_heat(hours, kwh_per_hour, use="spaceHeating"):
+    """CSNet's records of today: each of the first ``hours`` hours with that much heat."""
+    today = dt_util.now()
+    zero = {"spaceHeating": 0, "spaceCooling": 0, "dhw": 0, "swp": 0}
+    return [
+        {
+            "hourly": [
+                {"time": {"year": today.year, "month": today.month, "day": today.day, "hour": h}, "capacity": zero | {use: kwh_per_hour}} for h in range(hours)
+            ]
+        }
+    ]
+
+
+def _csnet_daily_cop(key, records):
+    sensor = _daily_sensor(key)
+    sensor.heat_source = "csnet"
+    sensor.coordinator.get_server_energy = lambda: records["energy"]
+    return sensor
+
+
+def test_daily_cop_with_csnet_heat_divides_the_recorded_hours():
+    """CSNet's heat of the full hours over the electricity of the same hours, not of the hour in progress."""
+    records = {"energy": None}
+    sensor = _csnet_daily_cop("daily_cop_hvac", records)
+    start = dt_util.now().replace(hour=10, minute=0, second=0, microsecond=0)
+    sensor._last_update_time = start - timedelta(minutes=1)
+    for minute in range(0, 70, 5):
+        records["energy"] = _hours_of_heat(11 if minute >= 65 else 10, 1.0)
+        with patch("custom_components.csnet_home.sensor.dt_util.now", return_value=start + timedelta(minutes=minute)):
+            sensor._handle_coordinator_update()
+    # 10:00 and 11:00 were marked; CSNet recorded the hours up to 11:00 by 11:05
+    electricity = sensor._electricity_by_hour[11]
+    assert 0 < electricity < sensor._energy_in
+    assert sensor.native_value == round(11.0 / electricity, 2)
+    attributes = sensor.extra_state_attributes
+    assert attributes["heat_kwh"] == 11.0
+    assert attributes["hours_recorded"] == 11
+    assert attributes["heat_source"] == "csnet"
+    assert attributes["electricity_today_kwh"] == round(sensor._energy_in, 4)
+
+
+def test_daily_cop_with_csnet_heat_waits_for_a_matched_hour():
+    """Just after a restart no hour start is known yet: the COP stays as it was."""
+    records = {"energy": _hours_of_heat(10, 1.0)}
+    sensor = _csnet_daily_cop("daily_cop_hvac", records)
+    sensor._state = 3.3
+    now = dt_util.now().replace(hour=10, minute=30, second=0, microsecond=0)
+    sensor._last_update_time = now - timedelta(minutes=1)
+    with patch("custom_components.csnet_home.sensor.dt_util.now", return_value=now):
+        sensor._handle_coordinator_update()
+    assert sensor.native_value == 3.3
+    assert sensor.extra_state_attributes["heat_kwh"] is None
+
+
+def test_dhw_daily_cop_with_csnet_heat_takes_the_hot_water_heat():
+    """The DHW COP divides the hot water heat CSNet recorded, not the space heating."""
+    records = {"energy": None}
+    sensor = _csnet_daily_cop("daily_cop_dhw", records)
+    sensor._get_heating_status().update({"operationStatus": 8})
+    start = dt_util.now().replace(hour=10, minute=0, second=0, microsecond=0)
+    sensor._last_update_time = start - timedelta(minutes=1)
+    records["energy"] = _hours_of_heat(10, 2.0, "dhw") + _hours_of_heat(10, 5.0)
+    with patch("custom_components.csnet_home.sensor.dt_util.now", return_value=start):
+        sensor._handle_coordinator_update()
+    assert sensor.extra_state_attributes["heat_kwh"] == 20.0
+
+
+async def test_daily_cop_restores_the_whole_days_electricity_with_csnet_heat():
+    """With CSNet heat the shown electricity is that of the recorded hours; the day's total is restored from its own attribute."""
+    sensor = _daily_sensor("daily_cop_hvac")
+    sensor.heat_source = "csnet"
+    await _restore_with(sensor, "4.0", dt_util.now(), {"electricity_kwh": 2.0, "electricity_today_kwh": 2.5, "heat_kwh": 8.0})
+    assert sensor._energy_in == 2.5
+
+
+@pytest.mark.parametrize(
+    ("status", "use"), [(3, "spaceCooling"), (1, "spaceCooling"), (6, "spaceHeating"), (5, "spaceHeating"), (8, "dhw"), (7, "dhw"), (10, "swp")]
+)
+def test_heat_goes_to_the_use_of_the_operation_status(status, use):
+    """The calculated heat is split by use the way CSNet splits it."""
+    assert _heat_use(status) == use
+
+
+def test_calculated_heat_uses_come_from_the_installation_without_csnet_records():
+    """Heating always; hot water and pool where the installation has them; cooling where a zone says so."""
+    coordinator = SimpleNamespace(get_sensors_data=lambda: [{"zone_id": 1}, {"zone_id": 3}])
+    assert _heat_uses(coordinator, None) == ["spaceHeating", "dhw"]
+    coordinator = SimpleNamespace(get_sensors_data=lambda: [{"zone_id": 1, "has_cooling": True}, {"zone_id": 4}])
+    assert _heat_uses(coordinator, None) == ["spaceHeating", "spaceCooling", "swp"]
+
+
+def test_calculated_heat_uses_follow_what_csnet_recorded():
+    """When CSNet recorded heat, its uses are the ones to split by."""
+    coordinator = SimpleNamespace(get_sensors_data=lambda: [])
+    energy = _hours_of_heat(2, 1.0, "dhw") + _hours_of_heat(2, 1.0)
+    for unit in energy:
+        unit["monthly"] = unit["hourly"]
+    assert _heat_uses(coordinator, energy) == ["spaceHeating", "dhw"]
 
 
 # --------------------------------------------------------------------------
@@ -1116,3 +1229,43 @@ async def test_pool_current_temperature_comes_from_the_unit(hass):
 async def test_pool_without_probe_keeps_the_element_value(hass):
     """-127 is not written into the pool zone."""
     assert (await _poll_with_pool(hass, -127))["current_temperature"] == 0
+
+
+@pytest.mark.parametrize(
+    ("descriptions", "key", "meter", "name"),
+    [
+        (CALCULATED_SENSOR_DESCRIPTIONS, "instant_cop", "sensor.meter", "COP instant (metered)"),
+        (DAILY_SENSOR_DESCRIPTIONS, "daily_cop_hvac", "sensor.meter", "COP today heating/cooling (metered)"),
+        (DAILY_SENSOR_DESCRIPTIONS, "daily_cop_dhw", None, "COP today hot water (estimated)"),
+    ],
+)
+def test_cops_are_named_like_the_period_cops(descriptions, key, meter, name):
+    """COP, then the period, then where the electricity comes from."""
+    assert _named_for_its_electricity(descriptions[key], meter).name == name
+
+
+@pytest.mark.parametrize(
+    ("descriptions", "key", "meter", "name"),
+    [
+        (CALCULATED_SENSOR_DESCRIPTIONS, "instant_consumption", "sensor.meter", "Electricity power (metered)"),
+        (DAILY_SENSOR_DESCRIPTIONS, "daily_consumption", None, "Electricity today (estimated)"),
+    ],
+)
+def test_electricity_is_named_by_where_it_comes_from(descriptions, key, meter, name):
+    """Electricity, the period, then where it comes from."""
+    assert _named_for_its_electricity(descriptions[key], meter).name == name
+
+
+def test_heat_power_keeps_its_name():
+    """The heat power is always calculated: its name says so already."""
+    description = CALCULATED_SENSOR_DESCRIPTIONS["heating_power"]
+    assert _named_for_its_electricity(description, "sensor.meter") is description
+    assert description.name == "Heat power (calculated)"
+
+
+def test_the_defrost_sensor_is_gone():
+    """The Defrost binary sensor is the one: the enum sensor repeated it."""
+    from custom_components.csnet_home.sensor import INSTALLATION_SENSOR_DESCRIPTIONS, REMOVED_INSTALLATION_SENSOR_KEYS
+
+    assert "defrost" not in {description.key for description in INSTALLATION_SENSOR_DESCRIPTIONS}
+    assert set(REMOVED_INSTALLATION_SENSOR_KEYS) == {"daily_heating", "defrost"}

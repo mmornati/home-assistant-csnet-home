@@ -39,13 +39,11 @@ UNIT_ROLES = {
     "heat_power": f"{DOMAIN}-installation-heating_power",
     "cop_now": f"{DOMAIN}-installation-instant_cop",
     "energy_today": f"{DOMAIN}-installation-daily_consumption",
-    "heat_today": f"{DOMAIN}-installation-daily_heating",
     "cop_today_estimated": f"{DOMAIN}-installation-daily_cop_hvac",
     # energy the CSNet server recorded, and the COP from the user's own meter
     "server_heat_today": f"{DOMAIN}-server_heat_today",
     "server_heat_yesterday": f"{DOMAIN}-server_heat_yesterday",
     "server_heat_month": f"{DOMAIN}-server_heat_month",
-    "server_electricity_today": f"{DOMAIN}-server_electricity_today",
     "server_electricity_yesterday": f"{DOMAIN}-server_electricity_yesterday",
     "server_electricity_month": f"{DOMAIN}-server_electricity_month",
     "cop_today": f"{DOMAIN}-metered_cop_today",
