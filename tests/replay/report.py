@@ -38,7 +38,7 @@ def check_invariants(result: ReplayResult) -> list[str]:
             value = values.get(name)
             if isinstance(value, float) and not 0 <= value <= MAX_COP:
                 problems.append(f"{poll.time:%Y-%m-%d %H:%M} {name} is out of range ({value})")
-        for name in ("daily_consumption_kwh", "daily_output_kwh"):
+        for name in ("daily_consumption_kwh", "server_heat_today_kwh"):
             value = values.get(name)
             if not isinstance(value, float):
                 continue
@@ -123,7 +123,6 @@ def daily_figures(result: ReplayResult) -> list[dict[str, Any]]:
                 "running_polls": running,
                 "estimated_kwh": _max(polls, "daily_consumption_kwh"),
                 "meter_kwh": round(meter[-1] - meter[0], 2) if len(meter) > 1 else None,
-                "output_kwh": _max(polls, "daily_output_kwh"),
                 "csnet_heat_kwh": csnet_heat.get(day) if complete else None,
                 "heat_today_sensor_kwh": _max(polls, "server_heat_today_kwh"),
                 "hvac_cop": _last(polls, "daily_hvac_cop"),
@@ -140,6 +139,7 @@ def summary(result: ReplayResult) -> dict[str, Any]:
         "source": result.sample.header.get("source"),
         "polls": len(result.polls),
         "entities": result.entity_count,
+        "heat_source": result.heat_source,
         "problems": check_invariants(result),
         "warnings": warnings(result),
         "days": daily_figures(result),
@@ -149,7 +149,7 @@ def summary(result: ReplayResult) -> dict[str, Any]:
 COLUMNS = [
     ("estimated_kwh", "Estimated kWh"),
     ("meter_kwh", "Meter kWh"),
-    ("output_kwh", "Heat kWh"),
+    ("heat_today_sensor_kwh", "Heat today kWh"),
     ("csnet_heat_kwh", "CSNet heat kWh"),
     ("hvac_cop", "HVAC COP"),
 ]
