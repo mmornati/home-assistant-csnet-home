@@ -21,7 +21,7 @@ from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_time_changed
 
 from custom_components.csnet_home.api import CSNetHomeAPI
-from custom_components.csnet_home.const import CONF_ENERGY_METER, CONF_POWER_SUPPLY, DOMAIN
+from custom_components.csnet_home.const import CONF_ENERGY_METER, CONF_HEAT_SOURCE, CONF_POWER_SUPPLY, DEFAULT_HEAT_SOURCE, DOMAIN
 
 from .sample import Sample
 
@@ -38,9 +38,10 @@ TRACKED = {
     "output_power_w": f"{DOMAIN}-installation-heating_power",
     "instant_cop": f"{DOMAIN}-installation-instant_cop",
     "daily_consumption_kwh": f"{DOMAIN}-installation-daily_consumption",
-    "daily_output_kwh": f"{DOMAIN}-installation-daily_heating",
     "daily_hvac_cop": f"{DOMAIN}-installation-daily_cop_hvac",
+    # Heat produced today: CSNet's records or the integration's own measure, per the setting
     "server_heat_today_kwh": f"{DOMAIN}-server_heat_today",
+    "server_heat_month_kwh": f"{DOMAIN}-server_heat_month",
     "metered_cop_today": f"{DOMAIN}-metered_cop_today",
     "outdoor_temperature": f"{DOMAIN}-installation-external_temperature",
 }
@@ -64,6 +65,9 @@ class ReplayResult:
     polls: list[Poll] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
     entity_count: int = 0
+    heat_source: str = DEFAULT_HEAT_SOURCE
+    # The poll indexes before which Home Assistant was restarted
+    restarts: list[int] = field(default_factory=list)
 
 
 class _Feeder:
@@ -164,8 +168,15 @@ async def replay_sample(
     *,
     power_supply: str | None = None,
     max_polls: int | None = None,
+    heat_source: str | None = None,
+    restart_before: tuple[int, ...] = (),
 ) -> ReplayResult:
-    """Replay a sample and return what the entities showed after each poll."""
+    """Replay a sample and return what the entities showed after each poll.
+
+    ``heat_source`` picks the heat produced setting; ``restart_before`` lists
+    poll indexes before which the entry is unloaded and set up again, the way
+    a restart of Home Assistant does.
+    """
     header = sample.header
     if header.get("time_zone"):
         await hass.config.async_set_time_zone(header["time_zone"])
@@ -183,6 +194,9 @@ async def replay_sample(
         data[CONF_ENERGY_METER] = METER_ENERGY_ENTITY
     if power_supply or header.get("power_supply"):
         data[CONF_POWER_SUPPLY] = power_supply or header["power_supply"]
+    if heat_source:
+        data[CONF_HEAT_SOURCE] = heat_source
+        result.heat_source = heat_source
     entry = MockConfigEntry(domain=DOMAIN, data=data)
     entry.add_to_hass(hass)
 
@@ -249,9 +263,19 @@ async def replay_sample(
                     feeder.advance(t)
                     feeder.local_now = dt_util.as_local(when).replace(tzinfo=None)
                     energy, power = set_meter(when)
-                    async_fire_time_changed(hass, when)
-                    await coordinator.async_refresh()
-                    await hass.async_block_till_done()
+                    if index in restart_before:
+                        # the first poll of a set up is the entry's own refresh
+                        assert await hass.config_entries.async_unload(entry.entry_id)
+                        await hass.async_block_till_done()
+                        assert await hass.config_entries.async_setup(entry.entry_id), "the entry did not set up again"
+                        await hass.async_block_till_done()
+                        coordinator = entry.runtime_data.coordinator
+                        coordinator.update_interval = None
+                        result.restarts.append(index)
+                    else:
+                        async_fire_time_changed(hass, when)
+                        await coordinator.async_refresh()
+                        await hass.async_block_till_done()
                 else:
                     energy, power = feeder.meter.get("energy_kwh"), feeder.meter.get("power_w")
                 values = {name: _number(hass.states.get(entity_id)) if entity_id else None for name, entity_id in entities.items()}
