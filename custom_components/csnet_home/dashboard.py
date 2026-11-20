@@ -52,6 +52,11 @@ UNIT_ROLES = {
     "cop_yesterday": f"{DOMAIN}-metered_cop_yesterday",
     "cop_month": f"{DOMAIN}-metered_cop_month",
     "cop_last_month": f"{DOMAIN}-metered_cop_last_month",
+    # without a meter, the same COPs with the estimated electricity
+    "cop_today_from_estimate": f"{DOMAIN}-estimated_cop_today",
+    "cop_yesterday_from_estimate": f"{DOMAIN}-estimated_cop_yesterday",
+    "cop_month_from_estimate": f"{DOMAIN}-estimated_cop_month",
+    "cop_last_month_from_estimate": f"{DOMAIN}-estimated_cop_last_month",
     # water side
     "water_out": f"{DOMAIN}-installation-out_water_temperature",
     # outlet of the heat pump's exchanger, before the 3-way valve: the flow to the tank
@@ -126,20 +131,28 @@ def _zone_of(unique_id: str, prefix: str) -> tuple[str, int] | None:
 
 
 def _meter_roles(hass: HomeAssistant, registry: er.EntityRegistry) -> dict[str, str]:
-    """Return the electricity meter the user chose in the settings, and the power sensor of the same device.
-
-    Meters (a smart plug, a DIN-rail meter) report energy and power side by side:
-    the power sensor whose entity id shares the most words with the meter's
-    ("total_active_energy" / "total_active_power") measures the same thing.
-    """
+    """Return the electricity meter the user chose in the settings, and the power sensor of the same device."""
     entries = hass.config_entries.async_entries(DOMAIN)
     meter = entries[0].data.get(CONF_ENERGY_METER) if entries else None
     if not meter:
         return {}
     roles = {"meter_energy": meter}
+    power = meter_power_entity(registry, meter)
+    if power:
+        roles["meter_power"] = power
+    return roles
+
+
+def meter_power_entity(registry: er.EntityRegistry, meter: str) -> str | None:
+    """Return the power sensor of the same device as an energy meter, or None.
+
+    Meters (a smart plug, a DIN-rail meter) report energy and power side by side:
+    the power sensor whose entity id shares the most words with the meter's
+    ("total_active_energy" / "total_active_power") measures the same thing.
+    """
     meter_entry = registry.async_get(meter)
     if not meter_entry or not meter_entry.device_id:
-        return roles
+        return None
 
     meter_words = set(meter.split(".", 1)[-1].split("_"))
 
@@ -161,9 +174,9 @@ def _meter_roles(hass: HomeAssistant, registry: er.EntityRegistry) -> dict[str, 
         and entry.disabled_by is None
         and (entry.device_class or entry.original_device_class) == "power"
     ]
-    if candidates:
-        roles["meter_power"] = max(candidates, key=lambda entity_id: (*likeness(entity_id), entity_id))
-    return roles
+    if not candidates:
+        return None
+    return max(candidates, key=lambda entity_id: (*likeness(entity_id), entity_id))
 
 
 @callback
@@ -222,8 +235,15 @@ def dashboard_entities(hass: HomeAssistant) -> dict:
     if DHW_ZONE in water_heaters:
         dhw = {"water_heater": water_heaters[DHW_ZONE], **found(DHW_ROLES)}
 
+    unit = found(UNIT_ROLES)
+    # one set of period COPs: the metered ones, or else the estimated ones
+    for period in ("today", "yesterday", "month", "last_month"):
+        estimated = unit.pop(f"cop_{period}_from_estimate", None)
+        if estimated and f"cop_{period}" not in unit:
+            unit[f"cop_{period}"] = estimated
+
     return {
-        "unit": {**found(UNIT_ROLES), **_meter_roles(hass, registry)},
+        "unit": {**unit, **_meter_roles(hass, registry)},
         "circuits": circuits,
         "dhw": dhw,
         "pool": {"water_heater": water_heaters[POOL_ZONE]} if POOL_ZONE in water_heaters else None,

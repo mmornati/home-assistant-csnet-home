@@ -1124,7 +1124,9 @@ class CsnetHeatPumpCard extends CsnetBaseCard {
     const delta = waterTemps[0] !== null && waterTemps[1] !== null ? waterTemps[0] - waterTemps[1] : null;
     // electricity: the user's meter, else the estimate, else CSNet's record
     const metered = (role) => {
-      const raw = stateOf(hass, unit[role])?.attributes?.electricity_kwh;
+      const attributes = stateOf(hass, unit[role])?.attributes;
+      if (attributes?.electricity_source === "estimate") return null;
+      const raw = attributes?.electricity_kwh;
       const v = raw === null || raw === undefined || raw === "" ? NaN : Number(raw);
       return Number.isFinite(v) ? v : null;
     };
@@ -1548,14 +1550,18 @@ class CsnetPerformanceCard extends CsnetBaseCard {
   period(hass, copRole, heatRole, electricityRole, key) {
     const unit = this.unit;
     const cop = stateOf(hass, unit[copRole]);
-    if (cop && num(hass, unit[copRole]) !== null) {
-      return { entity: unit[copRole], cop: num(hass, unit[copRole]), heat: cop.attributes.heat_kwh, electricity: cop.attributes.electricity_kwh };
-    }
+    const fromCop = cop && num(hass, unit[copRole]) !== null
+      ? { entity: unit[copRole], cop: num(hass, unit[copRole]), heat: cop.attributes.heat_kwh, electricity: cop.attributes.electricity_kwh }
+      : null;
+    // the COP with the electricity of the user's meter comes first
+    if (fromCop && cop.attributes.electricity_source !== "estimate") return fromCop;
     const heat = num(hass, unit[heatRole]);
     const metered = meterKwh(this._data, key);
     if (heat !== null && metered > 0) return { entity: unit.meter_energy, cop: heat / metered, heat, electricity: metered };
     const electricity = num(hass, unit[electricityRole]);
     if (heat !== null && electricity) return { entity: unit[heatRole], cop: heat / electricity, heat, electricity };
+    // without a meter or the electricity CSNet records: the COP with the estimated electricity
+    if (fromCop) return fromCop;
     // no electricity figure (no meter, no pulse meter): the heat alone
     if (heat !== null) return { entity: unit[heatRole], cop: null, heat, electricity: null };
     return null;

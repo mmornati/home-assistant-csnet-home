@@ -226,3 +226,24 @@ def test_cards_keep_their_element_and_skip_unchanged_content():
     show = source[source.index("  _show(css, html) {") :]
     show = show[: show.index("\n  }\n")]
     assert "if (!this._card)" in show and "if (html !== this._html)" in show and "if (css !== this._css)" in show
+
+
+async def test_period_cops_fall_back_to_the_estimated_ones(hass: HomeAssistant):
+    """Without a meter the cards get the estimated period COPs under the same roles."""
+    registry = er.async_get(hass)
+    _add(registry, "sensor", f"{DOMAIN}-estimated_cop_today", "sensor.cop_today_estimated")
+    _add(registry, "sensor", f"{DOMAIN}-estimated_cop_month", "sensor.cop_month_estimated")
+    MockConfigEntry(domain=DOMAIN, data={}).add_to_hass(hass)
+    unit = dashboard_entities(hass)["unit"]
+    assert unit["cop_today"] == "sensor.cop_today_estimated"
+    assert unit["cop_month"] == "sensor.cop_month_estimated"
+    assert not [role for role in unit if role.endswith("_from_estimate")]
+
+
+async def test_metered_period_cops_win_over_estimated_ones(hass: HomeAssistant):
+    """Should both exist for a moment, the metered COP is the one the cards get."""
+    registry = er.async_get(hass)
+    _add(registry, "sensor", f"{DOMAIN}-metered_cop_today", "sensor.cop_today_metered")
+    _add(registry, "sensor", f"{DOMAIN}-estimated_cop_today", "sensor.cop_today_estimated")
+    MockConfigEntry(domain=DOMAIN, data={}).add_to_hass(hass)
+    assert dashboard_entities(hass)["unit"]["cop_today"] == "sensor.cop_today_metered"
