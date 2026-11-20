@@ -2204,6 +2204,9 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
         # each hour, to go with the heat of the hours CSNet has recorded
         self._electricity_by_hour: dict[int, float] = {}
         self._csnet_figures: tuple[float, float, int] | None = None
+        # The hour from which the electricity has been counted: 0 when it
+        # covers the whole day, else the first hour whose start was seen
+        self._counted_since_hour: int | None = None
 
     async def async_added_to_hass(self):
         """Restore state and set up initial values."""
@@ -2230,6 +2233,8 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
                     # with the heat CSNet records, electricity_kwh is that of the recorded hours only
                     self._energy_in = max(0.0, float(attributes.get(ATTR_ELECTRICITY_TODAY_KWH, attributes.get(ATTR_ELECTRICITY_KWH, 0.0))))
                     self._energy_out = max(0.0, float(attributes.get(ATTR_HEAT_KWH, 0.0)))
+                    # the restored total holds the day's electricity since midnight
+                    self._counted_since_hour = 0
                 except (TypeError, ValueError):
                     self._energy_in = self._energy_out = 0.0
         else:
@@ -2270,20 +2275,28 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
         """Divide the heat CSNet recorded today by the electricity of the same hours.
 
         CSNet records the heat by full hours, a few minutes after each hour.
-        Until an hour can be matched (just after a restart), the COP stays as it was.
+        Only the hours whose electricity was counted are divided: after a
+        start in the middle of the day, from the first hour whose start was
+        seen. Until an hour can be matched, the COP stays as it was.
         """
         from .server_energy import HEAT, energy_on_day, hours_complete_on_day  # pylint: disable=import-outside-toplevel
 
         energy = self.coordinator.get_server_energy()
         hours = hours_complete_on_day(energy, now.date())
-        electricity = self._electricity_by_hour.get(hours) if hours else None
+        start = self._counted_since_hour
+        if not hours or start is None or hours <= start:
+            return
+        electricity = self._electricity_by_hour.get(hours)
         if electricity is None:
             return
+        electricity -= self._electricity_by_hour.get(start, 0.0) if start else 0.0
         uses = ("spaceHeating", "spaceCooling") if self._key == "daily_cop_hvac" else ("dhw",)
         figures = [energy_on_day(energy, now.date(), HEAT, use, before_hour=hours) for use in uses]
         if all(figure is None for figure in figures):
             return
         heat = sum(figure or 0.0 for figure in figures)
+        if start:
+            heat -= sum(energy_on_day(energy, now.date(), HEAT, use, before_hour=start) or 0.0 for use in uses)
         self._csnet_figures = (heat, electricity, hours)
         if electricity > 0.01:
             self._state = heat / electricity
@@ -2301,6 +2314,8 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
             self._energy_out = 0.0
             self._electricity_by_hour = {}
             self._csnet_figures = None
+            # counted since midnight from here on
+            self._counted_since_hour = 0
         # a new hour began since the last poll: its start can be marked after this poll's energy
         new_hour = self._last_update_time is not None and (self._last_update_time.date(), self._last_update_time.hour) != (now.date(), now.hour)
 
@@ -2397,6 +2412,8 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
             if self.heat_source == HEAT_SOURCE_CSNET:
                 if new_hour:
                     self._electricity_by_hour[now.hour] = self._energy_in
+                    if self._counted_since_hour is None:
+                        self._counted_since_hour = now.hour
                 self._update_from_csnet_heat(now)
 
         self.async_write_ha_state()

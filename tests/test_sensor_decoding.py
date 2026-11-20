@@ -1133,11 +1133,12 @@ def test_daily_cop_with_csnet_heat_divides_the_recorded_hours():
         with patch("custom_components.csnet_home.sensor.dt_util.now", return_value=start + timedelta(minutes=minute)):
             sensor._handle_coordinator_update()
     # 10:00 and 11:00 were marked; CSNet recorded the hours up to 11:00 by 11:05
-    electricity = sensor._electricity_by_hour[11]
+    electricity = sensor._electricity_by_hour[11] - sensor._electricity_by_hour[10]
     assert 0 < electricity < sensor._energy_in
-    assert sensor.native_value == round(11.0 / electricity, 2)
+    # counted from 10:00, the first hour whose start it saw: only that hour's heat
+    assert sensor.native_value == round(1.0 / electricity, 2)
     attributes = sensor.extra_state_attributes
-    assert attributes["heat_kwh"] == 11.0
+    assert attributes["heat_kwh"] == 1.0
     assert attributes["hours_recorded"] == 11
     assert attributes["heat_source"] == "csnet"
     assert attributes["electricity_today_kwh"] == round(sensor._energy_in, 4)
@@ -1156,10 +1157,33 @@ def test_daily_cop_with_csnet_heat_waits_for_a_matched_hour():
     assert sensor.extra_state_attributes["heat_kwh"] is None
 
 
+def test_daily_cop_with_csnet_heat_after_a_start_in_the_day_counts_from_the_first_seen_hour():
+    """Started at 22:45 without today's totals: the heat of the hours before 23:00 is not divided by 15 minutes of electricity."""
+    records = {"energy": _hours_of_heat(23, 4.0)}
+    sensor = _csnet_daily_cop("daily_cop_hvac", records)
+    start = dt_util.now().replace(hour=22, minute=45, second=0, microsecond=0)
+    sensor._last_update_time = start - timedelta(minutes=1)
+    for minute in range(0, 20, 5):
+        with patch("custom_components.csnet_home.sensor.dt_util.now", return_value=start + timedelta(minutes=minute)):
+            sensor._handle_coordinator_update()
+    assert sensor._counted_since_hour == 23
+    assert sensor.native_value == 0.0
+    assert sensor.extra_state_attributes["heat_kwh"] is None
+
+
+async def test_daily_cop_with_csnet_heat_counts_from_midnight_after_a_restore():
+    """Today's restored totals cover the day since midnight."""
+    sensor = _daily_sensor("daily_cop_hvac")
+    sensor.heat_source = "csnet"
+    await _restore_with(sensor, "4.0", dt_util.now(), {"electricity_kwh": 2.0, "electricity_today_kwh": 2.5, "heat_kwh": 8.0})
+    assert sensor._counted_since_hour == 0
+
+
 def test_dhw_daily_cop_with_csnet_heat_takes_the_hot_water_heat():
     """The DHW COP divides the hot water heat CSNet recorded, not the space heating."""
     records = {"energy": None}
     sensor = _csnet_daily_cop("daily_cop_dhw", records)
+    sensor._counted_since_hour = 0  # the day's electricity is counted since midnight
     sensor._get_heating_status().update({"operationStatus": 8})
     start = dt_util.now().replace(hour=10, minute=0, second=0, microsecond=0)
     sensor._last_update_time = start - timedelta(minutes=1)

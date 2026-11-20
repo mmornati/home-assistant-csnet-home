@@ -580,7 +580,7 @@ A meter on the heat pump's whole circuit can also count other loads fed from it,
 - **COP today hot water** accumulates while the unit is producing DHW, or defrosting outside space heating.
 - Both daily COPs include the auxiliary consumption between compressor runs, as a meter on the heat pump would.
 - With **calculated** heat, both daily COPs show the day's totals they come from in their `electricity_kwh` and `heat_kwh` attributes, and keep them across a restart of Home Assistant or a reload of the integration.
-- With **CSNet** heat, the HVAC COP divides CSNet's space heating and cooling heat, and the DHW COP its hot water heat, by the electricity of the same full hours: `heat_kwh` and `electricity_kwh` are those hours' figures, `hours_recorded` how many hours of today CSNet has recorded, and `electricity_today_kwh` the whole day's electricity. Just after a restart, the COP keeps its last value until the start of the next hour.
+- With **CSNet** heat, the HVAC COP divides CSNet's space heating and cooling heat, and the DHW COP its hot water heat, by the electricity of the same full hours: `heat_kwh` and `electricity_kwh` are those hours' figures, `hours_recorded` how many hours of today CSNet has recorded, and `electricity_today_kwh` the whole day's electricity. Just after a restart, the COP keeps its last value until the start of the next hour. When the integration starts during the day without today's totals (first install, or a restart that could not restore them), the COP counts from the first full hour it saw, not from midnight, since the electricity before it is unknown.
 
 ### COP per period
 
