@@ -286,7 +286,13 @@ async def test_metered_cop_is_heat_over_measured_electricity(hass, hass_storage,
     _set_meter(hass, "510.0")
     tracker.async_update(dt_util.now())
     assert sensors["today"].native_value == 4.0
-    assert sensors["today"].extra_state_attributes == {"heat_kwh": 40, "electricity_kwh": 10.0, "meter": "sensor.any_meter"}
+    assert sensors["today"].extra_state_attributes == {
+        "heat_kwh": 40,
+        "electricity_kwh": 10.0,
+        "meter": "sensor.any_meter",
+        "heat_source": "csnet",
+        "electricity_source": "meter",
+    }
 
     # 08:55: more electricity was used, but the hour is not recorded yet: the COP does not sag
     monkeypatch.setattr(dt_util, "now", lambda: at(13, 8, 55))

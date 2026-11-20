@@ -581,6 +581,7 @@ def test_every_form_field_and_error_has_a_text_in_each_language():
     reference = json.loads((base / "strings.json").read_text(encoding="utf-8"))["config"]
     fields = {CONF_USERNAME, CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_LANGUAGE, CONF_MAX_TEMP_OVERRIDE, CONF_FAN_COIL_MODEL}
     fields |= {CONF_ENABLE_ALARM_NOTIFICATIONS, CONF_FILTERED_ALARM_CODES, "power_supply", "energy_meter", "card_language", "user_agent"}
+    fields |= {"always_offer_dhw_boost", "heat_source"}
     for step in ("user", "reconfigure"):
         assert set(reference["step"][step]["data"]) == fields
         assert set(reference["step"][step]["data_description"]) == fields
