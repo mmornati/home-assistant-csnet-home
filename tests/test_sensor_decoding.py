@@ -315,7 +315,7 @@ def test_stopped_unit_draws_its_standby():
 
 
 def _observed(sensor, reading):
-    """A new reading, as the coordinator brings it: the model learns once, then the power is asked for."""
+    """Feed a new reading, as the coordinator brings it: the model learns once, then the power is asked for."""
     sensor.observe_power_reading(reading)
     return sensor._calculate_complex_power(reading)
 
@@ -715,7 +715,7 @@ def test_instant_cop_ignores_a_failed_poll():
 
 
 def _metered_cop_sensor(heating_status):
-    """An instant COP sensor with a meter whose reading the test sets."""
+    """Build an instant COP sensor with a meter whose reading the test sets."""
     sensor = _cop_sensor(heating_status)
     meter = {"state": "10.0"}
     sensor.energy_meter = "sensor.heat_pump_energy"
@@ -762,7 +762,7 @@ def test_instant_cop_uses_the_estimate_when_the_meter_cannot_tell(reading):
 
 
 def _meter_hass(states):
-    """A hass whose states the test sets: entity id -> (state, unit)."""
+    """Build a hass whose states the test sets: entity id -> (state, unit)."""
     return SimpleNamespace(
         states=SimpleNamespace(
             get=lambda entity_id: (
@@ -1103,7 +1103,7 @@ def test_normal_poll_interval_is_integrated_in_full():
 
 
 def _hours_of_heat(hours, kwh_per_hour, use="spaceHeating"):
-    """CSNet's records of today: each of the first ``hours`` hours with that much heat."""
+    """Build CSNet's records of today: each of the first ``hours`` hours with that much heat."""
     today = dt_util.now()
     zero = {"spaceHeating": 0, "spaceCooling": 0, "dhw": 0, "swp": 0}
     return [
@@ -1123,7 +1123,7 @@ def _csnet_daily_cop(key, records):
 
 
 def test_daily_cop_with_csnet_heat_divides_the_recorded_hours():
-    """CSNet's heat of the full hours over the electricity of the same hours, not of the hour in progress."""
+    """Divide CSNet's heat of the full hours by the electricity of the same hours, not of the hour in progress."""
     records = {"energy": None}
     sensor = _csnet_daily_cop("daily_cop_hvac", records)
     start = dt_util.now().replace(hour=10, minute=0, second=0, microsecond=0)

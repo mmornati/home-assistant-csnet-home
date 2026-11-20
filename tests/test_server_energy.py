@@ -508,7 +508,7 @@ async def test_cop_yesterday_waits_for_the_last_hour_of_yesterday(hass, hass_sto
 
 
 def _counter(hass, watts):
-    """An estimated-energy counter, and the power the test feeds it."""
+    """Build an estimated-energy counter, and the power the test feeds it."""
     power = {"watts": watts}
     return EstimatedEnergyCounter(hass, "entry"), power
 
@@ -597,12 +597,13 @@ async def test_estimated_cop_says_where_its_electricity_comes_from(hass, hass_st
 
 
 def _produced(hass, watts, use="spaceHeating"):
-    """A heat counter, and the heat the test feeds it."""
+    """Build a heat counter, and the heat the test feeds it."""
     heat = {"watts": watts, "use": use}
     return ProducedEnergyCounter(hass, "entry"), heat
 
 
 def local(day, hour, minute=0):
+    """Return a local time on a fixed November 2026 day."""
     return dt_util.now().replace(year=2026, month=11, day=day, hour=hour, minute=minute, second=0, microsecond=0)
 
 
