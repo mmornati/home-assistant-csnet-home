@@ -1,5 +1,6 @@
 """Support for CSNet Home sensors."""
 
+import dataclasses
 import logging
 from collections import Counter, deque
 from datetime import datetime, timedelta, timezone
@@ -29,9 +30,13 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_ENERGY_METER,
+    CONF_HEAT_SOURCE,
     CONF_POWER_SUPPLY,
+    DEFAULT_HEAT_SOURCE,
     DEFAULT_POWER_SUPPLY,
     DOMAIN,
+    HEAT_SOURCE_CALCULATED,
+    HEAT_SOURCE_CSNET,
     OPERATION_STATUS_MAP,
     OTC_COOLING_TYPE_NAMES,
     OTC_HEATING_TYPE_NAMES,
@@ -57,7 +62,6 @@ INSTALLATION_SENSOR_API_KEYS = {
     "c2_water_temperature": ["waterOutlet2Temp"],
     "set_water_temperature": ["waterTempSetting"],
     "water_pressure": ["waterPressure"],
-    "defrost": ["defrosting"],
     "mix_valve_position": ["mixingValveOpening"],
     "external_temperature": ["outdoorAmbientTemp"],
     "mean_external_temperature": ["outdoorAmbientAverageTemp"],
@@ -245,12 +249,6 @@ INSTALLATION_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         state_class=SensorStateClass.MEASUREMENT,
-    ),
-    SensorEntityDescription(
-        key="defrost",
-        name="Defrost",
-        device_class=SensorDeviceClass.ENUM,
-        options=[STATE_OFF, STATE_ON],
     ),
     SensorEntityDescription(
         key="mix_valve_position",
@@ -516,21 +514,21 @@ COMPRESSOR_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
 CALCULATED_SENSOR_DESCRIPTIONS: dict[str, SensorEntityDescription] = {
     "instant_consumption": SensorEntityDescription(
         key="instant_consumption",
-        name="Instant Consumption",
+        name="Electricity power",
         device_class=SensorDeviceClass.POWER,
         native_unit_of_measurement=UnitOfPower.WATT,
         state_class=SensorStateClass.MEASUREMENT,
     ),
     "heating_power": SensorEntityDescription(
         key="heating_power",
-        name="Output Power",
+        name="Heat power (calculated)",
         device_class=SensorDeviceClass.POWER,
         native_unit_of_measurement=UnitOfPower.WATT,
         state_class=SensorStateClass.MEASUREMENT,
     ),
     "instant_cop": SensorEntityDescription(
         key="instant_cop",
-        name="Instant COP",
+        name="COP instant",
         state_class=SensorStateClass.MEASUREMENT,
     ),
 }
@@ -539,26 +537,19 @@ CALCULATED_SENSOR_DESCRIPTIONS: dict[str, SensorEntityDescription] = {
 DAILY_SENSOR_DESCRIPTIONS: dict[str, SensorEntityDescription] = {
     "daily_consumption": SensorEntityDescription(
         key="daily_consumption",
-        name="Daily Consumption",
-        device_class=SensorDeviceClass.ENERGY,
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        state_class=SensorStateClass.TOTAL_INCREASING,
-    ),
-    "daily_heating": SensorEntityDescription(
-        key="daily_heating",
-        name="Daily Output Energy",
+        name="Electricity today",
         device_class=SensorDeviceClass.ENERGY,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         state_class=SensorStateClass.TOTAL_INCREASING,
     ),
     "daily_cop_hvac": SensorEntityDescription(
         key="daily_cop_hvac",
-        name="Daily HVAC COP",
+        name="COP today heating/cooling",
         state_class=SensorStateClass.MEASUREMENT,
     ),
     "daily_cop_dhw": SensorEntityDescription(
         key="daily_cop_dhw",
-        name="DHW Daily COP",
+        name="COP today hot water",
         state_class=SensorStateClass.MEASUREMENT,
     ),
 }
@@ -933,12 +924,29 @@ def _heating_curve_sensors(hass, entry, coordinator, remove_stale: bool = True) 
     return sensors
 
 
+# Removed: Daily Output Energy (the heat sensors replace it) and Defrost (the
+# Defrost binary sensor repeats it)
+REMOVED_INSTALLATION_SENSOR_KEYS = ("daily_heating", "defrost")
+
+# The sensors whose electricity is the meter's or the estimate's, named like
+# the period sensors: what it is, the period, then "(metered)" or "(estimated)"
+KEYS_NAMED_BY_ELECTRICITY = ("instant_consumption", "daily_consumption", "instant_cop", "daily_cop_hvac", "daily_cop_dhw")
+
+
+def _named_for_its_electricity(description: SensorEntityDescription, energy_meter: str | None) -> SensorEntityDescription:
+    """Return the description with its electricity in the name: "(metered)" or "(estimated)"."""
+    if description.key not in KEYS_NAMED_BY_ELECTRICITY:
+        return description
+    return dataclasses.replace(description, name=f"{description.name} ({'metered' if energy_meter else 'estimated'})")
+
+
 def _power_reading_follower(coordinator, observer):
     """Return the listener that lets the power model learn from each update of the coordinator.
 
     Added before the sensors' own listeners, it runs first at every update:
-    the crankcase heater's state, the model's correction factor and the
-    estimated electricity are then up to date when the sensors read them.
+    the crankcase heater's state, the model's correction factor, the
+    estimated electricity and the calculated heat are then up to date when
+    the sensors read them.
     """
 
     @callback
@@ -950,9 +958,15 @@ def _power_reading_follower(coordinator, observer):
             return
         observer.observe_power_reading(heating_status)
         # the estimated electricity, followed like a meter, also without any COP sensor
+        now = dt_util.now()
         counter = getattr(coordinator, "estimated_energy", None)
         if counter is not None:
-            counter.async_update(dt_util.now(), observer._calculate_complex_power(heating_status))  # pylint: disable=protected-access
+            counter.async_update(now, observer._calculate_complex_power(heating_status))  # pylint: disable=protected-access
+        # the heat the integration measures, when it is the source of the heat
+        produced = getattr(coordinator, "produced_energy", None)
+        if produced is not None:
+            watts, op_status, _text = observer._get_thermal_power_values(heating_status)  # pylint: disable=protected-access
+            produced.async_update(now, watts, _heat_use(op_status))
 
     return _follow
 
@@ -966,20 +980,51 @@ def _shared(coordinator, name: str, make):
     return found
 
 
-def _server_energy_sensors(hass, entry, coordinator) -> list:
-    """Return the sensors for the server's energy records, and the COP of each period.
+def _heat_uses(coordinator, energy) -> list[str]:
+    """Return the uses the calculated heat is split by: those CSNet recorded, else those of the installation."""
+    from .server_energy import HEAT, USES, has_energy  # pylint: disable=import-outside-toplevel
 
-    The period COPs divide the heat the server recorded by the electricity of
-    the same period: the user's meter when one is configured ("metered"), or
-    else the integration's estimate ("estimated"). Only one of the two sets
-    exists at a time.
+    recorded = [use for use in USES if has_energy(energy, HEAT, use)]
+    if recorded:
+        return recorded
+    sensors_data = coordinator.get_sensors_data() or []
+    zones = {sensor.get("zone_id") for sensor in sensors_data}
+    uses = ["spaceHeating"]
+    if any(sensor.get("has_cooling") is True for sensor in sensors_data):
+        uses.append("spaceCooling")
+    if 3 in zones:
+        uses.append("dhw")
+    if 4 in zones:
+        uses.append("swp")
+    return uses
+
+
+def _heat_use(op_status) -> str:
+    """Return the use the heat of an operation status goes to, as CSNet names it."""
+    if op_status in COOLING_OPERATION_STATUSES:
+        return "spaceCooling"
+    if op_status in (7, 8):
+        return "dhw"
+    if op_status in (9, 10):
+        return "swp"
+    return "spaceHeating"
+
+
+def _server_energy_sensors(hass, entry, coordinator) -> list:
+    """Return the sensors for the heat and electricity of the unit, and the COP of each period.
+
+    The heat is what the server recorded, or the integration's own measure
+    when the user chose it (or the server has none). The period COPs divide it
+    by the electricity of the same period: the user's meter when one is
+    configured ("metered"), or else the integration's estimate ("estimated").
+    Only one of the two sets exists at a time.
     """
     # imported here: that module is only needed by this platform's setup
     from .server_energy import (  # pylint: disable=import-outside-toplevel
         ESTIMATED_COP_DESCRIPTIONS,
         HEAT,
         METERED_COP_DESCRIPTIONS,
-        METERED_REMOVED_ENERGY_KEYS,
+        REMOVED_ENERGY_KEYS,
         CSNetHomeMeteredCopSensor,
         CSNetHomeServerEnergySensor,
         MeterTracker,
@@ -990,36 +1035,51 @@ def _server_energy_sensors(hass, entry, coordinator) -> list:
 
     energy = coordinator.get_server_energy()
     device_info = unit_device_info(coordinator)
+    produced = getattr(coordinator, "produced_energy", None)
+    heat_uses = _heat_uses(coordinator, energy) if produced is not None else None
     meter = entry.data.get(CONF_ENERGY_METER)
     counter = getattr(coordinator, "estimated_energy", None)
-    # one tracker of the meter's period readings, shared by every sensor that
-    # uses them, also when sensors are added later on
-    meter_tracker = _shared(coordinator, "meter_tracker", lambda: MeterTracker(hass, entry.entry_id, meter)) if meter else None
+    # One tracker of the period readings of the electricity, shared by every
+    # sensor that uses them, also when sensors are added later on: the user's
+    # meter, or else the integration's estimate, followed like a meter
+    if meter:
+        tracker = _shared(coordinator, "meter_tracker", lambda: MeterTracker(hass, entry.entry_id, meter))
+        electricity = "metered"
+    elif counter is not None:
+        tracker = _shared(
+            coordinator,
+            "estimate_tracker",
+            lambda: MeterTracker(hass, entry.entry_id, "estimate", reader=counter.reading_kwh, storage_key=estimated_meter_storage_key(entry.entry_id)),
+        )
+        electricity = "estimated"
+    else:
+        tracker = None
+        electricity = None
+    estimate = counter if not meter else None
 
-    # with a meter, the electricity of today, yesterday and the month is what it counted
     sensors: list = [
-        CSNetHomeServerEnergySensor(coordinator, description, device_info, meter_tracker)
-        for description in server_energy_descriptions(energy, metered_electricity=meter_tracker is not None)
+        CSNetHomeServerEnergySensor(coordinator, description, device_info, produced, tracker, estimate)
+        for description in server_energy_descriptions(energy, heat_uses, electricity)
     ]
+    has_heat = produced is not None or has_energy(energy, HEAT)
 
     if meter:
-        unused = list(ESTIMATED_COP_DESCRIPTIONS)
-        removed = list(METERED_REMOVED_ENERGY_KEYS)
-        if has_energy(energy, HEAT):
-            sensors += [CSNetHomeMeteredCopSensor(coordinator, description, device_info, meter_tracker) for description in METERED_COP_DESCRIPTIONS]
+        unused = ESTIMATED_COP_DESCRIPTIONS
+        if has_heat:
+            sensors += [
+                CSNetHomeMeteredCopSensor(coordinator, description, device_info, tracker, produced=produced) for description in METERED_COP_DESCRIPTIONS
+            ]
     else:
-        unused = list(METERED_COP_DESCRIPTIONS)
-        removed = []
-        if counter is not None and has_energy(energy, HEAT):
-            tracker = _shared(
-                coordinator,
-                "estimate_tracker",
-                lambda: MeterTracker(hass, entry.entry_id, "estimate", reader=counter.reading_kwh, storage_key=estimated_meter_storage_key(entry.entry_id)),
-            )
-            sensors += [CSNetHomeMeteredCopSensor(coordinator, description, device_info, tracker, counter) for description in ESTIMATED_COP_DESCRIPTIONS]
-    # the other set goes: the meter was added to or removed from the settings
+        unused = METERED_COP_DESCRIPTIONS
+        if tracker is not None and has_heat:
+            sensors += [
+                CSNetHomeMeteredCopSensor(coordinator, description, device_info, tracker, counter, produced=produced)
+                for description in ESTIMATED_COP_DESCRIPTIONS
+            ]
+    # the other set goes: the meter was added to or removed from the settings;
+    # and the sensors that are no more
     entity_registry = er.async_get(hass)
-    for key in [description.key for description in unused] + removed:
+    for key in [description.key for description in unused] + list(REMOVED_ENERGY_KEYS):
         entity_id = entity_registry.async_get_entity_id("sensor", DOMAIN, f"{DOMAIN}-{key}")
         if entity_id:
             entity_registry.async_remove(entity_id)
@@ -1133,9 +1193,35 @@ async def async_setup_entry(hass, entry, async_add_entities):
             await counter.async_load()
             coordinator.estimated_energy = counter
 
+        # Where the heat produced comes from: the heat CSNet records, or the
+        # integration's own measure, by the user's choice. A unit CSNet has
+        # recorded no heat for gets the integration's measure.
+        from .server_energy import HEAT, ProducedEnergyCounter, has_energy  # pylint: disable=import-outside-toplevel
+
+        heat_source = entry.data.get(CONF_HEAT_SOURCE, DEFAULT_HEAT_SOURCE)
+        server_energy = coordinator.get_server_energy()
+        # only once CSNet has answered: records that could not be read yet are no sign of a unit without them
+        if heat_source != HEAT_SOURCE_CALCULATED and server_energy is not None and not has_energy(server_energy, HEAT):
+            heat_source = HEAT_SOURCE_CALCULATED
+        coordinator.heat_source = heat_source
+        coordinator.produced_energy = None
+        if heat_source == HEAT_SOURCE_CALCULATED:
+            max_hours = observer._max_integration_hours()  # pylint: disable=protected-access
+            produced = ProducedEnergyCounter(hass, entry.entry_id, max_hours=max_hours)
+            await produced.async_load()
+            coordinator.produced_energy = produced
+
         follow = _power_reading_follower(coordinator, observer)
         follow()
         entry.async_on_unload(coordinator.async_add_listener(follow))
+
+        # Sensors that are no more: Daily Output Energy gave way to the heat
+        # sensors, and the Defrost sensor repeated the Defrost binary sensor
+        registry = er.async_get(hass)
+        for key in REMOVED_INSTALLATION_SENSOR_KEYS:
+            stale = registry.async_get_entity_id("sensor", DOMAIN, f"{DOMAIN}-installation-{key}")
+            if stale:
+                registry.async_remove(stale)
 
         for description in INSTALLATION_SENSOR_DESCRIPTIONS:
             sensors.append(
@@ -1155,7 +1241,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 coordinator,
                 global_device_data,
                 common_data,
-                description,
+                _named_for_its_electricity(description, energy_meter),
             )
             calculated_sensor.power_supply = power_supply
             calculated_sensor.energy_meter = energy_meter
@@ -1170,10 +1256,11 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 coordinator,
                 global_device_data,
                 common_data,
-                description,
+                _named_for_its_electricity(description, energy_meter),
             )
             calculated_sensor.power_supply = power_supply
             calculated_sensor.energy_meter = energy_meter
+            calculated_sensor.heat_source = heat_source
             sensors.append(calculated_sensor)
 
     # Energy the server recorded for the unit, and COP from the user's own meter
@@ -1527,10 +1614,6 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, SensorEntity):
 
     def _handle_simple_transformations(self, value):
         """Handle special cases and transformations for different sensor types."""
-        if self._key == "defrost":
-            # defrosting: 0 = off, 1 = on
-            return STATE_ON if value == 1 else STATE_OFF
-
         if self._key == "water_flow":
             # waterFlow value must be divided by 10 to have the right measurement unit
             if isinstance(value, (int, float)):
@@ -2073,16 +2156,21 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
 DAILY_COP_KEYS = ("daily_cop_hvac", "daily_cop_dhw")
 ATTR_ELECTRICITY_KWH = "electricity_kwh"
 ATTR_HEAT_KWH = "heat_kwh"
+# with the heat CSNet records: the whole day's electricity, kept across restarts
+ATTR_ELECTRICITY_TODAY_KWH = "electricity_today_kwh"
 
 
 class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
     """Sensor for accumulated daily values (Energy, Daily COP) with reset.
 
     Introduced in PR #155 by davigar1391.
-    Accumulates daily_consumption, daily_heating, daily_cop_hvac and
-    daily_cop_dhw. Resets at local midnight and restores state after HA
-    restarts via SensorState restoration.
+    Accumulates daily_consumption, daily_cop_hvac and daily_cop_dhw. Resets
+    at local midnight and restores state after HA restarts via SensorState
+    restoration.
     """
+
+    # Where a daily COP's heat comes from: the integration's measure, or the heat CSNet recorded
+    heat_source: str = HEAT_SOURCE_CALCULATED
 
     def __init__(
         self,
@@ -2112,6 +2200,13 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
         # the meter's reading at the last poll, to count what it measured since
         self._last_meter_kwh: float | None = None
         self._electricity_source: str | None = None
+        # With the heat CSNet records: the day's electricity at the start of
+        # each hour, to go with the heat of the hours CSNet has recorded
+        self._electricity_by_hour: dict[int, float] = {}
+        self._csnet_figures: tuple[float, float, int] | None = None
+        # The hour from which the electricity has been counted: 0 when it
+        # covers the whole day, else the first hour whose start was seen
+        self._counted_since_hour: int | None = None
 
     async def async_added_to_hass(self):
         """Restore state and set up initial values."""
@@ -2135,8 +2230,11 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
             if self._key in DAILY_COP_KEYS:
                 attributes = getattr(last_state, "attributes", None) or {}
                 try:
-                    self._energy_in = max(0.0, float(attributes.get(ATTR_ELECTRICITY_KWH, 0.0)))
+                    # with the heat CSNet records, electricity_kwh is that of the recorded hours only
+                    self._energy_in = max(0.0, float(attributes.get(ATTR_ELECTRICITY_TODAY_KWH, attributes.get(ATTR_ELECTRICITY_KWH, 0.0))))
                     self._energy_out = max(0.0, float(attributes.get(ATTR_HEAT_KWH, 0.0)))
+                    # the restored total holds the day's electricity since midnight
+                    self._counted_since_hour = 0
                 except (TypeError, ValueError):
                     self._energy_in = self._energy_out = 0.0
         else:
@@ -2151,9 +2249,20 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
             return {"electricity_source": source}
         if self._key not in DAILY_COP_KEYS:
             return None
+        if self.heat_source == HEAT_SOURCE_CSNET:
+            heat, electricity, hours = self._csnet_figures or (None, None, None)
+            return {
+                ATTR_HEAT_KWH: round(heat, 4) if heat is not None else None,
+                ATTR_ELECTRICITY_KWH: round(electricity, 4) if electricity is not None else None,
+                "hours_recorded": hours,
+                ATTR_ELECTRICITY_TODAY_KWH: round(self._energy_in, 4),
+                "heat_source": HEAT_SOURCE_CSNET,
+                "electricity_source": source,
+            }
         return {
             ATTR_ELECTRICITY_KWH: round(self._energy_in, 4),
             ATTR_HEAT_KWH: round(self._energy_out, 4),
+            "heat_source": HEAT_SOURCE_CALCULATED,
             "electricity_source": source,
         }
 
@@ -2161,6 +2270,36 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
     def native_value(self):
         """Return the accumulated state."""
         return round(self._state, 2)
+
+    def _update_from_csnet_heat(self, now) -> None:
+        """Divide the heat CSNet recorded today by the electricity of the same hours.
+
+        CSNet records the heat by full hours, a few minutes after each hour.
+        Only the hours whose electricity was counted are divided: after a
+        start in the middle of the day, from the first hour whose start was
+        seen. Until an hour can be matched, the COP stays as it was.
+        """
+        from .server_energy import HEAT, energy_on_day, hours_complete_on_day  # pylint: disable=import-outside-toplevel
+
+        energy = self.coordinator.get_server_energy()
+        hours = hours_complete_on_day(energy, now.date())
+        start = self._counted_since_hour
+        if not hours or start is None or hours <= start:
+            return
+        electricity = self._electricity_by_hour.get(hours)
+        if electricity is None:
+            return
+        electricity -= self._electricity_by_hour.get(start, 0.0) if start else 0.0
+        uses = ("spaceHeating", "spaceCooling") if self._key == "daily_cop_hvac" else ("dhw",)
+        figures = [energy_on_day(energy, now.date(), HEAT, use, before_hour=hours) for use in uses]
+        if all(figure is None for figure in figures):
+            return
+        heat = sum(figure or 0.0 for figure in figures)
+        if start:
+            heat -= sum(energy_on_day(energy, now.date(), HEAT, use, before_hour=start) or 0.0 for use in uses)
+        self._csnet_figures = (heat, electricity, hours)
+        if electricity > 0.01:
+            self._state = heat / electricity
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -2173,6 +2312,12 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
             self._state = 0.0
             self._energy_in = 0.0
             self._energy_out = 0.0
+            self._electricity_by_hour = {}
+            self._csnet_figures = None
+            # counted since midnight from here on
+            self._counted_since_hour = 0
+        # a new hour began since the last poll: its start can be marked after this poll's energy
+        new_hour = self._last_update_time is not None and (self._last_update_time.date(), self._last_update_time.hour) != (now.date(), now.hour)
 
         # A failed poll brings no new reading: do not add energy from old values
         if getattr(self.coordinator, "last_update_success", True) is False:
@@ -2226,9 +2371,6 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
         if self._key == "daily_consumption":
             self._state += energy_consumption_kwh
 
-        elif self._key == "daily_heating":
-            self._state += energy_heating_kwh
-
         # Daily COPs
         elif self._key in DAILY_COP_KEYS:
             defrost_active = heating_status.get("defrosting") == 1
@@ -2263,9 +2405,16 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
                 self._energy_out += energy_heating_kwh
 
                 # Calculate COP based on Accumulated totals
-                if self._energy_in > 0.01:
+                if self.heat_source != HEAT_SOURCE_CSNET and self._energy_in > 0.01:
                     self._state = self._energy_out / self._energy_in
             # If no energy consumed yet, keep previous state or 0
+
+            if self.heat_source == HEAT_SOURCE_CSNET:
+                if new_hour:
+                    self._electricity_by_hour[now.hour] = self._energy_in
+                    if self._counted_since_hour is None:
+                        self._counted_since_hour = now.hour
+                self._update_from_csnet_heat(now)
 
         self.async_write_ha_state()
 

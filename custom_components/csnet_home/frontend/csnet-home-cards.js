@@ -1132,14 +1132,14 @@ class CsnetHeatPumpCard extends CsnetBaseCard {
     };
     const meterToday = Number.isFinite(this._data?.meterToday) ? this._data.meterToday : null;
     const meterMonth = Number.isFinite(this._data?.meterMonth) ? this._data.meterMonth : null;
-    const energy = meterToday ?? metered("cop_today") ?? num(hass, unit.energy_today) ?? num(hass, unit.server_electricity_today);
-    const energyEntity = meterToday !== null ? unit.meter_energy : metered("cop_today") !== null ? unit.cop_today : unit.energy_today || unit.server_electricity_today;
+    const energy = meterToday ?? metered("cop_today") ?? num(hass, unit.energy_today);
+    const energyEntity = meterToday !== null ? unit.meter_energy : metered("cop_today") !== null ? unit.cop_today : unit.energy_today;
     const month = meterMonth ?? metered("cop_month") ?? num(hass, unit.server_electricity_month);
     const monthEntity = meterMonth !== null ? unit.meter_energy : metered("cop_month") !== null ? unit.cop_month : unit.server_electricity_month;
     const price = this.price(hass);
     const currency = escapeHtml(hass.config?.currency || "€");
-    const heat = num(hass, unit.server_heat_today) ?? num(hass, unit.heat_today);
-    const heatEntity = unit.server_heat_today || unit.heat_today;
+    const heat = num(hass, unit.server_heat_today);
+    const heatEntity = unit.server_heat_today;
     // COP: the metered sensor, else heat over the meter's closed hours, else the estimate
     const meterHours = meterKwh(this._data?.meter, "today");
     const heatHours = num(hass, unit.server_heat_today);
@@ -1574,7 +1574,7 @@ class CsnetPerformanceCard extends CsnetBaseCard {
     const share = Math.max(0, Math.min(1, (copNow || 0) / 6));
     const arc = Math.PI * 45;
     const periods = [
-      ["today", this.period(hass, "cop_today", "server_heat_today", "server_electricity_today", "today") || (num(hass, unit.cop_today_estimated) !== null ? { entity: unit.cop_today_estimated, cop: num(hass, unit.cop_today_estimated) } : null)],
+      ["today", this.period(hass, "cop_today", "server_heat_today", "energy_today", "today") || (num(hass, unit.cop_today_estimated) !== null ? { entity: unit.cop_today_estimated, cop: num(hass, unit.cop_today_estimated) } : null)],
       ["yesterday", this.period(hass, "cop_yesterday", "server_heat_yesterday", "server_electricity_yesterday", "yesterday")],
       ["this_month", this.period(hass, "cop_month", "server_heat_month", "server_electricity_month", "this_month")],
       ["last_month", this.period(hass, "cop_last_month", "", "", "last_month")],
@@ -1896,7 +1896,7 @@ class CsnetActivityCard extends CsnetBaseCard {
 
 /** The electricity entity with long-term statistics: the user's meter, else what CSNet records. */
 function electricityEntity(unit) {
-  return unit.meter_energy || unit.server_electricity_today;
+  return unit.meter_energy || unit.energy_today;
 }
 
 class CsnetDailyEnergyCard extends CsnetBaseCard {

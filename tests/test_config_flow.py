@@ -581,6 +581,7 @@ def test_every_form_field_and_error_has_a_text_in_each_language():
     reference = json.loads((base / "strings.json").read_text(encoding="utf-8"))["config"]
     fields = {CONF_USERNAME, CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_LANGUAGE, CONF_MAX_TEMP_OVERRIDE, CONF_FAN_COIL_MODEL}
     fields |= {CONF_ENABLE_ALARM_NOTIFICATIONS, CONF_FILTERED_ALARM_CODES, "power_supply", "energy_meter", "card_language", "user_agent"}
+    fields |= {"always_offer_dhw_boost", "heat_source"}
     for step in ("user", "reconfigure"):
         assert set(reference["step"][step]["data"]) == fields
         assert set(reference["step"][step]["data_description"]) == fields
@@ -666,6 +667,25 @@ async def test_energy_meter_can_be_set_and_removed_on_reconfigure(hass: HomeAssi
     assert _schema_key(result, "energy_meter").description == {"suggested_value": "sensor.any_brand_energy"}
     result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=settings)
     assert entry.data["energy_meter"] is None
+
+
+async def test_heat_source_defaults_to_csnet_and_can_be_changed(hass: HomeAssistant):
+    """The heat produced comes from CSNet by default; the integration's own measure can be chosen on reconfigure."""
+    from custom_components.csnet_home.const import CONF_HEAT_SOURCE  # pylint: disable=import-outside-toplevel
+
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+    key = _schema_key(result, CONF_HEAT_SOURCE)
+    assert key.default() == "csnet"
+    assert result["data_schema"].schema[key].config["options"] == ["csnet", "calculated"]
+    with patch(VALIDATE, return_value=True):
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=TEST_CONFIG)
+    assert result["data"][CONF_HEAT_SOURCE] == "csnet"
+
+    entry, result = await _start_reconfigure(hass)
+    settings = {k: v for k, v in TEST_CONFIG.items() if k != CONF_PASSWORD}
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=settings | {CONF_HEAT_SOURCE: "calculated"})
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data[CONF_HEAT_SOURCE] == "calculated"
 
 
 async def test_reconfigure_sets_the_card_language(hass: HomeAssistant):

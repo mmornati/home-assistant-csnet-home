@@ -38,6 +38,7 @@ You'll see a configuration dialog with the following fields:
 | **Fan Coil Control Model** | `standard` or `legacy` fan speed mapping | `standard` |
 | **Enable Alarm Notifications** | Create persistent notifications for new alarms | enabled |
 | **Filtered Alarm Codes** | Comma-separated alarm codes that never create a notification | `-1` |
+| **Heat produced** | Where the heat produced comes from: recorded by CSNet, or calculated by the integration | Recorded by CSNet |
 | **User-Agent (advanced)** | How the integration presents itself to CSNet Manager | a desktop Chrome browser |
 
 
@@ -107,6 +108,12 @@ You'll see a configuration dialog with the following fields:
 - Filtering only affects notifications: the alarm still appears in the alarm sensors
 
 See [Alarm Notifications](Advanced-Features.md#built-in-alarm-notifications) for details.
+
+**Heat produced** (Optional)
+- Where the heat comes from for the heat sensors (Heat today, yesterday, this month, and today by use) and for every daily or period COP
+- **Recorded by CSNet** (default): the heat CSNet Manager records for the unit, by full hours
+- **Calculated by the integration**: from the water flow and the temperatures at the heat exchanger, as it is produced
+- A unit CSNet has recorded no heat for always uses the calculated heat. See [Heat produced](Sensors-Reference.md#heat-produced)
 
 ### Step 3: Submit Configuration
 
@@ -194,7 +201,7 @@ Additional sensors for overall system monitoring:
 - `sensor.system_controller_weather_temperature`
 
 #### System Status Sensors
-- `sensor.system_controller_defrost`
+- `binary_sensor.system_controller_defrost`
 - `sensor.system_controller_mix_valve_position`
 - `sensor.system_controller_central_control_enabled`
 - `sensor.system_controller_unit_model`
@@ -214,14 +221,13 @@ Additional sensors for overall system monitoring:
 - `sensor.system_controller_otc_cooling_type_c2`
 - `sensor.system_controller_circuit_1_heating_curve_water_temperature` and `..._circuit_2_...`: only once you enter the curve values in the options, see [Heating Curve Values](Advanced-Features.md#heating-curve-values-water-law)
 
-#### Energy and Performance Sensors (estimated)
-- `sensor.system_controller_instant_consumption`
-- `sensor.system_controller_output_power`
-- `sensor.system_controller_instant_cop`
-- `sensor.system_controller_daily_consumption`
-- `sensor.system_controller_daily_output_energy`
-- `sensor.system_controller_daily_hvac_cop`
-- `sensor.system_controller_dhw_daily_cop`
+#### Energy and Performance Sensors
+Named by what they are, the period and the source: *(metered)* with an electricity meter, *(estimated)* without; *(csnet)* or *(calculated)* for the heat, as chosen in the settings. On a new installation:
+- `sensor.system_controller_electricity_power_metered`, `..._electricity_today_metered`, `..._electricity_yesterday_metered`, `..._electricity_this_month_metered`
+- `sensor.system_controller_heat_power_calculated`, `..._heat_today_csnet`, `..._heat_yesterday_csnet`, `..._heat_this_month_csnet`
+- `sensor.system_controller_cop_instant_metered`, `..._cop_today_heating_cooling_metered`, `..._cop_today_hot_water_metered`, `..._cop_today_metered`, `..._cop_yesterday_metered`, `..._cop_this_month_metered`, `..._cop_last_month_metered`
+
+Installations from before keep their entity IDs (for example `sensor.system_controller_instant_consumption`); only the names shown change. See [Energy and Performance Sensors](Sensors-Reference.md#energy-and-performance-sensors).
 
 #### Compressor / Outdoor Unit Sensors
 - 28 sensors such as `sensor.compressor_outdoor_unit_compressor_frequency`; see [Compressor Sensors](../COMPRESSOR_SENSORS.md)

@@ -61,6 +61,11 @@ def estimated_meter_storage_key(entry_id: str) -> str:
     return f"{DOMAIN}.estimated_meter.{entry_id}"
 
 
+def produced_energy_storage_key(entry_id: str) -> str:
+    """Return the storage key of the heat the integration measured, by use and period."""
+    return f"{DOMAIN}.produced_energy.{entry_id}"
+
+
 def estimated_energy_storage_key(entry_id: str) -> str:
     """Return the storage key of the running total of the estimated electricity."""
     return f"{DOMAIN}.estimated_energy.{entry_id}"
@@ -181,13 +186,17 @@ class ServerEnergyDescription(SensorEntityDescription):
     use: str | None = None
 
 
-def server_energy_descriptions(energy, metered_electricity: bool = False) -> list[ServerEnergyDescription]:
-    """Return the sensors this unit gets, from what the server has recorded for it.
+def server_energy_descriptions(energy, heat_uses: list[str] | None = None, electricity: str | None = None) -> list[ServerEnergyDescription]:
+    """Return the heat and electricity sensors of the unit.
 
-    With ``metered_electricity`` the electricity is what the user's meter
-    counted: its sensors exist whatever the server recorded, named
-    "(metered)", and today's is left to Daily Consumption, which is the
-    meter too.
+    Each is named by what it is, the period and where it comes from: "Heat
+    today (csnet)", "Electricity this month (metered)". With ``heat_uses`` the
+    heat is the integration's own measure ("calculated"): its sensors always
+    exist, split by those uses; else it is what the server recorded.
+    ``electricity`` is "metered" or "estimated" when the electricity is the
+    user's meter or the integration's estimate: its sensors always exist.
+    Without it, they show what the server recorded, for a unit with a pulse
+    meter only. Today's electricity is Electricity today, a sensor of its own.
     """
     common = {
         "device_class": SensorDeviceClass.ENERGY,
@@ -198,35 +207,35 @@ def server_energy_descriptions(energy, metered_electricity: bool = False) -> lis
     # figure downwards, which must not be taken for a meter reset
     increasing = {**common, "state_class": SensorStateClass.TOTAL}
     descriptions: list[ServerEnergyDescription] = []
-    if has_energy(energy, HEAT):
+    if heat_uses is not None or has_energy(energy, HEAT):
+        heat = "calculated" if heat_uses is not None else "csnet"
         descriptions += [
-            ServerEnergyDescription(key="server_heat_today", name="Heat produced today", **increasing),
-            ServerEnergyDescription(key="server_heat_yesterday", name="Heat produced yesterday", span="yesterday", **common),
-            ServerEnergyDescription(key="server_heat_month", name="Heat produced this month", span="month", **increasing),
+            ServerEnergyDescription(key="server_heat_today", name=f"Heat today ({heat})", **increasing),
+            ServerEnergyDescription(key="server_heat_yesterday", name=f"Heat yesterday ({heat})", span="yesterday", **common),
+            ServerEnergyDescription(key="server_heat_month", name=f"Heat this month ({heat})", span="month", **increasing),
         ]
-        used = [use for use in USES if has_energy(energy, HEAT, use)]
+        used = heat_uses if heat_uses is not None else [use for use in USES if has_energy(energy, HEAT, use)]
         if len(used) > 1:
             # with a single use the split would repeat the total
             descriptions += [
-                ServerEnergyDescription(key=f"server_heat_today_{use.lower()}", name=f"Heat produced today ({USES[use]})", use=use, **increasing)
-                for use in used
+                ServerEnergyDescription(key=f"server_heat_today_{use.lower()}", name=f"Heat today {USES[use]} ({heat})", use=use, **increasing) for use in used
             ]
-    if metered_electricity:
+    if electricity is None and has_pulse_meter(energy):
+        electricity = "csnet"
+    if electricity is not None:
         descriptions += [
-            ServerEnergyDescription(key="server_electricity_yesterday", name="Electricity yesterday (metered)", kind=ELECTRICITY, span="yesterday", **common),
-            ServerEnergyDescription(key="server_electricity_month", name="Electricity this month (metered)", kind=ELECTRICITY, span="month", **increasing),
-        ]
-    elif has_pulse_meter(energy):
-        descriptions += [
-            ServerEnergyDescription(key="server_electricity_today", name="Electricity consumed today", kind=ELECTRICITY, **increasing),
-            ServerEnergyDescription(key="server_electricity_yesterday", name="Electricity consumed yesterday", kind=ELECTRICITY, span="yesterday", **common),
-            ServerEnergyDescription(key="server_electricity_month", name="Electricity consumed this month", kind=ELECTRICITY, span="month", **increasing),
+            ServerEnergyDescription(
+                key="server_electricity_yesterday", name=f"Electricity yesterday ({electricity})", kind=ELECTRICITY, span="yesterday", **common
+            ),
+            ServerEnergyDescription(
+                key="server_electricity_month", name=f"Electricity this month ({electricity})", kind=ELECTRICITY, span="month", **increasing
+            ),
         ]
     return descriptions
 
 
-# With a meter, today's electricity is Daily Consumption: this one would repeat it
-METERED_REMOVED_ENERGY_KEYS = ("server_electricity_today",)
+# Removed: Electricity today, a sensor of its own, is today's electricity
+REMOVED_ENERGY_KEYS = ("server_electricity_today",)
 
 
 def read_span(energy, span: str, kind: str, use: str | None, now: datetime) -> float | None:
@@ -238,34 +247,53 @@ def read_span(energy, span: str, kind: str, use: str | None, now: datetime) -> f
 
 
 class CSNetHomeServerEnergySensor(CoordinatorEntity, SensorEntity):
-    """Energy of the unit: what the CSNet server recorded, or for the electricity what the user's meter counted."""
+    """Energy the CSNet server has recorded for the unit."""
 
     _attr_has_entity_name = True
     entity_description: ServerEnergyDescription
 
-    def __init__(self, coordinator, description: ServerEnergyDescription, device_info, tracker: MeterTracker | None = None) -> None:
-        """Initialize the sensor; with ``tracker`` its electricity is what the user's meter counted."""
+    def __init__(
+        self,
+        coordinator,
+        description: ServerEnergyDescription,
+        device_info,
+        produced: ProducedEnergyCounter | None = None,
+        tracker: MeterTracker | None = None,
+        counter: EstimatedEnergyCounter | None = None,
+    ) -> None:
+        """Initialize the sensor.
+
+        With ``produced`` its heat is the integration's own measure. With
+        ``tracker`` its electricity is what the user's meter counted, or with
+        ``counter`` too the integration's estimate, followed like a meter.
+        """
         super().__init__(coordinator)
         self.entity_description = description
         self._attr_unique_id = f"{DOMAIN}-{description.key}"
         self._attr_device_info = device_info
+        self._produced = produced if description.kind == HEAT else None
         self._tracker = tracker if description.kind == ELECTRICITY else None
+        self._counter = counter if self._tracker is not None else None
         if self._tracker is not None:
             # a meter counts in Wh: its figures are worth more than whole kWh
             self._attr_suggested_display_precision = 2
 
     async def async_added_to_hass(self) -> None:
-        """Load the meter's period readings before the first state is written."""
+        """Load the heat counted, or the meter's period readings, before the first state is written."""
         if self._tracker is not None:
             await self._tracker.async_load()
-            self._tracker.async_update(dt_util.now())
+            self._follow_electricity()
         await super().async_added_to_hass()
+
+    def _follow_electricity(self) -> None:
+        """Take the period readings (the estimate is brought up to date before the sensors)."""
+        self._tracker.async_update(dt_util.now())
 
     @callback
     def _handle_coordinator_update(self) -> None:
-        """Take the meter's reading at every poll."""
+        """Take the meter's reading first (the heat is counted before the sensors)."""
         if self._tracker is not None:
-            self._tracker.async_update(dt_util.now())
+            self._follow_electricity()
         super()._handle_coordinator_update()
 
     @property
@@ -273,6 +301,9 @@ class CSNetHomeServerEnergySensor(CoordinatorEntity, SensorEntity):
         """Return the kWh of the sensor's span."""
         description = self.entity_description
         now = dt_util.now()
+        if self._produced is not None:
+            value = self._produced.energy(description.span, description.use, now)
+            return round(value, 3) if value is not None else None
         if self._tracker is not None:
             value = {
                 "today": lambda: self._tracker.electricity("day", now),
@@ -284,10 +315,12 @@ class CSNetHomeServerEnergySensor(CoordinatorEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self):
-        """Say where the electricity comes from."""
-        if self.entity_description.kind != ELECTRICITY:
-            return None
-        return {"electricity_source": "meter" if self._tracker is not None else "csnet"}
+        """Say where the heat or the electricity comes from."""
+        if self.entity_description.kind == HEAT:
+            return {"heat_source": "calculated" if self._produced is not None else "csnet"}
+        if self._tracker is None:
+            return {"electricity_source": "csnet"}
+        return {"electricity_source": "estimate" if self._counter is not None else "meter"}
 
     @property
     def last_reset(self) -> datetime | None:
@@ -498,6 +531,99 @@ class EstimatedEnergyCounter:
         self._last_time = now
 
 
+class ProducedEnergyCounter:
+    """The heat the integration measures, per use, for today, yesterday, this month and last month.
+
+    It stands in for the heat CSNet records, when the user chooses the
+    integration's own measure or when CSNet has recorded no heat for the unit.
+    It is kept across restarts. Today and this month count from when the
+    integration started counting. Yesterday and last month have a figure once
+    the counting had started before they began: the first, partial day or
+    month has none. An outage only loses the heat of its own minutes.
+    """
+
+    def __init__(self, hass: HomeAssistant, entry_id: str, max_hours: float = ESTIMATE_MAX_INTEGRATION_HOURS) -> None:
+        """Initialize; it is fed the heat of each new reading."""
+        self.hass = hass
+        self._max_hours = max_hours
+        self._store = Store(hass, METER_STORAGE_VERSION, produced_energy_storage_key(entry_id))
+        self._periods: dict = {}
+        self._last_time: datetime | None = None
+        self._loaded = False
+
+    async def async_load(self) -> None:
+        """Load the figures kept before the last restart."""
+        if self._loaded:
+            return
+        self._loaded = True
+        try:
+            stored = await self._store.async_load()
+        except Exception as exc:  # pylint: disable=broad-except
+            _LOGGER.debug("Could not load the heat produced: %s", exc)
+            return
+        if isinstance(stored, dict) and isinstance(stored.get("periods"), dict):
+            self._periods = stored["periods"]
+            try:
+                # the last reading before the restart: the first reading after it stands for a few minutes at most
+                self._last_time = datetime.fromisoformat(stored["last_time"]) if stored.get("last_time") else None
+            except (TypeError, ValueError):
+                self._last_time = None
+
+    def _roll(self, now: datetime) -> None:
+        """Start a new day or month when one began."""
+        for scope, (period, _began) in _period_ids(now).items():
+            current = self._periods.get(scope)
+            if isinstance(current, dict) and current.get("period") == period:
+                continue
+            if isinstance(current, dict):
+                # the period that ended: complete unless the counting started in the middle of it
+                self._periods[f"last_{scope}"] = {**current, "complete": bool(current.get("from_start"))}
+            # counted from its start when the counting was already going on before
+            self._periods[scope] = {"period": period, "from_start": isinstance(current, dict), "uses": {}}
+
+    @callback
+    def async_update(self, now: datetime, watts: float, use: str | None) -> None:
+        """Add the heat of a new reading, to its use, for the time since the last one.
+
+        Called once per update of the coordinator, by the listener that also
+        lets the power model learn from the reading.
+        """
+        hours = (now - self._last_time).total_seconds() / 3600.0 if self._last_time is not None else None
+        self._roll(now)
+        if hours is not None and watts > 0 and use:
+            # after an outage the last reading says nothing about the gap
+            kwh = watts * min(hours, self._max_hours) / 1000.0
+            for scope in ("day", "month"):
+                uses = self._periods[scope]["uses"]
+                uses[use] = uses.get(use, 0.0) + kwh
+        self._last_time = now
+        # saved a minute later at most, and when Home Assistant stops
+        self._store.async_delay_save(self._data_to_save, ESTIMATE_SAVE_DELAY_S)
+
+    def _data_to_save(self) -> dict:
+        """Return what is kept across restarts."""
+        return {"periods": self._periods, "last_time": self._last_time.isoformat() if self._last_time else None}
+
+    def energy(self, span: str, use: str | None, now: datetime) -> float | None:
+        """Return the kWh of today, yesterday, this month or last month (of one use, or all), or None when not counted."""
+        today = now.date()
+        if span in ("today", "month"):
+            scope = "day" if span == "today" else "month"
+            period = _period_ids(now)[scope][0]
+            bucket = self._periods.get(scope)
+            if not isinstance(bucket, dict) or bucket.get("period") != period:
+                # nothing counted yet in this period
+                return 0.0
+        else:
+            scope = "day" if span == "yesterday" else "month"
+            period = (today - timedelta(days=1)).strftime("%Y-%m-%d") if span == "yesterday" else (today.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
+            bucket = self._periods.get(f"last_{scope}")
+            if not isinstance(bucket, dict) or bucket.get("period") != period or not bucket.get("complete"):
+                return None
+        uses = bucket.get("uses") or {}
+        return float(sum(uses.values()) if use is None else uses.get(use, 0.0))
+
+
 @dataclass(frozen=True, kw_only=True)
 class MeteredCopDescription(SensorEntityDescription):
     """A COP from server heat and metered (or estimated) electricity."""
@@ -522,10 +648,11 @@ ESTIMATED_COP_DESCRIPTIONS = (
 
 
 class CSNetHomeMeteredCopSensor(CoordinatorEntity, SensorEntity):
-    """Heat the server recorded divided by the electricity of the same period.
+    """Heat produced divided by the electricity of the same period.
 
-    The electricity is what a meter of the user counted, or, without one, the
-    integration's estimate (``counter``).
+    The heat is what the server recorded, or the integration's own measure
+    (``produced``). The electricity is what a meter of the user counted, or,
+    without one, the integration's estimate (``counter``).
     """
 
     _attr_has_entity_name = True
@@ -534,7 +661,13 @@ class CSNetHomeMeteredCopSensor(CoordinatorEntity, SensorEntity):
     entity_description: MeteredCopDescription
 
     def __init__(
-        self, coordinator, description: MeteredCopDescription, device_info, tracker: MeterTracker, counter: EstimatedEnergyCounter | None = None
+        self,
+        coordinator,
+        description: MeteredCopDescription,
+        device_info,
+        tracker: MeterTracker,
+        counter: EstimatedEnergyCounter | None = None,
+        produced: ProducedEnergyCounter | None = None,
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
@@ -543,9 +676,10 @@ class CSNetHomeMeteredCopSensor(CoordinatorEntity, SensorEntity):
         self._attr_device_info = device_info
         self._tracker = tracker
         self._counter = counter
+        self._produced = produced
 
     def _follow(self) -> None:
-        """Take the period readings (the estimate is brought up to date before the sensors)."""
+        """Take the period readings (the heat and the estimate are brought up to date before the sensors)."""
         self._tracker.async_update(dt_util.now())
 
     async def async_added_to_hass(self) -> None:
@@ -564,6 +698,15 @@ class CSNetHomeMeteredCopSensor(CoordinatorEntity, SensorEntity):
         """Return (heat, electricity) in kWh for the sensor's span."""
         now = dt_util.now()
         span = self.entity_description.span
+        if self._produced is not None:
+            # the integration's heat is counted as it is produced: the electricity up to now goes with it
+            electricity = {
+                "today": lambda: self._tracker.electricity("day", now),
+                "yesterday": lambda: self._tracker.electricity_yesterday(now),
+                "month": lambda: self._tracker.electricity("month", now),
+                "last_month": lambda: self._tracker.electricity_last_month(now),
+            }[span]()
+            return self._produced.energy(span, None, now), electricity
         energy = self.coordinator.get_server_energy()
         if span == "today":
             # both up to the last hour the server has recorded: it counts heat by the hour
@@ -594,7 +737,8 @@ class CSNetHomeMeteredCopSensor(CoordinatorEntity, SensorEntity):
         """Return the two figures the COP is made of."""
         heat, electricity = self._figures()
         return {
-            "heat_kwh": heat,
+            "heat_kwh": round(heat, 3) if heat is not None else None,
+            "heat_source": "calculated" if self._produced is not None else "csnet",
             "electricity_kwh": round(electricity, 3) if electricity is not None else None,
             "meter": None if self._counter is not None else self._tracker.entity_id,
             "electricity_source": "estimate" if self._counter is not None else "meter",

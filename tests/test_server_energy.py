@@ -18,6 +18,7 @@ from custom_components.csnet_home.server_energy import (
     CSNetHomeServerEnergySensor,
     EstimatedEnergyCounter,
     MeterTracker,
+    ProducedEnergyCounter,
     energy_in_month,
     energy_on_day,
     estimated_energy_storage_key,
@@ -27,6 +28,7 @@ from custom_components.csnet_home.server_energy import (
     hours_complete_on_day,
     meter_reading_kwh,
     meter_storage_key,
+    produced_energy_storage_key,
     server_energy_descriptions,
 )
 
@@ -94,7 +96,7 @@ def test_unit_without_a_meter_gets_heat_sensors_only():
     assert has_pulse_meter(ENERGY) is False
     stray_day = [dict(ENERGY[0], daily=ENERGY[0]["daily"] + [rec(60, 1, year=2026, month=11, day=10)])]
     assert has_pulse_meter(stray_day) is False
-    assert "server_electricity_today" not in [d.key for d in server_energy_descriptions(stray_day)]
+    assert not [d for d in server_energy_descriptions(stray_day) if d.kind == ELECTRICITY]
     assert [d.key for d in server_energy_descriptions(ENERGY)] == ["server_heat_today", "server_heat_yesterday", "server_heat_month"]
 
 
@@ -108,9 +110,18 @@ def test_unit_with_a_meter_and_hot_water_gets_the_split_and_the_electricity():
         "server_heat_month",
         "server_heat_today_spaceheating",
         "server_heat_today_dhw",
-        "server_electricity_today",
         "server_electricity_yesterday",
         "server_electricity_month",
+    ]
+    names = [d.name for d in server_energy_descriptions(energy)]
+    assert names == [
+        "Heat today (csnet)",
+        "Heat yesterday (csnet)",
+        "Heat this month (csnet)",
+        "Heat today space heating (csnet)",
+        "Heat today hot water (csnet)",
+        "Electricity yesterday (csnet)",
+        "Electricity this month (csnet)",
     ]
 
 
@@ -275,7 +286,13 @@ async def test_metered_cop_is_heat_over_measured_electricity(hass, hass_storage,
     _set_meter(hass, "510.0")
     tracker.async_update(dt_util.now())
     assert sensors["today"].native_value == 4.0
-    assert sensors["today"].extra_state_attributes == {"heat_kwh": 40, "electricity_kwh": 10.0, "meter": "sensor.any_meter"}
+    assert sensors["today"].extra_state_attributes == {
+        "heat_kwh": 40,
+        "electricity_kwh": 10.0,
+        "meter": "sensor.any_meter",
+        "heat_source": "csnet",
+        "electricity_source": "meter",
+    }
 
     # 08:55: more electricity was used, but the hour is not recorded yet: the COP does not sag
     monkeypatch.setattr(dt_util, "now", lambda: at(13, 8, 55))
@@ -449,18 +466,18 @@ async def test_energy_sensors_through_home_assistant_and_added_when_data_arrives
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        assert hass.states.get("sensor.system_controller_heat_produced_today") is None
+        assert hass.states.get("sensor.system_controller_heat_today_csnet") is None
 
         coordinator = entry.runtime_data.coordinator
         coordinator._server_energy = ENERGY
         coordinator.async_set_updated_data({"sensors": [], "common_data": {}})
         await hass.async_block_till_done()
 
-        state = hass.states.get("sensor.system_controller_heat_produced_this_month")
+        state = hass.states.get("sensor.system_controller_heat_this_month_csnet")
         assert state is not None and float(state.state) == 1200
         assert state.attributes["state_class"] == "total"
         assert state.attributes["last_reset"]
-        assert hass.states.get("sensor.system_controller_heat_produced_yesterday") is not None
+        assert hass.states.get("sensor.system_controller_heat_yesterday_csnet") is not None
         assert hass.states.get("sensor.system_controller_cop_today_metered") is not None
         assert hass.states.get("sensor.system_controller_cop_last_month_metered").state == "unknown"
 
@@ -497,7 +514,7 @@ async def test_cop_yesterday_waits_for_the_last_hour_of_yesterday(hass, hass_sto
 
 
 def _counter(hass, watts):
-    """An estimated-energy counter, and the power the test feeds it."""
+    """Build an estimated-energy counter, and the power the test feeds it."""
     power = {"watts": watts}
     return EstimatedEnergyCounter(hass, "entry"), power
 
@@ -585,12 +602,202 @@ async def test_estimated_cop_says_where_its_electricity_comes_from(hass, hass_st
     assert attributes["electricity_source"] == "estimate"
 
 
-def test_a_meter_gives_electricity_sensors_without_csnet_records():
-    """With a meter the electricity of yesterday and the month exist, named for it; today's is Daily Consumption."""
-    descriptions = [d for d in server_energy_descriptions(ENERGY, metered_electricity=True) if d.kind == ELECTRICITY]
-    assert [d.key for d in descriptions] == ["server_electricity_yesterday", "server_electricity_month"]
-    assert [d.name for d in descriptions] == ["Electricity yesterday (metered)", "Electricity this month (metered)"]
+def _produced(hass, watts, use="spaceHeating"):
+    """Build a heat counter, and the heat the test feeds it."""
+    heat = {"watts": watts, "use": use}
+    return ProducedEnergyCounter(hass, "entry"), heat
+
+
+def local(day, hour, minute=0):
+    """Return a local time on a fixed November 2026 day."""
+    return dt_util.now().replace(year=2026, month=11, day=day, hour=hour, minute=minute, second=0, microsecond=0)
+
+
+async def test_calculated_heat_is_counted_by_use(hass, hass_storage):
+    """6 kW for ten minutes of heating, then 3 kW for ten minutes of hot water."""
+    counter, heat = _produced(hass, 6000)
+    await counter.async_load()
+    counter.async_update(local(13, 10, 0), heat["watts"], heat["use"])
+    counter.async_update(local(13, 10, 10), heat["watts"], heat["use"])
+    heat.update(watts=3000, use="dhw")
+    counter.async_update(local(13, 10, 20), heat["watts"], heat["use"])
+    now = local(13, 10, 20)
+    assert counter.energy("today", "spaceHeating", now) == pytest.approx(1.0)
+    assert counter.energy("today", "dhw", now) == pytest.approx(0.5)
+    assert counter.energy("today", None, now) == pytest.approx(1.5)
+    assert counter.energy("month", None, now) == pytest.approx(1.5)
+    assert counter.energy("today", "spaceCooling", now) == 0
+
+
+async def test_calculated_heat_of_the_first_day_is_not_yesterday(hass, hass_storage):
+    """The first day was counted from the middle of it: it has no figure as yesterday."""
+    counter, heat = _produced(hass, 6000)
+    when = local(13, 12, 0)
+    while when <= local(14, 0, 5):
+        counter.async_update(when, heat["watts"], heat["use"])
+        when += timedelta(minutes=5)
+    assert counter.energy("yesterday", None, local(14, 0, 5)) is None
+
+
+async def test_calculated_heat_of_a_whole_day_is_yesterday(hass, hass_storage):
+    """Polled every 5 minutes from before midnight to after the next: yesterday is complete."""
+    counter, heat = _produced(hass, 6000)
+    when = local(12, 23, 55)
+    while when <= local(14, 0, 5):
+        counter.async_update(when, heat["watts"], heat["use"])
+        when += timedelta(minutes=5)
+    assert counter.energy("yesterday", None, local(14, 0, 5)) == pytest.approx(6 * 24, rel=0.01)
+    assert counter.energy("today", None, local(14, 0, 5)) == pytest.approx(1.0, rel=0.01)
+    assert counter.energy("last_month", None, local(14, 0, 5)) is None
+
+
+@pytest.mark.parametrize(("last_before", "first_after", "hours_counted"), [((12, 22, 0), (13, 2, 0), 22), ((13, 9, 0), (13, 13, 0), 20)])
+async def test_calculated_heat_after_an_outage_keeps_the_day(hass, hass_storage, last_before, first_after, hours_counted):
+    """Hours without readings, across midnight or during the day, lose only their own heat."""
+    counter, heat = _produced(hass, 6000)
+    readings = []
+    when = local(12, 21, 0)
+    while when <= local(*last_before):
+        readings.append(when)
+        when += timedelta(minutes=5)
+    when = local(*first_after)
+    while when <= local(14, 0, 5):
+        readings.append(when)
+        when += timedelta(minutes=5)
+    for when in readings:
+        counter.async_update(when, heat["watts"], heat["use"])
+    yesterday = counter.energy("yesterday", None, local(14, 0, 5))
+    # the hours of the 13th with readings (the first reading after the outage stands for 10 minutes)
+    assert yesterday == pytest.approx(6 * (hours_counted + 10 / 60), rel=0.01)
+
+
+async def test_calculated_heat_survives_a_restart(hass, hass_storage):
+    """The day's and the month's heat are loaded back."""
+    key = produced_energy_storage_key("entry")
+    hass_storage[key] = {
+        "version": 1,
+        "minor_version": 1,
+        "key": key,
+        "data": {"periods": {"day": {"period": "2026-11-13", "from_start": True, "uses": {"dhw": 2.5}}}},
+    }
+    counter, heat = _produced(hass, 0)
+    await counter.async_load()
+    assert counter.energy("today", "dhw", local(13, 12)) == 2.5
+
+
+async def test_calculated_heat_after_a_long_stop_keeps_the_day(hass, hass_storage):
+    """Home Assistant stopped for an hour: the day keeps its figure, less that hour."""
+    key = produced_energy_storage_key("entry")
+    day = {"period": "2026-11-13", "from_start": True, "uses": {"dhw": 2.5}}
+    stopped = local(13, 11).isoformat()
+    hass_storage[key] = {
+        "version": 1,
+        "minor_version": 1,
+        "key": key,
+        "data": {"periods": {"day": day, "month": {"period": "2026-11", "from_start": True, "uses": {"dhw": 2.5}}}, "last_time": stopped},
+    }
+    counter, heat = _produced(hass, 6000)
+    await counter.async_load()
+    counter.async_update(local(13, 12), heat["watts"], heat["use"])
+    assert counter.energy("today", None, local(13, 12)) == pytest.approx(2.5 + 1.0)  # ten minutes for the hour stopped
+    when = local(13, 12, 5)
+    while when <= local(14, 0, 5):
+        counter.async_update(when, heat["watts"], heat["use"])
+        when += timedelta(minutes=5)
+    assert counter.energy("yesterday", None, local(14, 0, 5)) == pytest.approx(2.5 + 1.0 + 6 * 12, rel=0.01)
+
+
+def test_calculated_heat_sensors_exist_without_csnet_records():
+    """With the integration's own heat, the heat sensors exist whatever CSNet recorded, split by the given uses."""
+    keys = [d.key for d in server_energy_descriptions(None, ["spaceHeating", "dhw"])]
+    assert keys == ["server_heat_today", "server_heat_yesterday", "server_heat_month", "server_heat_today_spaceheating", "server_heat_today_dhw"]
+    assert [d.key for d in server_energy_descriptions(None, ["spaceHeating"])] == ["server_heat_today", "server_heat_yesterday", "server_heat_month"]
+
+
+async def test_heat_sensor_shows_the_calculated_heat(hass, hass_storage):
+    """The sensor reads the integration's count and says so."""
+    counter, heat = _produced(hass, 6000, "dhw")
+    coordinator = SimpleNamespace(get_server_energy=lambda: ENERGY, async_add_listener=lambda *a, **k: lambda: None, last_update_success=True)
+    description = next(d for d in server_energy_descriptions(None, ["spaceHeating", "dhw"]) if d.key == "server_heat_today_dhw")
+    sensor = CSNetHomeServerEnergySensor(coordinator, description, None, counter)
+    now = dt_util.now()
+    counter.async_update(now - timedelta(minutes=10), heat["watts"], heat["use"])
+    counter.async_update(now, heat["watts"], heat["use"])
+    assert sensor.native_value == pytest.approx(1.0, abs=0.001)
+    assert sensor.extra_state_attributes == {"heat_source": "calculated"}
+    assert CSNetHomeServerEnergySensor(coordinator, description, None).extra_state_attributes == {"heat_source": "csnet"}
+
+
+async def test_period_cop_with_calculated_heat(hass, hass_storage):
+    """The period COP divides the integration's heat by the electricity of the same period, up to now."""
+    counter, _ = _counter(hass, 2000)
+    produced, _ = _produced(hass, 6000)
+    tracker = MeterTracker(hass, "entry", "estimate", reader=counter.reading_kwh, storage_key=estimated_meter_storage_key("entry"))
+    coordinator = SimpleNamespace(get_server_energy=lambda: ENERGY, async_add_listener=lambda *a, **k: lambda: None, last_update_success=True)
+    sensor = CSNetHomeMeteredCopSensor(coordinator, ESTIMATED_COP_DESCRIPTIONS[0], None, tracker, counter, produced=produced)
+    start = dt_util.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    for minutes in (0, 5, 10, 15):
+        when = start + timedelta(minutes=minutes)
+        counter.async_update(when, 2000)  # the listener of the power model, before the sensors
+        produced.async_update(when, 6000, "spaceHeating")
+        with patch("custom_components.csnet_home.server_energy.dt_util.now", return_value=when):
+            sensor._follow()
+    with patch("custom_components.csnet_home.server_energy.dt_util.now", return_value=start + timedelta(minutes=15)):
+        assert sensor.native_value == 3.0
+        assert sensor.extra_state_attributes["heat_source"] == "calculated"
+
+
+async def test_calculated_heat_gives_heat_sensors_and_cops_without_csnet_records(hass, hass_storage):
+    """With the integration's own heat, a unit CSNet recorded nothing for still gets them all."""
+    from custom_components.csnet_home.sensor import _server_energy_sensors
+
+    counter, _ = _counter(hass, 1000)
+    produced, _ = _produced(hass, 6000)
+    coordinator = SimpleNamespace(
+        get_server_energy=lambda: None,
+        get_sensors_data=lambda: [{"zone_id": 1}, {"zone_id": 3}],
+        get_installation_devices_data=lambda: {},
+        get_common_data=lambda: {},
+        async_add_listener=lambda *a, **k: lambda: None,
+        last_update_success=True,
+        estimated_energy=counter,
+        produced_energy=produced,
+    )
+    entry = SimpleNamespace(entry_id="entry", data={"energy_meter": None})
+    sensors = _server_energy_sensors(hass, entry, coordinator)
+    keys = [s.entity_description.key for s in sensors]
+    assert keys == [
+        "server_heat_today",
+        "server_heat_yesterday",
+        "server_heat_month",
+        "server_heat_today_spaceheating",
+        "server_heat_today_dhw",
+        "server_electricity_yesterday",
+        "server_electricity_month",
+        *[d.key for d in ESTIMATED_COP_DESCRIPTIONS],
+    ]
+    assert all(s.extra_state_attributes["heat_source"] == "calculated" for s in sensors[:5])
+
+
+@pytest.mark.parametrize("electricity", ["metered", "estimated"])
+def test_a_meter_or_the_estimate_gives_electricity_sensors_without_csnet_records(electricity):
+    """The meter's or the estimate's electricity sensors exist even when CSNet records no electricity of a meter."""
+    descriptions = server_energy_descriptions(ENERGY, electricity=electricity)
+    assert [d.key for d in descriptions][-2:] == ["server_electricity_yesterday", "server_electricity_month"]
+    assert [d.name for d in descriptions][-2:] == [f"Electricity yesterday ({electricity})", f"Electricity this month ({electricity})"]
     assert not [d for d in server_energy_descriptions(ENERGY) if d.kind == ELECTRICITY]
+
+
+def test_calculated_heat_is_named_so():
+    """The heat names say where the heat comes from."""
+    names = [d.name for d in server_energy_descriptions(None, ["spaceHeating", "dhw"])]
+    assert names == [
+        "Heat today (calculated)",
+        "Heat yesterday (calculated)",
+        "Heat this month (calculated)",
+        "Heat today space heating (calculated)",
+        "Heat today hot water (calculated)",
+    ]
 
 
 async def test_electricity_sensors_show_what_the_meter_counted(hass, hass_storage):
@@ -598,8 +805,8 @@ async def test_electricity_sensors_show_what_the_meter_counted(hass, hass_storag
     reading = {"kwh": 100.0}
     tracker = MeterTracker(hass, "entry", "sensor.meter", reader=lambda: reading["kwh"])
     coordinator = SimpleNamespace(get_server_energy=lambda: ENERGY, async_add_listener=lambda *a, **k: lambda: None, last_update_success=True)
-    descriptions = {d.key: d for d in server_energy_descriptions(ENERGY, metered_electricity=True)}
-    month = CSNetHomeServerEnergySensor(coordinator, descriptions["server_electricity_month"], None, tracker)
+    descriptions = {d.key: d for d in server_energy_descriptions(ENERGY, electricity="metered")}
+    month = CSNetHomeServerEnergySensor(coordinator, descriptions["server_electricity_month"], None, tracker=tracker)
     midnight = dt_util.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     with patch("custom_components.csnet_home.server_energy.dt_util.now", return_value=midnight):
         tracker.async_update(midnight)
@@ -613,13 +820,37 @@ async def test_electricity_sensors_show_what_the_meter_counted(hass, hass_storag
     assert from_csnet.extra_state_attributes == {"electricity_source": "csnet"}
 
 
-async def test_a_meter_removes_the_electricity_of_today_left_from_before(hass, hass_storage):
-    """Daily Consumption is the meter's today: the sensor that repeated it goes."""
+async def test_without_a_meter_the_electricity_is_the_estimate(hass, hass_storage):
+    """Without a meter the yesterday and month sensors follow the estimate, and say so."""
+    from custom_components.csnet_home.sensor import _server_energy_sensors
+
+    counter, _ = _counter(hass, 1000)
+    coordinator = SimpleNamespace(
+        get_server_energy=lambda: ENERGY,
+        get_installation_devices_data=lambda: {},
+        get_common_data=lambda: {},
+        async_add_listener=lambda *a, **k: lambda: None,
+        last_update_success=True,
+        estimated_energy=counter,
+    )
+    entry = SimpleNamespace(entry_id="entry", data={"energy_meter": None})
+    sensors = _server_energy_sensors(hass, entry, coordinator)
+    electricity = [s for s in sensors if s.entity_description.key.startswith("server_electricity")]
+    assert [s.entity_description.name for s in electricity] == ["Electricity yesterday (estimated)", "Electricity this month (estimated)"]
+    assert all(s.extra_state_attributes == {"electricity_source": "estimate"} for s in electricity)
+    cops = [s for s in sensors if s.entity_description.key.startswith("estimated_cop")]
+    assert {id(s._tracker) for s in electricity + cops} == {id(electricity[0]._tracker)}
+
+
+async def test_electricity_today_of_csnet_is_removed(hass, hass_storage):
+    """Electricity today, a sensor of its own, took its place."""
     from homeassistant.helpers import entity_registry as er
 
     from custom_components.csnet_home.const import DOMAIN
     from custom_components.csnet_home.sensor import _server_energy_sensors
 
+    registry = er.async_get(hass)
+    registry.async_get_or_create("sensor", DOMAIN, f"{DOMAIN}-server_electricity_today")
     coordinator = SimpleNamespace(
         get_server_energy=lambda: ENERGY,
         get_installation_devices_data=lambda: {},
@@ -627,11 +858,7 @@ async def test_a_meter_removes_the_electricity_of_today_left_from_before(hass, h
         async_add_listener=lambda *a, **k: lambda: None,
         last_update_success=True,
     )
-    registry = er.async_get(hass)
-    registry.async_get_or_create("sensor", DOMAIN, f"{DOMAIN}-server_electricity_today")
-    entry = SimpleNamespace(entry_id="entry", data={"energy_meter": "sensor.any_meter"})
-    keys = [s.entity_description.key for s in _server_energy_sensors(hass, entry, coordinator)]
-    assert "server_electricity_today" not in keys
+    _server_energy_sensors(hass, SimpleNamespace(entry_id="entry", data={"energy_meter": "sensor.any_meter"}), coordinator)
     assert registry.async_get_entity_id("sensor", DOMAIN, f"{DOMAIN}-server_electricity_today") is None
 
 

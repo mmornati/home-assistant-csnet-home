@@ -13,7 +13,7 @@ from custom_components.csnet_home import async_remove_entry, async_setup_entry, 
 from custom_components.csnet_home.const import DOMAIN
 from custom_components.csnet_home.coordinator import CSNetHomeData, alarm_storage_key
 from custom_components.csnet_home.power_calibration import power_calibration_storage_key
-from custom_components.csnet_home.server_energy import estimated_energy_storage_key, estimated_meter_storage_key
+from custom_components.csnet_home.server_energy import estimated_energy_storage_key, estimated_meter_storage_key, produced_energy_storage_key
 
 
 async def test_setup_entry_registers_no_update_listener(hass):
@@ -214,9 +214,9 @@ async def test_removing_the_entry_deletes_its_power_calibration(hass, hass_stora
 
 
 async def test_removing_the_entry_deletes_its_estimated_electricity(hass, hass_storage):
-    """The estimate's running total and its period readings go with the entry."""
+    """The estimate's running total, its period readings and the calculated heat go with the entry."""
     entry = MockConfigEntry(domain=DOMAIN, data={CONF_USERNAME: "user", CONF_PASSWORD: "pass"})
-    keys = (estimated_energy_storage_key(entry.entry_id), estimated_meter_storage_key(entry.entry_id))
+    keys = (estimated_energy_storage_key(entry.entry_id), estimated_meter_storage_key(entry.entry_id), produced_energy_storage_key(entry.entry_id))
     for key in keys:
         hass_storage[key] = {"version": 1, "minor_version": 1, "key": key, "data": {"total_kwh": 3.0}}
 

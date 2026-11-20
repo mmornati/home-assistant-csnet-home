@@ -43,7 +43,6 @@ MEASUREMENTS = {
     "in_water_temperature",
     "out_water_temperature",
     "external_temperature",
-    "defrost",
     "compressor_frequency",
     "compressor_current",
     "operation_status",
@@ -51,7 +50,6 @@ MEASUREMENTS = {
     "heating_power",
     "instant_cop",
     "daily_consumption",
-    "daily_heating",
     "daily_cop_hvac",
     "daily_cop_dhw",
 }

@@ -17,6 +17,7 @@
                     "enable_alarm_notifications": "Enable alarm notifications",
                     "filtered_alarm_codes": "Filtered alarm codes",
                     "energy_meter": "Electricity meter of the heat pump (optional)",
+                    "heat_source": "Heat produced",
                     "user_agent": "User-Agent (advanced)"
                 },
                 "data_description": {
@@ -32,6 +33,7 @@
                     "enable_alarm_notifications": "Create a Home Assistant notification when the unit reports an alarm",
                     "filtered_alarm_codes": "Comma-separated alarm codes that never notify (default: -1, communication errors). Leave empty to notify all.",
                     "energy_meter": "Any energy sensor (kWh) that measures the heat pump's electricity, from any device. Used to compute the COP from the heat CSNet records. Leave empty to keep the estimate only.",
+                    "heat_source": "Where the heat produced comes from, for every accumulated heating, cooling and hot water counter and every daily or period COP. CSNet: the heat CSNet Manager records for the unit (by full hours). Calculated: the integration's own measure, from the water flow and the exchanger's temperatures, in real time. With CSNet, the integration's measure is used when CSNet has not recorded any heat for the unit.",
                     "user_agent": "How the integration presents itself to CSNet Manager. Leave empty to use the default (a desktop Chrome browser). Change it only to test another value."
                 }
             },
@@ -51,6 +53,7 @@
                     "enable_alarm_notifications": "Enable alarm notifications",
                     "filtered_alarm_codes": "Filtered alarm codes",
                     "energy_meter": "Electricity meter of the heat pump (optional)",
+                    "heat_source": "Heat produced",
                     "user_agent": "User-Agent (advanced)"
                 },
                 "data_description": {
@@ -66,6 +69,7 @@
                     "enable_alarm_notifications": "Create a Home Assistant notification when the unit reports an alarm",
                     "filtered_alarm_codes": "Comma-separated alarm codes that never notify (default: -1, communication errors). Leave empty to notify all.",
                     "energy_meter": "Any energy sensor (kWh) that measures the heat pump's electricity, from any device. Used to compute the COP from the heat CSNet records. Leave empty to keep the estimate only.",
+                    "heat_source": "Where the heat produced comes from, for every accumulated heating, cooling and hot water counter and every daily or period COP. CSNet: the heat CSNet Manager records for the unit (by full hours). Calculated: the integration's own measure, from the water flow and the exchanger's temperatures, in real time. With CSNet, the integration's measure is used when CSNet has not recorded any heat for the unit.",
                     "user_agent": "How the integration presents itself to CSNet Manager. Leave empty to use the default (a desktop Chrome browser). Change it only to test another value."
                 }
             },
@@ -165,6 +169,12 @@
                 "en": "English",
                 "fr": "French",
                 "es": "Spanish"
+            }
+        },
+        "heat_source": {
+            "options": {
+                "csnet": "Recorded by CSNet",
+                "calculated": "Calculated by the integration"
             }
         }
     }

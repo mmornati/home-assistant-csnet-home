@@ -17,6 +17,7 @@
                     "enable_alarm_notifications": "Activar las notificaciones de alarma",
                     "filtered_alarm_codes": "Códigos de alarma filtrados",
                     "energy_meter": "Contador eléctrico de la bomba de calor (opcional)",
+                    "heat_source": "Calor producido",
                     "user_agent": "User-Agent (avanzado)"
                 },
                 "data_description": {
@@ -32,6 +33,7 @@
                     "enable_alarm_notifications": "Crear una notificación de Home Assistant cuando la unidad informa de una alarma",
                     "filtered_alarm_codes": "Códigos de alarma, separados por comas, que nunca notifican (por defecto: -1, errores de comunicación). Dejar vacío para notificar todos.",
                     "energy_meter": "Cualquier sensor de energía (kWh) que mida la electricidad de la bomba de calor, de cualquier dispositivo. Se usa para calcular el COP con el calor que registra CSNet. Dejar vacío para mantener solo la estimación.",
+                    "heat_source": "De dónde sale el calor producido, para todos los contadores acumulados de calefacción, refrigeración y ACS y todos los COP diarios o por periodo. CSNet: el calor que registra CSNet Manager para la unidad (por horas completas). Calculado: la medida propia de la integración, a partir del caudal y las temperaturas del intercambiador, al momento. Con CSNet, se usa la medida de la integración cuando CSNet no ha registrado calor para la unidad.",
                     "user_agent": "Cómo se presenta la integración ante CSNet Manager. Déjelo vacío para usar el valor por defecto (un navegador Chrome de escritorio). Cámbielo solo para probar otro valor."
                 }
             },
@@ -51,6 +53,7 @@
                     "enable_alarm_notifications": "Activar las notificaciones de alarma",
                     "filtered_alarm_codes": "Códigos de alarma filtrados",
                     "energy_meter": "Contador eléctrico de la bomba de calor (opcional)",
+                    "heat_source": "Calor producido",
                     "user_agent": "User-Agent (avanzado)"
                 },
                 "data_description": {
@@ -66,6 +69,7 @@
                     "enable_alarm_notifications": "Crear una notificación de Home Assistant cuando la unidad informa de una alarma",
                     "filtered_alarm_codes": "Códigos de alarma, separados por comas, que nunca notifican (por defecto: -1, errores de comunicación). Dejar vacío para notificar todos.",
                     "energy_meter": "Cualquier sensor de energía (kWh) que mida la electricidad de la bomba de calor, de cualquier dispositivo. Se usa para calcular el COP con el calor que registra CSNet. Dejar vacío para mantener solo la estimación.",
+                    "heat_source": "De dónde sale el calor producido, para todos los contadores acumulados de calefacción, refrigeración y ACS y todos los COP diarios o por periodo. CSNet: el calor que registra CSNet Manager para la unidad (por horas completas). Calculado: la medida propia de la integración, a partir del caudal y las temperaturas del intercambiador, al momento. Con CSNet, se usa la medida de la integración cuando CSNet no ha registrado calor para la unidad.",
                     "user_agent": "Cómo se presenta la integración ante CSNet Manager. Déjelo vacío para usar el valor por defecto (un navegador Chrome de escritorio). Cámbielo solo para probar otro valor."
                 }
             },
@@ -165,6 +169,12 @@
                 "en": "Inglés",
                 "fr": "Francés",
                 "es": "Español"
+            }
+        },
+        "heat_source": {
+            "options": {
+                "csnet": "Registrado por CSNet",
+                "calculated": "Calculado por la integración"
             }
         }
     }
