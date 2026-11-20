@@ -72,15 +72,21 @@ async def test_replay_survives_restarts(hass, freezer, path: Path, heat_source: 
     assert len(result.restarts) == 2
     # a figure that went down within a day (back to 0 after a restart) is reported here
     assert check_invariants(result) == []
+    compared = 0
     for index in result.restarts:
         before, after = result.polls[index - 1], result.polls[index]
-        if before.time.date() != after.time.date():
-            continue
-        for name in ("daily_consumption_kwh", "server_heat_today_kwh", "server_heat_month_kwh"):
+        names = []
+        if (before.time.year, before.time.month) == (after.time.year, after.time.month):
+            names.append("server_heat_month_kwh")
+        if before.time.date() == after.time.date():
+            names += ["daily_consumption_kwh", "server_heat_today_kwh"]
+        for name in names:
             old, new = before.values.get(name), after.values.get(name)
             if isinstance(old, float):
                 assert isinstance(new, float), f"{name} lost its value after the restart at {after.time}"
                 assert new >= old - 1e-6, f"{name} went from {old} to {new} after the restart at {after.time}"
+                compared += 1
+    assert compared, "no figure had a value around the restarts: nothing was checked"
 
 
 # Keys that must not carry a value in a sample kept in this repository
