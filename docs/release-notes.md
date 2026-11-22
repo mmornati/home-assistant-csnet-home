@@ -7,6 +7,16 @@ description: What changed in each version of the CSNet Home (unofficial, for Hit
 
 Every version of the integration, newest first. Install or update from HACS; each version is also on the [GitHub releases page](https://github.com/mmornati/home-assistant-csnet-home/releases).
 
+## 2.20.1
+
+*22 November 2026* · [GitHub release](https://github.com/mmornati/home-assistant-csnet-home/releases/tag/2.20.1)
+
+A display fix for the Connection card. Nothing else changes.
+
+#### Fixed
+
+- **Connection card, Unit timeline:** thin light stripes across the bar instead of one solid colour. The unit's connectivity sensor writes a history row on every update, and each row was drawn as its own block. After updating, reload the dashboard page. ([#277](https://github.com/mmornati/home-assistant-csnet-home/pull/277))
+
 ## 2.20.0
 
 *22 November 2026* · [GitHub release](https://github.com/mmornati/home-assistant-csnet-home/releases/tag/2.20.0)
