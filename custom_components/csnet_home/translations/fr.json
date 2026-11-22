@@ -178,5 +178,11 @@
                 "calculated": "Calculée par l'intégration"
             }
         }
+    },
+    "issues": {
+        "central_control_not_total": {
+            "title": "{units} ignore les commandes de CSNet Home",
+            "description": "Le réglage de la commande centrale de {units} n'est pas défini sur **Total** : l'unité n'applique pas ce que Home Assistant (ou l'application CSNet Home) lui envoie. Les changements de température et de mode sont acceptés par CSNet Manager, puis ignorés.\n\nSur la commande de l'unité, réglez la commande centrale sur **Total** (menu installateur). Ce message disparaît de lui-même dès que l'unité applique de nouveau les commandes."
+        }
     }
 }

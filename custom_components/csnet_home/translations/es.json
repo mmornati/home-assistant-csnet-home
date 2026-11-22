@@ -178,5 +178,11 @@
                 "calculated": "Calculado por la integración"
             }
         }
+    },
+    "issues": {
+        "central_control_not_total": {
+            "title": "{units} ignora las órdenes de CSNet Home",
+            "description": "El ajuste de control central de {units} no está en **Total**: la unidad no aplica lo que Home Assistant (o la app CSNet Home) le envía. CSNet Manager acepta los cambios de temperatura y de modo, y luego se ignoran.\n\nEn el controlador de la unidad, ponga el control central en **Total** (menú de instalador). Este mensaje desaparece solo en cuanto la unidad vuelve a aplicar las órdenes."
+        }
     }
 }

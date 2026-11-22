@@ -1,6 +1,8 @@
 """Tests for helper functions."""
 
-from custom_components.csnet_home.helpers import extract_heating_status
+import pytest
+
+from custom_components.csnet_home.helpers import extract_heating_status, is_central_control_enabled
 
 
 def test_extract_heating_status_none():
@@ -65,3 +67,29 @@ def test_extract_heating_status_not_dict_data():
     """Test extract_heating_status with data[0] not being a dict."""
     data = {"data": ["not_a_dict"]}
     assert extract_heating_status(data) is None
+
+
+@pytest.mark.parametrize(
+    ("heating_status", "expected"),
+    [
+        (None, None),
+        ({}, None),
+        ({"centralConfig": None}, None),
+        ({"centralConfig": True}, None),
+        ({"centralConfig": 3, "unitModel": 2, "lcdSoft": 0x0100}, True),
+        ({"centralConfig": 4}, True),
+        # other than the S80: a recent LCD software is enough
+        ({"centralConfig": 2, "unitModel": 0, "lcdSoft": 0x0222}, True),
+        ({"centralConfig": 2, "unitModel": 0, "lcdSoft": 0x0221}, False),
+        # 0: not known yet (wizard, restart)
+        ({"centralConfig": 0, "unitModel": 1, "lcdSoft": 0}, True),
+        # no lcdSoft: like the web app, not enough
+        ({"centralConfig": 2, "unitModel": 0}, False),
+        # the S80 always needs Total
+        ({"centralConfig": 2, "unitModel": 2, "lcdSoft": 0x0300}, False),
+        ({"centralConfig": 2, "unitModel": 2, "lcdSoft": 0}, False),
+    ],
+)
+def test_is_central_control_enabled(heating_status, expected):
+    """Same rule as isCentralWellConfigured() of the CSNet web app."""
+    assert is_central_control_enabled(heating_status) is expected

@@ -9,7 +9,7 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from custom_components.csnet_home.const import MIN_SCAN_INTERVAL
-from custom_components.csnet_home.coordinator import CSNetHomeCoordinator
+from custom_components.csnet_home.coordinator import CSNetHomeCoordinator, indoor_units_not_applying_commands
 
 
 @pytest.fixture(autouse=True)
@@ -674,3 +674,68 @@ async def test_installations_are_read_once_and_several_are_reported(hass, hass_s
     assert caplog.text.count("default one only") == (1 if warns else 0)
     assert coordinator.get_installations() == installations
     assert ("installations" in caplog.text and "default one only" in caplog.text) is warns
+
+
+def _central_control_api(heating_status_by_indoor):
+    """Return a mock API whose installation devices data has these indoor units."""
+    mock_api = MagicMock()
+    mock_api.async_get_elements_data = AsyncMock(
+        return_value={
+            "common_data": {"name": "Home"},
+            "sensors": [{"device_id": 1, "parent_id": 1706, "device_name": "Hitachi PAC", "room_name": "Etage"}],
+        }
+    )
+    mock_api.async_get_installation_devices_data = AsyncMock(
+        return_value={"data": [{"indoors": [{"id": indoor_id, "heatingStatus": status} for indoor_id, status in heating_status_by_indoor.items()]}]}
+    )
+    mock_api.async_get_installation_alarms = AsyncMock(return_value={"alarms": []})
+    mock_api.load_translations = AsyncMock()
+    return mock_api
+
+
+@pytest.mark.asyncio
+async def test_central_control_issue_raised_then_cleared(hass: HomeAssistant):
+    """A unit not set to Total raises a repair issue, removed once it applies commands."""
+    status = {"centralConfig": 2, "unitModel": 2, "lcdSoft": 0x0300}
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=60, entry_id="entry1", api=_central_control_api({1706: status}))
+
+    with patch("custom_components.csnet_home.coordinator.ir") as ir_mock:
+        await coordinator._async_update_data()
+        ir_mock.async_create_issue.assert_called_once()
+        args, kwargs = ir_mock.async_create_issue.call_args
+        assert args[1:] == ("csnet_home", "central_control_entry1")
+        assert kwargs["translation_key"] == "central_control_not_total"
+        assert kwargs["translation_placeholders"] == {"units": "Hitachi PAC"}
+        assert kwargs["is_fixable"] is False
+        ir_mock.async_delete_issue.assert_not_called()
+
+        status["centralConfig"] = 3
+        await coordinator._async_update_data()
+        ir_mock.async_delete_issue.assert_called_once_with(hass, "csnet_home", "central_control_entry1")
+        assert ir_mock.async_create_issue.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_central_control_issue_untouched_without_data(hass: HomeAssistant):
+    """A poll whose data has no centralConfig neither raises nor clears the issue."""
+    coordinator = CSNetHomeCoordinator(hass=hass, update_interval=60, entry_id="entry1", api=_central_control_api({1706: {"unitModel": 0}}))
+
+    with patch("custom_components.csnet_home.coordinator.ir") as ir_mock:
+        await coordinator._async_update_data()
+        ir_mock.async_create_issue.assert_not_called()
+        ir_mock.async_delete_issue.assert_not_called()
+
+
+def test_indoor_units_not_applying_commands():
+    """Every indoor unit of every device is checked."""
+    data = {
+        "data": [
+            {"indoors": [{"id": 1, "heatingStatus": {"centralConfig": 3}}, {"id": 2, "heatingStatus": {"centralConfig": 1, "unitModel": 2}}]},
+            {"indoors": [{"id": 3, "heatingStatus": {}}]},
+        ]
+    }
+    assert indoor_units_not_applying_commands(data) == [2]
+    assert indoor_units_not_applying_commands({"data": [{"indoors": [{"id": 1, "heatingStatus": {"centralConfig": 3}}]}]}) == []
+    assert indoor_units_not_applying_commands({}) is None
+    assert indoor_units_not_applying_commands(None) is None
+    assert indoor_units_not_applying_commands({"data": [{"indoors": [{"id": 1, "heatingStatus": {}}]}]}) is None

@@ -9,6 +9,7 @@ from homeassistant.const import CONF_SCAN_INTERVAL, Platform
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.device_registry import DeviceEntry
 from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.storage import Store
@@ -26,7 +27,14 @@ from custom_components.csnet_home.const import (
     DEFAULT_FILTERED_ALARM_CODES,
     DOMAIN,
 )
-from custom_components.csnet_home.coordinator import ALARM_STORAGE_VERSION, CSNetHomeConfigEntry, CSNetHomeCoordinator, CSNetHomeData, alarm_storage_key
+from custom_components.csnet_home.coordinator import (
+    ALARM_STORAGE_VERSION,
+    CENTRAL_CONTROL_ISSUE_PREFIX,
+    CSNetHomeConfigEntry,
+    CSNetHomeCoordinator,
+    CSNetHomeData,
+    alarm_storage_key,
+)
 from custom_components.csnet_home.dashboard import async_register_dashboard
 from custom_components.csnet_home.migration import async_migrate_zone_identifiers
 from custom_components.csnet_home.power_calibration import POWER_CALIBRATION_STORAGE_VERSION, power_calibration_storage_key
@@ -281,6 +289,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: CSNetHomeConfigEntry) -
     # Home Assistant drops entry.runtime_data itself; the session is ours to close
     if unload_ok:
         await entry.runtime_data.api.close()
+        # raised again by the next poll if the entry is loaded again
+        ir.async_delete_issue(hass, DOMAIN, f"{CENTRAL_CONTROL_ISSUE_PREFIX}{entry.entry_id}")
 
     # Return that unloading was successful.
     return unload_ok

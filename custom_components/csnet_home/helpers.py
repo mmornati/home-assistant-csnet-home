@@ -105,3 +105,41 @@ def zone_device_identifier(sensor_data):
 def legacy_zone_device_identifier(sensor_data):
     """Return the name-based device identifier used before 2.11."""
     return f"{sensor_data.get('device_name', 'Unknown')}-{sensor_data.get('room_name', 'Unknown')}"
+
+
+# heatingStatus.unitModel of the Yutaki S80, which needs centralConfig "Total" whatever its LCD software
+YUTAKI_S80_UNIT_MODEL = 2
+# heatingStatus.centralConfig from this value on is "Total": CSNet commands are applied
+CENTRAL_CONFIG_TOTAL = 3
+# LCD software from which units other than the S80 apply CSNet commands without "Total"
+LCD_SOFT_CENTRAL_OK = 0x0222
+
+
+def _as_int(value):
+    """Return value when it is an int (not a bool), otherwise None."""
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def is_central_control_enabled(heating_status):
+    """Tell whether the unit applies the commands CSNet Home sends it.
+
+    Same rule as isCentralWellConfigured() of the CSNet web app, which hides
+    the controls and shows "the central command setting is not set to Total"
+    when it is false.
+
+    Returns True or False, or None when heating_status does not say
+    (no data yet, or no centralConfig in it).
+    """
+    if not isinstance(heating_status, dict):
+        return None
+    central_config = _as_int(heating_status.get("centralConfig"))
+    if central_config is None:
+        return None
+    if central_config >= CENTRAL_CONFIG_TOTAL:
+        return True
+    if _as_int(heating_status.get("unitModel")) != YUTAKI_S80_UNIT_MODEL:
+        lcd_soft = _as_int(heating_status.get("lcdSoft"))
+        # 0: not known yet, while the unit's wizard runs or the unit restarts
+        if lcd_soft is not None and (lcd_soft == 0 or lcd_soft >= LCD_SOFT_CENTRAL_OK):
+            return True
+    return False

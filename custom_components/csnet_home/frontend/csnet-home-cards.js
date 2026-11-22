@@ -81,6 +81,8 @@ const TEXTS = {
     gateway: "Gateway",
     last_seen: "last contact {v}",
     central_control: "Central control",
+    central_total: "Set to Total",
+    central_not_total: "Not set to Total: the unit ignores commands",
     water_pressure: "Water pressure",
     expected_range: "expected {a} to {b} bar",
     running: "running",
@@ -200,6 +202,8 @@ const TEXTS = {
     gateway: "Passerelle",
     last_seen: "dernier échange {v}",
     central_control: "Contrôle central",
+    central_total: "Réglé sur Total",
+    central_not_total: "Pas sur Total : l'unité ignore les commandes",
     water_pressure: "Pression d'eau",
     expected_range: "attendu {a} à {b} bar",
     running: "en marche",
@@ -319,6 +323,8 @@ const TEXTS = {
     gateway: "Pasarela",
     last_seen: "última vez {v}",
     central_control: "Control central",
+    central_total: "Ajustado en Total",
+    central_not_total: "No está en Total: la unidad ignora las órdenes",
     water_pressure: "Presión del agua",
     expected_range: "esperada de {a} a {b} bar",
     running: "en marcha",
@@ -438,6 +444,8 @@ const TEXTS = {
     gateway: "Bramka",
     last_seen: "ostatni kontakt {v}",
     central_control: "Sterowanie centralne",
+    central_total: "Ustawione na Total",
+    central_not_total: "Nie ustawione na Total: jednostka ignoruje polecenia",
     water_pressure: "Ciśnienie wody",
     expected_range: "oczekiwane {a} do {b} bar",
     running: "pracuje",
@@ -1781,7 +1789,12 @@ class CsnetSystemHealthCard extends CsnetBaseCard {
       const detail = [conn, last ? t(hass, "last_seen", { v: relativeTime(hass, last) }) : "", wifi !== null ? `${fmt(hass, wifi, 0)} dBm` : ""].filter(Boolean).join(" · ");
       add(bad ? "bad" : "ok", t(hass, "gateway"), detail, gateway.connectivity);
     }
-    if (unit.central_control) add("ok", t(hass, "central_control"), stateOf(hass, unit.central_control)?.state, unit.central_control);
+    if (unit.central_control) {
+      // off: the unit is not set to "Total" and ignores what CSNet Home sends it
+      const central = stateOf(hass, unit.central_control)?.state;
+      if (central === "off") add("bad", t(hass, "central_control"), t(hass, "central_not_total"), unit.central_control);
+      else if (central === "on") add("ok", t(hass, "central_control"), t(hass, "central_total"), unit.central_control);
+    }
     if (unit.defrost) add(isOn(hass, unit.defrost) ? "info" : "ok", t(hass, "defrost"), isOn(hass, unit.defrost) ? t(hass, "running") : t(hass, "idle"), unit.defrost);
     for (const [role, label] of [["backup_heater", "backup_heater"], ["boiler", "boiler"]]) {
       if (unit[role] && isOn(hass, unit[role])) add("info", t(hass, label), t(hass, "running"), unit[role]);

@@ -350,6 +350,22 @@ See [How It Works](How-It-Works.md) for how the integration talks to CSNet Manag
    - Look at `alarm_code` attribute
    - Alarms may prevent operation
 
+### Commands Are Ignored (Central Control Not Set to Total)
+
+**Symptoms**:
+- Temperature or mode changes are accepted, then the unit goes back to what it was
+- The CSNet Home app shows: *"The central command setting is not set to 'Total', commands sent by CSNET Home will not be applied"*
+- Home Assistant shows a repair under **Settings → System → Repairs**: *"CSNet Home commands are ignored by …"*
+- `sensor.system_controller_central_control_enabled` is `off`, and the System health card shows **Central control** in red
+
+**Cause**: the unit's central control setting is not **Total**. CSNet Manager accepts every command, but the unit only applies them when this setting allows it. The integration uses the same rule as the CSNet web app:
+
+- `centralConfig` 3 or more (Total): commands are applied
+- Otherwise, on units other than the Yutaki S80, an LCD software of `0x0222` or later is enough
+- A Yutaki S80 always needs Total
+
+**Solution**: on the unit's controller, open the installer menu and set the central control setting to **Total**. The repair goes away on its own at the next poll after the unit applies commands again. Check `sensor.system_controller_central_config` to see the current value.
+
 ### Mode Changes Don't Work
 
 **Symptoms**: Try to change HVAC mode but it doesn't change

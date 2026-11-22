@@ -13,11 +13,13 @@ from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import DOMAIN, MIN_SCAN_INTERVAL
+from .helpers import is_central_control_enabled
 
 if TYPE_CHECKING:
     from .api import CSNetHomeAPI
@@ -37,6 +39,39 @@ SERVER_ENERGY_RETRY_SECONDS = 300
 WRITE_REFRESH_DELAY_SECONDS = 2.0
 ZONE_ALARM_NOTIFICATION_PREFIX = "csnet_home_alarm_"
 INSTALLATION_ALARM_NOTIFICATION_PREFIX = "csnet_home_inst_alarm_"
+CENTRAL_CONTROL_ISSUE_PREFIX = "central_control_"
+CENTRAL_CONTROL_LEARN_MORE_URL = (
+    "https://mmornati.github.io/home-assistant-csnet-home/wiki/Troubleshooting/#commands-are-ignored-central-control-not-set-to-total"
+)
+
+
+def indoor_units_not_applying_commands(installation_devices_data) -> list | None:
+    """Return the ids of the indoor units that ignore CSNet commands (not set to "Total").
+
+    None when no indoor unit says either way, so a poll without the data
+    neither raises nor clears the repair issue.
+    """
+    if not isinstance(installation_devices_data, dict):
+        return None
+    devices = installation_devices_data.get("data")
+    if not isinstance(devices, list):
+        return None
+    known = False
+    blocked = []
+    for device in devices:
+        indoors = device.get("indoors") if isinstance(device, dict) else None
+        if not isinstance(indoors, list):
+            continue
+        for indoor in indoors:
+            if not isinstance(indoor, dict):
+                continue
+            enabled = is_central_control_enabled(indoor.get("heatingStatus"))
+            if enabled is None:
+                continue
+            known = True
+            if not enabled:
+                blocked.append(indoor.get("id"))
+    return blocked if known else None
 
 
 def installation_alarm_list(answer) -> list | None:
@@ -190,6 +225,8 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         # Enrich sensor data
         self._enrich_sensor_data(cloud_api, installation_devices_data)
 
+        self._update_central_control_issue(installation_devices_data)
+
         await self._async_load_alarm_state()
 
         # Handle alarm notifications
@@ -201,6 +238,44 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         await self._async_save_alarm_state()
 
         return self._device_data
+
+    def _update_central_control_issue(self, installation_devices_data) -> None:
+        """Raise a repair issue while a unit ignores CSNet commands, remove it once it applies them."""
+        blocked = indoor_units_not_applying_commands(installation_devices_data)
+        if blocked is None:
+            return
+        issue_id = f"{CENTRAL_CONTROL_ISSUE_PREFIX}{self.entry_id}"
+        try:
+            if blocked:
+                ir.async_create_issue(
+                    self.hass,
+                    DOMAIN,
+                    issue_id,
+                    is_fixable=False,
+                    is_persistent=False,
+                    severity=ir.IssueSeverity.WARNING,
+                    translation_key="central_control_not_total",
+                    translation_placeholders={"units": self._indoor_unit_names(blocked)},
+                    learn_more_url=CENTRAL_CONTROL_LEARN_MORE_URL,
+                )
+            else:
+                ir.async_delete_issue(self.hass, DOMAIN, issue_id)
+        except Exception as exc:  # pylint: disable=broad-except
+            _LOGGER.debug("Could not update the central control repair issue: %s", exc)
+
+    def _indoor_unit_names(self, indoor_ids) -> str:
+        """Return the names CSNet gives the indoor units (their zones' device name), joined."""
+        names_by_id = {str(sensor.get("parent_id")): sensor.get("device_name") for sensor in self._device_data.get("sensors", []) if sensor.get("device_name")}
+        names = []
+        for indoor_id in indoor_ids:
+            name = names_by_id.get(str(indoor_id))
+            if name is None and len(names_by_id) == 1:
+                # one unit only: its zones may not carry the indoor id
+                name = next(iter(names_by_id.values()))
+            name = str(name or indoor_id)
+            if name not in names:
+                names.append(name)
+        return ", ".join(names)
 
     async def _async_get_installation_alarms(self, cloud_api):
         """Return the installation alarms, asking CSNet at most every ALARM_POLL_SECONDS.
