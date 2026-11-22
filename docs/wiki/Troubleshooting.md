@@ -364,7 +364,7 @@ See [How It Works](How-It-Works.md) for how the integration talks to CSNet Manag
 - Otherwise, on units other than the Yutaki S80, an LCD software of `0x0222` or later is enough
 - A Yutaki S80 always needs Total
 
-The rule comes from the CSNet web app, not from Hitachi documentation. A unit in another mode may still apply some commands: if changes from Home Assistant work for you, ignore the repair in Repairs.
+The rule comes from the CSNet web app, not from Hitachi documentation. A unit in another mode may still apply commands for a while: the maintainer's unit did, until CSNet stopped applying them and switching the unit to Total fixed it. If changes from Home Assistant work for you, you can ignore the repair in Repairs, but set Total as soon as they stop working.
 
 **Solution**: the setting is on the heat pump's controller, not in Home Assistant or the CSNet app. Users find it in the installer settings, under the external control option, as a control mode with choices such as Air, Water and **Total** (menu names vary between controllers; see your unit's installation manual). Pick **Total**. The repair goes away on its own at the next poll after CSNet reports it. `sensor.system_controller_central_config` shows the current value; its labels other than Total Control are guesses, and CSNet's raw value is what counts.
 
