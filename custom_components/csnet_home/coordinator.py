@@ -120,6 +120,8 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         self._installations = None
         self._installations_attempts = 0
         self._server_energy_fetched_at: float | None = None
+        # the energy records are read in the background: a slow answer never delays the readings
+        self._server_energy_task: asyncio.Task | None = None
         self._cancel_refresh_after_write: CALLBACK_TYPE | None = None
         self._saved_alarm_state: dict | None = None
         self._enable_alarm_notifications = enable_alarm_notifications
@@ -185,14 +187,15 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
             alarms = await self._async_get_installation_alarms(cloud_api)
             return elements, alarms
 
+        # The server's energy records: read in the background when due (cached; never fails or delays the poll)
+        self._schedule_server_energy(cloud_api)
+
         # Run independent fetch operations in parallel
         # 1. Elements chain (translations -> elements -> alarms)
         # 2. Installation devices data (independent)
-        # 3. The server's energy records (cached; never fails the poll)
         results = await asyncio.gather(
             fetch_elements_chain(),
             cloud_api.async_get_installation_devices_data(),
-            self._async_update_server_energy(cloud_api),
             self._async_read_installations(cloud_api),
         )
 
@@ -270,16 +273,43 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
             self._cancel_refresh_after_write()
             self._cancel_refresh_after_write = None
 
-    async def _async_update_server_energy(self, cloud_api) -> None:
-        """Read the server's energy records at most every SERVER_ENERGY_POLL_SECONDS.
+    def _schedule_server_energy(self, cloud_api) -> None:
+        """Start reading the energy records in the background, unless a read is under way or not due.
+
+        When records arrive, the entities hear of it at once: the sensors that
+        need them (heat, period COPs) are added then, not at the next poll.
+        """
+        if self._server_energy_task is not None and not self._server_energy_task.done():
+            return
+        if not self._server_energy_due():
+            return
+
+        async def read() -> None:
+            if await self._async_update_server_energy(cloud_api):
+                self.async_update_listeners()
+
+        name = f"{DOMAIN} energy records"
+        entry = getattr(self, "config_entry", None)
+        if entry is not None:
+            # cancelled when the entry unloads
+            self._server_energy_task = entry.async_create_background_task(self.hass, read(), name)
+        else:
+            self._server_energy_task = self.hass.async_create_background_task(read(), name)
+
+    def _server_energy_due(self) -> bool:
+        """Return whether the energy records should be read again."""
+        fetched_at = self._server_energy_fetched_at
+        return fetched_at is None or time.monotonic() - fetched_at >= SERVER_ENERGY_POLL_SECONDS
+
+    async def _async_update_server_energy(self, cloud_api) -> bool:
+        """Read the server's energy records at most every SERVER_ENERGY_POLL_SECONDS; return True when new ones arrived.
 
         The last answer is kept between requests and when a request fails. A
         failure here never fails the poll: the readings do not depend on it.
         """
+        if not self._server_energy_due():
+            return False
         now = time.monotonic()
-        fetched_at = self._server_energy_fetched_at
-        if fetched_at is not None and now - fetched_at < SERVER_ENERGY_POLL_SECONDS:
-            return
         try:
             data = await cloud_api.async_get_power_data()
         except Exception as exc:  # pylint: disable=broad-except
@@ -288,9 +318,10 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         if not isinstance(data, list):
             # not on every poll: an account this request never works for must not pay for it each minute
             self._server_energy_fetched_at = now - (SERVER_ENERGY_POLL_SECONDS - SERVER_ENERGY_RETRY_SECONDS)
-            return
+            return False
         self._server_energy = data
         self._server_energy_fetched_at = now
+        return True
 
     async def _async_read_installations(self, cloud_api) -> None:
         """Read the account's installations once; never fails the poll.

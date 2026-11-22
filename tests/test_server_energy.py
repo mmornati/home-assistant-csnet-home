@@ -1,5 +1,6 @@
 """Server energy records, the meter tracker and the metered COP."""
 
+import asyncio
 from datetime import date, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -175,6 +176,51 @@ async def test_coordinator_reads_the_records_every_15_minutes_and_keeps_them_on_
     await coordinator._async_update_data()
     assert api.async_get_power_data.await_count == 3
     assert coordinator.get_server_energy() is ENERGY
+
+
+async def test_a_slow_energy_request_never_delays_the_readings(hass, hass_storage):
+    """The records are read in the background: the poll ends first, one request at a time, listeners told on arrival."""
+    release = asyncio.Event()
+
+    async def slow_records():
+        await release.wait()
+        return ENERGY
+
+    api = MagicMock(spec=CSNetHomeAPI)
+    api.logged_in = True
+    api.async_get_elements_data = AsyncMock(side_effect=lambda: {"sensors": [], "common_data": {"name": "Home"}})
+    api.async_get_installation_devices_data = AsyncMock(return_value={})
+    api.async_get_installation_alarms = AsyncMock(return_value={"data": []})
+    api.load_translations = AsyncMock()
+    api.async_get_power_data = AsyncMock(side_effect=slow_records)
+    coordinator = CSNetHomeCoordinator(hass, 60, "entry", api=api)
+    told = []
+    coordinator.async_add_listener(lambda: told.append(coordinator.get_server_energy()))
+
+    # two polls while the records are on their way: both end, and the request is not sent twice
+    await asyncio.wait_for(coordinator._async_update_data(), 1)
+    await asyncio.wait_for(coordinator._async_update_data(), 1)
+    assert api.async_get_power_data.await_count == 1
+    assert coordinator.get_server_energy() is None
+
+    release.set()
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert coordinator.get_server_energy() is ENERGY
+    # the sensors that need the records hear of them now, not at the next poll
+    assert told and told[-1] is ENERGY
+
+
+async def test_the_energy_records_get_a_longer_wait(hass):
+    """The energy records take CSNet 5 to 20 s: they get 60 s, the readings keep 10 s."""
+    from custom_components.csnet_home.const import DEFAULT_API_TIMEOUT, ENERGY_RECORDS_TIMEOUT  # pylint: disable=import-outside-toplevel
+
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.logged_in = True
+    api.session = MagicMock(closed=False)
+    api._async_get_json = AsyncMock(return_value={"data": ENERGY})
+    assert await api.async_get_power_data() == ENERGY
+    assert api._async_get_json.await_args.kwargs["timeout"] == ENERGY_RECORDS_TIMEOUT == 60
+    assert DEFAULT_API_TIMEOUT == 10
 
 
 def _set_meter(hass, value, unit="kWh"):

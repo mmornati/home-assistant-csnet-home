@@ -7,6 +7,17 @@ description: What changed in each version of the CSNet Home (unofficial, for Hit
 
 Every version of the integration, newest first. Install or update from HACS; each version is also on the [GitHub releases page](https://github.com/mmornati/home-assistant-csnet-home/releases).
 
+## 2.20.2
+
+*22 November 2026* · [GitHub release](https://github.com/mmornati/home-assistant-csnet-home/releases/tag/2.20.2)
+
+The heat and period COP sensors no longer vanish when CSNet is slow to send its energy records. Nothing new is sent to the unit.
+
+#### Fixed
+
+- **Heat produced and COP today / yesterday / this month / last month stayed unavailable**, sometimes for hours after a restart. They are created once CSNet's energy records arrive, and CSNet takes 5 to 20 s to send them, against a 10 s limit. They now get 60 s, and are read in the background so a slow answer never delays the other readings; the sensors appear as soon as the records arrive. ([#279](https://github.com/mmornati/home-assistant-csnet-home/pull/279))
+- **A sign-in that timed out was logged as "Login exception: "** with nothing after it, and counted as a failed sign-in. It now says "Could not sign in to CSNet Manager: TimeoutError", and the CSNet Manager connection sensor shows `timeout`. ([#278](https://github.com/mmornati/home-assistant-csnet-home/pull/278))
+
 ## 2.20.1
 
 *22 November 2026* · [GitHub release](https://github.com/mmornati/home-assistant-csnet-home/releases/tag/2.20.1)

@@ -17,6 +17,7 @@ from custom_components.csnet_home.const import (
     DEFAULT_USER_AGENT,
     DELETESPECIFICALARM_PATH,
     ELEMENTS_PATH,
+    ENERGY_RECORDS_TIMEOUT,
     HEAT_SETTINGS_PATH,
     HEATING_MAX_TEMPERATURE,
     HEATING_MIN_TEMPERATURE,
@@ -534,7 +535,7 @@ class CSNetHomeAPI:
             except Exception as e:
                 _LOGGER.debug("Error closing validation session: %s", e)
 
-    async def _async_get_json(self, url, headers, description, renew_session=True):
+    async def _async_get_json(self, url, headers, description, renew_session=True, timeout: float = DEFAULT_API_TIMEOUT):
         """GET a JSON document, signing in again once if the session has expired.
 
         With ``renew_session=False`` an answer that is not JSON only fails
@@ -558,7 +559,7 @@ class CSNetHomeAPI:
             generation = self._login_generation
             started = time.monotonic()
             try:
-                async with asyncio.timeout(DEFAULT_API_TIMEOUT):
+                async with asyncio.timeout(timeout):
                     # the session's cookie jar carries the cookies
                     async with self.session.get(url, headers=headers) as response:
                         if not self._is_session_expired(response, None):
@@ -579,7 +580,7 @@ class CSNetHomeAPI:
                 self.note_problem(description, PROBLEM_UNREADABLE, describe_error(err))
                 return None
             except asyncio.TimeoutError as err:
-                _LOGGER.warning("No answer from CSNet Manager to the %s request within %d s (timeout)", description, DEFAULT_API_TIMEOUT)
+                _LOGGER.warning("No answer from CSNet Manager to the %s request within %d s (timeout)", description, timeout)
                 self.note_problem(description, PROBLEM_TIMEOUT, describe_error(err))
                 return None
             except aiohttp.ClientError as err:
@@ -783,7 +784,7 @@ class CSNetHomeAPI:
 
         try:
             # not worth a new login: the next poll of the readings renews an expired session
-            answer = await self._async_get_json(url, headers, "energy records", renew_session=False)
+            answer = await self._async_get_json(url, headers, "energy records", renew_session=False, timeout=ENERGY_RECORDS_TIMEOUT)
         except Exception as e:  # pylint: disable=broad-except
             _LOGGER.debug("Error during energy records retrieval: %s", e)
             return None
