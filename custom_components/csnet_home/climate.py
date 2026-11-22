@@ -22,6 +22,8 @@ from .const import (
     HEATING_MAX_TEMPERATURE,
     HEATING_MIN_TEMPERATURE,
     OPERATION_STATUS_MAP,
+    OPST_COOL_T_ON,
+    OPST_HEAT_T_ON,
     OTC_COOLING_TYPE_NAMES,
     OTC_HEATING_TYPE_NAMES,
     WATER_CIRCUIT_MAX_COOL,
@@ -316,8 +318,12 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
     def hvac_action(self):
         """Return what the zone is doing right now.
 
-        Compares the setpoint with the room temperature. The unit's circuit
-        demand is not used: it stays set while the room is above its setpoint.
+        Follows the unit's operation status, as the CSNet web app does: the
+        zone is heating (or cooling) while the unit reports "Heating (Cooling)
+        Thermostat On" and the zone's circuit has demand. A unit on a heating
+        curve keeps heating with the room at or above its setpoint, so the
+        room temperature does not say whether it runs. Units that do not
+        report an operation status keep the setpoint/room comparison.
         """
         if self._sensor_data is None:
             return HVACAction.IDLE
@@ -569,19 +575,39 @@ class CSNetHomeClimate(CoordinatorEntity, ClimateEntity):
             return None
         return setting, current
 
+    def _circuit_running(self, thermo_on_status):
+        """Return whether the unit runs this zone's circuit, or None when it does not say.
+
+        None means the unit reports no operation status: the caller falls back
+        to comparing setpoint and room temperature.
+        """
+        status = self._sensor_data.get("operation_status")
+        if not isinstance(status, int):
+            return None
+        if self._sensor_data.get("on_off") != 1 or status != thermo_on_status:
+            return False
+        demand_key = "c1_demand" if self._sensor_data.get("zone_id") in (1, 5) else "c2_demand"
+        return self._sensor_data.get(demand_key) is not False
+
     def is_heating(self):
-        """Return true if the thermostat is currently heating."""
+        """Return true if the unit is heating this zone."""
         if self._sensor_data is None:
             return False
+        running = self._circuit_running(OPST_HEAT_T_ON)
+        if running is not None:
+            return running
         temperatures = self._temperatures()
         if temperatures is None:
             return False
         return self._sensor_data.get("on_off") == 1 and self._sensor_data.get("mode") == 1 and temperatures[0] > temperatures[1]
 
     def is_cooling(self):
-        """Return true if the thermostat is currently cooling."""
+        """Return true if the unit is cooling this zone."""
         if self._sensor_data is None:
             return False
+        running = self._circuit_running(OPST_COOL_T_ON)
+        if running is not None:
+            return running
         temperatures = self._temperatures()
         if temperatures is None:
             return False

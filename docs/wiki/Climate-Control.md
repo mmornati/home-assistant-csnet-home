@@ -431,13 +431,14 @@ The desired temperature setpoint:
 
 ### HVAC Action
 
-Derived by the integration from the zone state, not from the compressor:
+Taken from the unit's operation status, as in the CSNet web app:
 
-- **heating** - Zone on, mode Heat, and target temperature above current temperature
-- **cooling** - Zone on, mode Cool, and target temperature below current temperature
-- **idle** - Anything else, including when the zone is off
+- **heating** - Zone on, the unit reports "Heating Thermostat On", and the zone's circuit has demand
+- **cooling** - Zone on, the unit reports "Cooling Thermostat On", and the zone's circuit has demand
+- **idle** - Zone on and anything else: thermostat off, hot water or pool production, alarm
+- **off** - Zone off
 
-For the real operating state, use the `operation_status_text` attribute.
+A heat pump on a heating curve keeps heating with the room at or above its setpoint, so the zone can show **heating** while the room is already warm. That is what the unit is doing. On units that do not report an operation status, the integration compares the target and current temperatures instead.
 
 ```yaml
 {{ state_attr('climate.remote_living_room', 'hvac_action') }}
