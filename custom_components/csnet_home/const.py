@@ -145,11 +145,12 @@ DEFAULT_LANGUAGE = "en"
 # Language of the dashboard cards: "auto" follows each user's Home Assistant profile
 CONF_CARD_LANGUAGE = "card_language"
 DEFAULT_CARD_LANGUAGE = "auto"
-CARD_LANGUAGES = ["auto", "en", "fr", "es"]
+CARD_LANGUAGES = ["auto", "en", "fr", "es", "pl"]
 LANGUAGE_FILES = {
     "en": "english.json",
     "fr": "french.json",
     "es": "spanish.json",
+    "pl": "polish.json",
 }
 
 # OTC (Outdoor Temperature Compensation) Constants

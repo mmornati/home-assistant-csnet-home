@@ -442,13 +442,14 @@ def _translation_session(files):
     return SimpleNamespace(get=get), requested
 
 
-@pytest.mark.parametrize(("language", "expected"), [("fr", "Défaut"), ("es", "Fallo"), ("en", "Fault"), (None, "Fallo")])
+@pytest.mark.parametrize(("language", "expected"), [("fr", "Défaut"), ("es", "Fallo"), ("pl", "Usterka"), ("en", "Fault"), (None, "Fault")])
 async def test_preferred_language_wins_for_alarm_text(hass, language, expected):
     """The chosen language is not overwritten by the fallbacks."""
     files = {
         "english.json": {"alarm_1": "Fault", "only_en": "English only"},
         "french.json": {"alarm_1": "Défaut"},
         "spanish.json": {"alarm_1": "Fallo"},
+        "polish.json": {"alarm_1": "Usterka"},
     }
     api = CSNetHomeAPI(hass, "user", "pass")
     api.session, _ = _translation_session(files)
@@ -462,29 +463,29 @@ async def test_preferred_language_wins_for_alarm_text(hass, language, expected):
 
 
 async def test_failed_translation_load_is_not_repeated_on_every_poll(hass):
-    """After a failure the three requests wait before being sent again."""
+    """After a failure the four requests wait before being sent again."""
     api = CSNetHomeAPI(hass, "user", "pass")
     api.session, requested = _translation_session({})
 
     with patch("custom_components.csnet_home.api.time.monotonic", return_value=1000.0):
         await api.load_translations()
         await api.load_translations()
-    assert len(requested) == 3
+    assert len(requested) == 4
 
     with patch("custom_components.csnet_home.api.time.monotonic", return_value=1000.0 + TRANSLATIONS_RETRY_SECONDS + 1):
         await api.load_translations()
-    assert len(requested) == 6
+    assert len(requested) == 8
 
 
 async def test_loaded_translations_are_not_requested_again(hass):
     """A successful load is kept for the life of the session."""
     api = CSNetHomeAPI(hass, "user", "pass")
-    api.session, requested = _translation_session({"english.json": {"a": "b"}, "french.json": {}, "spanish.json": {}})
+    api.session, requested = _translation_session({"english.json": {"a": "b"}, "french.json": {}, "spanish.json": {}, "polish.json": {}})
 
     await api.load_translations()
     await api.load_translations()
 
-    assert len(requested) == 3
+    assert len(requested) == 4
 
 
 # --------------------------------------------------------------------------

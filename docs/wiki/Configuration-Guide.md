@@ -70,13 +70,13 @@ You'll see a configuration dialog with the following fields:
 
 **Language** (Optional)
 - Language of the CSNet Manager translations used for alarm messages and alarm origins
-- **Options**: `en` (English), `fr` (French), `es` (Spanish)
+- **Options**: `en` (English), `fr` (French), `es` (Spanish), `pl` (Polish)
 - **Default**: `en`
 - The reconfigure form currently offers only `en` and `fr`
 
 **Card language** (Optional)
 - Language of the [dashboard cards](Dashboard-Cards.md)
-- **Options**: Automatic (each user's Home Assistant profile language), English, French, Spanish
+- **Options**: Automatic (each user's Home Assistant profile language), English, French, Spanish, Polish
 - **Default**: Automatic
 - A card can still choose its own language with its `language` option. After changing this setting, reload the dashboard page
 

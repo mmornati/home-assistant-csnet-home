@@ -47,6 +47,7 @@ from .const import (
     FAN_COIL_MODEL_LEGACY,
     FAN_COIL_MODEL_STANDARD,
     HEAT_SOURCES,
+    LANGUAGE_FILES,
     MIN_SCAN_INTERVAL,
     POWER_SUPPLY_OPTIONS,
 )
@@ -76,7 +77,7 @@ def _settings_schema(current: dict) -> dict:
             CONF_SCAN_INTERVAL,
             default=max(current.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL), MIN_SCAN_INTERVAL),
         ): SCAN_INTERVAL_SCHEMA,
-        vol.Optional(CONF_LANGUAGE, default=current.get(CONF_LANGUAGE, DEFAULT_LANGUAGE)): vol.In(["en", "fr", "es"]),
+        vol.Optional(CONF_LANGUAGE, default=current.get(CONF_LANGUAGE, DEFAULT_LANGUAGE)): vol.In(list(LANGUAGE_FILES)),
         vol.Optional(CONF_CARD_LANGUAGE, default=current.get(CONF_CARD_LANGUAGE, DEFAULT_CARD_LANGUAGE)): CARD_LANGUAGE_SELECTOR,
         max_temp_key: vol.All(vol.Coerce(int), vol.Range(min=8, max=80)),
         vol.Optional(CONF_FAN_COIL_MODEL, default=current.get(CONF_FAN_COIL_MODEL, DEFAULT_FAN_COIL_MODEL)): vol.In(

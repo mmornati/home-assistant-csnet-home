@@ -168,7 +168,8 @@
                 "auto": "Automatic (profile language)",
                 "en": "English",
                 "fr": "French",
-                "es": "Spanish"
+                "es": "Spanish",
+                "pl": "Polish"
             }
         },
         "heat_source": {
