@@ -12,7 +12,7 @@
  * power meter.
  */
 
-const CARD_VERSION = "1.2.0";
+const CARD_VERSION = "1.2.1";
 
 // ---------------------------------------------------------------------------
 // Texts
@@ -875,7 +875,13 @@ async function stateSegments(hass, ids, startMs, endMs = Date.now()) {
       const at = Math.max(startMs, row.lu !== undefined ? row.lu * 1000 : toMs(row.last_updated || row.last_changed));
       const next = rows[i + 1];
       const to = next ? Math.max(startMs, next.lu !== undefined ? next.lu * 1000 : toMs(next.last_updated || next.last_changed)) : endMs;
-      if (to > at) segments.push([at, to, row.s ?? row.state]);
+      if (to <= at) return;
+      const state = row.s ?? row.state;
+      const last = segments[segments.length - 1];
+      // a sensor that writes a row on every update repeats its state: one segment per state,
+      // or the edges of the many small ones show as stripes in the bar
+      if (last && last[2] === state && last[1] >= at) last[1] = to;
+      else segments.push([at, to, state]);
     });
     out[id] = segments;
   }
