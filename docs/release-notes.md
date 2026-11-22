@@ -7,6 +7,20 @@ description: What changed in each version of the CSNet Home (unofficial, for Hit
 
 Every version of the integration, newest first. Install or update from HACS; each version is also on the [GitHub releases page](https://github.com/mmornati/home-assistant-csnet-home/releases).
 
+## 2.18.0
+
+*22 November 2026* · [GitHub release](https://github.com/mmornati/home-assistant-csnet-home/releases/tag/2.18.0)
+
+Choose the power sensor of your electricity meter, for three-phase meters. No entity is renamed or removed, and nothing new is sent to the unit.
+
+#### Added
+
+- **Power sensor of the heat pump** (initial setup and Reconfigure), next to the electricity meter: any power sensor in W or kW, for example a helper that adds up the three phases of a meter. Left empty, the power sensor of the meter's device is used as before. Instant Consumption (the electricity power), the instant COP, the dashboard cards and the sample recording use it. It needs an electricity meter. See [Configuration Guide](wiki/Configuration-Guide.md). Reported, with a patch, by [@TomEkk33](https://github.com/TomEkk33). ([#273](https://github.com/mmornati/home-assistant-csnet-home/issues/273), [#274](https://github.com/mmornati/home-assistant-csnet-home/pull/274))
+
+#### Fixed
+
+- **A three-phase meter without a total power sensor gave the power of one phase only.** Choose a sensor for all phases in the new setting. When the power sensor found on the meter's device looks like one phase, a warning in the log now says so. ([#274](https://github.com/mmornati/home-assistant-csnet-home/pull/274))
+
 ## 2.17.0
 
 *22 November 2026* · [GitHub release](https://github.com/mmornati/home-assistant-csnet-home/releases/tag/2.17.0)

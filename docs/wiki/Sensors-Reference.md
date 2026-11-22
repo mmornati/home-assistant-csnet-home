@@ -507,7 +507,7 @@ Without a meter, the electricity of yesterday and of the month is the integratio
 
 ### Electricity power
 
-With a meter, the power it measures: the power sensor on the same device as the meter (for example `…_total_active_power` next to `…_total_active_energy`), shown as that sensor reports it, decimals included, and read at each update of the integration (once a minute by default). While that sensor has no reading, for example when the meter restarts, its last value stands in for up to 2 minutes before the estimate does. A meter without a power sensor gives what it counted over the last 10 minutes instead, once its readings span 2 minutes, in whole Watts.
+With a meter, the power it measures: the power sensor chosen in the settings (Power sensor of the heat pump), else the power sensor on the same device as the meter (for example `…_total_active_power` next to `…_total_active_energy`), shown as that sensor reports it, decimals included, and read at each update of the integration (once a minute by default). While that sensor has no reading, for example when the meter restarts, its last value stands in for up to 2 minutes before the estimate does. A meter without a power sensor gives what it counted over the last 10 minutes instead, once its readings span 2 minutes, in whole Watts.
 
 Without a meter, the estimate, the sum of these parts:
 
