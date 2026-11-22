@@ -181,8 +181,8 @@
     },
     "issues": {
         "central_control_not_total": {
-            "title": "{units} ignoruje polecenia CSNet Home",
-            "description": "Ustawienie sterowania centralnego {units} nie jest ustawione na **Total**, więc jednostka nie wykonuje tego, co wysyła Home Assistant (lub aplikacja CSNet Home): CSNet Manager przyjmuje zmiany temperatury i trybu, ale są one ignorowane.\n\nNa sterowniku jednostki ustaw sterowanie centralne na **Total** (menu instalatora). Ten komunikat zniknie sam, gdy jednostka znów zacznie wykonywać polecenia."
+            "title": "{units} może ignorować polecenia CSNet Home",
+            "description": "CSNet zgłasza, że ustawienie sterowania centralnego {units} nie jest ustawione na **Total**. W takim przypadku aplikacja webowa CSNet ostrzega, że wysyłane polecenia nie zostaną wykonane, a jednostka może też ignorować zmiany wprowadzone z Home Assistant.\n\nJeśli zmiany temperatury i trybu z Home Assistant nadal działają, możesz zignorować ten komunikat. W przeciwnym razie ustaw tryb sterowania na **Total** na sterowniku jednostki: użytkownicy znajdują go w ustawieniach instalatora, w opcji sterowania zewnętrznego (nazwy menu różnią się w zależności od sterownika). Ten komunikat zniknie sam, gdy CSNet zgłosi Total."
         }
     }
 }

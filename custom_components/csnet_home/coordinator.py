@@ -46,7 +46,7 @@ CENTRAL_CONTROL_LEARN_MORE_URL = (
 
 
 def indoor_units_not_applying_commands(installation_devices_data) -> list | None:
-    """Return the ids of the indoor units that ignore CSNet commands (not set to "Total").
+    """Return the ids of the indoor units not set to "Total", which may ignore CSNet commands.
 
     None when no indoor unit says either way, so a poll without the data
     neither raises nor clears the repair issue.
@@ -240,7 +240,7 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         return self._device_data
 
     def _update_central_control_issue(self, installation_devices_data) -> None:
-        """Raise a repair issue while a unit ignores CSNet commands, remove it once it applies them."""
+        """Raise a repair issue while a unit is not set to Total, remove it once CSNet reports it is."""
         blocked = indoor_units_not_applying_commands(installation_devices_data)
         if blocked is None:
             return

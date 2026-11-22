@@ -344,9 +344,9 @@ Monitor equipment operation.
 
 **Requirements for "On"**:
 - Central config ≥ 3 (Total Control), OR
-- LCD software version ≥ 0x0222, or not yet set (0), for non-S80 models
+- LCD software version ≥ 0x0222 for non-S80 models
 
-The state is `unknown` until CSNet reports the unit's central config. While it is `off`, a repair is raised in Home Assistant: see [Commands Are Ignored](Troubleshooting.md#commands-are-ignored-central-control-not-set-to-total).
+The state is `unknown` until CSNet reports the unit's central config, and while it reports an LCD software of 0 (it does for a poll or two now and then). While it is `off`, a repair is raised in Home Assistant: see [Commands Are Ignored](Troubleshooting.md#commands-are-ignored-central-control-not-set-to-total).
 
 ### Unit Model
 **Entity**: `sensor.system_controller_unit_model`  

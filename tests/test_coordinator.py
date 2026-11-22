@@ -709,6 +709,12 @@ async def test_central_control_issue_raised_then_cleared(hass: HomeAssistant):
         assert kwargs["is_fixable"] is False
         ir_mock.async_delete_issue.assert_not_called()
 
+        # a poll where CSNet sends lcdSoft 0 neither clears nor raises it
+        status.update(unitModel=0, lcdSoft=0)
+        await coordinator._async_update_data()
+        ir_mock.async_delete_issue.assert_not_called()
+        assert ir_mock.async_create_issue.call_count == 1
+
         status["centralConfig"] = 3
         await coordinator._async_update_data()
         ir_mock.async_delete_issue.assert_called_once_with(hass, "csnet_home", "central_control_entry1")

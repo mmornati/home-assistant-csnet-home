@@ -82,7 +82,7 @@ const TEXTS = {
     last_seen: "last contact {v}",
     central_control: "Central control",
     central_total: "Set to Total",
-    central_not_total: "Not set to Total: the unit ignores commands",
+    central_not_total: "Not set to Total: commands may be ignored",
     water_pressure: "Water pressure",
     expected_range: "expected {a} to {b} bar",
     running: "running",
@@ -203,7 +203,7 @@ const TEXTS = {
     last_seen: "dernier échange {v}",
     central_control: "Contrôle central",
     central_total: "Réglé sur Total",
-    central_not_total: "Pas sur Total : l'unité ignore les commandes",
+    central_not_total: "Pas sur Total : les commandes peuvent être ignorées",
     water_pressure: "Pression d'eau",
     expected_range: "attendu {a} à {b} bar",
     running: "en marche",
@@ -324,7 +324,7 @@ const TEXTS = {
     last_seen: "última vez {v}",
     central_control: "Control central",
     central_total: "Ajustado en Total",
-    central_not_total: "No está en Total: la unidad ignora las órdenes",
+    central_not_total: "No está en Total: las órdenes pueden ignorarse",
     water_pressure: "Presión del agua",
     expected_range: "esperada de {a} a {b} bar",
     running: "en marcha",
@@ -445,7 +445,7 @@ const TEXTS = {
     last_seen: "ostatni kontakt {v}",
     central_control: "Sterowanie centralne",
     central_total: "Ustawione na Total",
-    central_not_total: "Nie ustawione na Total: jednostka ignoruje polecenia",
+    central_not_total: "Nie ustawione na Total: polecenia mogą być ignorowane",
     water_pressure: "Ciśnienie wody",
     expected_range: "oczekiwane {a} do {b} bar",
     running: "pracuje",
@@ -1790,7 +1790,7 @@ class CsnetSystemHealthCard extends CsnetBaseCard {
       add(bad ? "bad" : "ok", t(hass, "gateway"), detail, gateway.connectivity);
     }
     if (unit.central_control) {
-      // off: the unit is not set to "Total" and ignores what CSNet Home sends it
+      // off: the unit is not set to "Total" and may ignore what CSNet Home sends it
       const central = stateOf(hass, unit.central_control)?.state;
       if (central === "off") add("bad", t(hass, "central_control"), t(hass, "central_not_total"), unit.central_control);
       else if (central === "on") add("ok", t(hass, "central_control"), t(hass, "central_total"), unit.central_control);

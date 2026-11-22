@@ -127,8 +127,11 @@ def is_central_control_enabled(heating_status):
     the controls and shows "the central command setting is not set to Total"
     when it is false.
 
-    Returns True or False, or None when heating_status does not say
-    (no data yet, or no centralConfig in it).
+    Returns True or False, or None when heating_status does not say: no
+    data yet, no centralConfig in it, or an lcdSoft of 0. The web app counts
+    that 0 as "fine" (not known yet, while the unit's wizard runs or it
+    restarts), but CSNet sends it for a poll or two on units with a real
+    version too, so a unit not set to Total would come and go.
     """
     if not isinstance(heating_status, dict):
         return None
@@ -139,7 +142,8 @@ def is_central_control_enabled(heating_status):
         return True
     if _as_int(heating_status.get("unitModel")) != YUTAKI_S80_UNIT_MODEL:
         lcd_soft = _as_int(heating_status.get("lcdSoft"))
-        # 0: not known yet, while the unit's wizard runs or the unit restarts
-        if lcd_soft is not None and (lcd_soft == 0 or lcd_soft >= LCD_SOFT_CENTRAL_OK):
+        if lcd_soft == 0:
+            return None
+        if lcd_soft is not None and lcd_soft >= LCD_SOFT_CENTRAL_OK:
             return True
     return False

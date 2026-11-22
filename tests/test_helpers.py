@@ -81,8 +81,9 @@ def test_extract_heating_status_not_dict_data():
         # other than the S80: a recent LCD software is enough
         ({"centralConfig": 2, "unitModel": 0, "lcdSoft": 0x0222}, True),
         ({"centralConfig": 2, "unitModel": 0, "lcdSoft": 0x0221}, False),
-        # 0: not known yet (wizard, restart)
-        ({"centralConfig": 0, "unitModel": 1, "lcdSoft": 0}, True),
+        # 0: not known yet (wizard, restart, or a single poll on a running unit)
+        ({"centralConfig": 0, "unitModel": 1, "lcdSoft": 0}, None),
+        ({"centralConfig": 3, "unitModel": 0, "lcdSoft": 0}, True),
         # no lcdSoft: like the web app, not enough
         ({"centralConfig": 2, "unitModel": 0}, False),
         # the S80 always needs Total

@@ -807,11 +807,11 @@ def test_central_control_enabled_sensor():
     installation_data["data"][0]["indoors"][0]["heatingStatus"]["lcdSoft"] = 546  # >= 0x0222
     assert s.state == STATE_ON
 
-    # Test with centralConfig < 3, non-S80, and lcdSoft = 0 (should be ON - not configured yet)
+    # centralConfig < 3, non-S80, lcdSoft = 0: not known yet (CSNet sends 0 for a poll or two)
     installation_data["data"][0]["indoors"][0]["heatingStatus"]["centralConfig"] = 2
     installation_data["data"][0]["indoors"][0]["heatingStatus"]["unitModel"] = 0
     installation_data["data"][0]["indoors"][0]["heatingStatus"]["lcdSoft"] = 0
-    assert s.state == STATE_ON
+    assert s.native_value is None
 
     # Test with centralConfig < 3, non-S80, old firmware (should be OFF)
     installation_data["data"][0]["indoors"][0]["heatingStatus"]["centralConfig"] = 2
