@@ -484,6 +484,8 @@ Installation-wide sensors on the **System-Controller** device. The CSNet API doe
 
 With an electricity meter chosen in the integration's settings (Reconfigure → Electricity meter of the heat pump), every sensor that depends on the electricity uses that meter instead. Each of them names the source it used in its `electricity_source` attribute: `meter` or `estimate`. While the meter has no reading, the estimate stands in.
 
+The electricity power comes from the power sensor chosen in the settings (Power sensor of the heat pump) or, without one, from the power sensor of the meter's own device. With a three-phase meter that has a power sensor per phase but no total, choose a sensor that adds up the phases: otherwise the power is that of one phase only.
+
 The heat produced comes from the source chosen in the settings (Heat produced): the heat **CSNet** Manager records for the unit (the default), or the integration's own measure, **calculated** from the heat power. The heat sensors and every daily or period COP use it, and show it in their `heat_source` attribute: `csnet` or `calculated`. A unit CSNet has answered for without any heat on record uses the calculated heat. The heat power and the instant COP are always calculated: CSNet records heat by the hour only.
 
 Every sensor is named the same way: what it is (*Electricity*, *Heat*, *COP*), the period, then where it comes from in brackets: *(metered)* or *(estimated)* for the electricity and the COPs, *(csnet)* or *(calculated)* for the heat. The unique IDs did not change with these names, so existing installations keep their entity IDs and history.
@@ -505,7 +507,7 @@ Without a meter, the electricity of yesterday and of the month is the integratio
 
 ### Electricity power
 
-With a meter, the power it measures: the power sensor on the same device as the meter (for example `…_total_active_power` next to `…_total_active_energy`), shown as that sensor reports it, decimals included, and read at each update of the integration (once a minute by default). While that sensor has no reading, for example when the meter restarts, its last value stands in for up to 2 minutes before the estimate does. A meter without a power sensor gives what it counted over the last 10 minutes instead, once its readings span 2 minutes, in whole Watts.
+With a meter, the power it measures: the power sensor chosen in the settings (Power sensor of the heat pump), else the power sensor on the same device as the meter (for example `…_total_active_power` next to `…_total_active_energy`), shown as that sensor reports it, decimals included, and read at each update of the integration (once a minute by default). While that sensor has no reading, for example when the meter restarts, its last value stands in for up to 2 minutes before the estimate does. A meter without a power sensor gives what it counted over the last 10 minutes instead, once its readings span 2 minutes, in whole Watts.
 
 Without a meter, the estimate, the sum of these parts:
 

@@ -96,7 +96,7 @@ It needs an electricity figure (your meter, or the electricity CSNet records wit
 
 The cards take what the integration already knows:
 
-- **Your electricity meter.** When you chose the heat pump's electricity meter in the integration settings (Reconfigure → Electricity meter of the heat pump), the cards use it for the electricity per day and the energy signature. They also find the meter's **power sensor** on the same device (for example `…_total_active_power` next to `…_total_active_energy`) and use it instead of the estimated power.
+- **Your electricity meter.** When you chose the heat pump's electricity meter in the integration settings (Reconfigure → Electricity meter of the heat pump), the cards use it for the electricity per day and the energy signature. For the power, they use the **power sensor** chosen in the settings (Power sensor of the heat pump) or, without one, the one on the meter's device (for example `…_total_active_power` next to `…_total_active_energy`), instead of the estimated power.
 - **The electricity price** set in the Energy dashboard (grid consumption → price), to show the cost of today and of this month. With one grid source per tariff (peak and off-peak, for example), the cards use today's average: each tariff's price weighted by what it counted today. A card can set its own with `price` or `price_entity`.
 - **The electricity meter's own statistics** for today and this month, when you chose a meter in the integration settings, so the overview shows what the meter counted from midnight even before the metered COP has a full day.
 - **The weather forecast** of your first weather entity, for the energy signature. A card can choose another with `weather_entity`.
@@ -154,8 +154,8 @@ Any entity a card uses can be replaced with `<role>_entity`, for example `outdoo
 
 | Role | Entity |
 |------|--------|
-| `power`, `heat_power`, `cop_now` | Power (your meter's power sensor when found, else the estimated consumption), output power, instant COP |
-| `meter_energy`, `meter_power` | The electricity meter chosen in the integration settings, and its power sensor |
+| `power`, `heat_power`, `cop_now` | Power (your meter's power sensor when there is one, else the estimated consumption), output power, instant COP |
+| `meter_energy`, `meter_power` | The electricity meter chosen in the integration settings, and its power sensor (the one chosen in the settings, else the one on the meter's device) |
 | `energy_today`, `heat_today` | Daily consumption and heat (estimated) |
 | `server_heat_today` / `_yesterday` / `_month`, `server_electricity_yesterday` / `_month` | Heat today, yesterday and this month (recorded by CSNet or calculated, as chosen in the settings); electricity of yesterday and the month (your meter, or the estimate) |
 | `cop_today`, `cop_yesterday`, `cop_month`, `cop_last_month` | COP from your electricity meter |

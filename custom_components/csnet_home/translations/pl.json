@@ -17,6 +17,7 @@
                     "enable_alarm_notifications": "Włącz powiadomienia o alarmach",
                     "filtered_alarm_codes": "Filtrowane kody alarmów",
                     "energy_meter": "Licznik energii pompy ciepła (opcjonalnie)",
+                    "energy_meter_power": "Czujnik mocy pompy ciepła (opcjonalnie)",
                     "heat_source": "Ciepło wytworzone",
                     "user_agent": "User-Agent (zaawansowane)"
                 },
@@ -33,6 +34,7 @@
                     "enable_alarm_notifications": "Twórz powiadomienie Home Assistant, gdy urządzenie zgłosi alarm",
                     "filtered_alarm_codes": "Kody alarmów oddzielone przecinkami, które nigdy nie będą wysyłać powiadomień (domyślnie: -1, błędy komunikacji). Pozostaw puste, aby powiadamiać o wszystkich.",
                     "energy_meter": "Dowolny czujnik energii (kWh), który mierzy zużycie energii przez pompę ciepła, z dowolnego urządzenia. Służy do obliczania COP na podstawie zapisów CSNet dotyczących ciepła. Pozostaw puste, aby zachować jedynie szacunek.",
+                    "energy_meter_power": "Czujnik mocy (W lub kW) powiązany z licznikiem energii, używany do chwilowego zużycia. Przy liczniku trójfazowym wybierz sumę faz lub pomocnika, który je sumuje. Pozostaw puste, aby użyć czujnika mocy znalezionego na urządzeniu licznika.",
                     "heat_source": "Źródło wytworzonego ciepła dla każdego skumulowanego licznika ogrzewania, chłodzenia i ciepłej wody oraz każdego dziennego lub okresowego współczynnika COP. CSNet: ilość ciepła zarejestrowana przez CSNet Manager dla jednostki (w pełnych godzinach). Obliczane: własny pomiar integracji, wyznaczany w czasie rzeczywistym na podstawie przepływu wody i temperatur wymiennika. W przypadku CSNet pomiar integracji jest używany, gdy CSNet nie zarejestrował żadnej ilości ciepła dla jednostki.",
                     "user_agent": "Sposób, w jaki integracja przedstawia się CSNet Managerowi. Pozostaw puste, aby użyć domyślnej wartości (desktopowy Chrome). Zmieniaj tylko w celu przetestowania innej wartości."
                 }
@@ -53,6 +55,7 @@
                     "enable_alarm_notifications": "Włącz powiadomienia o alarmach",
                     "filtered_alarm_codes": "Filtrowane kody alarmów",
                     "energy_meter": "Licznik energii pompy ciepła (opcjonalnie)",
+                    "energy_meter_power": "Czujnik mocy pompy ciepła (opcjonalnie)",
                     "heat_source": "Ciepło wytworzone",
                     "user_agent": "User-Agent (zaawansowane)"
                 },
@@ -69,6 +72,7 @@
                     "enable_alarm_notifications": "Twórz powiadomienie Home Assistant, gdy urządzenie zgłosi alarm",
                     "filtered_alarm_codes": "Kody alarmów oddzielone przecinkami, które nigdy nie będą wysyłać powiadomień (domyślnie: -1, błędy komunikacji). Pozostaw puste, aby powiadamiać o wszystkich.",
                     "energy_meter": "Dowolny czujnik energii (kWh), który mierzy zużycie energii przez pompę ciepła, z dowolnego urządzenia. Służy do obliczania COP na podstawie zapisów CSNet dotyczących ciepła. Pozostaw puste, aby zachować jedynie szacunek.",
+                    "energy_meter_power": "Czujnik mocy (W lub kW) powiązany z licznikiem energii, używany do chwilowego zużycia. Przy liczniku trójfazowym wybierz sumę faz lub pomocnika, który je sumuje. Pozostaw puste, aby użyć czujnika mocy znalezionego na urządzeniu licznika.",
                     "heat_source": "Źródło wytworzonego ciepła dla każdego skumulowanego licznika ogrzewania, chłodzenia i ciepłej wody oraz każdego dziennego lub okresowego współczynnika COP. CSNet: ilość ciepła zarejestrowana przez CSNet Manager dla jednostki (w pełnych godzinach). Obliczane: własny pomiar integracji, wyznaczany w czasie rzeczywistym na podstawie przepływu wody i temperatur wymiennika. W przypadku CSNet pomiar integracji jest używany, gdy CSNet nie zarejestrował żadnej ilości ciepła dla jednostki.",
                     "user_agent": "Sposób, w jaki integracja przedstawia się CSNet Managerowi. Pozostaw puste, aby użyć domyślnej wartości (desktopowy Chrome). Zmieniaj tylko w celu przetestowania innej wartości."
                 }
@@ -91,7 +95,8 @@
             "invalid_auth": "Nieprawidłowa nazwa użytkownika lub hasło. Sprawdź swoje dane logowania.",
             "unknown": "Wystąpił nieoczekiwany błąd. Spróbuj ponownie.",
             "invalid_alarm_codes": "Kody alarmów muszą być liczbami całkowitymi oddzielonymi przecinkami, na przykład: -1, 62",
-            "invalid_user_agent": "User-Agent musi być pojedynczą linią zwykłych znaków ASCII, maksymalnie 256."
+            "invalid_user_agent": "User-Agent musi być pojedynczą linią zwykłych znaków ASCII, maksymalnie 256.",
+            "power_without_meter": "Najpierw wybierz licznik energii: czujnik mocy jest z nim powiązany."
         },
         "abort": {
             "already_configured": "Ta integracja CSNet Home jest już skonfigurowana.",

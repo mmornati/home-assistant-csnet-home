@@ -38,6 +38,8 @@ You'll see a configuration dialog with the following fields:
 | **Fan Coil Control Model** | `standard` or `legacy` fan speed mapping | `standard` |
 | **Enable Alarm Notifications** | Create persistent notifications for new alarms | enabled |
 | **Filtered Alarm Codes** | Comma-separated alarm codes that never create a notification | `-1` |
+| **Electricity meter of the heat pump** | Any energy sensor (kWh) that measures the heat pump, for the electricity sensors and the COPs | empty (estimate) |
+| **Power sensor of the heat pump** | The power sensor that goes with the meter, for the electricity power | empty (found on the meter's device) |
 | **Heat produced** | Where the heat produced comes from: recorded by CSNet, or calculated by the integration | Recorded by CSNet |
 | **User-Agent (advanced)** | How the integration presents itself to CSNet Manager | a desktop Chrome browser |
 
@@ -108,6 +110,15 @@ You'll see a configuration dialog with the following fields:
 - Filtering only affects notifications: the alarm still appears in the alarm sensors
 
 See [Alarm Notifications](Advanced-Features.md#built-in-alarm-notifications) for details.
+
+**Electricity meter of the heat pump** (Optional)
+- Any Home Assistant energy sensor (kWh, Wh or MWh) that measures the heat pump's electricity, from any device or integration
+- The electricity sensors and the COPs use it instead of the estimate. See [Energy and Performance Sensors](Sensors-Reference.md#energy-and-performance-sensors)
+
+**Power sensor of the heat pump** (Optional)
+- The power sensor (W or kW) used for the electricity power (Instant Consumption) and the instant COP. It needs an electricity meter
+- Left empty, the integration takes the power sensor of the meter's own device, the one whose name is closest to the meter's
+- **Three-phase meters**: when the meter's device only has one power sensor per phase, the one found measures a single phase, and a warning is logged. Choose the total of the phases, or a [Template helper](https://www.home-assistant.io/integrations/template/) that adds the three phases up
 
 **Heat produced** (Optional)
 - Where the heat comes from for the heat sensors (Heat today, yesterday, this month, and today by use) and for every daily or period COP

@@ -17,6 +17,7 @@
                     "enable_alarm_notifications": "Activar las notificaciones de alarma",
                     "filtered_alarm_codes": "Códigos de alarma filtrados",
                     "energy_meter": "Contador eléctrico de la bomba de calor (opcional)",
+                    "energy_meter_power": "Sensor de potencia de la bomba de calor (opcional)",
                     "heat_source": "Calor producido",
                     "user_agent": "User-Agent (avanzado)"
                 },
@@ -33,6 +34,7 @@
                     "enable_alarm_notifications": "Crear una notificación de Home Assistant cuando la unidad informa de una alarma",
                     "filtered_alarm_codes": "Códigos de alarma, separados por comas, que nunca notifican (por defecto: -1, errores de comunicación). Dejar vacío para notificar todos.",
                     "energy_meter": "Cualquier sensor de energía (kWh) que mida la electricidad de la bomba de calor, de cualquier dispositivo. Se usa para calcular el COP con el calor que registra CSNet. Dejar vacío para mantener solo la estimación.",
+                    "energy_meter_power": "El sensor de potencia (W o kW) que acompaña al contador eléctrico, para el consumo instantáneo. Con un contador trifásico, elija el total de las fases, o un ayudante que las sume. Déjelo vacío para usar el sensor de potencia encontrado en el dispositivo del contador.",
                     "heat_source": "De dónde sale el calor producido, para todos los contadores acumulados de calefacción, refrigeración y ACS y todos los COP diarios o por periodo. CSNet: el calor que registra CSNet Manager para la unidad (por horas completas). Calculado: la medida propia de la integración, a partir del caudal y las temperaturas del intercambiador, al momento. Con CSNet, se usa la medida de la integración cuando CSNet no ha registrado calor para la unidad.",
                     "user_agent": "Cómo se presenta la integración ante CSNet Manager. Déjelo vacío para usar el valor por defecto (un navegador Chrome de escritorio). Cámbielo solo para probar otro valor."
                 }
@@ -53,6 +55,7 @@
                     "enable_alarm_notifications": "Activar las notificaciones de alarma",
                     "filtered_alarm_codes": "Códigos de alarma filtrados",
                     "energy_meter": "Contador eléctrico de la bomba de calor (opcional)",
+                    "energy_meter_power": "Sensor de potencia de la bomba de calor (opcional)",
                     "heat_source": "Calor producido",
                     "user_agent": "User-Agent (avanzado)"
                 },
@@ -69,6 +72,7 @@
                     "enable_alarm_notifications": "Crear una notificación de Home Assistant cuando la unidad informa de una alarma",
                     "filtered_alarm_codes": "Códigos de alarma, separados por comas, que nunca notifican (por defecto: -1, errores de comunicación). Dejar vacío para notificar todos.",
                     "energy_meter": "Cualquier sensor de energía (kWh) que mida la electricidad de la bomba de calor, de cualquier dispositivo. Se usa para calcular el COP con el calor que registra CSNet. Dejar vacío para mantener solo la estimación.",
+                    "energy_meter_power": "El sensor de potencia (W o kW) que acompaña al contador eléctrico, para el consumo instantáneo. Con un contador trifásico, elija el total de las fases, o un ayudante que las sume. Déjelo vacío para usar el sensor de potencia encontrado en el dispositivo del contador.",
                     "heat_source": "De dónde sale el calor producido, para todos los contadores acumulados de calefacción, refrigeración y ACS y todos los COP diarios o por periodo. CSNet: el calor que registra CSNet Manager para la unidad (por horas completas). Calculado: la medida propia de la integración, a partir del caudal y las temperaturas del intercambiador, al momento. Con CSNet, se usa la medida de la integración cuando CSNet no ha registrado calor para la unidad.",
                     "user_agent": "Cómo se presenta la integración ante CSNet Manager. Déjelo vacío para usar el valor por defecto (un navegador Chrome de escritorio). Cámbielo solo para probar otro valor."
                 }
@@ -91,7 +95,8 @@
             "invalid_auth": "Nombre de usuario o contraseña no válidos. Compruebe sus credenciales.",
             "unknown": "Se produjo un error inesperado. Por favor, inténtelo de nuevo.",
             "invalid_alarm_codes": "Los códigos de alarma deben ser números enteros separados por comas, por ejemplo: -1, 62",
-            "invalid_user_agent": "El User-Agent debe ser una sola línea de caracteres ASCII simples, 256 como máximo."
+            "invalid_user_agent": "El User-Agent debe ser una sola línea de caracteres ASCII simples, 256 como máximo.",
+            "power_without_meter": "Elija primero un contador eléctrico: el sensor de potencia va con él."
         },
         "abort": {
             "already_configured": "Esta integración de CSNet Home ya está configurada.",

@@ -581,19 +581,21 @@ def test_every_form_field_and_error_has_a_text_in_each_language():
     reference = json.loads((base / "strings.json").read_text(encoding="utf-8"))["config"]
     fields = {CONF_USERNAME, CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_LANGUAGE, CONF_MAX_TEMP_OVERRIDE, CONF_FAN_COIL_MODEL}
     fields |= {CONF_ENABLE_ALARM_NOTIFICATIONS, CONF_FILTERED_ALARM_CODES, "power_supply", "energy_meter", "card_language", "user_agent"}
+    fields |= {"energy_meter_power"}
     fields |= {"always_offer_dhw_boost", "heat_source"}
     for step in ("user", "reconfigure"):
         assert set(reference["step"][step]["data"]) == fields
         assert set(reference["step"][step]["data_description"]) == fields
     assert "invalid_alarm_codes" in reference["error"]
     assert "invalid_user_agent" in reference["error"]
+    assert "power_without_meter" in reference["error"]
 
     def keys(node, prefix=""):
         if isinstance(node, dict):
             return {path for key, value in node.items() for path in keys(value, f"{prefix}{key}.")}
         return {prefix}
 
-    for language in ("en", "fr", "es"):
+    for language in ("en", "fr", "es", "pl"):
         translated = json.loads((base / "translations" / f"{language}.json").read_text(encoding="utf-8"))["config"]
         assert keys(translated) == keys(reference), language
 
@@ -667,6 +669,47 @@ async def test_energy_meter_can_be_set_and_removed_on_reconfigure(hass: HomeAssi
     assert _schema_key(result, "energy_meter").description == {"suggested_value": "sensor.any_brand_energy"}
     result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=settings)
     assert entry.data["energy_meter"] is None
+
+
+async def test_meter_power_sensor_is_optional_and_any_power_sensor(hass: HomeAssistant):
+    """No power sensor by default (the one of the meter's device is used); any power sensor can be chosen."""
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+    key = _schema_key(result, "energy_meter_power")
+    assert isinstance(key, vol.Optional) and key.default is vol.UNDEFINED and not key.description
+    selector = result["data_schema"].schema[key]
+    assert selector.config["domain"] == ["sensor"] and selector.config["device_class"] == ["power"]
+
+    with patch(VALIDATE, return_value=True):
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=TEST_CONFIG)
+    assert result["data"]["energy_meter_power"] is None
+
+
+async def test_meter_power_sensor_can_be_set_and_removed_on_reconfigure(hass: HomeAssistant):
+    """A three-phase total (or a helper) is stored, suggested back, and removed when the field is emptied."""
+    entry, result = await _start_reconfigure(hass)
+    settings = {k: v for k, v in TEST_CONFIG.items() if k != CONF_PASSWORD} | {"energy_meter": "sensor.meter_energy"}
+
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=settings | {"energy_meter_power": "sensor.phases_power"})
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data["energy_meter_power"] == "sensor.phases_power"
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_RECONFIGURE, "entry_id": entry.entry_id})
+    assert _schema_key(result, "energy_meter_power").description == {"suggested_value": "sensor.phases_power"}
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=settings)
+    assert entry.data["energy_meter_power"] is None
+    assert entry.data["energy_meter"] == "sensor.meter_energy"
+
+
+async def test_meter_power_sensor_needs_an_electricity_meter(hass: HomeAssistant):
+    """A metered power beside an estimated energy would not add up: the form says so."""
+    entry, result = await _start_reconfigure(hass)
+    settings = {k: v for k, v in TEST_CONFIG.items() if k != CONF_PASSWORD}
+
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=settings | {"energy_meter_power": "sensor.phases_power"})
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["errors"] == {"energy_meter_power": "power_without_meter"}
+    assert "energy_meter_power" not in entry.data
 
 
 async def test_heat_source_defaults_to_csnet_and_can_be_changed(hass: HomeAssistant):

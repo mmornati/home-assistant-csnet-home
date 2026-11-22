@@ -9,6 +9,7 @@ from homeassistant.const import CONF_SCAN_INTERVAL, Platform
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceEntry
 from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.storage import Store
@@ -27,7 +28,7 @@ from custom_components.csnet_home.const import (
     DOMAIN,
 )
 from custom_components.csnet_home.coordinator import ALARM_STORAGE_VERSION, CSNetHomeConfigEntry, CSNetHomeCoordinator, CSNetHomeData, alarm_storage_key
-from custom_components.csnet_home.dashboard import async_register_dashboard
+from custom_components.csnet_home.dashboard import async_register_dashboard, meter_power_for
 from custom_components.csnet_home.migration import async_migrate_zone_identifiers
 from custom_components.csnet_home.power_calibration import POWER_CALIBRATION_STORAGE_VERSION, power_calibration_storage_key
 from custom_components.csnet_home.sample_recorder import SHARE_URL, SampleRecorder, sample_header, sample_path
@@ -194,8 +195,13 @@ async def _async_handle_start_sample_recording(call: ServiceCall) -> ServiceResp
     if api.sample_recorder is not None:
         raise ServiceValidationError(f"A sample is already being recorded to {api.sample_recorder.path}")
 
-    meter_energy = call.data.get("meter_energy_entity") or entry.data.get(CONF_ENERGY_METER)
-    meter_power = call.data.get("meter_power_entity")
+    if call.data.get("meter_energy_entity"):
+        meter_energy = call.data["meter_energy_entity"]
+        meter_power = call.data.get("meter_power_entity")
+    else:
+        # the meter of the settings, with the same power sensor as Instant Consumption
+        meter_energy = entry.data.get(CONF_ENERGY_METER)
+        meter_power = call.data.get("meter_power_entity") or meter_power_for(er.async_get(hass), entry.data)
     duration = call.data["duration_hours"] * 3600
     integration = await async_get_integration(hass, DOMAIN)
     coordinator = entry.runtime_data.coordinator
