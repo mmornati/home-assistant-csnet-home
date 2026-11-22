@@ -55,6 +55,10 @@ COMMON_API_HEADERS = {
 CONF_USER_AGENT = "user_agent"
 DEFAULT_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 DEFAULT_API_TIMEOUT = 10
+# The energy records are a large answer CSNet takes 5 to 20 s to send (measured
+# November 2026), and slow hardware needs more to read: they are read in the
+# background, so a long wait never delays the readings
+ENERGY_RECORDS_TIMEOUT = 60
 # Polling floor: CSNet Manager is an unofficial API, keep the load low
 MIN_SCAN_INTERVAL = 60
 DEFAULT_SCAN_INTERVAL = 60
