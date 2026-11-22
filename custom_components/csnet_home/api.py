@@ -13,6 +13,7 @@ from custom_components.csnet_home.const import (
     API_URL,
     COMMON_API_HEADERS,
     DEFAULT_API_TIMEOUT,
+    DEFAULT_LANGUAGE,
     DEFAULT_USER_AGENT,
     DELETESPECIFICALARM_PATH,
     ELEMENTS_PATH,
@@ -1400,8 +1401,9 @@ class CSNetHomeAPI:
             return
         self._translations_next_attempt = now + TRANSLATIONS_RETRY_SECONDS
 
-        preferred = getattr(self, "preferred_language", None)
-        preferred_file = LANGUAGE_FILES.get(preferred) if preferred else None
+        # an entry saved without a language uses the form's default, English
+        preferred = getattr(self, "preferred_language", None) or DEFAULT_LANGUAGE
+        preferred_file = LANGUAGE_FILES.get(preferred)
         # fallbacks first, preferred language last: the last file loaded wins
         endpoints = [file for file in LANGUAGE_FILES.values() if file != preferred_file]
         if preferred_file:

@@ -114,7 +114,7 @@ This custom integration solves that problem by connecting directly to the CSNet 
 
 ### Dashboard cards
 - Eleven cards in the **Add card** picker, nothing else to install: overview, live water circuit, heating curve, COP, system health, refrigerant circuit, temperatures, what ran, energy per day, power today, energy signature
-- They find their entities, use your electricity meter and the Energy dashboard price, follow light and dark themes, and speak English, French and Spanish
+- They find their entities, use your electricity meter and the Energy dashboard price, follow light and dark themes, and speak English, French, Spanish and Polish
 - See [Dashboard Cards](https://mmornati.github.io/home-assistant-csnet-home/wiki/Dashboard-Cards/) and the [release notes](https://mmornati.github.io/home-assistant-csnet-home/release-notes/)
 
 > **Note:** Mode and preset mappings are being refined based on community feedback in [Discussion #21](https://github.com/mmornati/home-assistant-csnet-home/discussions/21).

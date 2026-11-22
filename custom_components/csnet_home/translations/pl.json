@@ -1,0 +1,182 @@
+{
+    "config": {
+        "step": {
+            "user": {
+                "title": "Skonfiguruj CSNet Home",
+                "description": "Wprowadź dane logowania do CSNet Manager, aby połączyć Twój system Hitachi z Home Assistant.",
+                "data": {
+                    "username": "Nazwa użytkownika",
+                    "password": "Hasło",
+                    "scan_interval": "Interwał skanowania (sekundy)",
+                    "language": "Język",
+                    "card_language": "Język kart pulpitu",
+                    "max_temp_override": "Maksymalne zastąpienie temperatury (°C)",
+                    "fan_coil_model": "Model sterowania wentylatorem konwektora",
+                    "always_offer_dhw_boost": "Włącz doładowanie CWU",
+                    "power_supply": "Zasilanie jednostki zewnętrznej",
+                    "enable_alarm_notifications": "Włącz powiadomienia o alarmach",
+                    "filtered_alarm_codes": "Filtrowane kody alarmów",
+                    "energy_meter": "Licznik energii pompy ciepła (opcjonalnie)",
+                    "heat_source": "Ciepło wytworzone",
+                    "user_agent": "User-Agent (zaawansowane)"
+                },
+                "data_description": {
+                    "username": "Twoja nazwa użytkownika CSNet Manager",
+                    "password": "Twoje hasło CSNet Manager",
+                    "scan_interval": "Jak często sprawdzać aktualizacje (domyślnie i minimum: 60 sekund)",
+                    "language": "Preferowany język nazw urządzeń i alarmów",
+                    "card_language": "Automatycznie używa języka profilu każdego użytkownika Home Assistant. Karta może nadal mieć własny język.",
+                    "max_temp_override": "Zastępuje maksymalny limit temperatury (8–80°C). Pozostaw puste, aby użyć wartości domyślnej.",
+                    "fan_coil_model": "Wybierz typ sterowania wentylatorem konwektora (standardowy lub legacy)",
+                    "always_offer_dhw_boost": "Włącza tryb doładowania ciepłej wody użytkowej w jednostkach, w których nie jest on dostępny.",
+                    "power_supply": "Używane do szacowania mocy chwilowej i COP. Automatycznie wykrywa jednostki 8/10 HP jako trójfazowe, pozostałe jako jednofazowe.",
+                    "enable_alarm_notifications": "Twórz powiadomienie Home Assistant, gdy urządzenie zgłosi alarm",
+                    "filtered_alarm_codes": "Kody alarmów oddzielone przecinkami, które nigdy nie będą wysyłać powiadomień (domyślnie: -1, błędy komunikacji). Pozostaw puste, aby powiadamiać o wszystkich.",
+                    "energy_meter": "Dowolny czujnik energii (kWh), który mierzy zużycie energii przez pompę ciepła, z dowolnego urządzenia. Służy do obliczania COP na podstawie zapisów CSNet dotyczących ciepła. Pozostaw puste, aby zachować jedynie szacunek.",
+                    "heat_source": "Źródło wytworzonego ciepła dla każdego skumulowanego licznika ogrzewania, chłodzenia i ciepłej wody oraz każdego dziennego lub okresowego współczynnika COP. CSNet: ilość ciepła zarejestrowana przez CSNet Manager dla jednostki (w pełnych godzinach). Obliczane: własny pomiar integracji, wyznaczany w czasie rzeczywistym na podstawie przepływu wody i temperatur wymiennika. W przypadku CSNet pomiar integracji jest używany, gdy CSNet nie zarejestrował żadnej ilości ciepła dla jednostki.",
+                    "user_agent": "Sposób, w jaki integracja przedstawia się CSNet Managerowi. Pozostaw puste, aby użyć domyślnej wartości (desktopowy Chrome). Zmieniaj tylko w celu przetestowania innej wartości."
+                }
+            },
+            "reconfigure": {
+                "title": "Ponownie skonfiguruj CSNet Home",
+                "description": "Zaktualizuj konfigurację CSNet Home. Pozostaw hasło puste, aby zachować obecne.",
+                "data": {
+                    "username": "Nazwa użytkownika",
+                    "password": "Hasło",
+                    "scan_interval": "Interwał skanowania (sekundy)",
+                    "language": "Język",
+                    "card_language": "Język kart pulpitu",
+                    "max_temp_override": "Maksymalne zastąpienie temperatury (°C)",
+                    "fan_coil_model": "Model sterowania wentylatorem konwektora",
+                    "always_offer_dhw_boost": "Włącz doładowanie CWU",
+                    "power_supply": "Zasilanie jednostki zewnętrznej",
+                    "enable_alarm_notifications": "Włącz powiadomienia o alarmach",
+                    "filtered_alarm_codes": "Filtrowane kody alarmów",
+                    "energy_meter": "Licznik energii pompy ciepła (opcjonalnie)",
+                    "heat_source": "Ciepło wytworzone",
+                    "user_agent": "User-Agent (zaawansowane)"
+                },
+                "data_description": {
+                    "username": "Twoja nazwa użytkownika CSNet Manager",
+                    "password": "Pozostaw puste, aby zachować obecne hasło",
+                    "scan_interval": "Jak często sprawdzać aktualizacje (minimum: 60 sekund)",
+                    "language": "Preferowany język nazw urządzeń i alarmów",
+                    "card_language": "Automatycznie używa języka profilu każdego użytkownika Home Assistant. Karta może nadal mieć własny język.",
+                    "max_temp_override": "Zastępuje maksymalny limit temperatury (8–80°C)",
+                    "fan_coil_model": "Wybierz typ sterowania wentylatorem konwektora",
+                    "always_offer_dhw_boost": "Włącza tryb doładowania ciepłej wody użytkowej w jednostkach, w których nie jest on dostępny.",
+                    "power_supply": "Używane do szacowania mocy chwilowej i COP. Automatycznie wykrywa jednostki 8/10 HP jako trójfazowe, pozostałe jako jednofazowe.",
+                    "enable_alarm_notifications": "Twórz powiadomienie Home Assistant, gdy urządzenie zgłosi alarm",
+                    "filtered_alarm_codes": "Kody alarmów oddzielone przecinkami, które nigdy nie będą wysyłać powiadomień (domyślnie: -1, błędy komunikacji). Pozostaw puste, aby powiadamiać o wszystkich.",
+                    "energy_meter": "Dowolny czujnik energii (kWh), który mierzy zużycie energii przez pompę ciepła, z dowolnego urządzenia. Służy do obliczania COP na podstawie zapisów CSNet dotyczących ciepła. Pozostaw puste, aby zachować jedynie szacunek.",
+                    "heat_source": "Źródło wytworzonego ciepła dla każdego skumulowanego licznika ogrzewania, chłodzenia i ciepłej wody oraz każdego dziennego lub okresowego współczynnika COP. CSNet: ilość ciepła zarejestrowana przez CSNet Manager dla jednostki (w pełnych godzinach). Obliczane: własny pomiar integracji, wyznaczany w czasie rzeczywistym na podstawie przepływu wody i temperatur wymiennika. W przypadku CSNet pomiar integracji jest używany, gdy CSNet nie zarejestrował żadnej ilości ciepła dla jednostki.",
+                    "user_agent": "Sposób, w jaki integracja przedstawia się CSNet Managerowi. Pozostaw puste, aby użyć domyślnej wartości (desktopowy Chrome). Zmieniaj tylko w celu przetestowania innej wartości."
+                }
+            },
+            "reauth_confirm": {
+                "title": "Ponownie uwierzytelnij CSNet Home",
+                "description": "Twoje dane logowania do CSNet Manager są już nieprawidłowe. Podaj zaktualizowane dane, aby kontynuować korzystanie z tej integracji.",
+                "data": {
+                    "username": "Nazwa użytkownika",
+                    "password": "Hasło"
+                },
+                "data_description": {
+                    "username": "Twoja nazwa użytkownika CSNet Manager (zaktualizuj, jeśli się zmieniła)",
+                    "password": "Twoje zaktualizowane hasło do CSNet Manager"
+                }
+            }
+        },
+        "error": {
+            "cannot_connect": "Nie można połączyć się z CSNet Manager. Sprawdź połączenie internetowe i spróbuj ponownie.",
+            "invalid_auth": "Nieprawidłowa nazwa użytkownika lub hasło. Sprawdź swoje dane logowania.",
+            "unknown": "Wystąpił nieoczekiwany błąd. Spróbuj ponownie.",
+            "invalid_alarm_codes": "Kody alarmów muszą być liczbami całkowitymi oddzielonymi przecinkami, na przykład: -1, 62",
+            "invalid_user_agent": "User-Agent musi być pojedynczą linią zwykłych znaków ASCII, maksymalnie 256."
+        },
+        "abort": {
+            "already_configured": "Ta integracja CSNet Home jest już skonfigurowana.",
+            "reauth_successful": "Ponowne uwierzytelnienie zakończone powodzeniem! Twoje dane logowania zostały zaktualizowane.",
+            "reconfigure_successful": "Ponowna konfiguracja zakończona powodzeniem! Twoje ustawienia zostały zaktualizowane."
+        }
+    },
+    "entity": {
+        "sensor": {
+            "dhw_mode": {
+                "state": {
+                    "economic": "Ekonomiczny",
+                    "standard": "Standardowy",
+                    "high_demand": "Wysokie zap."
+                }
+            },
+            "fan_speed_actual": {
+                "state": {
+                    "off": "Wyłączony",
+                    "low": "Niski",
+                    "medium": "Średni",
+                    "high": "Wysoki"
+                }
+            }
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Krzywe grzewcze",
+                "description": "CSNet raportuje rodzaj krzywej grzewczej (prawo wodne) używany przez każdy obieg ({circuits}), ale nie podaje jej wartości. Skopiuj wartości ustawione przez instalatora na sterowniku urządzenia (Ogrzewanie przestrzeni > Tryb obliczania temperatury wody). Są one używane wyłącznie do obliczania temperatury wody dla czujników krzywej grzewczej: nic nie jest wysyłane do urządzenia. Pozostaw obieg pusty, jeśli nie chcesz dla niego czujnika.",
+                "data": {
+                    "c1_low_ambient_temperature": "Obieg 1 – Niska temperatura otoczenia",
+                    "c1_water_at_low_ambient": "Obieg 1 – Temperatura wody przy niskiej temperaturze otoczenia",
+                    "c1_high_ambient_temperature": "Obieg 1 – Wysoka temperatura otoczenia",
+                    "c1_water_at_high_ambient": "Obieg 1 – Temperatura wody przy wysokiej temperaturze otoczenia",
+                    "c1_gradient": "Obieg 1 – Nachylenie",
+                    "c1_vertex_offset": "Obieg 1 – Przesunięcie wierzchołka",
+                    "c2_low_ambient_temperature": "Obieg 2 – Niska temperatura otoczenia",
+                    "c2_water_at_low_ambient": "Obieg 2 – Temperatura wody przy niskiej temperaturze otoczenia",
+                    "c2_high_ambient_temperature": "Obieg 2 – Wysoka temperatura otoczenia",
+                    "c2_water_at_high_ambient": "Obieg 2 – Temperatura wody przy wysokiej temperaturze otoczenia",
+                    "c2_gradient": "Obieg 2 – Nachylenie",
+                    "c2_vertex_offset": "Obieg 2 – Przesunięcie wierzchołka"
+                },
+                "data_description": {
+                    "c1_low_ambient_temperature": "Temperatura zewnętrzna dla zimnego punktu krzywej",
+                    "c1_water_at_low_ambient": "Temperatura wody w zimnym punkcie",
+                    "c1_high_ambient_temperature": "Temperatura zewnętrzna dla łagodnego punktu krzywej",
+                    "c1_water_at_high_ambient": "Temperatura wody w łagodnym punkcie",
+                    "c1_gradient": "Wartość krzywej ustawiona na urządzeniu (0,2 do 2,2). Krzywa zaczyna się od 20°C wody przy 20°C na zewnątrz",
+                    "c1_vertex_offset": "Przesunięcie całej krzywej (-10 do +10°C). Pozostaw puste, jeśli nie dotyczy",
+                    "c2_low_ambient_temperature": "Temperatura zewnętrzna dla zimnego punktu krzywej",
+                    "c2_water_at_low_ambient": "Temperatura wody w zimnym punkcie",
+                    "c2_high_ambient_temperature": "Temperatura zewnętrzna dla łagodnego punktu krzywej",
+                    "c2_water_at_high_ambient": "Temperatura wody w łagodnym punkcie",
+                    "c2_gradient": "Wartość krzywej ustawiona na urządzeniu (0,2 do 2,2). Krzywa zaczyna się od 20°C wody przy 20°C na zewnątrz",
+                    "c2_vertex_offset": "Przesunięcie całej krzywej (-10 do +10°C). Pozostaw puste, jeśli nie dotyczy"
+                }
+            }
+        },
+        "error": {
+            "incomplete_curve": "Wypełnij wszystkie wartości tej krzywej dla obiegu albo żadnej z nich.",
+            "high_ambient_not_above_low": "Wysoka temperatura otoczenia musi być wyższa niż niska."
+        },
+        "abort": {
+            "not_loaded": "Integracja musi być załadowana, aby odczytać, z jakich krzywych grzewczych korzysta urządzenie. Spróbuj ponownie, gdy już wystartuje.",
+            "no_heating_curve": "Żaden z obiegów nie używa krzywej grzewczej punktowej ani nachyleniowej, więc nie ma czego opisywać. Stała temperatura wody ma już własną encję."
+        }
+    },
+    "selector": {
+        "card_language": {
+            "options": {
+                "auto": "Automatyczny (język profilu)",
+                "en": "Angielski",
+                "fr": "Francuski",
+                "es": "Hiszpański",
+                "pl": "Polski"
+            }
+        },
+        "heat_source": {
+            "options": {
+                "csnet": "Zapisane przez CSNet",
+                "calculated": "Wyliczone przez integrację"
+            }
+        }
+    }
+}

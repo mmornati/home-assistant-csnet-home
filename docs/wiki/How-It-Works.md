@@ -36,7 +36,7 @@ The integration never talks to your heat pump directly and needs nothing on your
 | **Host** | `https://www.csnetmanager.com` only. There is no telemetry, analytics or third-party service in the code. |
 | **Polling interval** | 60 seconds by default and at minimum, set during setup or reconfiguration. |
 | **Requests per poll** | 3 HTTPS requests: `GET /data/elements`, `GET /data/installationdevices`, `GET /data/installationalarms`. |
-| **On start-up** | Sign-in (`GET` then `POST /login`) and three alarm translation files (`/translations/*.json`). |
+| **On start-up** | Sign-in (`GET` then `POST /login`) and four alarm translation files (`/translations/*.json`). |
 | **When you change something** | One `POST /data/indoor/heat_setting` per change (temperature, mode, preset, hot water, pool, silent mode, fan speed, fixed water temperature). Clearing an alarm calls `POST /data/deletemyspecificalarm`. |
 | **Timeout** | 10 seconds per request. |
 | **User-Agent** | The one of a desktop Chrome browser by default. It is a [setting](Configuration-Guide.md#user-agent), so another value can be tried. |
