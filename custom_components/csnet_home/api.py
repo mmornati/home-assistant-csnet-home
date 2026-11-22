@@ -483,8 +483,11 @@ class CSNetHomeAPI:
                     self._last_login_rejected = response.status == 200
                     _LOGGER.error("Login failed. Status code: %s", response.status)
                     return False
-        except Exception as e:
-            _LOGGER.error("Login exception: %s", e, exc_info=True)
+        except (asyncio.TimeoutError, aiohttp.ClientError):
+            # async_login logs it by name and notes the problem (a timeout has no message)
+            raise
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            _LOGGER.error("Login exception: %s", describe_error(e), exc_info=True)
             return False
 
     @staticmethod

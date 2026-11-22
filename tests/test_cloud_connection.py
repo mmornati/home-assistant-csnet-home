@@ -223,3 +223,17 @@ def test_connection_sensor_stays_available_and_reports_the_problem():
 
     connection.record_success(NOON, 0.2)
     assert sensor.is_on is True
+
+
+async def test_a_login_form_timeout_is_named_and_noted(hass, caplog):
+    """The login form timing out was logged as "Login exception: " with nothing after it."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.session = MagicMock(closed=False)
+    api.session.post = MagicMock(side_effect=asyncio.TimeoutError())
+    api.get_xsrf_token = AsyncMock(return_value=True)
+    api.xsrf_token = "token"
+
+    assert await api.async_login() is False
+    assert "Could not sign in to CSNet Manager: TimeoutError" in caplog.text
+    assert "Login exception" not in caplog.text
+    assert api.problems["login"] == (PROBLEM_TIMEOUT, "TimeoutError")
