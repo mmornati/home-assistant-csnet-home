@@ -7,6 +7,27 @@ description: What changed in each version of the CSNet Home (unofficial, for Hit
 
 Every version of the integration, newest first. Install or update from HACS; each version is also on the [GitHub releases page](https://github.com/mmornati/home-assistant-csnet-home/releases).
 
+## 2.20.0
+
+*22 November 2026* · [GitHub release](https://github.com/mmornati/home-assistant-csnet-home/releases/tag/2.20.0)
+
+The connection to CSNet Manager in the dashboard cards, and a twelfth card about it. No live entity is renamed or removed, and nothing new is sent to the unit.
+
+#### Please read before updating
+
+- After updating, reload the dashboard page (or reset the frontend cache in the app) so the browser loads the new cards.
+
+#### Added
+
+- **Connection card** (`custom:csnet-connection-card`): whether Home Assistant and the unit reach CSNet Manager over the last hours, with the share of time connected, failed polls today and in a row, CSNet's answer time, the last problem and why, the unit's last contact and Wi-Fi. See [Dashboard Cards](wiki/Dashboard-Cards.md#connection). ([#276](https://github.com/mmornati/home-assistant-csnet-home/pull/276))
+- **System health card:** a CSNet Manager item, red while the connection is down. ([#276](https://github.com/mmornati/home-assistant-csnet-home/pull/276))
+- **Every card** shows a red line on top while CSNet Manager cannot be reached, with the reason and when the last data came. ([#276](https://github.com/mmornati/home-assistant-csnet-home/pull/276))
+
+#### Fixed
+
+- **System health said "Alarms: none active" during an outage**, from an unavailable sensor. Items without a reading are now left out. ([#276](https://github.com/mmornati/home-assistant-csnet-home/pull/276))
+- **An unavailable "Daily COP" entity** left over from 2.9 and before is removed at startup. ([#276](https://github.com/mmornati/home-assistant-csnet-home/pull/276))
+
 ## 2.19.0
 
 *22 November 2026* · [GitHub release](https://github.com/mmornati/home-assistant-csnet-home/releases/tag/2.19.0)

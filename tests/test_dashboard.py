@@ -119,15 +119,16 @@ def test_card_file_ships_every_card_and_language():
         "csnet-daily-energy-card",
         "csnet-power-profile-card",
         "csnet-energy-signature-card",
+        "csnet-connection-card",
     ):
         assert f'"{tag}"' in source
     texts = source[source.index("const TEXTS = {") : source.index("function lang(")]
     blocks = {}
-    for language in ("en", "fr", "es"):
+    for language in ("en", "fr", "es", "pl"):
         start = texts.index(f"  {language}: {{")
         end = texts.index("\n  },", start)
         blocks[language] = {line.strip().split(":", 1)[0] for line in texts[start:end].splitlines()[1:] if ":" in line}
-    assert blocks["en"] == blocks["fr"] == blocks["es"]
+    assert blocks["en"] == blocks["fr"] == blocks["es"] == blocks["pl"]
 
 
 def test_manifest_loads_after_the_frontend():
@@ -318,3 +319,9 @@ async def test_sensors_warn_when_the_power_found_is_one_phase(hass: HomeAssistan
     chosen = _meter_power_sensor(hass, SimpleNamespace(data={CONF_ENERGY_METER: "sensor.meter_energy", CONF_ENERGY_METER_POWER: "sensor.meter_power_l1"}))
     assert chosen == "sensor.meter_power_l1"
     assert "single phase" not in caplog.text
+
+
+async def test_the_connection_sensor_is_a_role(hass: HomeAssistant):
+    """The cards find the CSNet Manager connection sensor by its unique id."""
+    _add(er.async_get(hass), "binary_sensor", "csnet_home-cloud-connection", "binary_sensor.renamed_link")
+    assert dashboard_entities(hass)["unit"]["cloud_connection"] == "binary_sensor.renamed_link"

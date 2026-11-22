@@ -1292,4 +1292,17 @@ def test_the_defrost_sensor_is_gone():
     from custom_components.csnet_home.sensor import INSTALLATION_SENSOR_DESCRIPTIONS, REMOVED_INSTALLATION_SENSOR_KEYS
 
     assert "defrost" not in {description.key for description in INSTALLATION_SENSOR_DESCRIPTIONS}
-    assert set(REMOVED_INSTALLATION_SENSOR_KEYS) == {"daily_heating", "defrost"}
+    assert set(REMOVED_INSTALLATION_SENSOR_KEYS) == {"daily_heating", "defrost", "daily_cop_heating"}
+
+
+def test_removed_sensors_are_not_created_any_more():
+    """A key in the clean-up list must not belong to a sensor the integration still creates."""
+    from custom_components.csnet_home.sensor import (  # pylint: disable=import-outside-toplevel
+        CALCULATED_SENSOR_DESCRIPTIONS,
+        DAILY_SENSOR_DESCRIPTIONS,
+        INSTALLATION_SENSOR_DESCRIPTIONS,
+        REMOVED_INSTALLATION_SENSOR_KEYS,
+    )
+
+    created = {d.key for d in INSTALLATION_SENSOR_DESCRIPTIONS} | set(CALCULATED_SENSOR_DESCRIPTIONS) | set(DAILY_SENSOR_DESCRIPTIONS)
+    assert not created & set(REMOVED_INSTALLATION_SENSOR_KEYS)

@@ -927,7 +927,8 @@ def _heating_curve_sensors(hass, entry, coordinator, remove_stale: bool = True) 
 
 # Removed: Daily Output Energy (the heat sensors replace it) and Defrost (the
 # Defrost binary sensor repeats it)
-REMOVED_INSTALLATION_SENSOR_KEYS = ("daily_heating", "defrost")
+# daily_cop_heating: the "Daily COP" of 2.9 and before, left in the registry since
+REMOVED_INSTALLATION_SENSOR_KEYS = ("daily_heating", "defrost", "daily_cop_heating")
 
 # The sensors whose electricity is the meter's or the estimate's, named like
 # the period sensors: what it is, the period, then "(metered)" or "(estimated)"

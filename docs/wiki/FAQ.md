@@ -159,7 +159,7 @@ Yes, through Home Assistant. If you've connected Home Assistant to Alexa or Goog
 
 ### Is there a ready-made dashboard?
 
-Yes. The integration ships eleven dashboard cards (overview, live water circuit, heating curve, COP, health, energy charts and more). Search for **CSNet** in the **Add card** picker, or paste the example view from [Dashboard Cards](Dashboard-Cards.md). No other card has to be installed.
+Yes. The integration ships twelve dashboard cards (overview, live water circuit, heating curve, COP, health, connection, energy charts and more). Search for **CSNet** in the **Add card** picker, or paste the example view from [Dashboard Cards](Dashboard-Cards.md). No other card has to be installed.
 
 ### Can I see my heating curve (water law)?
 

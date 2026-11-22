@@ -24,7 +24,7 @@ The **CSNet Home (unofficial, for Hitachi)** integration connects Hitachi heat p
 - [Sensors Reference](Sensors-Reference.md): every sensor, its unit and where it comes from
 - [Compressor Sensors](../COMPRESSOR_SENSORS.md): outdoor unit internals
 - [Advanced Features](Advanced-Features.md): silent mode, fan coils, OTC and heating curves, alarms, services
-- [Dashboard Cards](Dashboard-Cards.md): eleven cards shipped with the integration, nothing else to install
+- [Dashboard Cards](Dashboard-Cards.md): twelve cards shipped with the integration, nothing else to install
 - [Temperature Schedules](Schedules.md): blueprints to change a zone's setpoint on a weekly or day/night schedule
 - [Release notes](../release-notes.md): what changed in each version
 - [How it works & disclaimer](How-It-Works.md): the API, network traffic, privacy, known limitations

@@ -36,6 +36,8 @@ POOL_ZONE = 4
 
 # role -> unique id, for the unit as a whole
 UNIT_ROLES = {
+    # whether Home Assistant reaches CSNet Manager
+    "cloud_connection": f"{DOMAIN}-cloud-connection",
     # power and energy, estimated from the unit's readings
     "power": f"{DOMAIN}-installation-instant_consumption",
     "heat_power": f"{DOMAIN}-installation-heating_power",
