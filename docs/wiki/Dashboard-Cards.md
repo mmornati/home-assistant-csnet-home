@@ -1,6 +1,6 @@
 # Dashboard Cards
 
-The integration ships eleven dashboard cards. You don't need to install anything else: no HACS frontend download and no third-party card. After the integration is set up (and the browser page is reloaded once), the cards appear in the dashboard **Add card** picker. Search for **CSNet**.
+The integration ships twelve dashboard cards. You don't need to install anything else: no HACS frontend download and no third-party card. After the integration is set up (and the browser page is reloaded once), the cards appear in the dashboard **Add card** picker. Search for **CSNet**.
 
 The cards find their entities themselves, so a card works as soon as you add it, even if you renamed the entities or use Home Assistant in another language. They follow your theme (light and dark) and are translated to English, French, Spanish and Polish: by default in each user's profile language, or in the **Card language** chosen in the integration settings. Numbers and dates follow the same language (a French card writes 3 389 W and 8,01 €), unless the user chose a number format in their profile.
 
@@ -10,15 +10,18 @@ The cards find their entities themselves, so a card works as soon as you add it,
 | Water circuit | `custom:csnet-water-circuit-card` | Live diagram: outdoor unit, flow and return temperatures (the flow is the heat exchanger's outlet while the tank is being heated), each circuit with its room temperature, setpoint and demand, the mixing valve of circuit 2, the hot water tank and pool when present, pumps, flow rate and pressure |
 | Heating curve | `custom:csnet-heating-curve-card` | The heating curves you entered in the integration options, where the unit is on them now, and the unit's water target over the last days |
 | Performance | `custom:csnet-performance-card` | COP now, today, yesterday, this month and last month, with the share of heat taken from the air |
-| System health | `custom:csnet-system-health-card` | Alarms, gateway, central control, defrost and water pressure |
+| System health | `custom:csnet-system-health-card` | Alarms, the connection to CSNet Manager, gateway, central control, defrost and water pressure |
 | Refrigerant circuit | `custom:csnet-refrigerant-card` | Compressor frequency and current, discharge, evaporator, gas and liquid temperatures, pressures, expansion valve, outdoor fan |
 | Temperatures | `custom:csnet-temperatures-card` | Flow, return, after the mixing valve, water target and outdoor temperature over the last hours, with the compressor frequency behind |
 | Activity | `custom:csnet-activity-card` | What ran over the last hours, with the total time: compressor, defrost, each circuit's demand, hot water (the heat pump heating the tank), the tank's electric heater, pumps, backup heater, boiler |
 | Energy per day | `custom:csnet-daily-energy-card` | Electricity and heat per day, the COP of each day and the average outdoor temperature |
 | Power today | `custom:csnet-power-profile-card` | Today's power against the average day of the last two weeks |
 | Energy signature | `custom:csnet-energy-signature-card` | Tomorrow's electricity from the weather forecast, kWh per degree colder, 7-day average and base load |
+| Connection | `custom:csnet-connection-card` | Whether Home Assistant and the unit reach CSNet Manager: the last hours as timelines with the share of time connected, failed polls today and in a row, answer time, last data, last problem and why, the unit's last contact and Wi-Fi |
 
 Tap any value to open its entity's details.
+
+While Home Assistant cannot reach CSNet Manager, every card shows a red line on top with the reason and when the last data came, so values shown as unavailable have an explanation. Tap it to open the [CSNet Manager connection](Sensors-Reference.md#csnet-manager-connection) sensor.
 
 <div class="csnet-video" markdown>
 <iframe src="../../videos/csnet-home-tour/?embed=1&lang=en" title="A one-minute narrated tour of the integration" loading="lazy" allow="fullscreen; autoplay" allowfullscreen></iframe>
@@ -57,6 +60,10 @@ Tap any value to open its entity's details.
 
 ![System health card](../images/cards/card-system-health-light.jpg#only-light){ loading=lazy width="560" }
 ![System health card](../images/cards/card-system-health-dark.jpg#only-dark){ loading=lazy width="560" }
+
+### Connection
+
+The link between Home Assistant and CSNet Manager, and between the unit and CSNet, over the last hours (green: connected, red: not, grey: no history yet), with the share of time each was connected. Below: failed polls today and in a row, CSNet's answer time, when the last data came, the last problem and its reason (no answer within 10 s, no name lookup, an error from CSNet…), the unit's last contact and its Wi-Fi signal. A failed poll now and then is normal; several in a row, or a red Home Assistant line while the unit's line stays green, point to the connection on your side.
 
 ### Refrigerant circuit
 
@@ -127,6 +134,7 @@ sections:
       - type: custom:csnet-system-health-card
       - type: custom:csnet-refrigerant-card
       - type: custom:csnet-energy-signature-card
+      - type: custom:csnet-connection-card
   - type: grid
     column_span: 2
     cards:
@@ -143,7 +151,7 @@ Every card accepts `title` (an empty title hides it) and `language` (`auto`, `en
 | Heat pump | `power_entity` | A power sensor (W) to use instead of the integration's estimate, for example a real electricity meter on the heat pump's circuit |
 | Heat pump | `max_power` | Value of a full gauge, in W (default 4000) |
 | Heat pump, Energy signature | `price`, `price_entity` | Electricity price per kWh, instead of the Energy dashboard's |
-| Temperatures, Activity | `hours` | Hours shown (default 24) |
+| Temperatures, Activity, Connection | `hours` | Hours shown (default 24) |
 | Energy per day | `days` | Days shown (default 14) |
 | Power today | `days` | Days the average day is made of (default 14) |
 | Energy signature | `days`, `weather_entity` | Days the fit is made of (default 60); weather entity for the forecast |
@@ -161,6 +169,7 @@ Any entity a card uses can be replaced with `<role>_entity`, for example `outdoo
 | `cop_today`, `cop_yesterday`, `cop_month`, `cop_last_month` | COP from your electricity meter |
 | `water_out`, `water_in`, `water_target`, `water_c2`, `water_flow`, `water_pressure`, `mix_valve` | Water side |
 | `outdoor`, `outdoor_average` | Outdoor temperature, and the average the unit uses for its curves |
+| `cloud_connection` | The CSNet Manager connection sensor |
 | `compressor`, `defrost`, `pump_1`, `pump_2`, `pump_3`, `backup_heater`, `boiler` | What runs |
 | `compressor_frequency`, `compressor_current`, `discharge_temperature`, `evaporator_temperature`, `gas_temperature`, `liquid_temperature`, `discharge_pressure`, `suction_pressure`, `expansion_valve`, `outdoor_fan_rpm` | Refrigerant circuit |
 

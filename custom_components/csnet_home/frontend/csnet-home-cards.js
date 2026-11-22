@@ -12,7 +12,7 @@
  * power meter.
  */
 
-const CARD_VERSION = "1.1.5";
+const CARD_VERSION = "1.2.0";
 
 // ---------------------------------------------------------------------------
 // Texts
@@ -137,6 +137,35 @@ const TEXTS = {
     demand_of: "Demand {name}",
     needs_meter: "Needs an electricity figure: choose your heat pump's electricity meter in the integration settings (Reconfigure).",
     language: "Language (default: the integration setting)",
+    connection: "Connection",
+    cloud: "CSNet Manager",
+    cloud_link: "Home Assistant",
+    unit_link: "Unit",
+    connected: "Connected",
+    cloud_down: "CSNet Manager unreachable",
+    answer_in: "answer in {v} s",
+    failed_today: "{n} failed polls today",
+    failed_polls_today: "Failed polls today",
+    failed_in_a_row: "Failed in a row",
+    answer_time: "Answer time",
+    last_data: "Last data",
+    last_problem: "Last problem",
+    none: "none",
+    available: "available",
+    unit_contact: "Unit's last contact",
+    wifi: "Wi-Fi",
+    no_history: "no history yet",
+    problem_timeout: "no answer within 10 s",
+    problem_dns: "name lookup failed (DNS or internet)",
+    problem_no_connection: "no connection (internet or CSNet down)",
+    problem_connection_lost: "connection lost",
+    problem_http_error: "error from CSNet",
+    problem_error_answer: "CSNet answered without the readings",
+    problem_unreadable_answer: "unreadable answer from CSNet",
+    problem_login_failed: "sign-in failed",
+    problem_login_rejected: "credentials refused",
+    problem_login_waiting: "waiting to sign in again",
+    problem_no_data: "no readings",
   },
   fr: {
     heat_pump: "Pompe à chaleur",
@@ -256,6 +285,35 @@ const TEXTS = {
     demand_of: "Demande {name}",
     needs_meter: "Il faut une mesure d'électricité : choisissez le compteur d'électricité de la pompe à chaleur dans les réglages de l'intégration (Reconfigurer).",
     language: "Langue (par défaut : le réglage de l'intégration)",
+    connection: "Connexion",
+    cloud: "CSNet Manager",
+    cloud_link: "Home Assistant",
+    unit_link: "Unité",
+    connected: "Connecté",
+    cloud_down: "CSNet Manager injoignable",
+    answer_in: "réponse en {v} s",
+    failed_today: "{n} relevés échoués aujourd'hui",
+    failed_polls_today: "Relevés échoués aujourd'hui",
+    failed_in_a_row: "Échecs d'affilée",
+    answer_time: "Temps de réponse",
+    last_data: "Dernières données",
+    last_problem: "Dernier problème",
+    none: "aucun",
+    available: "disponible",
+    unit_contact: "Dernier contact de l'unité",
+    wifi: "Wi-Fi",
+    no_history: "pas encore d'historique",
+    problem_timeout: "pas de réponse en 10 s",
+    problem_dns: "nom introuvable (DNS ou internet)",
+    problem_no_connection: "pas de connexion (internet ou CSNet en panne)",
+    problem_connection_lost: "connexion perdue",
+    problem_http_error: "erreur de CSNet",
+    problem_error_answer: "CSNet a répondu sans les relevés",
+    problem_unreadable_answer: "réponse illisible de CSNet",
+    problem_login_failed: "échec de connexion au compte",
+    problem_login_rejected: "identifiants refusés",
+    problem_login_waiting: "attente avant de se reconnecter",
+    problem_no_data: "aucun relevé",
   },
   es: {
     heat_pump: "Bomba de calor",
@@ -375,6 +433,35 @@ const TEXTS = {
     demand_of: "Demanda {name}",
     needs_meter: "Se necesita un medidor de energía: elija el medidor de energía de la bomba de calor en los ajustes de la integración (Reconfigurar).",
     language: "Idioma (por defecto: el ajuste de la integración)",
+    connection: "Conexión",
+    cloud: "CSNet Manager",
+    cloud_link: "Home Assistant",
+    unit_link: "Unidad",
+    connected: "Conectado",
+    cloud_down: "CSNet Manager inaccesible",
+    answer_in: "respuesta en {v} s",
+    failed_today: "{n} lecturas fallidas hoy",
+    failed_polls_today: "Lecturas fallidas hoy",
+    failed_in_a_row: "Fallos seguidos",
+    answer_time: "Tiempo de respuesta",
+    last_data: "Últimos datos",
+    last_problem: "Último problema",
+    none: "ninguno",
+    available: "disponible",
+    unit_contact: "Último contacto de la unidad",
+    wifi: "Wi-Fi",
+    no_history: "aún sin historial",
+    problem_timeout: "sin respuesta en 10 s",
+    problem_dns: "nombre no resuelto (DNS o internet)",
+    problem_no_connection: "sin conexión (internet o CSNet caído)",
+    problem_connection_lost: "conexión perdida",
+    problem_http_error: "error de CSNet",
+    problem_error_answer: "CSNet respondió sin las lecturas",
+    problem_unreadable_answer: "respuesta ilegible de CSNet",
+    problem_login_failed: "inicio de sesión fallido",
+    problem_login_rejected: "credenciales rechazadas",
+    problem_login_waiting: "esperando para volver a iniciar sesión",
+    problem_no_data: "sin lecturas",
   },
   pl: {
     heat_pump: "Pompa ciepła",
@@ -494,6 +581,35 @@ const TEXTS = {
     demand_of: "Zapotrz. {name}",
     needs_meter: "Wymaga wartości zużycia energii: wybierz licznik energii Twojej pompy ciepła w ustawieniach integracji (Ponowna konfiguracja).",
     language: "Język (domyślnie: ustawienie integracji)",
+    connection: "Połączenie",
+    cloud: "CSNet Manager",
+    cloud_link: "Home Assistant",
+    unit_link: "Jednostka",
+    connected: "Połączono",
+    cloud_down: "CSNet Manager niedostępny",
+    answer_in: "odpowiedź w {v} s",
+    failed_today: "{n} nieudanych odczytów dziś",
+    failed_polls_today: "Nieudane odczyty dziś",
+    failed_in_a_row: "Nieudane z rzędu",
+    answer_time: "Czas odpowiedzi",
+    last_data: "Ostatnie dane",
+    last_problem: "Ostatni problem",
+    none: "brak",
+    available: "dostępności",
+    unit_contact: "Ostatni kontakt jednostki",
+    wifi: "Wi-Fi",
+    no_history: "brak historii",
+    problem_timeout: "brak odpowiedzi w 10 s",
+    problem_dns: "nie znaleziono nazwy (DNS lub internet)",
+    problem_no_connection: "brak połączenia (internet lub awaria CSNet)",
+    problem_connection_lost: "utracono połączenie",
+    problem_http_error: "błąd CSNet",
+    problem_error_answer: "CSNet odpowiedział bez odczytów",
+    problem_unreadable_answer: "nieczytelna odpowiedź CSNet",
+    problem_login_failed: "logowanie nieudane",
+    problem_login_rejected: "dane logowania odrzucone",
+    problem_login_waiting: "oczekiwanie na ponowne logowanie",
+    problem_no_data: "brak odczytów",
   },
 };
 
@@ -611,6 +727,11 @@ function relativeTime(hass, value) {
 // ---------------------------------------------------------------------------
 // Shared look
 // ---------------------------------------------------------------------------
+
+const OFFLINE_CSS = `
+  .offline { margin: 0 0 10px; padding: 8px 10px; border-radius: 10px; font-size: 12px; cursor: pointer;
+    background: color-mix(in srgb, var(--csnet-bad) 14%, transparent); color: var(--primary-text-color); }
+`;
 
 const BASE_CSS = `
   :host {
@@ -731,6 +852,52 @@ async function onPeriods(hass, ids, startMs, endMs = Date.now()) {
     out[id] = periods;
   }
   return out;
+}
+
+/** History of some entities as segments: { entity_id: [[from ms, to ms, state], ...] }, from their first known state. */
+async function stateSegments(hass, ids, startMs, endMs = Date.now()) {
+  const wanted = [...new Set(ids.filter(Boolean))];
+  if (!wanted.length) return {};
+  const result = await hass.callWS({
+    type: "history/history_during_period",
+    start_time: new Date(startMs).toISOString(),
+    end_time: new Date(endMs).toISOString(),
+    entity_ids: wanted,
+    minimal_response: true,
+    no_attributes: true,
+    significant_changes_only: false,
+  });
+  const out = {};
+  for (const id of wanted) {
+    const rows = result?.[id] || [];
+    const segments = [];
+    rows.forEach((row, i) => {
+      const at = Math.max(startMs, row.lu !== undefined ? row.lu * 1000 : toMs(row.last_updated || row.last_changed));
+      const next = rows[i + 1];
+      const to = next ? Math.max(startMs, next.lu !== undefined ? next.lu * 1000 : toMs(next.last_updated || next.last_changed)) : endMs;
+      if (to > at) segments.push([at, to, row.s ?? row.state]);
+    });
+    out[id] = segments;
+  }
+  return out;
+}
+
+/** What went wrong with the link to CSNet, in words: the connection sensor's problem attribute. */
+function problemText(hass, connection) {
+  const problem = connection?.attributes?.problem;
+  if (!problem) return "";
+  const text = t(hass, `problem_${problem}`);
+  const detail = problem === "http_error" ? connection.attributes.detail : "";
+  return detail ? `${text} (${detail})` : text;
+}
+
+/** The banner every card shows while Home Assistant cannot reach CSNet Manager, so unavailable values have a reason. */
+function offlineBanner(hass, entityId) {
+  const connection = stateOf(hass, entityId);
+  if (connection?.state !== "off") return "";
+  const last = connection.attributes?.last_success;
+  const detail = [problemText(hass, connection), last ? t(hass, "last_seen", { v: relativeTime(hass, last) }) : ""].filter(Boolean).join(" · ");
+  return `<div class="offline" data-entity="${escapeHtml(entityId)}"><b>${escapeHtml(t(hass, "cloud_down"))}</b>${detail ? ` · ${escapeHtml(detail)}` : ""}</div>`;
 }
 
 const PRICE_CACHE = new WeakMap();
@@ -1072,7 +1239,8 @@ class CsnetBaseCard extends HTMLElement {
     this._ensureData();
     if (signature === this._signature) return;
     this._signature = signature;
-    this._show(BASE_CSS + this.css(), this.content(hass));
+    const banner = this.showsOfflineBanner() ? offlineBanner(hass, this.unit.cloud_connection) : "";
+    this._show(BASE_CSS + OFFLINE_CSS + this.css(), banner + this.content(hass));
   }
 
   /**
@@ -1098,6 +1266,11 @@ class CsnetBaseCard extends HTMLElement {
 
   extraSignature() {
     return null;
+  }
+
+  /** Whether the card says so on top when CSNet Manager cannot be reached (the cards about the connection say it themselves). */
+  showsOfflineBanner() {
+    return true;
   }
 
   /** Cards that read history: what to load (null: nothing), how, and how often. */
@@ -1748,6 +1921,10 @@ class CsnetSystemHealthCard extends CsnetBaseCard {
     return [...super.watched(), ...Object.values(this._roles?.gateway || {})];
   }
 
+  showsOfflineBanner() {
+    return false;
+  }
+
   css() {
     return `
       .headline { text-align: center; font-size: 22px; font-weight: 700; margin-bottom: 10px; }
@@ -1768,7 +1945,8 @@ class CsnetSystemHealthCard extends CsnetBaseCard {
     const gateway = this._roles?.gateway || {};
     const items = [];
     const add = (level, name, detail, entity) => {
-      if (entity && !stateOf(hass, entity)) return;
+      // nothing to say about a sensor without a reading (CSNet unreachable: its own item says so)
+      if (entity && (!stateOf(hass, entity) || stateOf(hass, entity).state === "unavailable")) return;
       items.push({ level, name, detail, entity });
     };
     const alarms = num(hass, unit.active_alarms);
@@ -1780,6 +1958,17 @@ class CsnetSystemHealthCard extends CsnetBaseCard {
       const bad = conn && /off|disconn|offline|lost/i.test(conn);
       const detail = [conn, last ? t(hass, "last_seen", { v: relativeTime(hass, last) }) : "", wifi !== null ? `${fmt(hass, wifi, 0)} dBm` : ""].filter(Boolean).join(" · ");
       add(bad ? "bad" : "ok", t(hass, "gateway"), detail, gateway.connectivity);
+    }
+    const connection = stateOf(hass, unit.cloud_connection);
+    if (connection && (connection.state === "on" || connection.state === "off")) {
+      const a = connection.attributes || {};
+      const failedToday = Number(a.failed_polls_today) || 0;
+      const detail =
+        connection.state === "on"
+          ? [t(hass, "connected"), a.response_time != null ? t(hass, "answer_in", { v: fmt(hass, a.response_time, 2) }) : "", failedToday ? t(hass, "failed_today", { n: failedToday }) : ""]
+          : [problemText(hass, connection), a.last_success ? t(hass, "last_seen", { v: relativeTime(hass, a.last_success) }) : ""];
+      // a failed poll now and then is normal: only a connection down now needs a look
+      add(connection.state === "off" ? "bad" : "ok", t(hass, "cloud"), detail.filter(Boolean).join(" · "), unit.cloud_connection);
     }
     if (unit.central_control) add("ok", t(hass, "central_control"), stateOf(hass, unit.central_control)?.state, unit.central_control);
     if (unit.defrost) add(isOn(hass, unit.defrost) ? "info" : "ok", t(hass, "defrost"), isOn(hass, unit.defrost) ? t(hass, "running") : t(hass, "idle"), unit.defrost);
@@ -2369,6 +2558,133 @@ class CsnetCardEditor extends HTMLElement {
 }
 
 // ---------------------------------------------------------------------------
+// Connection
+// ---------------------------------------------------------------------------
+
+class CsnetConnectionCard extends CsnetBaseCard {
+  static editorSchema() {
+    return [
+      { name: "title", selector: { text: {} } },
+      { name: "hours", selector: { number: { min: 1, max: 168, step: 1, mode: "box" } } },
+    ];
+  }
+
+  get hours() {
+    return Number(this._config.hours ?? 24);
+  }
+
+  showsOfflineBanner() {
+    return false;
+  }
+
+  watched() {
+    return [...super.watched(), ...Object.values(this._roles?.gateway || {})];
+  }
+
+  /** The two links shown as timelines: Home Assistant to CSNet, and the unit to CSNet. */
+  links() {
+    const hass = this._localHass(this._hass);
+    return [
+      [this.unit.cloud_connection, t(hass, "cloud_link")],
+      [this._roles?.gateway?.connectivity, t(hass, "unit_link")],
+    ].filter(([id]) => id && stateOf(hass, id));
+  }
+
+  dataKey() {
+    const ids = this.links().map(([id]) => id);
+    return ids.length ? `${ids.join("|")}|${this.hours}` : null;
+  }
+
+  refreshMs() {
+    return 5 * 60000;
+  }
+
+  async fetchData(hass) {
+    const start = Date.now() - this.hours * 3600000;
+    return { start, segments: await stateSegments(hass, this.links().map(([id]) => id), start) };
+  }
+
+  css() {
+    return `
+      .headline { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 12px; cursor: pointer;
+        background: color-mix(in srgb, var(--csnet-ok) 10%, transparent); }
+      .headline.bad { background: color-mix(in srgb, var(--csnet-bad) 14%, transparent); }
+      .headline .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--csnet-ok); flex: none; }
+      .headline.bad .dot { background: var(--csnet-bad); }
+      .headline .state { font-size: 16px; font-weight: 700; }
+      .headline .why { font-size: 12px; color: var(--csnet-muted); }
+      .tl { display: grid; grid-template-columns: minmax(90px, 32%) 1fr auto; gap: 6px 10px; align-items: center; font-size: 12px; margin-top: 12px; }
+      .tl .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+      .tl .bar { position: relative; height: 14px; border-radius: 4px; background: var(--csnet-line); overflow: hidden; cursor: pointer; }
+      .tl .bar span { position: absolute; top: 0; bottom: 0; }
+      .tl .total { font-variant-numeric: tabular-nums; color: var(--csnet-muted); text-align: right; min-width: 48px; }
+      .axis { display: flex; justify-content: space-between; font-size: 10px; color: var(--csnet-muted); margin: 4px 58px 0 calc(32% + 10px); white-space: nowrap; }
+      .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-top: 12px; }
+      .stat { padding: 8px 10px; border-radius: 10px; background: var(--csnet-line); cursor: pointer; }
+      .stat .label { font-size: 11px; color: var(--csnet-muted); }
+      .stat .value { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 2px; }
+      .stat .sub { font-size: 11px; color: var(--csnet-muted); }
+      .stat.warn .value { color: var(--csnet-warn); }
+      .stat.bad .value { color: var(--csnet-bad); }
+    `;
+  }
+
+  content(hass) {
+    const id = this.unit.cloud_connection;
+    const connection = stateOf(hass, id);
+    if (!connection) return `${this.title(hass, "connection")}<div class="message">${escapeHtml(t(hass, "no_integration"))}</div>`;
+    const a = connection.attributes || {};
+    const down = connection.state === "off";
+    const why = down
+      ? [problemText(hass, connection), a.last_success ? t(hass, "last_seen", { v: relativeTime(hass, a.last_success) }) : ""]
+      : [a.response_time != null ? t(hass, "answer_in", { v: fmt(hass, a.response_time, 2) }) : ""];
+    const headline = `<div class="headline ${down ? "bad" : ""}" data-entity="${escapeHtml(id)}"><span class="dot"></span><div>
+      <div class="state">${escapeHtml(down ? t(hass, "cloud_down") : `${t(hass, "cloud")} · ${t(hass, "connected")}`)}</div>
+      <div class="why">${escapeHtml(why.filter(Boolean).join(" · "))}</div></div></div>`;
+
+    const data = this._data && !this._data.error ? this._data : null;
+    const x1 = Date.now();
+    const x0 = data ? data.start : x1 - this.hours * 3600000;
+    const span = x1 - x0;
+    const color = (state) => (state === "on" ? "var(--csnet-ok)" : state === "off" ? "var(--csnet-bad)" : "var(--csnet-muted)");
+    const rows = this.links()
+      .map(([entity, label]) => {
+        const segments = data?.segments?.[entity] || [];
+        const known = segments.filter(([, , state]) => state === "on" || state === "off");
+        const total = known.reduce((sum, [a0, b0]) => sum + (b0 - a0), 0);
+        const up = known.filter(([, , state]) => state === "on").reduce((sum, [a0, b0]) => sum + (b0 - a0), 0);
+        const share = total ? `${fmt(hass, (up / total) * 100, up === total ? 0 : 1)} %` : data ? t(hass, "no_history") : "…";
+        const spans = segments
+          .map(([a0, b0, state]) => `<span style="left:${(((a0 - x0) / span) * 100).toFixed(2)}%;width:${Math.max(0.3, ((b0 - a0) / span) * 100).toFixed(2)}%;background:${color(state)}"></span>`)
+          .join("");
+        return `<div class="name" data-entity="${escapeHtml(entity)}" title="${escapeHtml(label)}">${escapeHtml(label)}</div>
+          <div class="bar" data-entity="${escapeHtml(entity)}">${spans}</div><div class="total" title="${escapeHtml(t(hass, "available"))}">${escapeHtml(share)}</div>`;
+      })
+      .join("");
+    const marks = [0, 0.5, 1].map((f) => `<span>${escapeHtml(hourLabel(hass, x0 + f * span))}</span>`).join("");
+
+    const failedToday = Number(a.failed_polls_today) || 0;
+    const inARow = Number(a.failed_polls_in_a_row) || 0;
+    const gateway = this._roles?.gateway || {};
+    const lastContact = stateOf(hass, gateway.last_communication)?.state;
+    const wifi = num(hass, gateway.wifi_signal);
+    const stat = (label, value, sub = "", level = "", entity = id) =>
+      `<div class="stat ${level}" data-entity="${escapeHtml(entity || "")}"><div class="label">${escapeHtml(label)}</div><div class="value">${escapeHtml(value)}</div>${sub ? `<div class="sub">${escapeHtml(sub)}</div>` : ""}</div>`;
+    const stats = [
+      stat(t(hass, "failed_polls_today"), String(failedToday), "", failedToday ? "warn" : ""),
+      stat(t(hass, "failed_in_a_row"), String(inARow), "", inARow ? "bad" : ""),
+      stat(t(hass, "answer_time"), a.response_time != null ? `${fmt(hass, a.response_time, 2)} s` : "–"),
+      stat(t(hass, "last_data"), a.last_success ? relativeTime(hass, a.last_success) : "–"),
+      stat(t(hass, "last_problem"), a.last_failure ? relativeTime(hass, a.last_failure) : t(hass, "none"), down ? problemText(hass, connection) : ""),
+      lastContact && lastContact !== "unavailable" && lastContact !== "unknown" ? stat(t(hass, "unit_contact"), relativeTime(hass, lastContact), "", "", gateway.last_communication) : "",
+      wifi !== null ? stat(t(hass, "wifi"), `${fmt(hass, wifi, 0)} dBm`, "", wifi < -75 ? "warn" : "", gateway.wifi_signal) : "",
+    ].join("");
+
+    return `${this.title(hass, "connection")}${headline}<div class="tl">${rows}</div>${rows ? `<div class="axis">${marks}</div>` : ""}<div class="stats">${stats}</div>`;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Registration
 // ---------------------------------------------------------------------------
 
@@ -2377,13 +2693,14 @@ const CARDS = [
   ["csnet-water-circuit-card", CsnetWaterCircuitCard, "CSNet · Water circuit", "Live diagram: outdoor unit, flow and return, each circuit and the hot water tank, pumps."],
   ["csnet-heating-curve-card", CsnetHeatingCurveCard, "CSNet · Heating curve", "The heating curves you entered, where the unit is on them now, and its water target over the last days."],
   ["csnet-performance-card", CsnetPerformanceCard, "CSNet · Performance", "COP now, today, yesterday and per month, with the share of heat taken from the air."],
-  ["csnet-system-health-card", CsnetSystemHealthCard, "CSNet · System health", "Alarms, gateway, central control, defrost and water pressure at a glance."],
+  ["csnet-system-health-card", CsnetSystemHealthCard, "CSNet · System health", "Alarms, CSNet connection, gateway, central control, defrost and water pressure at a glance."],
   ["csnet-temperatures-card", CsnetTemperaturesCard, "CSNet · Temperatures", "Flow, return, target, outdoor temperature and compressor frequency over the last hours."],
   ["csnet-activity-card", CsnetActivityCard, "CSNet · Activity", "What ran over the last hours: compressor, defrost, circuit demands, hot water, pumps, backup heater."],
   ["csnet-daily-energy-card", CsnetDailyEnergyCard, "CSNet · Energy per day", "Electricity and heat per day with the COP and the average outdoor temperature."],
   ["csnet-power-profile-card", CsnetPowerProfileCard, "CSNet · Power today", "Today's power against the average day of the last two weeks."],
   ["csnet-energy-signature-card", CsnetEnergySignatureCard, "CSNet · Energy signature", "Tomorrow's electricity from the weather forecast, kWh per degree, 7-day average and base load."],
   ["csnet-refrigerant-card", CsnetRefrigerantCard, "CSNet · Refrigerant circuit", "Compressor, temperatures, pressures and expansion valve of the outdoor unit."],
+  ["csnet-connection-card", CsnetConnectionCard, "CSNet · Connection", "Whether Home Assistant and the unit reach CSNet Manager: last hours, failed polls, answer time, what went wrong."],
 ];
 
 if (!customElements.get("csnet-home-card-editor")) customElements.define("csnet-home-card-editor", CsnetCardEditor);
