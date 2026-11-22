@@ -7,6 +7,20 @@ description: What changed in each version of the CSNet Home (unofficial, for Hit
 
 Every version of the integration, newest first. Install or update from HACS; each version is also on the [GitHub releases page](https://github.com/mmornati/home-assistant-csnet-home/releases).
 
+## 2.19.0
+
+*22 November 2026* · [GitHub release](https://github.com/mmornati/home-assistant-csnet-home/releases/tag/2.19.0)
+
+See when Home Assistant cannot reach CSNet Manager, and why. No entity is renamed or removed, and nothing new is sent to the unit.
+
+#### Added
+
+- **CSNet Manager connection** (`binary_sensor.system_controller_csnet_manager_connection`, diagnostic): `on` when the last poll brought the readings, `off` when it failed. It stays available when the other entities are not, and says what went wrong in its `problem` attribute: `timeout`, `dns`, `no_connection`, `http_error`, `error_answer`… with the request, the error, the last success and failure, the failed polls in a row and today, and the response time. See [CSNet Manager Connection](wiki/Sensors-Reference.md#csnet-manager-connection). ([#275](https://github.com/mmornati/home-assistant-csnet-home/pull/275))
+
+#### Fixed
+
+- **The logs of a failed poll read like an error from CSNet** even when CSNet had not answered: a timeout was logged with an empty message, followed by "status not 'success'". They now say "no answer within 10 s (timeout)", give the type and text of a connection error, and only report an answer without success when CSNet answered. ([#275](https://github.com/mmornati/home-assistant-csnet-home/pull/275))
+
 ## 2.18.0
 
 *22 November 2026* · [GitHub release](https://github.com/mmornati/home-assistant-csnet-home/releases/tag/2.18.0)

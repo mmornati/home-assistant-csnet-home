@@ -16,7 +16,9 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 
+from .cloud_connection import CloudConnection
 from .const import DOMAIN, MIN_SCAN_INTERVAL
 
 if TYPE_CHECKING:
@@ -122,6 +124,8 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         self._saved_alarm_state: dict | None = None
         self._enable_alarm_notifications = enable_alarm_notifications
         self._filtered_alarm_codes = self._parse_filtered_alarm_codes(filtered_alarm_codes)
+        # How the polls of CSNet Manager went, for the connection sensor
+        self.connection = CloudConnection()
         super().__init__(
             hass,
             _LOGGER,
@@ -142,6 +146,24 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
             return set()
 
     async def _async_update_data(self):
+        """Fetch data for all sensors, and note how the poll went for the connection sensor."""
+        problems = getattr(self.api, "problems", None)
+        if isinstance(problems, dict):
+            problems.clear()
+        try:
+            data = await self._async_fetch_data()
+        except ConfigEntryAuthFailed:
+            self.connection.record_failure(dt_util.now(), {}, rejected=True)
+            raise
+        except Exception:
+            problems = getattr(self.api, "problems", None)
+            self.connection.record_failure(dt_util.now(), dict(problems) if isinstance(problems, dict) else {})
+            raise
+        response = getattr(self.api, "response_seconds", None)
+        self.connection.record_success(dt_util.now(), response.get("elements") if isinstance(response, dict) else None)
+        return data
+
+    async def _async_fetch_data(self):
         """Fetch data for all sensors."""
 
         _LOGGER.debug("Fetching all CSNet Home sensor data from API.")

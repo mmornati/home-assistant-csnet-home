@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from custom_components.csnet_home.cloud_connection import CloudConnection
 from custom_components.csnet_home.const import DOMAIN
 from custom_components.csnet_home.coordinator import CSNetHomeData
 from custom_components.csnet_home.diagnostics import REDACTED, async_get_config_entry_diagnostics, redact
@@ -29,6 +30,7 @@ def _coordinator():
     coordinator = MagicMock()
     coordinator.last_update_success = True
     coordinator.update_interval = timedelta(seconds=60)
+    coordinator.connection = CloudConnection()
     coordinator.get_sensors_data.return_value = [
         {"device_id": 1709, "room_id": 394, "zone_id": 1, "room_name": "Ground floor", "current_temperature": 19.5},
     ]
@@ -91,7 +93,7 @@ async def test_diagnostics_keeps_the_values_needed_to_debug(hass):
 
     result = await async_get_config_entry_diagnostics(hass, entry)
 
-    assert result["coordinator"] == {"last_update_success": True, "update_interval_seconds": 60.0}
+    assert result["coordinator"] == {"last_update_success": True, "update_interval_seconds": 60.0, "connection": CloudConnection().as_attributes()}
     assert result["sensors"][0]["room_name"] == "Ground floor"
     assert result["sensors"][0]["current_temperature"] == 19.5
     assert result["common_data"]["weather_temperature"] == 2

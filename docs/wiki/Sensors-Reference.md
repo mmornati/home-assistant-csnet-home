@@ -7,7 +7,7 @@ Complete reference of all sensors provided by the CSNet Home (unofficial, for Hi
 The integration creates numerous sensors to monitor your Hitachi heat pump system. Sensors are organized into several categories:
 
 - **Zone Sensors** - Per-zone temperature and status
-- **Device Sensors** - WiFi and connectivity
+- **Device Sensors** - WiFi and connectivity, and the connection of Home Assistant to CSNet Manager
 - **Water System Sensors** - Hydraulic system and DHW tank monitoring
 - **Environmental Sensors** - Outdoor and weather data
 - **System Status Sensors** - Equipment operation status
@@ -188,6 +188,54 @@ action:
 **Entity**: `sensor.{device}_last_communication`  
 **Device Class**: `timestamp`  
 **Description**: Timestamp (UTC) of the device's last communication with CSNet Manager
+
+### CSNet Manager Connection
+**Entity**: `binary_sensor.system_controller_csnet_manager_connection` (diagnostic)  
+**Values**: `on` (connected), `off` (the last poll failed)  
+**Device Class**: `connectivity`  
+**Description**: Whether the last poll of CSNet Manager by Home Assistant brought the readings. The sensors above say whether the **unit** talks to CSNet; this one says whether **Home Assistant** does. It stays available when the polls fail, so it says why the other entities are unavailable.
+
+**Attributes**:
+
+| Attribute | What it is |
+|-----------|------------|
+| `problem` | What went wrong with the last poll (see below), empty when it worked |
+| `failed_request` | The request that met the problem: `elements`, `login`, `installation devices`… |
+| `detail` | The error as received, for example `HTTP 503` or `TimeoutError` |
+| `last_success` / `last_failure` | When the last poll worked, and when one last failed |
+| `failed_polls_in_a_row` | Failed polls since the last one that worked |
+| `failed_polls_today` | Failed polls since midnight |
+| `response_time` | Seconds CSNet took to answer the last good poll |
+
+**Problems**, and on which side they usually are:
+
+| `problem` | What happened | Usually |
+|-----------|---------------|---------|
+| `timeout` | No answer within 10 seconds | Either side: CSNet slow, or the connection from Home Assistant |
+| `dns` | The name `www.csnetmanager.com` could not be looked up | This side: DNS or internet down |
+| `no_connection` | No connection could be opened | This side (internet down), or CSNet down |
+| `connection_lost` | The connection closed before the answer | Either side |
+| `http_error` | CSNet answered with an error status (`detail` says which) | CSNet |
+| `error_answer` | CSNet answered, but without the readings | CSNet |
+| `unreadable_answer` | CSNet's answer could not be read | CSNet |
+| `login_failed` / `login_rejected` | Signing in failed / the credentials were refused | CSNet / your credentials |
+| `login_waiting` | Waiting before signing in again after a failed login | – |
+| `no_data` | No readings, without a known reason | – |
+
+**Usage**: one failed poll now and then is normal; notify when it lasts.
+```yaml
+trigger:
+  - platform: state
+    entity_id: binary_sensor.system_controller_csnet_manager_connection
+    to: "off"
+    for: "00:10:00"
+action:
+  - service: notify.mobile_app
+    data:
+      message: >
+        CSNet Manager unreachable for 10 minutes:
+        {{ state_attr('binary_sensor.system_controller_csnet_manager_connection', 'problem') }}
+```
 
 ---
 
