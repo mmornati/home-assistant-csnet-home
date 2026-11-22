@@ -410,7 +410,8 @@ See [Troubleshooting](Troubleshooting.md) for detailed help.
 Usually means connection lost to CSNet Manager:
 - Check internet connection
 - Check if CSNet Manager website is accessible
-- Check `connectivity` sensor
+- Check the **CSNet Manager Connection** binary sensor: its `problem` attribute says whether the request timed out, the name could not be looked up, or CSNet answered with an error
+- Check `connectivity` sensor (the unit's own link to CSNet)
 - Try reloading integration
 
 ### Temperature isn't updating

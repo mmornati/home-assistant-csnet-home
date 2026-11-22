@@ -246,24 +246,28 @@ See [How It Works](How-It-Works.md) for how the integration talks to CSNet Manag
    ping www.csnetmanager.com
    ```
 
-2. **Check Connectivity Sensor**:
-   - Look at `sensor.{device}_connectivity`
-   - If "off", device can't reach cloud
+2. **Check the CSNet Manager Connection sensor**:
+   - Look at `binary_sensor.system_controller_csnet_manager_connection` and its `problem` attribute
+   - `dns` or `no_connection`: Home Assistant can't reach the internet or look up names; `http_error` or `error_answer`: CSNet Manager has a problem; `timeout`: either. See [CSNet Manager Connection](Sensors-Reference.md#csnet-manager-connection)
 
-3. **Check Last Communication**:
+3. **Check Connectivity Sensor**:
+   - Look at `sensor.{device}_connectivity`
+   - If "off", the unit itself can't reach the cloud
+
+4. **Check Last Communication**:
    - Look at `sensor.{device}_last_communication`
    - If timestamp is old, connection lost
 
-4. **Restart Integration**:
+5. **Restart Integration**:
    - Settings → Devices & Services
    - Find CSNet Home
    - Click ⋮ → Reload
 
-5. **Check CSNet Manager Status**:
+6. **Check CSNet Manager Status**:
    - Try accessing www.csnetmanager.com
    - If site is down, wait for service restoration
 
-6. **Re-authenticate**:
+7. **Re-authenticate**:
    - Settings → Devices & Services → CSNet Home (unofficial, for Hitachi) → ⋮ → **Reconfigure**
    - Re-enter your credentials; they are validated before saving and the integration reloads
 
@@ -289,19 +293,21 @@ See [How It Works](How-It-Works.md) for how the integration talks to CSNet Manag
    - Try increasing to 120 or 180 seconds (via **Reconfigure**)
    - Reduces API call frequency
 
-3. **Monitor Connection**:
+3. **Monitor Connection**: the CSNet Manager Connection sensor counts the failed polls of the day (`failed_polls_today`) and says what went wrong each time:
    ```yaml
    automation:
      - alias: "Log Connection Issues"
        trigger:
          - platform: state
-           entity_id: sensor.remote_connectivity
+           entity_id: binary_sensor.system_controller_csnet_manager_connection
            to: "off"
        action:
          - service: logbook.log
            data:
              name: "CSNet Connection"
-             message: "Device went offline at {{ now() }}"
+             message: >
+               Poll failed at {{ now() }}:
+               {{ state_attr('binary_sensor.system_controller_csnet_manager_connection', 'problem') }}
    ```
 
 4. **Check Network Quality**:

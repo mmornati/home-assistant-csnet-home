@@ -7,7 +7,13 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry, MockEntityPlatform
 
-from custom_components.csnet_home.binary_sensor import BINARY_SENSOR_DESCRIPTIONS, CSNetHomeBinarySensor, _read, async_setup_entry
+from custom_components.csnet_home.binary_sensor import (
+    BINARY_SENSOR_DESCRIPTIONS,
+    CSNetHomeBinarySensor,
+    CSNetHomeCloudConnectionSensor,
+    _read,
+    async_setup_entry,
+)
 from custom_components.csnet_home.const import DOMAIN
 from custom_components.csnet_home.sensor import SYSTEM_STATUS_FLAG_BITS
 
@@ -38,7 +44,10 @@ async def _setup(coordinator, listeners=None):
     await async_setup_entry(None, entry, created.extend)
     if listeners is not None:
         listeners.append(created)
-    return {entity.entity_description.key: entity for entity in created}
+    entities = {entity.entity_description.key: entity for entity in created}
+    # the connection sensor is always there, whatever the unit reports
+    assert isinstance(entities.pop("cloud_connection"), CSNetHomeCloudConnectionSensor)
+    return entities
 
 
 def test_every_flag_sensor_uses_a_known_bit():

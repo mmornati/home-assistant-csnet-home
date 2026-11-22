@@ -269,6 +269,40 @@ def redact_data(data):
     return data
 
 
+# What went wrong with a request to CSNet Manager, for the connection sensor.
+# Some point to this side (no name lookup), some to CSNet (an error answer),
+# a timeout can be either.
+PROBLEM_TIMEOUT = "timeout"
+PROBLEM_DNS = "dns"
+PROBLEM_NO_CONNECTION = "no_connection"
+PROBLEM_CONNECTION_LOST = "connection_lost"
+PROBLEM_HTTP_ERROR = "http_error"
+PROBLEM_UNREADABLE = "unreadable_answer"
+PROBLEM_ERROR_ANSWER = "error_answer"
+PROBLEM_LOGIN_FAILED = "login_failed"
+PROBLEM_LOGIN_REJECTED = "login_rejected"
+PROBLEM_LOGIN_WAITING = "login_waiting"
+PROBLEM_NO_DATA = "no_data"
+
+
+def problem_of(err: BaseException) -> str:
+    """Return the kind of problem an exception raised by a request stands for."""
+    if isinstance(err, asyncio.TimeoutError):
+        return PROBLEM_TIMEOUT
+    dns_error = getattr(aiohttp, "ClientConnectorDNSError", None)
+    if dns_error is not None and isinstance(err, dns_error):
+        return PROBLEM_DNS
+    if isinstance(err, aiohttp.ClientConnectorError):
+        return PROBLEM_NO_CONNECTION
+    return PROBLEM_CONNECTION_LOST
+
+
+def describe_error(err: BaseException) -> str:
+    """Return an exception as text that is never empty (a timeout has no message)."""
+    text = str(err).strip()
+    return f"{type(err).__name__}: {text}" if text else type(err).__name__
+
+
 class CSNetHomeAPI:
     """Handles communication with the cloud service API."""
 
@@ -301,6 +335,15 @@ class CSNetHomeAPI:
         # Consecutive logins where the server answered with the login page again
         self.auth_rejections = 0
         self._last_login_rejected = False
+        # What went wrong with each request since the coordinator last cleared
+        # it, by request: (kind of problem, detail); and how long the last
+        # answer to each request took, in seconds
+        self.problems: dict[str, tuple[str, str]] = {}
+        self.response_seconds: dict[str, float] = {}
+
+    def note_problem(self, request: str, problem: str, detail: str = "") -> None:
+        """Remember what went wrong with a request, for the connection sensor."""
+        self.problems[request] = (problem, detail)
 
     @property
     def auth_failed(self) -> bool:
@@ -349,14 +392,22 @@ class CSNetHomeAPI:
             remaining = self.login_backoff_remaining
             if remaining > 0:
                 _LOGGER.debug("Skipping CSNet login, backing off for another %.0f s", remaining)
+                self.note_problem("login", PROBLEM_LOGIN_WAITING, f"next attempt in {remaining:.0f} s")
                 return False
 
             rejected = False
             try:
                 success = await self._async_do_login()
                 rejected = not success and self._last_login_rejected
-            except Exception as e:
-                _LOGGER.error("Login exception: %s", e)
+                if not success:
+                    self.note_problem("login", PROBLEM_LOGIN_REJECTED if rejected else PROBLEM_LOGIN_FAILED)
+            except (asyncio.TimeoutError, aiohttp.ClientError) as e:
+                _LOGGER.warning("Could not sign in to CSNet Manager: %s", describe_error(e))
+                self.note_problem("login", problem_of(e), describe_error(e))
+                success = False
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                _LOGGER.error("Login exception: %s", describe_error(e))
+                self.note_problem("login", PROBLEM_LOGIN_FAILED, describe_error(e))
                 success = False
 
             if success:
@@ -502,6 +553,7 @@ class CSNetHomeAPI:
         """
         for attempt in (1, 2):
             generation = self._login_generation
+            started = time.monotonic()
             try:
                 async with asyncio.timeout(DEFAULT_API_TIMEOUT):
                     # the session's cookie jar carries the cookies
@@ -509,8 +561,10 @@ class CSNetHomeAPI:
                         if not self._is_session_expired(response, None):
                             if response.status != 200:
                                 _LOGGER.warning("CSNet Manager answered the %s request with HTTP %s", description, response.status)
+                                self.note_problem(description, PROBLEM_HTTP_ERROR, f"HTTP {response.status}")
                                 return None
                             data = await response.json()
+                            self.response_seconds[description] = round(time.monotonic() - started, 2)
                             if self.sample_recorder is not None:
                                 self.sample_recorder.add(description, data)
                             return data
@@ -519,9 +573,15 @@ class CSNetHomeAPI:
                 pass
             except json.JSONDecodeError as err:
                 _LOGGER.error("CSNet Manager sent unreadable JSON for the %s request: %s", description, err)
+                self.note_problem(description, PROBLEM_UNREADABLE, describe_error(err))
                 return None
-            except (asyncio.TimeoutError, aiohttp.ClientError) as err:
-                _LOGGER.warning("CSNet Manager did not answer the %s request: %s", description, err or type(err).__name__)
+            except asyncio.TimeoutError as err:
+                _LOGGER.warning("No answer from CSNet Manager to the %s request within %d s (timeout)", description, DEFAULT_API_TIMEOUT)
+                self.note_problem(description, PROBLEM_TIMEOUT, describe_error(err))
+                return None
+            except aiohttp.ClientError as err:
+                _LOGGER.warning("Could not reach CSNet Manager for the %s request: %s", description, describe_error(err))
+                self.note_problem(description, problem_of(err), describe_error(err))
                 return None
 
             if not renew_session:
@@ -530,6 +590,7 @@ class CSNetHomeAPI:
 
             if attempt == 2:
                 _LOGGER.error("CSNet Manager still returns its login page for the %s request after signing in again", description)
+                self.note_problem(description, PROBLEM_LOGIN_FAILED, "login page instead of data")
                 async with self._login_lock:
                     # The new session does not work either: back off like a failed login
                     # instead of signing in again on every request.
@@ -635,10 +696,14 @@ class CSNetHomeAPI:
                     _LOGGER.debug("Retrieved Data Elements: %s", redact_data(data_elements))
                 return data_elements
 
-            _LOGGER.error("Error in API response, status not 'success'")
+            if data is not None:
+                # CSNet answered, but not with the readings
+                _LOGGER.error("CSNet Manager answered the elements request without success (status: %s)", data.get("status"))
+                self.note_problem("elements", PROBLEM_ERROR_ANSWER, f"status: {data.get('status')}")
+            # without an answer, the reason is already logged
             return None
         except Exception as e:
-            _LOGGER.error("Error during sensor data retrieval: %s", e)
+            _LOGGER.error("Error during sensor data retrieval: %s", describe_error(e))
             return None
 
     async def async_get_installation_devices_data(self):
@@ -659,10 +724,10 @@ class CSNetHomeAPI:
                 if _LOGGER.isEnabledFor(logging.DEBUG):
                     _LOGGER.debug("Installation devices data retrieved: %s", redact_data(data))
                 return data
-            _LOGGER.error("Error in installation devices API response")
+            # the reason is already logged
             return None
         except Exception as e:
-            _LOGGER.error("Error during installation devices data retrieval: %s", e)
+            _LOGGER.error("Error during installation devices data retrieval: %s", describe_error(e))
             return None
 
     async def async_get_installation_alarms(self):
@@ -690,7 +755,7 @@ class CSNetHomeAPI:
             _LOGGER.error("Error in installation alarms API response")
             return None
         except Exception as e:
-            _LOGGER.error("Error during installation alarms data retrieval: %s", e)
+            _LOGGER.error("Error during installation alarms data retrieval: %s", describe_error(e))
             return None
 
     async def async_get_power_data(self):
@@ -946,7 +1011,7 @@ class CSNetHomeAPI:
                                 return False
                             return True
             except (aiohttp.ClientError, asyncio.TimeoutError) as err:
-                _LOGGER.error("Error during %s: %s", description, err)
+                _LOGGER.error("Error during %s: %s", description, describe_error(err))
                 return False
 
             self.logged_in = False

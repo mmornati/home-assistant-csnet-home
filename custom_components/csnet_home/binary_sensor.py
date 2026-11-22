@@ -1,8 +1,9 @@
-"""Binary sensors for what the unit is running right now.
+"""Binary sensors for what the unit is running right now, and for the link to CSNet Manager.
 
 They decode ``heatingStatus.systemStatus2Flags`` the way the CSNet web app
 does, plus the defrost state, and sit on the same device as the unit's
-other sensors.
+other sensors. The connection sensor says whether the last poll of CSNet
+Manager brought the readings, and what went wrong when it did not.
 """
 
 from __future__ import annotations
@@ -11,6 +12,7 @@ import logging
 from dataclasses import dataclass
 
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass, BinarySensorEntity, BinarySensorEntityDescription
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -106,6 +108,14 @@ BINARY_SENSOR_DESCRIPTIONS: tuple[CSNetHomeBinarySensorDescription, ...] = (
 )
 
 
+CLOUD_CONNECTION_DESCRIPTION = BinarySensorEntityDescription(
+    key="cloud_connection",
+    name="CSNet Manager connection",
+    device_class=BinarySensorDeviceClass.CONNECTIVITY,
+    entity_category=EntityCategory.DIAGNOSTIC,
+)
+
+
 def _read(heating_status, description: CSNetHomeBinarySensorDescription) -> bool | None:
     """Return the state of one binary sensor, or None when the unit does not report it."""
     if not isinstance(heating_status, dict):
@@ -155,6 +165,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: CSNetHomeConfigEntry, as
         if entities:
             async_add_entities(entities)
 
+    # there from the start: it matters most when no reading comes
+    async_add_entities([CSNetHomeCloudConnectionSensor(coordinator)])
     _add_reported()
     entry.async_on_unload(coordinator.async_add_listener(_add_reported))
 
@@ -179,6 +191,38 @@ class CSNetHomeBinarySensor(CoordinatorEntity, BinarySensorEntity):
     def is_on(self) -> bool | None:
         """Return True when the unit reports this as running or active."""
         return _read(self._heating_status(), self.entity_description)
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return the device of the unit, the one its sensors are on."""
+        return unit_device_info(self.coordinator)
+
+
+class CSNetHomeCloudConnectionSensor(CoordinatorEntity, BinarySensorEntity):
+    """Whether the last poll of CSNet Manager brought the readings, and what went wrong when not."""
+
+    _attr_has_entity_name = True
+
+    def __init__(self, coordinator: CSNetHomeCoordinator) -> None:
+        """Initialize the connection sensor."""
+        super().__init__(coordinator)
+        self.entity_description = CLOUD_CONNECTION_DESCRIPTION
+        self._attr_unique_id = f"{DOMAIN}-cloud-connection"
+
+    @property
+    def available(self) -> bool:
+        """Stay available when the polls fail: that is what it reports."""
+        return True
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return True when the last poll brought the readings, None before the first poll."""
+        return self.coordinator.connection.connected
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Return what went wrong, when, and how often."""
+        return self.coordinator.connection.as_attributes()
 
     @property
     def device_info(self) -> DeviceInfo:

@@ -115,6 +115,7 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: ConfigE
         "coordinator": {
             "last_update_success": coordinator.last_update_success,
             "update_interval_seconds": coordinator.update_interval.total_seconds() if coordinator.update_interval else None,
+            "connection": coordinator.connection.as_attributes() if hasattr(coordinator, "connection") else None,
         },
         "sensors": redact(coordinator.get_sensors_data() or []),
         "server_energy": _server_energy_summary(coordinator.get_server_energy()),
