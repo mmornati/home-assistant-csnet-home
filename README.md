@@ -621,7 +621,7 @@ home-assistant-csnet-home/
 
 ## Known Limitations
 
-- **AUTO mode** is not exposed as a settable HA HVAC mode due to server-side semantics; the entity reports heating/cooling/idle actions based on temperatures and `mode`
+- **AUTO mode** is not exposed as a settable HA HVAC mode due to server-side semantics; the entity reports heating/cooling/idle actions from the unit's operation status
 - Some fields from the elements endpoint are device-specific and undocumented; we are progressively surfacing them (see [#21](https://github.com/mmornati/home-assistant-csnet-home/discussions/21))
 - The integration requires an active internet connection to communicate with the CSNet Manager cloud service
 - Response times depend on the CSNet Manager service availability and response time
