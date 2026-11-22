@@ -42,7 +42,10 @@ start_sample_recording:
           device_class: energy
     meter_power_entity:
       name: Meter power
-      description: Power sensor (W) of the same meter, to compare the instant estimate.
+      description: >
+        Power sensor (W or kW) of the same meter, to compare the instant
+        estimate. Defaults to the power sensor of the settings when the
+        energy sensor is not picked.
       selector:
         entity:
           domain: sensor

@@ -12,7 +12,7 @@ from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.exceptions import ServiceValidationError
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.csnet_home.const import CONF_ENERGY_METER, DOMAIN
+from custom_components.csnet_home.const import CONF_ENERGY_METER, CONF_ENERGY_METER_POWER, DOMAIN
 from custom_components.csnet_home.diagnostics import REDACTED
 from custom_components.csnet_home.sample_recorder import SAMPLE_FORMAT, SampleRecorder, redact_reply, sample_header
 from tests.replay.sample import read_sample
@@ -163,6 +163,23 @@ async def test_services_start_and_stop_a_recording(hass, loaded_entry, tmp_path)
 
     with pytest.raises(ServiceValidationError):
         await hass.services.async_call(DOMAIN, "stop_sample_recording", {}, blocking=True)
+
+
+async def test_recording_uses_the_power_sensor_of_the_settings(hass, loaded_entry, tmp_path):
+    """The settings' power sensor is recorded with the settings' meter, not with another meter picked for the sample."""
+    hass.config.config_dir = str(tmp_path)
+    hass.config_entries.async_update_entry(loaded_entry, data={**loaded_entry.data, CONF_ENERGY_METER_POWER: "sensor.phases_power"})
+    api = loaded_entry.runtime_data.api
+
+    await hass.services.async_call(DOMAIN, "start_sample_recording", {"duration_hours": 1}, blocking=True, return_response=True)
+    assert api.sample_recorder._meter_power_entity == "sensor.phases_power"  # pylint: disable=protected-access
+    await hass.services.async_call(DOMAIN, "stop_sample_recording", {}, blocking=True)
+
+    await hass.services.async_call(
+        DOMAIN, "start_sample_recording", {"duration_hours": 1, "meter_energy_entity": "sensor.other_energy"}, blocking=True, return_response=True
+    )
+    assert api.sample_recorder._meter_power_entity is None  # pylint: disable=protected-access
+    await hass.services.async_call(DOMAIN, "stop_sample_recording", {}, blocking=True)
 
 
 async def test_unloading_the_entry_keeps_the_recording(hass, loaded_entry, tmp_path):

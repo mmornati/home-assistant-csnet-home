@@ -16,6 +16,8 @@ DELETESPECIFICALARM_PATH = "/data/deletemyspecificalarm"
 HEAT_SETTINGS_PATH = "/data/indoor/heat_setting"
 CONF_MAX_TEMP_OVERRIDE = "max_temp_override"
 CONF_ENERGY_METER = "energy_meter"
+# The power sensor that goes with the energy meter; found on the meter's device when not chosen
+CONF_ENERGY_METER_POWER = "energy_meter_power"
 # Where the heat produced comes from: the heat CSNet records, or the integration's own calculation
 CONF_HEAT_SOURCE = "heat_source"
 HEAT_SOURCE_CSNET = "csnet"

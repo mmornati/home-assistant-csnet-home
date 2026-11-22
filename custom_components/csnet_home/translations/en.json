@@ -17,6 +17,7 @@
                     "enable_alarm_notifications": "Enable alarm notifications",
                     "filtered_alarm_codes": "Filtered alarm codes",
                     "energy_meter": "Electricity meter of the heat pump (optional)",
+                    "energy_meter_power": "Power sensor of the heat pump (optional)",
                     "heat_source": "Heat produced",
                     "user_agent": "User-Agent (advanced)"
                 },
@@ -33,6 +34,7 @@
                     "enable_alarm_notifications": "Create a Home Assistant notification when the unit reports an alarm",
                     "filtered_alarm_codes": "Comma-separated alarm codes that never notify (default: -1, communication errors). Leave empty to notify all.",
                     "energy_meter": "Any energy sensor (kWh) that measures the heat pump's electricity, from any device. Used to compute the COP from the heat CSNet records. Leave empty to keep the estimate only.",
+                    "energy_meter_power": "The power sensor (W or kW) that goes with the electricity meter, for Instant Consumption. With a three-phase meter, choose the total of the phases, or a helper that adds them up. Leave empty to use the power sensor found on the meter's device.",
                     "heat_source": "Where the heat produced comes from, for every accumulated heating, cooling and hot water counter and every daily or period COP. CSNet: the heat CSNet Manager records for the unit (by full hours). Calculated: the integration's own measure, from the water flow and the exchanger's temperatures, in real time. With CSNet, the integration's measure is used when CSNet has not recorded any heat for the unit.",
                     "user_agent": "How the integration presents itself to CSNet Manager. Leave empty to use the default (a desktop Chrome browser). Change it only to test another value."
                 }
@@ -53,6 +55,7 @@
                     "enable_alarm_notifications": "Enable alarm notifications",
                     "filtered_alarm_codes": "Filtered alarm codes",
                     "energy_meter": "Electricity meter of the heat pump (optional)",
+                    "energy_meter_power": "Power sensor of the heat pump (optional)",
                     "heat_source": "Heat produced",
                     "user_agent": "User-Agent (advanced)"
                 },
@@ -69,6 +72,7 @@
                     "enable_alarm_notifications": "Create a Home Assistant notification when the unit reports an alarm",
                     "filtered_alarm_codes": "Comma-separated alarm codes that never notify (default: -1, communication errors). Leave empty to notify all.",
                     "energy_meter": "Any energy sensor (kWh) that measures the heat pump's electricity, from any device. Used to compute the COP from the heat CSNet records. Leave empty to keep the estimate only.",
+                    "energy_meter_power": "The power sensor (W or kW) that goes with the electricity meter, for Instant Consumption. With a three-phase meter, choose the total of the phases, or a helper that adds them up. Leave empty to use the power sensor found on the meter's device.",
                     "heat_source": "Where the heat produced comes from, for every accumulated heating, cooling and hot water counter and every daily or period COP. CSNet: the heat CSNet Manager records for the unit (by full hours). Calculated: the integration's own measure, from the water flow and the exchanger's temperatures, in real time. With CSNet, the integration's measure is used when CSNet has not recorded any heat for the unit.",
                     "user_agent": "How the integration presents itself to CSNet Manager. Leave empty to use the default (a desktop Chrome browser). Change it only to test another value."
                 }
@@ -91,7 +95,8 @@
             "invalid_auth": "Invalid username or password. Please check your credentials.",
             "unknown": "An unexpected error occurred. Please try again.",
             "invalid_alarm_codes": "Alarm codes must be whole numbers separated by commas, for example: -1, 62",
-            "invalid_user_agent": "The User-Agent must be a single line of plain ASCII characters, 256 at most."
+            "invalid_user_agent": "The User-Agent must be a single line of plain ASCII characters, 256 at most.",
+            "power_without_meter": "Choose an electricity meter first: the power sensor goes with it."
         },
         "abort": {
             "already_configured": "This CSNet Home integration is already configured.",

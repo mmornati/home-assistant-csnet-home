@@ -484,6 +484,8 @@ Installation-wide sensors on the **System-Controller** device. The CSNet API doe
 
 With an electricity meter chosen in the integration's settings (Reconfigure → Electricity meter of the heat pump), every sensor that depends on the electricity uses that meter instead. Each of them names the source it used in its `electricity_source` attribute: `meter` or `estimate`. While the meter has no reading, the estimate stands in.
 
+The electricity power comes from the power sensor chosen in the settings (Power sensor of the heat pump) or, without one, from the power sensor of the meter's own device. With a three-phase meter that has a power sensor per phase but no total, choose a sensor that adds up the phases: otherwise the power is that of one phase only.
+
 The heat produced comes from the source chosen in the settings (Heat produced): the heat **CSNet** Manager records for the unit (the default), or the integration's own measure, **calculated** from the heat power. The heat sensors and every daily or period COP use it, and show it in their `heat_source` attribute: `csnet` or `calculated`. A unit CSNet has answered for without any heat on record uses the calculated heat. The heat power and the instant COP are always calculated: CSNet records heat by the hour only.
 
 Every sensor is named the same way: what it is (*Electricity*, *Heat*, *COP*), the period, then where it comes from in brackets: *(metered)* or *(estimated)* for the electricity and the COPs, *(csnet)* or *(calculated)* for the heat. The unique IDs did not change with these names, so existing installations keep their entity IDs and history.

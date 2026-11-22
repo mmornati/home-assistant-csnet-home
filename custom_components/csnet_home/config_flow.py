@@ -26,6 +26,7 @@ from .const import (
     CONF_CARD_LANGUAGE,
     CONF_ENABLE_ALARM_NOTIFICATIONS,
     CONF_ENERGY_METER,
+    CONF_ENERGY_METER_POWER,
     CONF_FAN_COIL_MODEL,
     CONF_FILTERED_ALARM_CODES,
     CONF_HEAT_SOURCE,
@@ -58,6 +59,8 @@ SCAN_INTERVAL_SCHEMA = vol.All(vol.Coerce(int), vol.Range(min=MIN_SCAN_INTERVAL)
 # Masked in the browser, and never pre-filled: the stored password is not sent to the frontend
 # Any energy sensor, from any integration: the integration only reads its state
 ENERGY_METER_SELECTOR = EntitySelector(EntitySelectorConfig(domain="sensor", device_class="energy"))
+# Any power sensor too: a three-phase total, or a helper that adds up the phases
+ENERGY_METER_POWER_SELECTOR = EntitySelector(EntitySelectorConfig(domain="sensor", device_class="power"))
 HEAT_SOURCE_SELECTOR = SelectSelector(SelectSelectorConfig(options=HEAT_SOURCES, mode=SelectSelectorMode.DROPDOWN, translation_key=CONF_HEAT_SOURCE))
 CARD_LANGUAGE_SELECTOR = SelectSelector(SelectSelectorConfig(options=CARD_LANGUAGES, mode=SelectSelectorMode.DROPDOWN, translation_key=CONF_CARD_LANGUAGE))
 PASSWORD_SELECTOR = TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD, autocomplete="current-password"))
@@ -72,6 +75,9 @@ def _settings_schema(current: dict) -> dict:
     energy_meter_key = vol.Optional(CONF_ENERGY_METER)
     if current.get(CONF_ENERGY_METER):
         energy_meter_key = vol.Optional(CONF_ENERGY_METER, description={"suggested_value": current[CONF_ENERGY_METER]})
+    energy_meter_power_key = vol.Optional(CONF_ENERGY_METER_POWER)
+    if current.get(CONF_ENERGY_METER_POWER):
+        energy_meter_power_key = vol.Optional(CONF_ENERGY_METER_POWER, description={"suggested_value": current[CONF_ENERGY_METER_POWER]})
     return {
         vol.Optional(
             CONF_SCAN_INTERVAL,
@@ -99,6 +105,7 @@ def _settings_schema(current: dict) -> dict:
         vol.Optional(CONF_POWER_SUPPLY, default=current.get(CONF_POWER_SUPPLY, DEFAULT_POWER_SUPPLY)): vol.In(POWER_SUPPLY_OPTIONS),
         # optional, and a suggestion so it can be emptied again
         energy_meter_key: ENERGY_METER_SELECTOR,
+        energy_meter_power_key: ENERGY_METER_POWER_SELECTOR,
         vol.Optional(CONF_HEAT_SOURCE, default=current.get(CONF_HEAT_SOURCE, DEFAULT_HEAT_SOURCE)): HEAT_SOURCE_SELECTOR,
         # a suggestion, not a default: emptying the field goes back to the default
         vol.Optional(CONF_USER_AGENT, description={"suggested_value": current.get(CONF_USER_AGENT) or DEFAULT_USER_AGENT}): str,
@@ -120,6 +127,8 @@ def _settings_from_input(user_input: dict) -> dict:
         CONF_POWER_SUPPLY: user_input.get(CONF_POWER_SUPPLY, DEFAULT_POWER_SUPPLY),
         # any energy sensor of Home Assistant that measures the heat pump; none by default
         CONF_ENERGY_METER: user_input.get(CONF_ENERGY_METER) or None,
+        # its power sensor; none means the one found on the meter's device
+        CONF_ENERGY_METER_POWER: user_input.get(CONF_ENERGY_METER_POWER) or None,
         CONF_HEAT_SOURCE: user_input.get(CONF_HEAT_SOURCE, DEFAULT_HEAT_SOURCE),
         CONF_USER_AGENT: _user_agent(user_input),
     }
@@ -144,6 +153,9 @@ def _settings_errors(user_input: dict) -> dict[str, str]:
     # one line of printable ASCII: anything else is not a valid header value
     if len(user_agent) > 256 or not all(" " <= char <= "~" for char in user_agent):
         return {CONF_USER_AGENT: "invalid_user_agent"}
+    # a metered power next to an estimated energy would not add up
+    if user_input.get(CONF_ENERGY_METER_POWER) and not user_input.get(CONF_ENERGY_METER):
+        return {CONF_ENERGY_METER_POWER: "power_without_meter"}
     return {}
 
 

@@ -12,13 +12,15 @@ answers which entity plays which role, found by the entities' unique ids.
 from __future__ import annotations
 
 import logging
+import re
+from collections.abc import Mapping
 from pathlib import Path
 
 import voluptuous as vol
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 
-from .const import CARD_LANGUAGES, CONF_CARD_LANGUAGE, CONF_ENERGY_METER, DOMAIN
+from .const import CARD_LANGUAGES, CONF_CARD_LANGUAGE, CONF_ENERGY_METER, CONF_ENERGY_METER_POWER, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -129,16 +131,36 @@ def _zone_of(unique_id: str, prefix: str) -> tuple[str, int] | None:
 
 
 def _meter_roles(hass: HomeAssistant, registry: er.EntityRegistry) -> dict[str, str]:
-    """Return the electricity meter the user chose in the settings, and the power sensor of the same device."""
+    """Return the electricity meter the user chose in the settings, and its power sensor."""
     entries = hass.config_entries.async_entries(DOMAIN)
     meter = entries[0].data.get(CONF_ENERGY_METER) if entries else None
     if not meter:
         return {}
     roles = {"meter_energy": meter}
-    power = meter_power_entity(registry, meter)
+    power = meter_power_for(registry, entries[0].data)
     if power:
         roles["meter_power"] = power
     return roles
+
+
+def meter_power_for(registry: er.EntityRegistry, settings: Mapping) -> str | None:
+    """Return the power sensor of the electricity meter in the settings, or None without a meter.
+
+    The power sensor the user chose, else the one found on the meter's device.
+    """
+    meter = settings.get(CONF_ENERGY_METER)
+    if not meter:
+        return None
+    return settings.get(CONF_ENERGY_METER_POWER) or meter_power_entity(registry, meter)
+
+
+# One phase of a three-phase meter: "phase_a", "l1", "channel_b", "phase_1"...
+_ONE_PHASE = re.compile(r"(?:^|_)(?:l[123]|(?:phase|channel)_?[abc123])(?:_|$)")
+
+
+def looks_like_one_phase(entity_id: str) -> bool:
+    """Return whether an entity id names a single phase of a three-phase meter."""
+    return bool(_ONE_PHASE.search(entity_id.split(".", 1)[-1]))
 
 
 def meter_power_entity(registry: er.EntityRegistry, meter: str) -> str | None:

@@ -30,6 +30,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_ENERGY_METER,
+    CONF_ENERGY_METER_POWER,
     CONF_HEAT_SOURCE,
     CONF_POWER_SUPPLY,
     DEFAULT_HEAT_SOURCE,
@@ -1123,6 +1124,21 @@ def _remove_unsupported_compressor_entities(hass, unsupported_keys) -> None:
             _LOGGER.info("Removed %s: the outdoor unit has no such sensor", entity_id)
 
 
+def _meter_power_sensor(hass, entry) -> str | None:
+    """Return the power sensor of the settings' electricity meter, and warn when it was found and seems to be one phase."""
+    from .dashboard import looks_like_one_phase, meter_power_for  # pylint: disable=import-outside-toplevel
+
+    power = meter_power_for(er.async_get(hass), entry.data)
+    if power and not entry.data.get(CONF_ENERGY_METER_POWER) and looks_like_one_phase(power):
+        _LOGGER.warning(
+            "The electricity meter's power sensor %s seems to measure a single phase, so the electricity power may be "
+            "only part of the heat pump's. Choose a power sensor for all phases (a total, or a helper that adds them "
+            "up) in the integration's settings",
+            power,
+        )
+    return power
+
+
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up sensors for CSNet Home."""
     _LOGGER.debug("Starting CSNet Home sensor setup")
@@ -1177,13 +1193,11 @@ async def async_setup_entry(hass, entry, async_add_entities):
         observer.power_supply = power_supply
 
         # Where the electricity comes from: the user's meter (and the power
-        # sensor of the same device), or else the estimate
+        # sensor they chose, else the one of the same device), or else the estimate
         energy_meter = entry.data.get(CONF_ENERGY_METER)
         energy_meter_power = None
         if energy_meter:
-            from .dashboard import meter_power_entity  # pylint: disable=import-outside-toplevel
-
-            energy_meter_power = meter_power_entity(er.async_get(hass), energy_meter)
+            energy_meter_power = _meter_power_sensor(hass, entry)
             coordinator.estimated_energy = None
         else:
             from .server_energy import EstimatedEnergyCounter  # pylint: disable=import-outside-toplevel

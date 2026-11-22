@@ -17,8 +17,9 @@ in [csnet-home-samples](https://github.com/mmornati/csnet-home-samples), with a
 2. Choose how long to record. Two days or more cover the daily totals and CSNet's
    hourly heat records. A day with defrosts, a DHW cycle or cooling is worth more
    than a longer quiet period.
-3. If you have a meter on the heat pump's circuit, pick its **power** sensor. Its
-   energy sensor is taken from the integration's settings, or pick it too.
+3. If you have a meter on the heat pump's circuit, its energy and power sensors
+   are taken from the integration's settings. To record another meter, pick its
+   **energy** and **power** sensors.
 4. When the time is up (or when you run **CSNet Home: Stop sample recording**),
    a notification says where the file is: `csnet_home_samples/` in Home
    Assistant's configuration folder.

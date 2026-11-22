@@ -17,6 +17,7 @@
                     "enable_alarm_notifications": "Activer les notifications d'alarme",
                     "filtered_alarm_codes": "Codes d'alarme filtrés",
                     "energy_meter": "Compteur électrique de la pompe à chaleur (facultatif)",
+                    "energy_meter_power": "Capteur de puissance de la pompe à chaleur (facultatif)",
                     "heat_source": "Chaleur produite",
                     "user_agent": "User-Agent (avancé)"
                 },
@@ -33,6 +34,7 @@
                     "enable_alarm_notifications": "Créer une notification Home Assistant quand l'unité signale une alarme",
                     "filtered_alarm_codes": "Codes d'alarme, séparés par des virgules, qui ne notifient jamais (par défaut : -1, erreurs de communication). Laisser vide pour tout notifier.",
                     "energy_meter": "N'importe quel capteur d'énergie (kWh) mesurant l'électricité de la pompe à chaleur, quel que soit l'appareil. Sert à calculer le COP à partir de la chaleur enregistrée par CSNet. Laisser vide pour ne garder que l'estimation.",
+                    "energy_meter_power": "Le capteur de puissance (W ou kW) qui va avec le compteur électrique, pour la consommation instantanée. Avec un compteur triphasé, choisissez le total des phases, ou une entrée d'aide qui les additionne. Laissez vide pour utiliser le capteur de puissance trouvé sur l'appareil du compteur.",
                     "heat_source": "D'où vient la chaleur produite, pour tous les compteurs cumulés de chauffage, de rafraîchissement et d'ECS et tous les COP journaliers ou par période. CSNet : la chaleur que CSNet Manager enregistre pour l'unité (par heures complètes). Calculée : la mesure de l'intégration, à partir du débit et des températures de l'échangeur, en temps réel. Avec CSNet, la mesure de l'intégration est utilisée quand CSNet n'a enregistré aucune chaleur pour l'unité.",
                     "user_agent": "Comment l'intégration se présente à CSNet Manager. Laissez vide pour utiliser la valeur par défaut (un navigateur Chrome de bureau). À modifier uniquement pour tester une autre valeur."
                 }
@@ -53,6 +55,7 @@
                     "enable_alarm_notifications": "Activer les notifications d'alarme",
                     "filtered_alarm_codes": "Codes d'alarme filtrés",
                     "energy_meter": "Compteur électrique de la pompe à chaleur (facultatif)",
+                    "energy_meter_power": "Capteur de puissance de la pompe à chaleur (facultatif)",
                     "heat_source": "Chaleur produite",
                     "user_agent": "User-Agent (avancé)"
                 },
@@ -69,6 +72,7 @@
                     "enable_alarm_notifications": "Créer une notification Home Assistant quand l'unité signale une alarme",
                     "filtered_alarm_codes": "Codes d'alarme, séparés par des virgules, qui ne notifient jamais (par défaut : -1, erreurs de communication). Laisser vide pour tout notifier.",
                     "energy_meter": "N'importe quel capteur d'énergie (kWh) mesurant l'électricité de la pompe à chaleur, quel que soit l'appareil. Sert à calculer le COP à partir de la chaleur enregistrée par CSNet. Laisser vide pour ne garder que l'estimation.",
+                    "energy_meter_power": "Le capteur de puissance (W ou kW) qui va avec le compteur électrique, pour la consommation instantanée. Avec un compteur triphasé, choisissez le total des phases, ou une entrée d'aide qui les additionne. Laissez vide pour utiliser le capteur de puissance trouvé sur l'appareil du compteur.",
                     "heat_source": "D'où vient la chaleur produite, pour tous les compteurs cumulés de chauffage, de rafraîchissement et d'ECS et tous les COP journaliers ou par période. CSNet : la chaleur que CSNet Manager enregistre pour l'unité (par heures complètes). Calculée : la mesure de l'intégration, à partir du débit et des températures de l'échangeur, en temps réel. Avec CSNet, la mesure de l'intégration est utilisée quand CSNet n'a enregistré aucune chaleur pour l'unité.",
                     "user_agent": "Comment l'intégration se présente à CSNet Manager. Laissez vide pour utiliser la valeur par défaut (un navigateur Chrome de bureau). À modifier uniquement pour tester une autre valeur."
                 }
@@ -91,7 +95,8 @@
             "invalid_auth": "Nom d'utilisateur ou mot de passe invalide. Veuillez vérifier vos identifiants.",
             "unknown": "Une erreur inattendue s'est produite. Veuillez réessayer.",
             "invalid_alarm_codes": "Les codes d'alarme doivent être des nombres entiers séparés par des virgules, par exemple : -1, 62",
-            "invalid_user_agent": "Le User-Agent doit tenir sur une seule ligne de caractères ASCII simples, 256 au maximum."
+            "invalid_user_agent": "Le User-Agent doit tenir sur une seule ligne de caractères ASCII simples, 256 au maximum.",
+            "power_without_meter": "Choisissez d'abord un compteur électrique : le capteur de puissance va avec lui."
         },
         "abort": {
             "already_configured": "Cette intégration CSNet Home est déjà configurée.",
