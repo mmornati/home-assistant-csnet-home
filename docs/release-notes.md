@@ -7,6 +7,79 @@ description: What changed in each version of the CSNet Home (unofficial, for Hit
 
 Every version of the integration, newest first. Install or update from HACS; each version is also on the [GitHub releases page](https://github.com/mmornati/home-assistant-csnet-home/releases).
 
+## 2.17.0
+
+*22 November 2026* · [GitHub release](https://github.com/mmornati/home-assistant-csnet-home/releases/tag/2.17.0)
+
+Polish, the zone's running action taken from the unit, and blueprints to schedule a zone's temperature. No entity is renamed or removed, and nothing new is sent to the unit.
+
+#### Please read before updating
+
+- **A zone can now show `heating` while the room is above its setpoint.** `hvac_action` follows what the unit is doing (its operation status and the circuit's demand), as the CSNet web app does. A unit on a heating curve keeps heating with a warm room, and the zone now says so. If an automation used `hvac_action: idle` to mean "the room is warm enough", compare the temperatures instead.
+- After updating, reload the dashboard page (or clear the app cache on phones) so the browser loads the Polish cards.
+
+#### Added
+
+- **Polish.** The integration settings, the dashboard cards and the alarm texts are now available in Polish (`pl` in **Language** and **Card language**), thanks to [@TomEkk33](https://github.com/TomEkk33). ([#266](https://github.com/mmornati/home-assistant-csnet-home/issues/266), [#268](https://github.com/mmornati/home-assistant-csnet-home/pull/268))
+- **Temperature schedules from the UI.** Two automation blueprints change a zone's setpoint on a schedule: a weekly programme with several blocks a day from a schedule helper, and a day / bedtime / night programme. They only change the setpoint, and only when it differs. See [Temperature Schedules](wiki/Schedules.md). Asked by [@Franck72230](https://github.com/Franck72230) in [discussion #20](https://github.com/mmornati/home-assistant-csnet-home/discussions/20). ([#270](https://github.com/mmornati/home-assistant-csnet-home/pull/270))
+
+#### Fixed
+
+- **A zone showed `idle` while the heat pump was heating** as soon as the room reached its setpoint. Reported by [@loupi2004](https://github.com/loupi2004) in [discussion #227](https://github.com/mmornati/home-assistant-csnet-home/discussions/227). On the recorded samples, polls where the unit draws more than 1 kW now show `heating` 94 % of the time, against 52-62 % before. ([#269](https://github.com/mmornati/home-assistant-csnet-home/pull/269))
+- **Heat pump card, water ΔT while heating the tank:** it now uses the exchanger outlet, as the water circuit card does. From [@TomEkk33](https://github.com/TomEkk33)'s contribution. ([#268](https://github.com/mmornati/home-assistant-csnet-home/pull/268))
+- Very old entries saved without a language now load the English alarm texts instead of the last file loaded. ([#268](https://github.com/mmornati/home-assistant-csnet-home/pull/268))
+
+## 2.16.0
+
+*20 November 2026* · [GitHub release](https://github.com/mmornati/home-assistant-csnet-home/releases/tag/2.16.0)
+
+Energy and COP rework: a closer electricity estimate, the electricity meter used everywhere, and a choice of where the heat produced comes from. Nothing changes in what is sent to the unit.
+
+#### Please read before updating
+
+- **Daily Output Energy is removed.** The *Heat produced today / yesterday / this month* sensors replace it. If you use it in the Energy dashboard, an automation or a custom card, switch to *Heat produced today*. The old *Daily COP* sensor and the defrost *sensor* (the defrost *binary sensor* stays) are removed too.
+- With an electricity meter set in the settings, the electricity sensors, Instant Consumption and the COPs now show what the meter counts. The *COP … (metered)* sensors only exist with a meter, the *COP … (estimated)* ones only without one.
+
+#### Added
+
+- **Heat produced setting** (initial setup and Reconfigure): *Recorded by CSNet* (default, nothing changes) or *Calculated by the integration* from the water flow and temperatures. Every heat counter and COP follows it and says which in a `heat_source` attribute. Switching starts the day and month from zero. ([#263](https://github.com/mmornati/home-assistant-csnet-home/pull/263))
+- **Electricity meter for every electricity sensor**, the estimate without one; each sensor says which in `electricity_source`. ([#262](https://github.com/mmornati/home-assistant-csnet-home/pull/262))
+- **Record a sample of your unit** with the `start_sample_recording` / `stop_sample_recording` actions, to share it in [csnet-home-samples](https://github.com/mmornati/csnet-home-samples) and help test changes on more units. See [Sample Data](wiki/Sample-Data.md). ([#265](https://github.com/mmornati/home-assistant-csnet-home/pull/265))
+- **DHW boost always offered** with the Legacy control option. ([#253](https://github.com/mmornati/home-assistant-csnet-home/pull/253))
+- **The dashboard cards show the heat pump heating the DHW tank.** ([#259](https://github.com/mmornati/home-assistant-csnet-home/pull/259))
+
+#### Improved
+
+- **Closer electricity estimate**, fitted against a metered unit: within 0.2 kWh a day of a Shelly meter on the replayed samples. ([#260](https://github.com/mmornati/home-assistant-csnet-home/pull/260))
+- **Heat at the exchanger outlet, averaged instant COP, daily COP kept across restarts.** ([#261](https://github.com/mmornati/home-assistant-csnet-home/pull/261))
+
+Thanks to [@davigar1391](https://github.com/davigar1391) for most of this release.
+
+## 2.15.0
+
+*16 November 2026* · [GitHub release](https://github.com/mmornati/home-assistant-csnet-home/releases/tag/2.15.0)
+
+The integration's unofficial status made explicit, and better Spanish cards. Entity ids, the domain and the HACS package are unchanged.
+
+#### Changed
+
+- **New displayed name: "CSNet Home (unofficial, for Hitachi)"**, with the integration's own icon and logo instead of the Hitachi logo (shown from Home Assistant 2026.3). ([#256](https://github.com/mmornati/home-assistant-csnet-home/pull/256))
+- **User-Agent setting**, optional, in the setup and Reconfigure forms. Left empty, the requests are the same as before. ([#256](https://github.com/mmornati/home-assistant-csnet-home/pull/256))
+- **Better Spanish texts on the dashboard cards**, thanks to [@davigar1391](https://github.com/davigar1391). ([#255](https://github.com/mmornati/home-assistant-csnet-home/pull/255))
+
+## 2.14.3
+
+*14 November 2026* · [GitHub release](https://github.com/mmornati/home-assistant-csnet-home/releases/tag/2.14.3)
+
+Two fixes to the dashboard cards. Nothing changes in the entities or in what is sent to the unit.
+
+#### Fixed
+
+- **The page jumped while scrolling on phones.** Every state change of the unit rebuilt all eleven cards. The cards now keep their frame in place and only replace what changed. ([#252](https://github.com/mmornati/home-assistant-csnet-home/pull/252))
+- **Numbers and dates follow the card language.** A French card under an English profile now writes 3 389 W and 8,01 €. A number format chosen in the user profile still wins. ([#252](https://github.com/mmornati/home-assistant-csnet-home/pull/252))
+
+After updating, reload the dashboard page. In the Home Assistant app: Settings → Companion app → Debugging → Reset frontend cache.
+
 ## 2.14.2
 
 *14 November 2026* · [GitHub release](https://github.com/mmornati/home-assistant-csnet-home/releases/tag/2.14.2)
