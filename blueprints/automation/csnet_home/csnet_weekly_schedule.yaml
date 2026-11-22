@@ -1,0 +1,124 @@
+---
+blueprint:
+  name: CSNet Home - weekly temperature schedule
+  description: >-
+    Sets a CSNet Home zone to a comfort temperature during the time blocks of a
+    Home Assistant schedule helper, and to an eco temperature outside them.
+    Edit the blocks in Settings > Devices & services > Helpers, with several
+    blocks per day, as in the CSNet app's weekly programme.
+
+    The temperature is only sent when the zone is on, in one of the chosen
+    modes, and when it differs from the current setpoint. It is applied again
+    when Home Assistant starts and when the zone is turned back on.
+
+    Use either this schedule or the one in the CSNet app for a zone, not both.
+  domain: automation
+  author: mmornati
+  homeassistant:
+    min_version: "2024.10.0"
+  source_url: https://github.com/mmornati/home-assistant-csnet-home/blob/main/blueprints/automation/csnet_home/csnet_weekly_schedule.yaml  # yamllint disable-line rule:line-length
+  input:
+    climate_entity:
+      name: Zone
+      description: The CSNet Home climate entity to control.
+      selector:
+        entity:
+          filter:
+            - integration: csnet_home
+              domain: climate
+    schedule_entity:
+      name: Schedule
+      description: >-
+        A schedule helper. While it is on, the zone uses the comfort
+        temperature; while it is off, the eco temperature.
+      selector:
+        entity:
+          filter:
+            - domain: schedule
+    comfort_temperature:
+      name: Comfort temperature
+      description: Setpoint during the schedule's blocks.
+      default: 21
+      selector:
+        number:
+          min: 5
+          max: 60
+          step: 0.5
+          unit_of_measurement: °C
+          mode: box
+    eco_temperature:
+      name: Eco temperature
+      description: Setpoint outside the schedule's blocks.
+      default: 18
+      selector:
+        number:
+          min: 5
+          max: 60
+          step: 0.5
+          unit_of_measurement: °C
+          mode: box
+    hvac_modes:
+      name: Active in modes
+      description: >-
+        The schedule only changes the setpoint while the zone is in one of
+        these modes. Keep heating only for a heating schedule, and make a
+        second automation with other temperatures for cooling.
+      default:
+        - heat
+      selector:
+        select:
+          multiple: true
+          options:
+            - label: Heat
+              value: heat
+            - label: Cool
+              value: cool
+            - label: Auto (heat/cool)
+              value: heat_cool
+
+mode: restart
+max_exceeded: silent
+
+triggers:
+  - trigger: state
+    entity_id: !input schedule_entity
+    to:
+      - "on"
+      - "off"
+  - trigger: state
+    entity_id: !input climate_entity
+    from:
+      - "off"
+      - unavailable
+      - unknown
+  - trigger: homeassistant
+    event: start
+
+variables:
+  climate_entity: !input climate_entity
+  schedule_entity: !input schedule_entity
+  comfort_temperature: !input comfort_temperature
+  eco_temperature: !input eco_temperature
+  hvac_modes: !input hvac_modes
+
+actions:
+  # After a restart the zone and the schedule may take a moment to load
+  - wait_template: >-
+      {{ states(climate_entity) not in ['unavailable', 'unknown']
+         and states(schedule_entity) in ['on', 'off'] }}
+    timeout: "00:05:00"
+    continue_on_timeout: false
+  - variables:
+      target_temperature: >-
+        {{ (comfort_temperature if is_state(schedule_entity, 'on') else eco_temperature) | float }}
+  - condition: template
+    value_template: "{{ states(climate_entity) in hvac_modes }}"
+  - condition: template
+    value_template: >-
+      {{ state_attr(climate_entity, 'temperature') is none
+         or (state_attr(climate_entity, 'temperature') | float(0) - target_temperature) | abs > 0.01 }}
+  - action: climate.set_temperature
+    target:
+      entity_id: "{{ climate_entity }}"
+    data:
+      temperature: "{{ target_temperature }}"

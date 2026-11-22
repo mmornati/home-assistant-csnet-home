@@ -1,0 +1,168 @@
+---
+blueprint:
+  name: CSNet Home - day, bedtime and night temperatures
+  description: >-
+    A simple daily routine for a CSNet Home zone: a fixed temperature during
+    the day, a little warmer at bedtime, and a few degrees lower at night.
+    The same times are used every day.
+
+    The temperature is only sent when the zone is on, in one of the chosen
+    modes, and when it differs from the current setpoint. It is applied again
+    when Home Assistant starts and when the zone is turned back on.
+
+    Use either this routine or the schedule in the CSNet app for a zone, not
+    both.
+  domain: automation
+  author: mmornati
+  homeassistant:
+    min_version: "2024.10.0"
+  source_url: https://github.com/mmornati/home-assistant-csnet-home/blob/main/blueprints/automation/csnet_home/csnet_day_bedtime_night.yaml  # yamllint disable-line rule:line-length
+  input:
+    climate_entity:
+      name: Zone
+      description: The CSNet Home climate entity to control.
+      selector:
+        entity:
+          filter:
+            - integration: csnet_home
+              domain: climate
+    day_temperature:
+      name: Day temperature
+      description: Setpoint from the day time until bedtime.
+      default: 20
+      selector:
+        number:
+          min: 5
+          max: 60
+          step: 0.5
+          unit_of_measurement: °C
+          mode: box
+    day_time:
+      name: Day starts at
+      default: "06:30:00"
+      selector:
+        time: {}
+    bedtime_time:
+      name: Bedtime starts at
+      default: "21:00:00"
+      selector:
+        time: {}
+    bedtime_increase:
+      name: Bedtime increase
+      description: Degrees added to the day temperature at bedtime. 0 to skip.
+      default: 1
+      selector:
+        number:
+          min: 0
+          max: 5
+          step: 0.5
+          unit_of_measurement: °C
+          mode: box
+    night_time:
+      name: Night starts at
+      description: Can be after midnight, for example 00:30.
+      default: "23:00:00"
+      selector:
+        time: {}
+    night_decrease:
+      name: Night decrease
+      description: Degrees taken off the day temperature at night.
+      default: 2
+      selector:
+        number:
+          min: 0
+          max: 10
+          step: 0.5
+          unit_of_measurement: °C
+          mode: box
+    hvac_modes:
+      name: Active in modes
+      description: >-
+        The routine only changes the setpoint while the zone is in one of
+        these modes.
+      default:
+        - heat
+      selector:
+        select:
+          multiple: true
+          options:
+            - label: Heat
+              value: heat
+            - label: Cool
+              value: cool
+            - label: Auto (heat/cool)
+              value: heat_cool
+
+mode: restart
+max_exceeded: silent
+
+triggers:
+  - trigger: time
+    at: !input day_time
+  - trigger: time
+    at: !input bedtime_time
+  - trigger: time
+    at: !input night_time
+  - trigger: state
+    entity_id: !input climate_entity
+    from:
+      - "off"
+      - unavailable
+      - unknown
+  - trigger: homeassistant
+    event: start
+
+variables:
+  climate_entity: !input climate_entity
+  day_temperature: !input day_temperature
+  day_time: !input day_time
+  bedtime_time: !input bedtime_time
+  bedtime_increase: !input bedtime_increase
+  night_time: !input night_time
+  night_decrease: !input night_decrease
+  hvac_modes: !input hvac_modes
+
+actions:
+  # After a restart the zone may take a moment to load
+  - wait_template: "{{ states(climate_entity) not in ['unavailable', 'unknown'] }}"
+    timeout: "00:05:00"
+    continue_on_timeout: false
+  - variables:
+      # The period is the one whose start time passed last; before the first
+      # start time of the day it is the last period of yesterday
+      period: >-
+        {% set ns = namespace(best=-1, period='night', last=-1, last_period='night') %}
+        {% set now_minutes = now().hour * 60 + now().minute %}
+        {% for start, name in [(day_time, 'day'), (bedtime_time, 'bedtime'), (night_time, 'night')] %}
+          {% set parts = start.split(':') %}
+          {% set minutes = parts[0] | int * 60 + parts[1] | int %}
+          {% if minutes <= now_minutes and minutes > ns.best %}
+            {% set ns.best = minutes %}
+            {% set ns.period = name %}
+          {% endif %}
+          {% if minutes > ns.last %}
+            {% set ns.last = minutes %}
+            {% set ns.last_period = name %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.period if ns.best >= 0 else ns.last_period }}
+      target_temperature: >-
+        {% set base = day_temperature | float %}
+        {% if period == 'bedtime' %}
+          {{ base + bedtime_increase | float }}
+        {% elif period == 'night' %}
+          {{ base - night_decrease | float }}
+        {% else %}
+          {{ base }}
+        {% endif %}
+  - condition: template
+    value_template: "{{ states(climate_entity) in hvac_modes }}"
+  - condition: template
+    value_template: >-
+      {{ state_attr(climate_entity, 'temperature') is none
+         or (state_attr(climate_entity, 'temperature') | float(0) - target_temperature | float) | abs > 0.01 }}
+  - action: climate.set_temperature
+    target:
+      entity_id: "{{ climate_entity }}"
+    data:
+      temperature: "{{ target_temperature | float }}"

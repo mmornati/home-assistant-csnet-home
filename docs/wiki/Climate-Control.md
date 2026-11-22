@@ -709,6 +709,8 @@ cards:
 
 ### Temperature Schedule
 
+For a schedule set up from the UI, without YAML, use the blueprints in [Temperature Schedules](Schedules.md). The automation below does the same by hand.
+
 ```yaml
 automation:
   - alias: "Living Room Temperature Schedule"
