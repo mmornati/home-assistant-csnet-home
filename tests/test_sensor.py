@@ -656,6 +656,12 @@ def test_central_config_sensor():
     installation_data["data"][0]["indoors"][0]["heatingStatus"]["centralConfig"] = 99
     assert "Unknown" in s.state
 
+    # CSNet sends null, or a value that is not a number: no crash
+    installation_data["data"][0]["indoors"][0]["heatingStatus"]["centralConfig"] = None
+    assert s.native_value is None
+    installation_data["data"][0]["indoors"][0]["heatingStatus"]["centralConfig"] = "3"
+    assert s.native_value == "Unknown (3)"
+
 
 def test_lcd_software_version_sensor():
     """Test LCD software version sensor."""
@@ -801,11 +807,11 @@ def test_central_control_enabled_sensor():
     installation_data["data"][0]["indoors"][0]["heatingStatus"]["lcdSoft"] = 546  # >= 0x0222
     assert s.state == STATE_ON
 
-    # Test with centralConfig < 3, non-S80, and lcdSoft = 0 (should be ON - not configured yet)
+    # centralConfig < 3, non-S80, lcdSoft = 0: not known yet (CSNet sends 0 for a poll or two)
     installation_data["data"][0]["indoors"][0]["heatingStatus"]["centralConfig"] = 2
     installation_data["data"][0]["indoors"][0]["heatingStatus"]["unitModel"] = 0
     installation_data["data"][0]["indoors"][0]["heatingStatus"]["lcdSoft"] = 0
-    assert s.state == STATE_ON
+    assert s.native_value is None
 
     # Test with centralConfig < 3, non-S80, old firmware (should be OFF)
     installation_data["data"][0]["indoors"][0]["heatingStatus"]["centralConfig"] = 2
@@ -851,7 +857,7 @@ def test_central_control_enabled_no_data():
         None,
         "Central Control Enabled",
     )
-    assert s.state == STATE_OFF
+    assert s.native_value is None
 
     # Test with None data
     coordinator = SimpleNamespace(
@@ -867,7 +873,7 @@ def test_central_control_enabled_no_data():
         None,
         "Central Control Enabled",
     )
-    assert s.state == STATE_OFF
+    assert s.native_value is None
 
     # Test with missing heatingStatus
     coordinator = SimpleNamespace(
@@ -883,7 +889,7 @@ def test_central_control_enabled_no_data():
         None,
         "Central Control Enabled",
     )
-    assert s.state == STATE_OFF
+    assert s.native_value is None
 
 
 def test_central_control_sensors_metadata():
@@ -3398,3 +3404,24 @@ def test_c2_water_temperature_reads_water_outlet_2():
 def test_c2_water_temperature_hides_missing_sensor_sentinel():
     """Units without a second-circuit sensor report -127; show no value instead."""
     assert _c2_water_sensor(-127).native_value is None
+
+
+def test_central_control_enabled_null_central_config():
+    """A null centralConfig gives unknown, not an error and not off."""
+    device_data = {
+        "device_name": "System",
+        "device_id": "global",
+        "room_name": "Controller",
+        "parent_id": "global",
+        "room_id": "global",
+    }
+    common_data = {"name": "Hitachi Installation", "firmware": "1.0.0"}
+    heating_status = {"centralConfig": None, "unitModel": 2, "lcdSoft": 0x0100}
+    coordinator = SimpleNamespace(
+        get_installation_devices_data=lambda: {"data": [{"indoors": [{"heatingStatus": heating_status}]}]},
+        get_common_data=lambda: common_data,
+    )
+    s = CSNetHomeInstallationSensor(coordinator, device_data, common_data, "central_control_enabled", "binary", None, "Central Control Enabled")
+    assert s.native_value is None
+    heating_status["centralConfig"] = 1
+    assert s.native_value == STATE_OFF

@@ -44,7 +44,7 @@ from .const import (
     POWER_SUPPLY_THREE_PHASE,
 )
 from .coordinator import CSNetHomeCoordinator
-from .helpers import find_indoor_unit, zone_device_identifier, zone_key
+from .helpers import CENTRAL_CONFIG_TOTAL, YUTAKI_S80_UNIT_MODEL, find_indoor_unit, is_central_control_enabled, zone_device_identifier, zone_key
 from .power_calibration import CrankcaseHeaterTracker, PowerCalibration
 
 _LOGGER = logging.getLogger(__name__)
@@ -675,7 +675,6 @@ MAX_ENERGY_INTEGRATION_HOURS = 5 / 60
 
 SUCTION_PRESSURE_ABSENT = 128  # 0x80, constant on units without the sensor
 SECOND_CYCLE_PRESSURE_ABSENT = 127
-YUTAKI_S80_UNIT_MODEL = 2  # Only the S80 has a second (R134a) refrigerant cycle
 SUCTION_PRESSURE_KEYS = ("suction_pressure", "suction_pressure_correction")
 
 # Watts per reported compressor Amp, by outdoor unit power supply (Issue #229).
@@ -768,6 +767,7 @@ def unsupported_compressor_sensor_keys(installation_data) -> set[str]:
     if heating_status.get("ouSuctionPress") in (None, SUCTION_PRESSURE_ABSENT):
         unsupported.update(SUCTION_PRESSURE_KEYS)
 
+    # Only the S80 has a second (R134a) refrigerant cycle
     has_second_cycle = heating_status.get("unitModel") == YUTAKI_S80_UNIT_MODEL or second_cycle.get("dischargePressure") not in (
         None,
         SECOND_CYCLE_PRESSURE_ABSENT,
@@ -1545,41 +1545,21 @@ class CSNetHomeInstallationSensor(CoordinatorEntity, SensorEntity):
                 3: "Total Control",
                 4: "Total Control+",
             }
+            if value is None:
+                return None
             decoded = config_names.get(value, f"Unknown ({value})")
-            if value is not None and value < 3:
+            if isinstance(value, int) and not isinstance(value, bool) and value < CENTRAL_CONFIG_TOTAL:
                 decoded += " ⚠️"  # Warning for insufficient control
             return decoded
 
         return value
 
     def _handle_central_control_enabled(self):
-        """Calculate if central control is properly configured."""
-        heating_status = self._get_heating_status()
-        if not heating_status:
-            return STATE_OFF
-
-        central_config = heating_status.get("centralConfig", 0)
-
-        # Central config >= 3 means "Total" control is enabled
-        if central_config >= 3:
-            return STATE_ON
-
-        # For non-S80 models, check LCD software version
-        unit_model = heating_status.get("unitModel", 0)
-        code_yutaki_s80 = 2
-
-        if unit_model != code_yutaki_s80:
-            lcd_soft = heating_status.get("lcdSoft", 0)
-
-            # lcdSoft == 0 means not configured yet (during wizard)
-            if lcd_soft == 0:
-                return STATE_ON
-
-            # Version >= 0x0222 (546 decimal) allows control
-            if lcd_soft >= 0x0222:
-                return STATE_ON
-
-        return STATE_OFF
+        """Return whether the unit applies CSNet commands, or None (unknown) without data."""
+        enabled = is_central_control_enabled(self._get_heating_status())
+        if enabled is None:
+            return None
+        return STATE_ON if enabled else STATE_OFF
 
     def _handle_diagnostic_sensors(self):
         """Handle System Configuration Diagnostic sensors (Issue #78)."""

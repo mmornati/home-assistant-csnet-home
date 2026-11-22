@@ -350,6 +350,24 @@ See [How It Works](How-It-Works.md) for how the integration talks to CSNet Manag
    - Look at `alarm_code` attribute
    - Alarms may prevent operation
 
+### Commands Are Ignored (Central Control Not Set to Total)
+
+**Symptoms**:
+- Temperature or mode changes are accepted, then the unit goes back to what it was
+- The CSNet web app shows: *"The central command setting is not set to 'Total', commands sent by CSNET Home will not be applied"*
+- Home Assistant shows a repair under **Settings → System → Repairs**: *"… may ignore CSNet Home commands"*
+- `sensor.system_controller_central_control_enabled` is `off`, and the System health card shows **Central control** in red
+
+**Cause**: the control mode set on the unit's own controller is not **Total**. CSNet Manager accepts every command, but the unit may not apply them. The integration uses the same rule as the CSNet web app, which then shows the warning above and hides its controls:
+
+- `centralConfig` 3 or more (Total): commands are applied
+- Otherwise, on units other than the Yutaki S80, an LCD software of `0x0222` or later is enough
+- A Yutaki S80 always needs Total
+
+The rule comes from the CSNet web app, not from Hitachi documentation. A unit in another mode may still apply commands for a while: the maintainer's unit did, until CSNet stopped applying them and switching the unit to Total fixed it. If changes from Home Assistant work for you, you can ignore the repair in Repairs, but set Total as soon as they stop working.
+
+**Solution**: the setting is on the heat pump's controller, not in Home Assistant or the CSNet app. Users find it in the installer settings, under the external control option, as a control mode with choices such as Air, Water and **Total** (menu names vary between controllers; see your unit's installation manual). Pick **Total**. The repair goes away on its own at the next poll after CSNet reports it. `sensor.system_controller_central_config` shows the current value; its labels other than Total Control are guesses, and CSNet's raw value is what counts.
+
 ### Mode Changes Don't Work
 
 **Symptoms**: Try to change HVAC mode but it doesn't change

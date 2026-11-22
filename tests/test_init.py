@@ -7,6 +7,7 @@ from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import ServiceRegistry
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers import issue_registry as ir
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.csnet_home import async_remove_entry, async_setup_entry, async_unload_entry
@@ -62,6 +63,26 @@ async def test_setup_entry_keeps_api_and_coordinator_on_the_entry(hass):
         with patch.object(api, "close", AsyncMock()) as close:
             assert await async_unload_entry(hass, entry)
         close.assert_awaited_once()
+
+
+async def test_unload_removes_the_central_control_repair(hass):
+    """The repair of an unloaded entry goes away; the next poll raises it again if still true."""
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_USERNAME: "user", CONF_PASSWORD: "pass"})
+    entry.add_to_hass(hass)
+
+    coordinator = MagicMock()
+    coordinator.async_config_entry_first_refresh = AsyncMock()
+    with (
+        patch("custom_components.csnet_home.CSNetHomeCoordinator", return_value=coordinator),
+        patch.object(hass.config_entries, "async_forward_entry_setups", AsyncMock()),
+        patch.object(hass.config_entries, "async_unload_platforms", AsyncMock(return_value=True)),
+    ):
+        assert await async_setup_entry(hass, entry)
+        issue_id = f"central_control_{entry.entry_id}"
+        ir.async_create_issue(hass, DOMAIN, issue_id, is_fixable=False, severity=ir.IssueSeverity.WARNING, translation_key="central_control_not_total")
+        with patch.object(entry.runtime_data.api, "close", AsyncMock()):
+            assert await async_unload_entry(hass, entry)
+        assert ir.async_get(hass).async_get_issue(DOMAIN, issue_id) is None
 
 
 async def test_unload_keeps_the_session_when_platforms_do_not_unload(hass):

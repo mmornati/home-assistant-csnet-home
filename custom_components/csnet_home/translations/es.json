@@ -178,5 +178,11 @@
                 "calculated": "Calculado por la integración"
             }
         }
+    },
+    "issues": {
+        "central_control_not_total": {
+            "title": "{units} puede ignorar las órdenes de CSNet Home",
+            "description": "CSNet indica que el ajuste de control central de {units} no está en **Total**. En ese caso, la web de CSNet avisa de que las órdenes que envía no se aplicarán, y la unidad también puede ignorar los cambios hechos desde Home Assistant.\n\nSi los cambios de temperatura y de modo desde Home Assistant siguen funcionando, puede ignorar este mensaje. Si no, ponga el modo de control en **Total** en el controlador de la unidad: los usuarios lo encuentran en los ajustes de instalador, en la opción de control externo (los nombres de los menús cambian según el controlador). Este mensaje desaparece solo cuando CSNet indica Total."
+        }
     }
 }

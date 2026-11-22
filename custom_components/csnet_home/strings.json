@@ -178,5 +178,11 @@
                 "calculated": "Calculated by the integration"
             }
         }
+    },
+    "issues": {
+        "central_control_not_total": {
+            "title": "{units} may ignore CSNet Home commands",
+            "description": "CSNet reports that the central control setting of {units} is not set to **Total**. In that case the CSNet web app warns that the commands it sends will not be applied, and changes made from Home Assistant may be ignored by the unit too.\n\nIf temperature and mode changes from Home Assistant still work, you can ignore this message. Otherwise, set the control mode to **Total** on the unit's own controller: users find it in the installer settings, under the external control option (menu names vary between controllers). This message goes away on its own once CSNet reports Total."
+        }
     }
 }
