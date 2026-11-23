@@ -600,8 +600,8 @@ The unit reports whole degrees. With the usual ΔT of 2 to 5 °C, half a degree 
 
 **Calibration against the unit's heat counter.** The unit also counts the heat it produced itself, in whole kWh (`unitCapacity`, the counter its own controller shows). Between two steps of that counter the unit made a known number of kWh; the integration compares it with what it measured over the same time, and learns the ratio for this unit. The measured heat is then multiplied by it, with nothing to set:
 
-- One factor for space heating (measured at the water outlet) and one for hot water (at the exchanger outlet). Cooling is left as measured.
-- A window counts once the counter has risen by 5 kWh in space heating, or 2 kWh for hot water, all of it one use, with no defrost, no backup heater or boiler, no probe standing in for another and no reading missing. Other windows are left out.
+- One factor for space heating and one for cooling (both measured at the water outlet), and one for hot water (at the exchanger outlet).
+- A window counts once the counter has risen by 5 kWh in space heating or cooling, or 2 kWh for hot water, all of it one use, with no defrost, no backup heater or boiler, no probe standing in for another and no reading missing. Other windows are left out.
 - The first ten windows are averaged; after that each one moves the factor by a tenth of the way. The factor stays between 0.6 and 1.6, and is kept across restarts.
 - It applies to the heat power, the instant COP, and the calculated heat and COPs. The `heat_calibration` attribute of the heat power shows each factor and the number of windows behind it.
 

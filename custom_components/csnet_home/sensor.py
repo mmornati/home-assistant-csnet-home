@@ -2142,8 +2142,8 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
         """Return (heat in Watts, operation status, its text, use, clean) as the probes measure it, uncorrected.
 
         ``clean`` is True when the heat was measured at the use's own probe
-        (the water outlet in space heating, the exchanger outlet for hot
-        water), with no defrost, no backup heater or boiler, and no probe
+        (the water outlet in space heating and cooling, the exchanger outlet
+        for hot water), with no defrost, no backup heater or boiler, and no probe
         standing in for a missing one: the readings a correction applies to.
         """
         raw_flow = heating_status.get("waterFlow", 0)
@@ -2200,7 +2200,7 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
         if delta_t > 0 and flow_rate >= 0.01:
             thermal_power = round(flow_rate * 1160 * delta_t, 2)
 
-        clean = own_probe and not other_heat_source and not heating_status.get("defrosting") and not is_cooling
+        clean = own_probe and not other_heat_source and not heating_status.get("defrosting")
         return thermal_power, op_status, op_status_text, use, clean
 
     @property

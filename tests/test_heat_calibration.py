@@ -55,12 +55,20 @@ def test_hot_water_has_a_factor_of_its_own():
     assert calibration.factor("spaceHeating") == 1.0
 
 
-def test_cooling_is_left_as_measured():
-    """Cooling is not calibrated."""
+def test_cooling_has_a_factor_of_its_own():
+    """Cooling learns apart from space heating, though both are measured at the water outlet."""
     calibration = HeatCalibration()
-    run(calibration, 8, 3000, use="spaceCooling")
+    run(calibration, 7, 5000, use="spaceCooling", ratio=1.1)
+    assert calibration.factor("spaceCooling") == pytest.approx(1.1, abs=0.03)
+    assert calibration.factor("spaceHeating") == 1.0
+
+
+def test_a_use_not_calibrated_is_left_as_measured():
+    """The pool is not calibrated."""
+    calibration = HeatCalibration()
+    run(calibration, 8, 3000, use="swp")
     assert calibration.factors == {}
-    assert calibration.factor("spaceCooling") == 1.0
+    assert calibration.factor("swp") == 1.0
 
 
 @pytest.mark.parametrize("dirty_minute", [10, 60])
@@ -145,13 +153,14 @@ def _heat_sensor(reading, factors):
     [
         ({"operationStatus": 6}, 1.05),  # space heating, water outlet
         ({"operationStatus": 8, "waterOutletHPTemp": 45}, 0.9),  # hot water, exchanger outlet
+        ({"operationStatus": 3, "waterOutletTemp": 36}, 1.2),  # cooling, water outlet
     ],
-    ids=["space heating", "hot water"],
+    ids=["space heating", "hot water", "cooling"],
 )
 def test_the_heat_power_uses_the_factor_of_its_use(reading, factor):
     """Each use is corrected by its own factor."""
     heating_status = RUNNING | reading
-    sensor = _heat_sensor(heating_status, {"spaceHeating": 1.05, "dhw": 0.9})
+    sensor = _heat_sensor(heating_status, {"spaceHeating": 1.05, "dhw": 0.9, "spaceCooling": 1.2})
     plain = sensor._measure_heat(heating_status)[0]  # pylint: disable=protected-access
     assert sensor._get_thermal_power_values(heating_status)[0] == round(plain * factor, 2)  # pylint: disable=protected-access
 
@@ -159,14 +168,13 @@ def test_the_heat_power_uses_the_factor_of_its_use(reading, factor):
 @pytest.mark.parametrize(
     "reading",
     [
-        {"operationStatus": 3, "waterOutletTemp": 36},  # cooling
         {"operationStatus": 6, "waterOutletHPTemp": 45, "systemStatus2Flags": 1 << 8},  # backup heater on
         {"operationStatus": 6, "waterOutletTemp": -127},  # water outlet failed: the exchanger outlet stands in
     ],
-    ids=["cooling", "backup heater", "probe standing in"],
+    ids=["backup heater", "probe standing in"],
 )
 def test_the_heat_power_is_left_as_measured_elsewhere(reading):
-    """Cooling, another heat source, or a probe standing in for another: no correction."""
+    """Another heat source, or a probe standing in for another: no correction."""
     heating_status = RUNNING | reading
     sensor = _heat_sensor(heating_status, {"spaceHeating": 1.05, "dhw": 0.9})
     assert sensor._get_thermal_power_values(heating_status)[0] == sensor._measure_heat(heating_status)[0]  # pylint: disable=protected-access

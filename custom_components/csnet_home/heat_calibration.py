@@ -9,9 +9,9 @@ whole kWh (``unitCapacity``): its own controller and CSNet show that counter.
 Between two steps of that counter the unit produced a known number of kWh.
 Over the same time the integration measured its own figure. Their ratio is the
 correction for this unit; it is learnt slowly, one window of the counter after
-another, and kept across restarts. One factor is kept for space heating (the
-water outlet) and one for hot water (the exchanger outlet), since each is
-measured at its own probe.
+another, and kept across restarts. One factor is kept for each use: space
+heating and cooling (both at the water outlet; a unit's probes may read
+differently cold than warm) and hot water (the exchanger outlet).
 
 A window counts only when all of it was one use, measured at its own probe,
 with no defrost, no backup heater or boiler, and no reading missing.
@@ -29,13 +29,13 @@ from .const import DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 HEAT_CALIBRATION_STORAGE_VERSION = 1
-# The uses calibrated, each at its own probe: space heating at the water
-# outlet, hot water at the exchanger outlet. Cooling is left as measured.
-CALIBRATED_USES = ("spaceHeating", "dhw")
+# The uses calibrated, each with a factor of its own: space heating and
+# cooling at the water outlet, hot water at the exchanger outlet
+CALIBRATED_USES = ("spaceHeating", "spaceCooling", "dhw")
 # kWh of the counter a window needs before it is learnt from: the counter's
 # steps are seen at the next reading, so a window is a few readings long at
 # each end; a longer window makes that share small
-MIN_WINDOW_KWH = {"spaceHeating": 5, "dhw": 2}
+MIN_WINDOW_KWH = {"spaceHeating": 5, "spaceCooling": 5, "dhw": 2}
 # Readings further apart than this break a window: heat in between is unknown
 MAX_READING_GAP = timedelta(minutes=5)
 # A window whose ratio falls outside these says something else went on: it is left out
