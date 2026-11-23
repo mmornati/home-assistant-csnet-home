@@ -206,7 +206,7 @@ async def replay_sample(
     if not polls:
         return result
 
-    async def fake_get_json(self, url, headers, description, renew_session=True):  # noqa: ARG001
+    async def fake_get_json(self, url, headers, description, renew_session=True, timeout=None):  # noqa: ARG001
         return feeder.reply(description)
 
     async def fake_login(self):

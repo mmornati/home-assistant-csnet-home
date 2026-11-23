@@ -30,6 +30,7 @@ from custom_components.csnet_home.const import (
     LOGIN_PATH,
     MAX_AUTH_REJECTIONS,
     POWER_INDOORS_PATH,
+    READINGS_TIMEOUT,
     WATER_CIRCUIT_MAX_COOL,
     WATER_CIRCUIT_MAX_HEAT,
     WATER_CIRCUIT_MIN_COOL,
@@ -624,7 +625,7 @@ class CSNetHomeAPI:
         }
 
         try:
-            data = await self._async_get_json(sensor_data_url, headers, "elements")
+            data = await self._async_get_json(sensor_data_url, headers, "elements", timeout=READINGS_TIMEOUT)
             if data is not None and data.get("status") == "success":
                 if _LOGGER.isEnabledFor(logging.DEBUG):
                     _LOGGER.debug("Sensor data retrieved: %s", redact_data(data["data"]))
@@ -723,7 +724,7 @@ class CSNetHomeAPI:
         }
 
         try:
-            data = await self._async_get_json(installation_devices_url, headers, "installation devices")
+            data = await self._async_get_json(installation_devices_url, headers, "installation devices", timeout=READINGS_TIMEOUT)
             if data is not None:
                 if _LOGGER.isEnabledFor(logging.DEBUG):
                     _LOGGER.debug("Installation devices data retrieved: %s", redact_data(data))

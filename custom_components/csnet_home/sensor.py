@@ -45,7 +45,7 @@ from .const import (
     POWER_SUPPLY_THREE_PHASE,
 )
 from .coordinator import CSNetHomeCoordinator
-from .helpers import find_indoor_unit, zone_device_identifier, zone_key
+from .helpers import find_indoor_unit, poll_brought_readings, zone_device_identifier, zone_key
 from .power_calibration import CrankcaseHeaterTracker, PowerCalibration
 
 _LOGGER = logging.getLogger(__name__)
@@ -953,7 +953,7 @@ def _power_reading_follower(coordinator, observer):
 
     @callback
     def _follow() -> None:
-        if getattr(coordinator, "last_update_success", True) is False:
+        if not poll_brought_readings(coordinator):
             return
         heating_status = observer._get_heating_status()  # pylint: disable=protected-access
         if not heating_status:
@@ -1932,7 +1932,7 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
         """Keep the readings of the averaged instant COP, then write the state."""
         if self._key == "instant_consumption" and self.energy_meter and not self.energy_meter_power:
             self._follow_meter(dt_util.now())
-        if self._key == "instant_cop" and getattr(self.coordinator, "last_update_success", True) is not False:
+        if self._key == "instant_cop" and poll_brought_readings(self.coordinator):
             if self._cop_samples is None:
                 self._cop_samples = deque()
             heating_status = self._get_heating_status()
@@ -2388,7 +2388,7 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
         new_hour = self._last_update_time is not None and (self._last_update_time.date(), self._last_update_time.hour) != (now.date(), now.hour)
 
         # A failed poll brings no new reading: do not add energy from old values
-        if getattr(self.coordinator, "last_update_success", True) is False:
+        if not poll_brought_readings(self.coordinator):
             self.async_write_ha_state()
             return
 

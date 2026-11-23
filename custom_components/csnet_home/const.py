@@ -55,6 +55,10 @@ COMMON_API_HEADERS = {
 CONF_USER_AGENT = "user_agent"
 DEFAULT_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 DEFAULT_API_TIMEOUT = 10
+# The readings (elements, installation devices). CSNet Manager has been seen to
+# hold every answer for 10 to 20 s, every five minutes or so (November 2026):
+# with the 10 s of the other requests each of these stalls failed a poll
+READINGS_TIMEOUT = 30
 # The energy records are a large answer CSNet takes 5 to 20 s to send (measured
 # November 2026), and slow hardware needs more to read: they are read in the
 # background, so a long wait never delays the readings

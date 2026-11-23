@@ -34,6 +34,10 @@ SERVER_ENERGY_POLL_SECONDS = 900
 # After a request for them failed, they are asked for again this much later
 INSTALLATIONS_MAX_ATTEMPTS = 3
 SERVER_ENERGY_RETRY_SECONDS = 300
+# Failed polls in a row through which the last readings stay on the entities.
+# CSNet Manager has short stalls: one or two missed polls must not turn every
+# entity unavailable. The connection sensor reports each failed poll all the same.
+KEPT_FAILED_POLLS = 2
 # CSNet needs a moment to apply an order: a read sent right after a write can
 # still return the old value
 WRITE_REFRESH_DELAY_SECONDS = 2.0
@@ -135,6 +139,8 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         self._filtered_alarm_codes = self._parse_filtered_alarm_codes(filtered_alarm_codes)
         # How the polls of CSNet Manager went, for the connection sensor
         self.connection = CloudConnection()
+        # True while the entities show the readings of an earlier poll, because the last one failed
+        self.kept_last_readings = False
         super().__init__(
             hass,
             _LOGGER,
@@ -155,19 +161,33 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
             return set()
 
     async def _async_update_data(self):
-        """Fetch data for all sensors, and note how the poll went for the connection sensor."""
+        """Fetch data for all sensors, and note how the poll went for the connection sensor.
+
+        A poll that fails right after one that worked keeps the last readings,
+        for KEPT_FAILED_POLLS polls in a row at most: the entities stay
+        available through a short stall of CSNet Manager. After that the poll
+        fails for Home Assistant too and the entities turn unavailable.
+        Refused credentials and errors of the integration itself always fail it.
+        """
         problems = getattr(self.api, "problems", None)
         if isinstance(problems, dict):
             problems.clear()
         try:
             data = await self._async_fetch_data()
         except ConfigEntryAuthFailed:
+            self.kept_last_readings = False
             self.connection.record_failure(dt_util.now(), {}, rejected=True)
             raise
-        except Exception:
+        except Exception as err:
             problems = getattr(self.api, "problems", None)
             self.connection.record_failure(dt_util.now(), dict(problems) if isinstance(problems, dict) else {})
-            raise
+            failed = self.connection.failed_polls_in_a_row
+            self.kept_last_readings = isinstance(err, UpdateFailed) and getattr(self, "data", None) is not None and failed <= KEPT_FAILED_POLLS
+            if not self.kept_last_readings:
+                raise
+            _LOGGER.info("Poll of CSNet Manager failed (%s); keeping the last readings (failed poll %s of %s kept)", err, failed, KEPT_FAILED_POLLS)
+            return self.data
+        self.kept_last_readings = False
         response = getattr(self.api, "response_seconds", None)
         self.connection.record_success(dt_util.now(), response.get("elements") if isinstance(response, dict) else None)
         return data

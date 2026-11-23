@@ -38,7 +38,8 @@ The integration never talks to your heat pump directly and needs nothing on your
 | **Requests per poll** | 3 HTTPS requests: `GET /data/elements`, `GET /data/installationdevices`, `GET /data/installationalarms`. |
 | **On start-up** | Sign-in (`GET` then `POST /login`) and four alarm translation files (`/translations/*.json`). |
 | **When you change something** | One `POST /data/indoor/heat_setting` per change (temperature, mode, preset, hot water, pool, silent mode, fan speed, fixed water temperature). Clearing an alarm calls `POST /data/deletemyspecificalarm`. |
-| **Timeout** | 10 seconds per request. |
+| **Timeout** | 30 seconds for the readings (`/data/elements`, `/data/installationdevices`), 60 for the energy records, 10 for every other request. |
+| **When a poll fails** | The entities keep the last readings through one or two failed polls in a row, then turn unavailable. The CSNet Manager connection sensor reports every failed poll. |
 | **User-Agent** | The one of a desktop Chrome browser by default. It is a [setting](Configuration-Guide.md#user-agent), so another value can be tried. |
 | **Session** | Signs in like the web app: fetches a CSRF token from the login page, posts the login form, then reuses the session cookie. Only one sign-in runs at a time. If a read fails, it signs in again on the next poll; if a change comes back with the login page, it signs in again and resends the change once. |
 | **When sign-in fails** | Waits before trying again: 1 minute, then 2, 4, 8… up to 30 minutes between attempts, with no other requests in between. A successful sign-in resets the delay. |

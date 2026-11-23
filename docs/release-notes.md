@@ -7,6 +7,19 @@ description: What changed in each version of the CSNet Home (unofficial, for Hit
 
 Every version of the integration, newest first. Install or update from HACS; each version is also on the [GitHub releases page](https://github.com/mmornati/home-assistant-csnet-home/releases).
 
+## 2.21.2
+
+*23 November 2026* · [GitHub release](https://github.com/mmornati/home-assistant-csnet-home/releases/tag/2.21.2)
+
+A short stall of CSNet Manager no longer turns every entity unavailable. Nothing new is sent to the unit.
+
+Since 22 November 2026 CSNet Manager holds every answer for 10 to 20 seconds, about every five minutes. The integration gave up after 10 seconds, so each stall failed a poll and every entity went unavailable for a minute: 40 to 60 times a day. The way the integration asks CSNet has not changed; the stalls are on CSNet's side. Thanks to @loupi2004 for the report and the logs.
+
+#### Fixed
+
+- **The readings get 30 seconds instead of 10.** A slow answer of CSNet now arrives instead of failing the poll. The other requests keep their limits. ([#284](https://github.com/mmornati/home-assistant-csnet-home/pull/284), [#280](https://github.com/mmornati/home-assistant-csnet-home/issues/280))
+- **One or two failed polls in a row keep the last readings.** The entities stay available with the values of the last good poll, and go unavailable at the third failed poll (about three minutes without an answer), or at once if CSNet refuses the sign-in. A kept poll adds nothing to the energy and heat counters. The *CSNet Manager connection* sensor still turns off at the first failed poll and counts each one, so it can be off while the entities still show values. ([#284](https://github.com/mmornati/home-assistant-csnet-home/pull/284))
+
 ## 2.21.1
 
 *23 November 2026* · [GitHub release](https://github.com/mmornati/home-assistant-csnet-home/releases/tag/2.21.1)
