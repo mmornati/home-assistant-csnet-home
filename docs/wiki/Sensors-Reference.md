@@ -615,6 +615,23 @@ The calculated heat is split by the uses CSNet has recorded for the unit, or els
 
 These sensors replace **Daily Output Energy**, which is removed. They were named *Heat produced today / yesterday / this month*.
 
+### Heat from the unit's counter
+
+The unit keeps its own running total of the heat it produced, in whole kWh, and reports it as `unitCapacity` (the **Compressor Capacity** sensor). It starts over after 249. CSNet's hourly heat is the rise of that counter, so counting the rise in Home Assistant gives the same figure as CSNet, and keeps giving it when CSNet records less heat than the unit produces (as on 22 and 23 November 2026, when CSNet recorded 0 to 1 kWh an hour while the counter rose by 3 to 10).
+
+Beside the heat sensors above, whatever their source, the integration counts it in its own sensors, with their own entities:
+
+| Sensor | Unit | Description |
+|--------|------|-------------|
+| Heat today / yesterday / this month (unit counter) | kWh | The rise of the counter in the period, in whole kWh |
+| COP today / yesterday / this month / last month (unit counter, metered or estimated) | – | That heat divided by the electricity of the same period: your meter, or else the estimate |
+
+- They are created once the counter has risen, so a unit that does not report a counter gets none.
+- Each rise goes to the use of the operation status at that moment (see the table above). The last reading is kept across restarts: the heat of a stop of Home Assistant is counted when it comes back, on that day.
+- A drop counts as the counter starting over when the heat it means is small (up to 30 kWh), or no more than the unit could make in the time since the last reading (up to 30 kW): a counter that went round while Home Assistant was off is counted. Any other drop, such as one step back near the top, or a reading more than 24 hours after the previous one, counts nothing and starts again from there.
+- Today and this month count from when the counting started, so the first day and month are partial and have no figure as yesterday or last month.
+- Their `heat_source` attribute is `unit_counter`. The cards can show this heat and these COPs instead of, or beside, the others (option `heat_source`, see [Dashboard Cards](Dashboard-Cards.md#options)).
+
 ### COP instant
 
 The heat delivered divided by the electricity used over the last 15 minutes of the current compressor run, rounded to 2 decimals. The unit reports whole degrees, so a single reading can be off by 20 % or more; the average evens that out. It reports `0` while the compressor is stopped, and each run starts a new average. With an electricity meter chosen in the integration's settings, the electricity is what that meter counted over the window instead of the estimate, once it has counted 20 Wh. Only readings with the compressor running and drawing current count: the poll a compressor starts up, at a few Hz and 0 A, is left out. Without a meter, each reading counts for the time since the previous one, so an extra update (after a command or a reload) weighs only the seconds it covers.

@@ -969,6 +969,10 @@ def _power_reading_follower(coordinator, observer):
         if produced is not None:
             watts, op_status, _text = observer._get_thermal_power_values(heating_status)  # pylint: disable=protected-access
             produced.async_update(now, watts, _heat_use(op_status))
+        # the unit's own heat counter, counted for what the unit is doing now
+        unit_heat = getattr(coordinator, "unit_heat", None)
+        if unit_heat is not None:
+            unit_heat.async_update_reading(now, heating_status.get("unitCapacity"), _heat_use(heating_status.get("operationStatus")))
 
     return _follow
 
@@ -1012,6 +1016,58 @@ def _heat_use(op_status) -> str:
     return "spaceHeating"
 
 
+def _electricity_tracker(hass, entry, coordinator):
+    """Return (tracker, "metered" or "estimated", estimate counter) for the electricity of the period sensors.
+
+    One tracker of the period readings of the electricity, shared by every
+    sensor that uses them, also when sensors are added later on: the user's
+    meter, or else the integration's estimate, followed like a meter. The
+    tracker is None without either.
+    """
+    from .server_energy import MeterTracker, estimated_meter_storage_key  # pylint: disable=import-outside-toplevel
+
+    meter = entry.data.get(CONF_ENERGY_METER)
+    counter = getattr(coordinator, "estimated_energy", None)
+    if meter:
+        return _shared(coordinator, "meter_tracker", lambda: MeterTracker(hass, entry.entry_id, meter)), "metered", counter
+    if counter is not None:
+        tracker = _shared(
+            coordinator,
+            "estimate_tracker",
+            lambda: MeterTracker(hass, entry.entry_id, "estimate", reader=counter.reading_kwh, storage_key=estimated_meter_storage_key(entry.entry_id)),
+        )
+        return tracker, "estimated", counter
+    return None, None, counter
+
+
+def _unit_heat_sensors(hass, entry, coordinator) -> list:
+    """Return the heat and COP sensors of the unit's own heat counter, once it has counted some heat.
+
+    They stand beside the heat CSNet records (or the calculated heat), so
+    both can be compared. A unit whose counter never rises gets none.
+    """
+    from .server_energy import (  # pylint: disable=import-outside-toplevel
+        CSNetHomeMeteredCopSensor,
+        CSNetHomeServerEnergySensor,
+        unit_cop_descriptions,
+        unit_heat_descriptions,
+    )
+
+    unit_heat = getattr(coordinator, "unit_heat", None)
+    if unit_heat is None or not unit_heat.has_counted:
+        return []
+    device_info = unit_device_info(coordinator)
+    sensors: list = [CSNetHomeServerEnergySensor(coordinator, description, device_info, unit_heat) for description in unit_heat_descriptions()]
+    tracker, electricity, counter = _electricity_tracker(hass, entry, coordinator)
+    if tracker is not None:
+        estimate = counter if electricity == "estimated" else None
+        sensors += [
+            CSNetHomeMeteredCopSensor(coordinator, description, device_info, tracker, estimate, produced=unit_heat)
+            for description in unit_cop_descriptions(electricity)
+        ]
+    return sensors
+
+
 def _server_energy_sensors(hass, entry, coordinator) -> list:
     """Return the sensors for the heat and electricity of the unit, and the COP of each period.
 
@@ -1029,8 +1085,6 @@ def _server_energy_sensors(hass, entry, coordinator) -> list:
         REMOVED_ENERGY_KEYS,
         CSNetHomeMeteredCopSensor,
         CSNetHomeServerEnergySensor,
-        MeterTracker,
-        estimated_meter_storage_key,
         has_energy,
         server_energy_descriptions,
     )
@@ -1040,23 +1094,7 @@ def _server_energy_sensors(hass, entry, coordinator) -> list:
     produced = getattr(coordinator, "produced_energy", None)
     heat_uses = _heat_uses(coordinator, energy) if produced is not None else None
     meter = entry.data.get(CONF_ENERGY_METER)
-    counter = getattr(coordinator, "estimated_energy", None)
-    # One tracker of the period readings of the electricity, shared by every
-    # sensor that uses them, also when sensors are added later on: the user's
-    # meter, or else the integration's estimate, followed like a meter
-    if meter:
-        tracker = _shared(coordinator, "meter_tracker", lambda: MeterTracker(hass, entry.entry_id, meter))
-        electricity = "metered"
-    elif counter is not None:
-        tracker = _shared(
-            coordinator,
-            "estimate_tracker",
-            lambda: MeterTracker(hass, entry.entry_id, "estimate", reader=counter.reading_kwh, storage_key=estimated_meter_storage_key(entry.entry_id)),
-        )
-        electricity = "estimated"
-    else:
-        tracker = None
-        electricity = None
+    tracker, electricity, counter = _electricity_tracker(hass, entry, coordinator)
     estimate = counter if not meter else None
 
     sensors: list = [
@@ -1226,6 +1264,15 @@ async def async_setup_entry(hass, entry, async_add_entities):
             await produced.async_load()
             coordinator.produced_energy = produced
 
+        # The unit's own heat counter, counted beside the heat above when the unit reports one
+        from .server_energy import UnitHeatCounter  # pylint: disable=import-outside-toplevel
+
+        # made also when the first reading has no counter yet (a slow first answer):
+        # it counts from the first reading that has one, and gets sensors once it rose
+        unit_heat = UnitHeatCounter(hass, entry.entry_id)
+        await unit_heat.async_load()
+        coordinator.unit_heat = unit_heat
+
         follow = _power_reading_follower(coordinator, observer)
         follow()
         entry.async_on_unload(coordinator.async_add_listener(follow))
@@ -1280,6 +1327,8 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     # Energy the server recorded for the unit, and COP from the user's own meter
     sensors.extend(_server_energy_sensors(hass, entry, coordinator))
+    # Heat and COP from the unit's own heat counter, beside them
+    sensors.extend(_unit_heat_sensors(hass, entry, coordinator))
 
     # More readings of the unit, where the unit reports them
     sensors.extend(_unit_sensors(coordinator))
@@ -1350,7 +1399,11 @@ async def async_setup_entry(hass, entry, async_add_entities):
     @callback
     def _add_when_reported() -> None:
         # the unit and heating curve sensors are a handful of readings: looked at after every poll
-        candidates = [*_unit_sensors(coordinator), *_heating_curve_sensors(hass, entry, coordinator, remove_stale=False)]
+        candidates = [
+            *_unit_sensors(coordinator),
+            *_heating_curve_sensors(hass, entry, coordinator, remove_stale=False),
+            *_unit_heat_sensors(hass, entry, coordinator),
+        ]
         # the energy sensors are only looked at again when the records were read again
         if id(coordinator.get_server_energy()) != seen[0]:
             seen[0] = id(coordinator.get_server_energy())

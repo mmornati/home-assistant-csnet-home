@@ -153,6 +153,7 @@ Every card accepts `title` (an empty title hides it) and `language` (`auto`, `en
 | Heat pump, Energy signature | `price`, `price_entity` | Electricity price per kWh, instead of the Energy dashboard's |
 | Temperatures, Activity, Connection | `hours` | Hours shown (default 24) |
 | Energy per day | `days` | Days shown (default 14) |
+| Heat pump, Performance, Energy per day | `heat_source` | Where the heat and the COPs come from: `csnet` (the heat sensors, as chosen in the settings; the default), `unit_counter` (the [unit's own heat counter](Sensors-Reference.md#heat-from-the-units-counter)) or, on Performance and Energy per day, `both`, to compare them. Energy per day then draws CSNet's heat as a lighter bar beside the counter's, each with its COP. The counter's heat has statistics from the day its sensors were created |
 | Power today | `days` | Days the average day is made of (default 14) |
 | Energy signature | `days`, `weather_entity` | Days the fit is made of (default 60); weather entity for the forecast |
 | Heating curve | `days` | Days of history drawn as dots (default 30, 0 for none); the last 3 days are coloured |
@@ -167,6 +168,7 @@ Any entity a card uses can be replaced with `<role>_entity`, for example `outdoo
 | `energy_today`, `heat_today` | Daily consumption and heat (estimated) |
 | `server_heat_today` / `_yesterday` / `_month`, `server_electricity_yesterday` / `_month` | Heat today, yesterday and this month (recorded by CSNet or calculated, as chosen in the settings); electricity of yesterday and the month (your meter, or the estimate) |
 | `cop_today`, `cop_yesterday`, `cop_month`, `cop_last_month` | COP from your electricity meter |
+| `unit_heat_today` / `_yesterday` / `_month`, `unit_cop_today` / `_yesterday` / `_month` / `_last_month` | Heat and COPs from the unit's own heat counter |
 | `water_out`, `water_in`, `water_target`, `water_c2`, `water_flow`, `water_pressure`, `mix_valve` | Water side |
 | `outdoor`, `outdoor_average` | Outdoor temperature, and the average the unit uses for its curves |
 | `cloud_connection` | The CSNet Manager connection sensor |
