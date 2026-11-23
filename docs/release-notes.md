@@ -7,6 +7,16 @@ description: What changed in each version of the CSNet Home (unofficial, for Hit
 
 Every version of the integration, newest first. Install or update from HACS; each version is also on the [GitHub releases page](https://github.com/mmornati/home-assistant-csnet-home/releases).
 
+## 2.21.1
+
+*23 November 2026* · [GitHub release](https://github.com/mmornati/home-assistant-csnet-home/releases/tag/2.21.1)
+
+The card editor shows its list options in your language. Nothing new is sent to the unit.
+
+#### Fixed
+
+- **The options of the "Heat and COP" and "Language" lists in the card editor were in English** (Unit counter, CSNet + unit counter, Auto). They now follow the language of your Home Assistant profile, in English, French, Spanish and Polish. Cards 1.3.1: reload the dashboard page after updating. ([#283](https://github.com/mmornati/home-assistant-csnet-home/pull/283))
+
 ## 2.21.0
 
 *23 November 2026* · [GitHub release](https://github.com/mmornati/home-assistant-csnet-home/releases/tag/2.21.0)
