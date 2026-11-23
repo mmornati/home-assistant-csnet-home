@@ -12,7 +12,7 @@
  * power meter.
  */
 
-const CARD_VERSION = "1.3.0";
+const CARD_VERSION = "1.3.1";
 
 // ---------------------------------------------------------------------------
 // Texts
@@ -114,6 +114,9 @@ const TEXTS = {
     heat_source: "Heat and COP",
     from_csnet: "CSNet",
     from_unit_counter: "unit counter",
+    option_unit_counter: "Unit counter",
+    option_both: "CSNet + unit counter",
+    option_auto: "Auto",
     electricity_source_server: "Electricity as CSNet records it. Choose your heat pump's electricity meter in the integration settings for measured values.",
     now: "Now",
     usual_at_this_hour: "Usual at this hour ({d} days)",
@@ -265,6 +268,9 @@ const TEXTS = {
     heat_source: "Chaleur et COP",
     from_csnet: "CSNet",
     from_unit_counter: "compteur PAC",
+    option_unit_counter: "Compteur PAC",
+    option_both: "CSNet + compteur PAC",
+    option_auto: "Automatique",
     electricity_source_server: "Électricité telle que CSNet l'enregistre. Choisissez le compteur d'électricité de la pompe à chaleur dans les réglages de l'intégration pour des valeurs mesurées.",
     now: "Maintenant",
     usual_at_this_hour: "Habituel à cette heure ({d} jours)",
@@ -416,6 +422,9 @@ const TEXTS = {
     heat_source: "Calor y COP",
     from_csnet: "CSNet",
     from_unit_counter: "contador de la unidad",
+    option_unit_counter: "Contador de la unidad",
+    option_both: "CSNet + contador de la unidad",
+    option_auto: "Automático",
     electricity_source_server: "Energía según la registra CSNet. Elija el medidor de energía de la bomba de calor en los ajustes de la integración para valores precisos.",
     now: "Ahora",
     usual_at_this_hour: "Habitual a esta hora ({d} días)",
@@ -567,6 +576,9 @@ const TEXTS = {
     heat_source: "Ciepło i COP",
     from_csnet: "CSNet",
     from_unit_counter: "licznik pompy",
+    option_unit_counter: "Licznik pompy",
+    option_both: "CSNet + licznik pompy",
+    option_auto: "Automatycznie",
     electricity_source_server: "Elektryczność według zapisów CSNet. Wybierz licznik energii pompy ciepła w ustawieniach integracji, aby korzystać z wartości pomiarowych.",
     now: "Teraz",
     usual_at_this_hour: "Zwykle o tej porze ({d} dni)",
@@ -2601,7 +2613,7 @@ const LANGUAGE_FIELD = {
     select: {
       mode: "dropdown",
       options: [
-        { value: "auto", label: "Auto" },
+        { value: "auto", label: "Auto", text: "option_auto" },
         { value: "en", label: "English" },
         { value: "fr", label: "Français" },
         { value: "es", label: "Español" },
@@ -2615,9 +2627,9 @@ const LANGUAGE_FIELD = {
 function heatSourceField(withBoth = true) {
   const options = [
     { value: "csnet", label: "CSNet" },
-    { value: "unit_counter", label: "Unit counter" },
+    { value: "unit_counter", label: "Unit counter", text: "option_unit_counter" },
   ];
-  if (withBoth) options.push({ value: "both", label: "CSNet + unit counter" });
+  if (withBoth) options.push({ value: "both", label: "CSNet + unit counter", text: "option_both" });
   return { name: "heat_source", selector: { select: { mode: "dropdown", options } } };
 }
 
@@ -2657,7 +2669,13 @@ class CsnetCardEditor extends HTMLElement {
       this.appendChild(this._form);
     }
     this._form.hass = this._hass;
-    this._form.schema = this.schema || [];
+    // the options of the lists, in the user's language (`text`: the key of their label)
+    this._form.schema = (this.schema || []).map((field) => {
+      const options = field.selector?.select?.options;
+      if (!options?.some((option) => option.text)) return field;
+      const translated = options.map(({ text, ...option }) => (text ? { ...option, label: t(this._hass, text) } : option));
+      return { ...field, selector: { ...field.selector, select: { ...field.selector.select, options: translated } } };
+    });
     this._form.data = this._config;
   }
 }
