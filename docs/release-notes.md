@@ -11,11 +11,13 @@ Every version of the integration, newest first. Install or update from HACS; eac
 
 *23 November 2026* · [GitHub release](https://github.com/mmornati/home-assistant-csnet-home/releases/tag/2.20.3)
 
-Heat produced and the COPs no longer fall to 0 while CSNet has lost touch with the unit's IOT module. Nothing new is sent to the unit.
+Heat produced and the COPs no longer fall to 0 if CSNet answers with no energy records. Nothing new is sent to the unit.
+
+A very low COP since 22 November 2026 comes from CSNet itself: while it has trouble with the unit's IOT module, it records far less heat than the unit produces, and the COP divides that figure. Check the IOT module if CSNet's web app says the installation is no longer connected.
 
 #### Fixed
 
-- **Heat produced today and the COPs fell to 0 when CSNet lost touch with the IOT module.** CSNet then answers with no hourly or daily energy records (its web app shows "Votre installation ne semble plus connectée avec le serveur"). That answer no longer replaces the records read before; it is asked for again 5 minutes later, and the log says once that CSNet sent no records, then when they come back. ([#281](https://github.com/mmornati/home-assistant-csnet-home/pull/281))
+- **Heat produced today and the COPs could fall to 0 if CSNet answered with no hourly or daily energy records**, as its csnethome.com site did on 23 November 2026 while it showed "Votre installation ne semble plus connectée avec le serveur". Such an answer no longer replaces the records read before; it is asked for again 5 minutes later, and the log says once that CSNet sent no records, then when they come back. ([#281](https://github.com/mmornati/home-assistant-csnet-home/pull/281))
 
 ## 2.20.2
 
