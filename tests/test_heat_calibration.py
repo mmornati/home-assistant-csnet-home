@@ -4,12 +4,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from custom_components.csnet_home.heat_calibration import (
-    MAX_FACTOR,
-    MIN_LEARNING_RATE,
-    MIN_WINDOW_KWH,
-    HeatCalibration,
-)
+from custom_components.csnet_home.heat_calibration import MAX_FACTOR, MIN_LEARNING_RATE, MIN_WINDOW_KWH, HeatCalibration
 from custom_components.csnet_home.sensor import CALCULATED_SENSOR_DESCRIPTIONS, CSNetHomeCalculatedSensor
 from tests.test_sensor_decoding import DEVICE_DATA, RUNNING, _coordinator
 

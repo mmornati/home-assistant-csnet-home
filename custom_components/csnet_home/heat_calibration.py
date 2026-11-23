@@ -19,8 +19,8 @@ with no defrost, no backup heater or boiler, and no reading missing.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
 import logging
+from datetime import datetime, timedelta
 
 from homeassistant.helpers.storage import Store
 
