@@ -54,6 +54,11 @@ def installation_alarm_list(answer) -> list | None:
     return data if isinstance(data, list) else None
 
 
+def _has_day_records(energy) -> bool:
+    """Return True when the energy records hold an hourly or a daily record of some indoor unit."""
+    return isinstance(energy, list) and any(isinstance(unit, dict) and (unit.get("hourly") or unit.get("daily")) for unit in energy)
+
+
 def alarm_storage_key(entry_id: str) -> str:
     """Return the storage key of the alarms an entry has already notified."""
     return f"{DOMAIN}.notified_alarms.{entry_id}"
@@ -122,6 +127,8 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         self._server_energy_fetched_at: float | None = None
         # the energy records are read in the background: a slow answer never delays the readings
         self._server_energy_task: asyncio.Task | None = None
+        # whether an answer without records was logged (once, until records come back)
+        self._server_energy_emptied_logged = False
         self._cancel_refresh_after_write: CALLBACK_TYPE | None = None
         self._saved_alarm_state: dict | None = None
         self._enable_alarm_notifications = enable_alarm_notifications
@@ -306,6 +313,9 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
 
         The last answer is kept between requests and when a request fails. A
         failure here never fails the poll: the readings do not depend on it.
+        An answer without any hourly or daily record, as CSNet sends while it
+        has lost touch with the unit's IOT module, does not replace records
+        read before: the heat would drop to 0 and the COPs with it.
         """
         if not self._server_energy_due():
             return False
@@ -315,10 +325,17 @@ class CSNetHomeCoordinator(DataUpdateCoordinator):
         except Exception as exc:  # pylint: disable=broad-except
             _LOGGER.debug("Could not read the energy records: %s", exc)
             data = None
-        if not isinstance(data, list):
+        emptied = isinstance(data, list) and _has_day_records(self._server_energy) and not _has_day_records(data)
+        if emptied and not self._server_energy_emptied_logged:
+            _LOGGER.warning("CSNet Manager sent no hourly or daily energy records; the last ones are kept until it sends them again")
+            self._server_energy_emptied_logged = True
+        if not isinstance(data, list) or emptied:
             # not on every poll: an account this request never works for must not pay for it each minute
             self._server_energy_fetched_at = now - (SERVER_ENERGY_POLL_SECONDS - SERVER_ENERGY_RETRY_SECONDS)
             return False
+        if self._server_energy_emptied_logged and _has_day_records(data):
+            _LOGGER.info("CSNet Manager sends the hourly and daily energy records again")
+            self._server_energy_emptied_logged = False
         self._server_energy = data
         self._server_energy_fetched_at = now
         return True

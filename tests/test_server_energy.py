@@ -178,6 +178,53 @@ async def test_coordinator_reads_the_records_every_15_minutes_and_keeps_them_on_
     assert coordinator.get_server_energy() is ENERGY
 
 
+# What CSNet sent on 23 November 2026 while it had lost touch with the IOT
+# module: no hourly or daily record, one stale month
+EMPTIED_ENERGY = [{"indoorId": 6996, "hourly": [], "daily": [], "monthly": [rec(686, year=2025, month=10)], "cascadeMaster": False}]
+
+
+async def test_records_without_hours_or_days_do_not_replace_the_last_ones(hass, hass_storage, monkeypatch, caplog):
+    """An answer without hourly or daily records keeps the last records, is asked again after the retry delay, and logs once."""
+    clock = [1000.0]
+    monkeypatch.setattr("custom_components.csnet_home.coordinator.time.monotonic", lambda: clock[0])
+    api = MagicMock(spec=CSNetHomeAPI)
+    api.logged_in = True
+    api.async_get_elements_data = AsyncMock(side_effect=lambda: {"sensors": [], "common_data": {"name": "Home"}})
+    api.async_get_installation_devices_data = AsyncMock(return_value={})
+    api.async_get_installation_alarms = AsyncMock(return_value={"data": []})
+    api.load_translations = AsyncMock()
+    api.async_get_power_data = AsyncMock(return_value=ENERGY)
+    hass.services = MagicMock()
+    hass.services.async_call = AsyncMock()
+    coordinator = CSNetHomeCoordinator(hass, 60, "entry", api=api)
+    await coordinator._async_update_server_energy(api)
+    assert coordinator.get_server_energy() is ENERGY
+
+    api.async_get_power_data.return_value = EMPTIED_ENERGY
+    for _ in range(2):
+        clock[0] += SERVER_ENERGY_POLL_SECONDS
+        assert await coordinator._async_update_server_energy(api) is False
+    assert coordinator.get_server_energy() is ENERGY
+    assert caplog.text.count("sent no hourly or daily energy records") == 1
+    # asked again after the retry delay, not a whole poll period
+    clock[0] += SERVER_ENERGY_RETRY_SECONDS
+    assert coordinator._server_energy_due()
+
+    api.async_get_power_data.return_value = ENERGY[:]
+    assert await coordinator._async_update_server_energy(api) is True
+    assert coordinator.get_server_energy() == ENERGY
+    assert "sends the hourly and daily energy records again" in caplog.text
+
+
+async def test_records_without_hours_or_days_are_taken_when_there_is_nothing_better(hass):
+    """A first answer without hourly or daily records is kept: an account may have only months."""
+    api = MagicMock(spec=CSNetHomeAPI)
+    api.async_get_power_data = AsyncMock(return_value=EMPTIED_ENERGY)
+    coordinator = CSNetHomeCoordinator(hass, 60, "entry", api=api)
+    assert await coordinator._async_update_server_energy(api) is True
+    assert coordinator.get_server_energy() is EMPTIED_ENERGY
+
+
 async def test_a_slow_energy_request_never_delays_the_readings(hass, hass_storage):
     """The records are read in the background: the poll ends first, one request at a time, listeners told on arrival."""
     release = asyncio.Event()
