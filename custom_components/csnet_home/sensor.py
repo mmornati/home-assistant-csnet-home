@@ -36,6 +36,7 @@ from .const import (
     DEFAULT_HEAT_SOURCE,
     DEFAULT_POWER_SUPPLY,
     DOMAIN,
+    HEAT_SOURCE_AUTO,
     HEAT_SOURCE_CALCULATED,
     HEAT_SOURCE_CSNET,
     OPERATION_STATUS_MAP,
@@ -1099,7 +1100,7 @@ def _server_energy_sensors(hass, entry, coordinator) -> list:
 
     sensors: list = [
         CSNetHomeServerEnergySensor(coordinator, description, device_info, produced, tracker, estimate)
-        for description in server_energy_descriptions(energy, heat_uses, electricity)
+        for description in server_energy_descriptions(energy, heat_uses, electricity, getattr(produced, "source", "calculated"))
     ]
     has_heat = produced is not None or has_energy(energy, HEAT)
 
@@ -1246,10 +1247,11 @@ async def async_setup_entry(hass, entry, async_add_entities):
             await counter.async_load()
             coordinator.estimated_energy = counter
 
-        # Where the heat produced comes from: the heat CSNet records, or the
-        # integration's own measure, by the user's choice. A unit CSNet has
-        # recorded no heat for gets the integration's measure.
-        from .server_energy import HEAT, ProducedEnergyCounter, has_energy  # pylint: disable=import-outside-toplevel
+        # Where the heat produced comes from: the heat CSNet records, the
+        # integration's own measure, or CSNet's hours with the integration's
+        # measure for the hours CSNet missed ("auto"), by the user's choice.
+        # A unit CSNet has recorded no heat for gets the integration's measure.
+        from .server_energy import HEAT, AutoHeatCounter, ProducedEnergyCounter, has_energy  # pylint: disable=import-outside-toplevel
 
         heat_source = entry.data.get(CONF_HEAT_SOURCE, DEFAULT_HEAT_SOURCE)
         server_energy = coordinator.get_server_energy()
@@ -1258,9 +1260,12 @@ async def async_setup_entry(hass, entry, async_add_entities):
             heat_source = HEAT_SOURCE_CALCULATED
         coordinator.heat_source = heat_source
         coordinator.produced_energy = None
-        if heat_source == HEAT_SOURCE_CALCULATED:
+        if heat_source in (HEAT_SOURCE_CALCULATED, HEAT_SOURCE_AUTO):
             max_hours = observer._max_integration_hours()  # pylint: disable=protected-access
-            produced = ProducedEnergyCounter(hass, entry.entry_id, max_hours=max_hours)
+            if heat_source == HEAT_SOURCE_AUTO:
+                produced = AutoHeatCounter(hass, entry.entry_id, coordinator.get_server_energy, max_hours=max_hours)
+            else:
+                produced = ProducedEnergyCounter(hass, entry.entry_id, max_hours=max_hours)
             await produced.async_load()
             coordinator.produced_energy = produced
 
@@ -2226,6 +2231,8 @@ ATTR_ELECTRICITY_KWH = "electricity_kwh"
 ATTR_HEAT_KWH = "heat_kwh"
 # with the heat CSNet records: the whole day's electricity, kept across restarts
 ATTR_ELECTRICITY_TODAY_KWH = "electricity_today_kwh"
+# with the automatic heat: the day's electricity at the start of each hour followed from its start
+ATTR_ELECTRICITY_MARKS = "electricity_at_hour_start_kwh"
 
 
 class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
@@ -2300,11 +2307,20 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
                 try:
                     # with the heat CSNet records, electricity_kwh is that of the recorded hours only
                     self._energy_in = max(0.0, float(attributes.get(ATTR_ELECTRICITY_TODAY_KWH, attributes.get(ATTR_ELECTRICITY_KWH, 0.0))))
-                    self._energy_out = max(0.0, float(attributes.get(ATTR_HEAT_KWH, 0.0)))
+                    # an unknown heat (None) keeps the electricity
+                    self._energy_out = max(0.0, float(attributes.get(ATTR_HEAT_KWH) or 0.0))
                     # the restored total holds the day's electricity since midnight
                     self._counted_since_hour = 0
                 except (TypeError, ValueError):
                     self._energy_in = self._energy_out = 0.0
+                if self.heat_source == HEAT_SOURCE_AUTO:
+                    # the electricity at the start of each hour followed today, to divide hour by hour
+                    marks = attributes.get(ATTR_ELECTRICITY_MARKS)
+                    for hour, reading in (marks.items() if isinstance(marks, dict) else ()):
+                        try:
+                            self._electricity_by_hour[int(hour)] = max(0.0, float(reading))
+                        except (TypeError, ValueError):
+                            continue
         else:
             self._state = 0.0
         self._last_update_time = dt_util.now()
@@ -2327,12 +2343,50 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
                 "heat_source": HEAT_SOURCE_CSNET,
                 "electricity_source": source,
             }
+        if self.heat_source == HEAT_SOURCE_AUTO:
+            heat, electricity = self._auto_figures(dt_util.now())
+            return {
+                # the heat and electricity of the hours divided: those followed from start to end, and the hour in progress
+                ATTR_HEAT_KWH: round(heat, 4) if heat is not None else None,
+                ATTR_ELECTRICITY_KWH: round(electricity, 4) if electricity is not None else None,
+                # what is restored after a restart: the day's electricity, and its reading at the start of each hour followed
+                ATTR_ELECTRICITY_TODAY_KWH: round(self._energy_in, 4),
+                ATTR_ELECTRICITY_MARKS: {str(hour): round(reading, 4) for hour, reading in sorted(self._electricity_by_hour.items())},
+                "heat_source": HEAT_SOURCE_AUTO,
+                "electricity_source": source,
+            }
         return {
             ATTR_ELECTRICITY_KWH: round(self._energy_in, 4),
             ATTR_HEAT_KWH: round(self._energy_out, 4),
             "heat_source": HEAT_SOURCE_CALCULATED,
             "electricity_source": source,
         }
+
+    def _auto_figures(self, now) -> tuple[float | None, float | None]:
+        """Return (heat, electricity) of this COP's uses, over the hours whose electricity was counted.
+
+        The electricity of an hour is known when its start and its end were
+        marked (the hour in progress: since its start). Hours Home Assistant
+        did not follow from start to end, around a restart or an outage, are
+        left out of both, so the day's heat from CSNet does not meet only part
+        of the day's electricity. (None, None) before the first such hour, or
+        without the counter.
+        """
+        counter = getattr(self.coordinator, "produced_energy", None)
+        marks = self._electricity_by_hour
+        if counter is None or not marks or not hasattr(counter, "heat_by_hour"):
+            return None, None
+        electricity_by_hour = {}
+        for hour, reading in marks.items():
+            if hour == now.hour:
+                electricity_by_hour[hour] = self._energy_in - reading
+            elif hour + 1 in marks:
+                electricity_by_hour[hour] = marks[hour + 1] - reading
+        if not electricity_by_hour:
+            return None, None
+        uses = ("spaceHeating", "spaceCooling") if self._key == "daily_cop_hvac" else ("dhw",)
+        heat_by_hour = counter.heat_by_hour(now, electricity_by_hour, uses)
+        return max(sum(heat_by_hour.values()), 0.0), max(sum(electricity_by_hour.values()), 0.0)
 
     @property
     def native_value(self):
@@ -2395,10 +2449,13 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
         # Calculate time difference in hours (for Watts to Watt-hours)
         if self._last_update_time:
             time_diff = (now - self._last_update_time).total_seconds() / 3600.0
+            # the readings went on without a gap: an hour that began since was followed from its start
+            followed = time_diff <= self._max_integration_hours()
             # After an outage the last reading says nothing about the gap
             time_diff = min(time_diff, self._max_integration_hours())
         else:
             time_diff = 0
+            followed = False
 
         self._last_update_time = now
 
@@ -2473,16 +2530,22 @@ class CSNetHomeDailySensor(CSNetHomeCalculatedSensor, RestoreEntity):
                 self._energy_out += energy_heating_kwh
 
                 # Calculate COP based on Accumulated totals
-                if self.heat_source != HEAT_SOURCE_CSNET and self._energy_in > 0.01:
+                if self.heat_source == HEAT_SOURCE_CALCULATED and self._energy_in > 0.01:
                     self._state = self._energy_out / self._energy_in
             # If no energy consumed yet, keep previous state or 0
 
-            if self.heat_source == HEAT_SOURCE_CSNET:
-                if new_hour:
+            if self.heat_source in (HEAT_SOURCE_CSNET, HEAT_SOURCE_AUTO):
+                # with the automatic heat, an hour that began during an outage is not divided
+                if new_hour and (followed or self.heat_source == HEAT_SOURCE_CSNET):
                     self._electricity_by_hour[now.hour] = self._energy_in
                     if self._counted_since_hour is None:
                         self._counted_since_hour = now.hour
-                self._update_from_csnet_heat(now)
+                if self.heat_source == HEAT_SOURCE_AUTO:
+                    heat, electricity = self._auto_figures(now)
+                    if heat is not None and electricity is not None and electricity > 0.01:
+                        self._state = heat / electricity
+                else:
+                    self._update_from_csnet_heat(now)
 
         self.async_write_ha_state()
 

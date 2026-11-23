@@ -219,12 +219,15 @@ def bypass_setup_entry():
 
 
 async def _open_options(hass, status, options=None, loaded=True):
-    """Add an entry and open its options form."""
+    """Add an entry, open its options and choose the heating curves in the menu."""
     entry = MockConfigEntry(domain=DOMAIN, data={}, options=options or {})
     entry.add_to_hass(hass)
     if loaded:
         entry.runtime_data = SimpleNamespace(coordinator=_coordinator_with(status))
-    return entry, await hass.config_entries.options.async_init(entry.entry_id)
+    menu = await hass.config_entries.options.async_init(entry.entry_id)
+    assert menu["type"] == data_entry_flow.FlowResultType.MENU
+    assert menu["menu_options"] == ["heating_curves", "recalculate_cop"]
+    return entry, await hass.config_entries.options.async_configure(menu["flow_id"], {"next_step_id": "heating_curves"})
 
 
 def _fields(result):
@@ -302,16 +305,17 @@ def test_every_options_field_has_a_text_in_each_language():
         for n in (1, 2)
         for f in ("low_ambient_temperature", "water_at_low_ambient", "high_ambient_temperature", "water_at_high_ambient", "gradient", "vertex_offset")
     }
-    assert set(reference["step"]["init"]["data"]) == fields
-    assert set(reference["step"]["init"]["data_description"]) == fields
-    assert set(reference["error"]) == {"incomplete_curve", "high_ambient_not_above_low"}
-    assert set(reference["abort"]) == {"not_loaded", "no_heating_curve"}
+    assert set(reference["step"]["heating_curves"]["data"]) == fields
+    assert set(reference["step"]["heating_curves"]["data_description"]) == fields
+    assert set(reference["step"]["init"]["menu_options"]) == {"heating_curves", "recalculate_cop", "restore_cop"}
+    assert set(reference["error"]) == {"incomplete_curve", "high_ambient_not_above_low", "confirm_required"}
+    assert {"not_loaded", "no_heating_curve"} <= set(reference["abort"])
 
     def keys(node, prefix=""):
         if isinstance(node, dict):
             return {path for key, value in node.items() for path in keys(value, f"{prefix}{key}.")}
         return {prefix}
 
-    for language in ("en", "fr", "es"):
+    for language in ("en", "fr", "es", "pl"):
         translated = json.loads((base / "translations" / f"{language}.json").read_text(encoding="utf-8"))["options"]
         assert keys(translated) == keys(reference), language

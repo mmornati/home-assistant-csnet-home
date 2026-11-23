@@ -359,7 +359,7 @@ To configure OTC:
 
 CSNet reports **which kind** of heating curve each circuit uses, but not the curve itself. You can copy the values your installer set into the integration, and Home Assistant then computes the water temperature the curve asks for. **Nothing is sent to the unit**: these values only feed a sensor.
 
-1. Go to **Settings** → **Devices & Services** → **CSNet Home** → **Configure**.
+1. Go to **Settings** → **Devices & Services** → **CSNet Home** → **Configure**, and choose **Heating curves**.
 2. The form shows only the circuits whose heating curve is **Points** or **Gradient**, with the fields of that kind of curve. Copy the values from the unit controller (Space heating → Water calculation mode):
    - **Points**: low ambient temperature, water set point at low ambient temperature, high ambient temperature, water set point at high ambient temperature.
    - **Gradient**: the gradient value (0.2 to 2.2).

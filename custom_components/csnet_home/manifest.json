@@ -1,7 +1,7 @@
 {
     "domain": "csnet_home",
     "name": "CSNet Home (unofficial, for Hitachi)",
-    "after_dependencies": ["frontend", "http", "websocket_api"],
+    "after_dependencies": ["frontend", "http", "recorder", "websocket_api"],
     "codeowners": ["@mmornati"],
     "config_flow": true,
     "dependencies": [],

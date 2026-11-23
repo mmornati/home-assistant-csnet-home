@@ -75,6 +75,11 @@ def produced_energy_storage_key(entry_id: str) -> str:
     return f"{DOMAIN}.produced_energy.{entry_id}"
 
 
+def auto_heat_storage_key(entry_id: str) -> str:
+    """Return the storage key of the heat of the automatic source, by hour, day and period."""
+    return f"{DOMAIN}.auto_heat.{entry_id}"
+
+
 def unit_heat_storage_key(entry_id: str) -> str:
     """Return the storage key of the heat counted from the unit's own heat counter."""
     return f"{DOMAIN}.unit_heat.{entry_id}"
@@ -143,6 +148,17 @@ def energy_on_day(energy, day: date, kind: str, use: str | None = None, before_h
     return total
 
 
+def energy_in_hour(energy, day: date, hour: int, kind: str, use: str | None = None) -> float | None:
+    """Return the kWh the server recorded for one hour of one day, or None when no unit has a record for that hour."""
+    found = False
+    total = 0.0
+    for record in _records(energy, "hourly"):
+        if _matches(record, year=day.year, month=day.month, day=day.day, hour=hour):
+            found = True
+            total += _amount(record, kind, use)
+    return total if found else None
+
+
 def hours_complete_on_day(energy, day: date) -> int | None:
     """Return how many hours of the day the server has recorded (the hour after the last record), or None.
 
@@ -200,13 +216,17 @@ class ServerEnergyDescription(SensorEntityDescription):
     use: str | None = None
 
 
-def server_energy_descriptions(energy, heat_uses: list[str] | None = None, electricity: str | None = None) -> list[ServerEnergyDescription]:
+def server_energy_descriptions(
+    energy, heat_uses: list[str] | None = None, electricity: str | None = None, heat_label: str = "calculated"
+) -> list[ServerEnergyDescription]:
     """Return the heat and electricity sensors of the unit.
 
     Each is named by what it is, the period and where it comes from: "Heat
     today (csnet)", "Electricity this month (metered)". With ``heat_uses`` the
-    heat is the integration's own measure ("calculated"): its sensors always
-    exist, split by those uses; else it is what the server recorded.
+    heat is counted by the integration (``heat_label``: "calculated", or
+    "auto" for CSNet's hours with the calculated heat where CSNet missed
+    them): its sensors always exist, split by those uses; else it is what the
+    server recorded.
     ``electricity`` is "metered" or "estimated" when the electricity is the
     user's meter or the integration's estimate: its sensors always exist.
     Without it, they show what the server recorded, for a unit with a pulse
@@ -222,7 +242,7 @@ def server_energy_descriptions(energy, heat_uses: list[str] | None = None, elect
     increasing = {**common, "state_class": SensorStateClass.TOTAL}
     descriptions: list[ServerEnergyDescription] = []
     if heat_uses is not None or has_energy(energy, HEAT):
-        heat = "calculated" if heat_uses is not None else "csnet"
+        heat = heat_label if heat_uses is not None else "csnet"
         descriptions += [
             ServerEnergyDescription(key="server_heat_today", name=f"Heat today ({heat})", **increasing),
             ServerEnergyDescription(key="server_heat_yesterday", name=f"Heat yesterday ({heat})", span="yesterday", **common),
@@ -331,7 +351,13 @@ class CSNetHomeServerEnergySensor(CoordinatorEntity, SensorEntity):
     def extra_state_attributes(self):
         """Say where the heat or the electricity comes from."""
         if self.entity_description.kind == HEAT:
-            return {"heat_source": self._produced.source if self._produced is not None else "csnet"}
+            attributes = {"heat_source": self._produced.source if self._produced is not None else "csnet"}
+            if isinstance(self._produced, AutoHeatCounter) and self.entity_description.span == "today" and self.entity_description.use is None:
+                # how many of today's full hours are CSNet's, and how many the calculated heat stood in for
+                sources = self._produced.hour_sources(dt_util.now())
+                attributes["hours_from_csnet"] = sources["csnet"]
+                attributes["hours_calculated"] = sources["calculated"]
+            return attributes
         if self._tracker is None:
             return {"electricity_source": "csnet"}
         return {"electricity_source": "estimate" if self._counter is not None else "meter"}
@@ -646,6 +672,266 @@ class ProducedEnergyCounter:
         for scope in ("day", "month"):
             uses = self._periods[scope]["uses"]
             uses[use] = uses.get(use, 0.0) + kwh
+
+
+def _records_by_hour_and_day(energy) -> tuple[dict, dict]:
+    """Return the heat the server recorded, by use, per (day, hour) and per day.
+
+    A day is its daily record, or the sum of its hours when it has no daily
+    record. An hourly record of more heat than the unit can make in an hour
+    is left out: the oldest hour CSNet keeps has been seen holding a running
+    total (23121 kWh for one hour of 8 November 2026, a day of 80 kWh).
+    Every indoor unit is added up.
+    """
+    hours: dict = {}
+    for record in _records(energy, "hourly"):
+        when = record.get("time") if isinstance(record, dict) else None
+        try:
+            key = (date(when["year"], when["month"], when["day"]), int(when["hour"]))
+        except (KeyError, TypeError, ValueError):
+            continue
+        if _amount(record, HEAT, None) > UNIT_HEAT_MAX_KW:
+            continue
+        uses = hours.setdefault(key, dict.fromkeys(USES, 0.0))
+        for use in USES:
+            uses[use] += _amount(record, HEAT, use)
+    days: dict = {}
+    for record in _records(energy, "daily"):
+        when = record.get("time") if isinstance(record, dict) else None
+        try:
+            day = date(when["year"], when["month"], when["day"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        total = days.setdefault(day, dict.fromkeys(USES, 0.0))
+        for use in USES:
+            total[use] += _amount(record, HEAT, use)
+    # the days known only by their hours
+    only_hours = {day for day, _hour in hours} - set(days)
+    for (day, _hour), uses in hours.items():
+        if day not in only_hours:
+            continue
+        total = days.setdefault(day, dict.fromkeys(USES, 0.0))
+        for use in USES:
+            total[use] += uses[use]
+    return hours, days
+
+
+# The automatic source keeps CSNet's heat of an hour unless the integration measured
+# at least this much heat in that hour and CSNet recorded less than this share of it
+AUTO_MIN_HOUR_KWH = 1.5
+AUTO_MIN_SHARE = 0.5
+# Today and this month hold their figure through a step back of up to this much (or
+# share of it): CSNet's whole kWh replacing calculated heat. A larger one is shown.
+AUTO_FLOOR_KWH = 3.0
+AUTO_FLOOR_SHARE = 0.1
+
+
+class AutoHeatCounter(ProducedEnergyCounter):
+    """The heat CSNet records, hour by hour, with the calculated heat for the hours CSNet missed.
+
+    CSNet records the unit's heat by full hours, from the unit's own figures:
+    the better measure, when it arrives. It sometimes fails to: hours without
+    a record, or with almost nothing while the unit was heating (seen on
+    22 and 23 November 2026, while the CSNet gateway was reported offline).
+    The integration also measures the heat itself, from the water flow and
+    temperatures, at every reading. For each full hour this keeps CSNet's
+    heat, unless CSNet has no record for it or recorded less than half of
+    what the integration measured (at least AUTO_MIN_HOUR_KWH): then the
+    integration's heat stands in. The hour in progress, which CSNet records
+    only after it ends, is the integration's.
+
+    The integration's heat of today and yesterday is kept by hour, the heat
+    of each finished day of this month and last month by day, across
+    restarts. Days before the counting started are CSNet's.
+    """
+
+    source = "auto"
+
+    def __init__(self, hass: HomeAssistant, entry_id: str, energy_reader, max_hours: float = ESTIMATE_MAX_INTEGRATION_HOURS) -> None:
+        """Initialize; ``energy_reader`` returns CSNet's energy records, it is fed the calculated heat of each reading."""
+        super().__init__(hass, entry_id, max_hours, storage_key=auto_heat_storage_key(entry_id))
+        self._energy_reader = energy_reader
+        self._now: datetime | None = None
+
+    @callback
+    def async_update(self, now: datetime, watts: float, use: str | None) -> None:
+        """Count the heat of a new reading, in the hour it was read in."""
+        self._now = now
+        # an hour with a reading was measured, also when nothing was produced in it
+        self._periods.setdefault("hours", {}).setdefault(now.strftime("%Y-%m-%d"), {}).setdefault(str(now.hour), {})
+        super().async_update(now, watts, use)
+
+    def _add(self, kwh: float, use: str) -> None:
+        """Add heat to today, this month and the hour of the reading."""
+        super()._add(kwh, use)
+        if self._now is not None:
+            bucket = self._periods["hours"][self._now.strftime("%Y-%m-%d")][str(self._now.hour)]
+            bucket[use] = bucket.get(use, 0.0) + kwh
+
+    def _roll(self, now: datetime) -> None:
+        """Keep the hours of today and yesterday, the total of each older day of this month and last month.
+
+        A day's total is taken when its hours are let go, the day after it
+        ended: CSNet has recorded its last hour by then.
+        """
+        super()._roll(now)
+        today = now.date()
+        yesterday = (today - timedelta(days=1)).isoformat()
+        hours_kept = self._periods.setdefault("hours", {})
+        days_kept = self._periods.setdefault("days", {})
+        older = [day for day in hours_kept if day < yesterday]
+        energy = self._energy()
+        # right after a start CSNet's records are not read yet: the hours wait for them
+        if older and energy is not None:
+            recorded = _records_by_hour_and_day(energy)
+            for day in older:
+                try:
+                    days_kept[day] = self._day(date.fromisoformat(day), 24, *recorded)[0]
+                except ValueError:
+                    pass
+                del hours_kept[day]
+        first_of_last_month = (today.replace(day=1) - timedelta(days=1)).replace(day=1).isoformat()
+        for day in [day for day in days_kept if day < first_of_last_month]:
+            del days_kept[day]
+        # the floors of today and this month belong to their own period
+        periods = (today.isoformat(), today.strftime("%Y-%m"))
+        shown = self._periods.setdefault("shown", {})
+        for key in [key for key, value in shown.items() if not isinstance(value, list) or value[:1] and value[0] not in periods]:
+            del shown[key]
+
+    def _energy(self):
+        """Return CSNet's energy records, or None."""
+        try:
+            return self._energy_reader()
+        except Exception:  # pylint: disable=broad-except
+            return None
+
+    def _hour(self, day: date, hour: int, recorded_hours: dict) -> tuple[dict, str | None]:
+        """Return the heat of one full hour by use, and where it comes from: "csnet", "calculated" or None (unknown)."""
+        measured = ((self._periods.get("hours") or {}).get(day.isoformat()) or {}).get(str(hour))
+        recorded = recorded_hours.get((day, hour))
+        if recorded is None:
+            return (dict(measured), "calculated") if measured is not None else ({}, None)
+        if measured is None:
+            return dict(recorded), "csnet"
+        measured_total = sum(measured.values())
+        if measured_total >= AUTO_MIN_HOUR_KWH and sum(recorded.values()) < measured_total * AUTO_MIN_SHARE:
+            return dict(measured), "calculated"
+        # the same test for each use: CSNet may keep the heating and miss the hot water of the hour
+        uses = dict(recorded)
+        source = "csnet"
+        for use, kwh in measured.items():
+            if kwh >= AUTO_MIN_HOUR_KWH and uses.get(use, 0.0) < kwh * AUTO_MIN_SHARE:
+                uses[use] = kwh
+                source = "calculated"
+        return uses, source
+
+    def _day(self, day: date, hours: int, recorded_hours: dict, recorded_days: dict) -> tuple[dict, dict]:
+        """Return the heat of the first ``hours`` full hours of a day by use, and how many hours came from where.
+
+        A day whose hours the integration did not keep is the total kept for
+        it, else CSNet's day (its daily record, or its hours without one).
+        """
+        counts = {"csnet": 0, "calculated": 0, "unknown": 0}
+        total: dict = {}
+        if day.isoformat() not in (self._periods.get("hours") or {}):
+            kept = (self._periods.get("days") or {}).get(day.isoformat())
+            if kept is not None:
+                return dict(kept), counts
+            recorded = recorded_days.get(day)
+            if recorded is not None:
+                return dict(recorded), {"csnet": hours, "calculated": 0, "unknown": 0}
+            counts["unknown"] = hours
+            return total, counts
+        for hour in range(hours):
+            uses, source = self._hour(day, hour, recorded_hours)
+            counts[source or "unknown"] += 1
+            for use, kwh in uses.items():
+                total[use] = total.get(use, 0.0) + kwh
+        if hours == 24 and counts["unknown"] and day in recorded_days and not any(key[0] == day for key in recorded_hours):
+            # counted from the middle of the day, with CSNet's whole day on record but not its hours: CSNet's day
+            return dict(recorded_days[day]), {"csnet": 24, "calculated": 0, "unknown": 0}
+        return total, counts
+
+    def _today(self, now: datetime, recorded_hours: dict, recorded_days: dict) -> tuple[dict, dict]:
+        """Return today's heat by use (the full hours, then the hour in progress) and the hours' sources."""
+        total, counts = self._day(now.date(), now.hour, recorded_hours, recorded_days)
+        current = ((self._periods.get("hours") or {}).get(now.date().isoformat()) or {}).get(str(now.hour)) or {}
+        for use, kwh in current.items():
+            total[use] = total.get(use, 0.0) + kwh
+        return total, counts
+
+    def hour_sources(self, now: datetime) -> dict:
+        """Return how many of today's full hours have CSNet's heat, the calculated heat, or none."""
+        recorded_hours, recorded_days = _records_by_hour_and_day(self._energy())
+        return self._today(now, recorded_hours, recorded_days)[1]
+
+    def heat_by_hour(self, now: datetime, hours, uses: tuple[str, ...]) -> dict[int, float]:
+        """Return today's heat of the given uses in each of the given hours: the hour in progress as counted so far."""
+        recorded_hours, _recorded_days = _records_by_hour_and_day(self._energy())
+        today = now.date()
+        found = {}
+        for hour in hours:
+            if hour == now.hour:
+                heat = ((self._periods.get("hours") or {}).get(today.isoformat()) or {}).get(str(hour)) or {}
+            else:
+                heat = self._hour(today, hour, recorded_hours)[0]
+            found[hour] = sum(heat.get(use, 0.0) for use in uses)
+        return found
+
+    def energy(self, span: str, use: str | None, now: datetime) -> float | None:
+        """Return the kWh of today, yesterday, this month or last month (of one use, or all), or None when unknown.
+
+        Today and this month never go down: when CSNet's record of an hour,
+        in whole kWh, replaces a little more calculated heat, the figure
+        stays where it was until the heat that follows makes up for it.
+        """
+        value = self._compute(span, use, now)
+        if span not in ("today", "month") or value is None:
+            return value
+        period = _period_ids(now)["day" if span == "today" else "month"][0]
+        shown = self._periods.setdefault("shown", {})
+        key = f"{span}:{use or 'all'}"
+        last = shown.get(key)
+        if isinstance(last, list) and len(last) == 2 and last[0] == period and value < last[1]:
+            # a small step back is CSNet's rounding and is held; a large one is a correction of the records, shown
+            if last[1] - value <= max(AUTO_FLOOR_KWH, last[1] * AUTO_FLOOR_SHARE):
+                return float(last[1])
+        shown[key] = [period, value]
+        return value
+
+    def _compute(self, span: str, use: str | None, now: datetime) -> float | None:
+        """Return the kWh of a span as the hours' sources give it."""
+        recorded_hours, recorded_days = _records_by_hour_and_day(self._energy())
+        today = now.date()
+
+        def pick(uses: dict) -> float:
+            return float(sum(uses.values()) if use is None else uses.get(use, 0.0))
+
+        if span == "today":
+            return pick(self._today(now, recorded_hours, recorded_days)[0])
+        if span == "yesterday":
+            uses, counts = self._day(today - timedelta(days=1), 24, recorded_hours, recorded_days)
+            return None if counts["unknown"] else pick(uses)
+        first = today.replace(day=1)
+        if span == "month":
+            last = today
+        else:
+            last = first - timedelta(days=1)
+            first = last.replace(day=1)
+        total = 0.0
+        day = first
+        while day <= last:
+            if day == today:
+                uses = self._today(now, recorded_hours, recorded_days)[0]
+            else:
+                uses, counts = self._day(day, 24, recorded_hours, recorded_days)
+                if counts["unknown"] and span == "last_month":
+                    # a day of last month nobody knows the heat of: no figure rather than a partial one
+                    return None
+            total += pick(uses)
+            day += timedelta(days=1)
+        return total
 
 
 class UnitHeatCounter(ProducedEnergyCounter):

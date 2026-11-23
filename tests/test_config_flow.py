@@ -719,7 +719,7 @@ async def test_heat_source_defaults_to_csnet_and_can_be_changed(hass: HomeAssist
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
     key = _schema_key(result, CONF_HEAT_SOURCE)
     assert key.default() == "csnet"
-    assert result["data_schema"].schema[key].config["options"] == ["csnet", "calculated"]
+    assert result["data_schema"].schema[key].config["options"] == ["csnet", "calculated", "auto"]
     with patch(VALIDATE, return_value=True):
         result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input=TEST_CONFIG)
     assert result["data"][CONF_HEAT_SOURCE] == "csnet"

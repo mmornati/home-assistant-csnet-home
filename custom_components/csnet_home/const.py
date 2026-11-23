@@ -18,11 +18,13 @@ CONF_MAX_TEMP_OVERRIDE = "max_temp_override"
 CONF_ENERGY_METER = "energy_meter"
 # The power sensor that goes with the energy meter; found on the meter's device when not chosen
 CONF_ENERGY_METER_POWER = "energy_meter_power"
-# Where the heat produced comes from: the heat CSNet records, or the integration's own calculation
+# Where the heat produced comes from: the heat CSNet records, the integration's own
+# calculation, or each hour the heat CSNet recorded unless CSNet missed it ("auto")
 CONF_HEAT_SOURCE = "heat_source"
 HEAT_SOURCE_CSNET = "csnet"
 HEAT_SOURCE_CALCULATED = "calculated"
-HEAT_SOURCES = [HEAT_SOURCE_CSNET, HEAT_SOURCE_CALCULATED]
+HEAT_SOURCE_AUTO = "auto"
+HEAT_SOURCES = [HEAT_SOURCE_CSNET, HEAT_SOURCE_CALCULATED, HEAT_SOURCE_AUTO]
 DEFAULT_HEAT_SOURCE = HEAT_SOURCE_CSNET
 CONF_FAN_COIL_MODEL = "fan_coil_model"
 CONF_ENABLE_ALARM_NOTIFICATIONS = "enable_alarm_notifications"
