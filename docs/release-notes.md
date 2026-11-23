@@ -7,6 +7,14 @@ description: What changed in each version of the CSNet Home (unofficial, for Hit
 
 Every version of the integration, newest first. Install or update from HACS; each version is also on the [GitHub releases page](https://github.com/mmornati/home-assistant-csnet-home/releases).
 
+## Next version
+
+*Not released yet*
+
+#### Fixed
+
+- **Heat produced today and the COPs fell to 0 when CSNet lost touch with the IOT module.** CSNet then answers with no hourly or daily energy records (its web app shows "Votre installation ne semble plus connectée avec le serveur"). That answer no longer replaces the records read before; it is asked for again 5 minutes later, and the log says once that CSNet sent no records, then when they come back. Nothing new is sent to the unit.
+
 ## 2.20.2
 
 *22 November 2026* · [GitHub release](https://github.com/mmornati/home-assistant-csnet-home/releases/tag/2.20.2)
