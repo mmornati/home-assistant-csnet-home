@@ -25,7 +25,7 @@ Entity IDs follow the pattern `sensor.compressor_outdoor_unit_{sensor_name}`, fo
 |--------|-------------|------|
 | **Compressor Frequency** | Current operating frequency of the compressor (`ouHz`) | Hz |
 | **Compressor Current** | Electrical current draw (`ouCurrent`) | A |
-| **Compressor Capacity** | Unit capacity value (`unitCapacity`) | - |
+| **Compressor Capacity** | The unit's running total of the heat it produced (`unitCapacity`), in whole kWh, starting over after 249; see Heat from the unit's counter in the sensors reference | - |
 | **Operation Status** | Current operational state, as text | - |
 
 **Operation Status** values: `Off`, `Cooling Demand Off`, `Cooling Thermostat Off`, `Cooling Thermostat On`, `Heating Demand Off`, `Heating Thermostat Off`, `Heating Thermostat On`, `Domestic Hot Water Off`, `Domestic Hot Water On`, `Swimming Pool Off`, `Swimming Pool On`, `Alarm` (unknown codes show as `Unknown (n)`). Its attributes are `raw_value`, `status_text` and `defrosting`.

@@ -59,6 +59,14 @@ UNIT_ROLES = {
     "cop_yesterday_from_estimate": f"{DOMAIN}-estimated_cop_yesterday",
     "cop_month_from_estimate": f"{DOMAIN}-estimated_cop_month",
     "cop_last_month_from_estimate": f"{DOMAIN}-estimated_cop_last_month",
+    # the heat of the unit's own heat counter, and the COPs with it
+    "unit_heat_today": f"{DOMAIN}-unit_heat_today",
+    "unit_heat_yesterday": f"{DOMAIN}-unit_heat_yesterday",
+    "unit_heat_month": f"{DOMAIN}-unit_heat_month",
+    "unit_cop_today": f"{DOMAIN}-unit_cop_today",
+    "unit_cop_yesterday": f"{DOMAIN}-unit_cop_yesterday",
+    "unit_cop_month": f"{DOMAIN}-unit_cop_month",
+    "unit_cop_last_month": f"{DOMAIN}-unit_cop_last_month",
     # water side
     "water_out": f"{DOMAIN}-installation-out_water_temperature",
     # outlet of the heat pump's exchanger, before the 3-way valve: the flow to the tank

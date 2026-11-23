@@ -7,6 +7,17 @@ description: What changed in each version of the CSNet Home (unofficial, for Hit
 
 Every version of the integration, newest first. Install or update from HACS; each version is also on the [GitHub releases page](https://github.com/mmornati/home-assistant-csnet-home/releases).
 
+## 2.21.0
+
+*Not released yet*
+
+Heat and COP from the unit's own heat counter, beside CSNet's, and cards that show either or both. Nothing new is sent to the unit.
+
+#### New
+
+- **Heat and COP from the unit's counter.** The unit reports a running total of the heat it produced (`unitCapacity`, the Compressor Capacity sensor, in whole kWh). CSNet's hourly heat is the rise of that counter, but on 22 and 23 November 2026 CSNet recorded 0 to 1 kWh an hour while the counter rose by 3 to 10, and the COPs dropped to 0.2. The integration now counts the rise itself, in new sensors beside the others: *Heat today / yesterday / this month (unit counter)* and *COP today / yesterday / this month / last month (unit counter, metered or estimated)*. They are created once the counter has risen.
+- **Cards: `heat_source` option** on Heat pump, Performance and Energy per day: `csnet` (as before), `unit_counter`, or `both` on Performance and Energy per day to compare the two. Cards 1.3.0: reload the dashboard page after updating.
+
 ## 2.20.3
 
 *23 November 2026* · [GitHub release](https://github.com/mmornati/home-assistant-csnet-home/releases/tag/2.20.3)

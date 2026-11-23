@@ -12,7 +12,7 @@
  * power meter.
  */
 
-const CARD_VERSION = "1.2.1";
+const CARD_VERSION = "1.3.0";
 
 // ---------------------------------------------------------------------------
 // Texts
@@ -111,6 +111,9 @@ const TEXTS = {
     before_days: "before ({d} days)",
     mixing_note: "The unit makes water for the warmer curve; the mixing valve cools it for the other circuit.",
     outdoor_mean: "Outdoor average",
+    heat_source: "Heat and COP",
+    from_csnet: "CSNet",
+    from_unit_counter: "unit counter",
     electricity_source_server: "Electricity as CSNet records it. Choose your heat pump's electricity meter in the integration settings for measured values.",
     now: "Now",
     usual_at_this_hour: "Usual at this hour ({d} days)",
@@ -259,6 +262,9 @@ const TEXTS = {
     before_days: "avant ({d} jours)",
     mixing_note: "L'unité produit l'eau de la loi la plus chaude ; la vanne 3 voies la refroidit pour l'autre circuit.",
     outdoor_mean: "Extérieur moyen",
+    heat_source: "Chaleur et COP",
+    from_csnet: "CSNet",
+    from_unit_counter: "compteur PAC",
     electricity_source_server: "Électricité telle que CSNet l'enregistre. Choisissez le compteur d'électricité de la pompe à chaleur dans les réglages de l'intégration pour des valeurs mesurées.",
     now: "Maintenant",
     usual_at_this_hour: "Habituel à cette heure ({d} jours)",
@@ -407,6 +413,9 @@ const TEXTS = {
     before_days: "antes ({d} días)",
     mixing_note: "La unidad produce el agua de la curva más caliente; la válvula mezcladora la enfría para el otro circuito.",
     outdoor_mean: "Exterior medio",
+    heat_source: "Calor y COP",
+    from_csnet: "CSNet",
+    from_unit_counter: "contador de la unidad",
     electricity_source_server: "Energía según la registra CSNet. Elija el medidor de energía de la bomba de calor en los ajustes de la integración para valores precisos.",
     now: "Ahora",
     usual_at_this_hour: "Habitual a esta hora ({d} días)",
@@ -555,6 +564,9 @@ const TEXTS = {
     before_days: "przed ({d} dni)",
     mixing_note: "Urządzenie przygotowuje wodę dla cieplejszej krzywej; zawór mieszający schładza ją dla drugiego obiegu.",
     outdoor_mean: "Średnia zewnętrzna",
+    heat_source: "Ciepło i COP",
+    from_csnet: "CSNet",
+    from_unit_counter: "licznik pompy",
     electricity_source_server: "Elektryczność według zapisów CSNet. Wybierz licznik energii pompy ciepła w ustawieniach integracji, aby korzystać z wartości pomiarowych.",
     now: "Teraz",
     usual_at_this_hour: "Zwykle o tej porze ({d} dni)",
@@ -1192,7 +1204,24 @@ class CsnetBaseCard extends HTMLElement {
 
   /** The roles, with the entities the card configuration replaces (`<role>_entity`). */
   get unit() {
+    return this.unitFor(this.heatSource === "unit_counter" ? "unit_counter" : "csnet");
+  }
+
+  /** The card's `heat_source` option: csnet (the default), unit_counter or both; csnet when the unit has no counter sensors. */
+  get heatSource() {
+    const source = this._config?.heat_source;
+    if ((source === "unit_counter" || source === "both") && this._roles?.unit?.unit_heat_today) return source;
+    return "csnet";
+  }
+
+  /** The roles with the heat and COPs of one source: "csnet" (the heat sensors) or "unit_counter" (the unit's own counter). */
+  unitFor(source) {
     const unit = { ...(this._roles?.unit || {}) };
+    if (source === "unit_counter") {
+      for (const [role, counterRole] of Object.entries(UNIT_COUNTER_ROLES)) unit[role] = unit[counterRole];
+      // CSNet's own COP of today is no stand-in for the counter's
+      delete unit.cop_today_estimated;
+    }
     // a real power meter on the heat pump beats the estimate
     if (unit.meter_power) {
       unit.power_estimate = unit.power;
@@ -1363,6 +1392,7 @@ class CsnetHeatPumpCard extends CsnetBaseCard {
       { name: "max_power", selector: { number: { min: 500, max: 30000, step: 100, mode: "box" } } },
       { name: "price", selector: { number: { min: 0, max: 5, step: 0.001, mode: "box" } } },
       { name: "price_entity", selector: { entity: {} } },
+      heatSourceField(false),
     ];
   }
 
@@ -1821,6 +1851,10 @@ class CsnetHeatingCurveCard extends CsnetBaseCard {
 // ---------------------------------------------------------------------------
 
 class CsnetPerformanceCard extends CsnetBaseCard {
+  static editorSchema() {
+    return [{ name: "title", selector: { text: {} } }, heatSourceField()];
+  }
+
   css() {
     return `
       .now { display: flex; align-items: center; gap: 16px; }
@@ -1833,6 +1867,8 @@ class CsnetPerformanceCard extends CsnetBaseCard {
       .bar .e { background: var(--csnet-heat); }
       .bar .a { background: var(--csnet-ok); }
       .detail { font-size: 11px; color: var(--csnet-muted); }
+      .period .cops { display: flex; gap: 14px; align-items: baseline; }
+      .period .src { font-size: 10px; color: var(--csnet-muted); margin-right: 4px; }
     `;
   }
 
@@ -1846,8 +1882,7 @@ class CsnetPerformanceCard extends CsnetBaseCard {
   }
 
   /** COP of a period: the metered sensor, else heat over the meter's history, else the server's heat and electricity. */
-  period(hass, copRole, heatRole, electricityRole, key) {
-    const unit = this.unit;
+  period(hass, copRole, heatRole, electricityRole, key, unit = this.unit) {
     const cop = stateOf(hass, unit[copRole]);
     const fromCop = cop && num(hass, unit[copRole]) !== null
       ? { entity: unit[copRole], cop: num(hass, unit[copRole]), heat: cop.attributes.heat_kwh, electricity: cop.attributes.electricity_kwh }
@@ -1872,12 +1907,19 @@ class CsnetPerformanceCard extends CsnetBaseCard {
     const copNow = running ? num(hass, unit.cop_now) : null;
     const share = Math.max(0, Math.min(1, (copNow || 0) / 6));
     const arc = Math.PI * 45;
-    const periods = [
-      ["today", this.period(hass, "cop_today", "server_heat_today", "energy_today", "today") || (num(hass, unit.cop_today_estimated) !== null ? { entity: unit.cop_today_estimated, cop: num(hass, unit.cop_today_estimated) } : null)],
-      ["yesterday", this.period(hass, "cop_yesterday", "server_heat_yesterday", "server_electricity_yesterday", "yesterday")],
-      ["this_month", this.period(hass, "cop_month", "server_heat_month", "server_electricity_month", "this_month")],
-      ["last_month", this.period(hass, "cop_last_month", "", "", "last_month")],
-    ].filter(([, p]) => p && (Number.isFinite(p.cop) || Number.isFinite(p.heat)));
+    const both = this.heatSource === "both";
+    const counter = both ? this.unitFor("unit_counter") : null;
+    const periodsOf = (u) => ({
+      today: this.period(hass, "cop_today", "server_heat_today", "energy_today", "today", u) || (num(hass, u.cop_today_estimated) !== null ? { entity: u.cop_today_estimated, cop: num(hass, u.cop_today_estimated) } : null),
+      yesterday: this.period(hass, "cop_yesterday", "server_heat_yesterday", "server_electricity_yesterday", "yesterday", u),
+      this_month: this.period(hass, "cop_month", "server_heat_month", "server_electricity_month", "this_month", u),
+      last_month: this.period(hass, "cop_last_month", "", "", "last_month", u),
+    });
+    const main = periodsOf(unit);
+    // with both sources: the unit counter's COP beside CSNet's
+    const second = counter ? periodsOf(counter) : {};
+    const periods = Object.entries(main).filter(([, p]) => p && (Number.isFinite(p.cop) || Number.isFinite(p.heat)));
+    const label = (source) => (both ? `<span class="src">${escapeHtml(t(hass, source))}</span>` : "");
     const rows = periods
       .map(([key, p]) => {
         if (!Number.isFinite(p.cop)) {
@@ -1890,7 +1932,9 @@ class CsnetPerformanceCard extends CsnetBaseCard {
           ? `${t(hass, "heat_electricity", { h: fmt(hass, p.heat, 1), e: fmt(hass, p.electricity, 1) })} · ${t(hass, "from_air", { p: fmt(hass, (1 - electricityShare) * 100, 0) })}`
           : t(hass, "from_air", { p: fmt(hass, (1 - electricityShare) * 100, 0) });
         return `<div class="period" data-entity="${escapeHtml(p.entity)}">
-          <div class="head"><span class="name">${t(hass, key)}</span><span class="cop">${fmt(hass, p.cop, 2)}</span></div>
+          <div class="head"><span class="name">${t(hass, key)}</span><span class="cops">${label("from_csnet")}<span class="cop">${fmt(hass, p.cop, 2)}</span>${
+            Number.isFinite(second[key]?.cop) ? `<span data-entity="${escapeHtml(second[key].entity || "")}">${label("from_unit_counter")}<span class="cop">${fmt(hass, second[key].cop, 2)}</span></span>` : ""
+          }</span></div>
           <div class="bar"><div class="e" style="width:${(electricityShare * 100).toFixed(1)}%"></div><div class="a" style="width:${((1 - electricityShare) * 100).toFixed(1)}%"></div></div>
           <div class="detail">${escapeHtml(detail)}</div></div>`;
       })
@@ -2223,6 +2267,7 @@ class CsnetDailyEnergyCard extends CsnetBaseCard {
     return [
       { name: "title", selector: { text: {} } },
       { name: "days", selector: { number: { min: 3, max: 90, step: 1, mode: "box" } } },
+      heatSourceField(),
     ];
   }
 
@@ -2230,9 +2275,20 @@ class CsnetDailyEnergyCard extends CsnetBaseCard {
     return Number(this._config.days ?? 14);
   }
 
+  /** The heat entities drawn: [key, entity], the unit counter's second when both are shown. */
+  heatEntities() {
+    if (this.heatSource === "both") {
+      return [
+        ["heat", this.unitFor("csnet").server_heat_today],
+        ["heat2", this.unitFor("unit_counter").server_heat_today],
+      ].filter(([, id]) => id);
+    }
+    return [["heat", this.unit.server_heat_today]].filter(([, id]) => id);
+  }
+
   dataKey() {
     const unit = this.unit;
-    const ids = [electricityEntity(unit), unit.server_heat_today, unit.outdoor].filter(Boolean);
+    const ids = [electricityEntity(unit), ...this.heatEntities().map(([, id]) => id), unit.outdoor].filter(Boolean);
     return ids.length ? `${ids.join("|")}|${this.days}` : null;
   }
 
@@ -2243,7 +2299,8 @@ class CsnetDailyEnergyCard extends CsnetBaseCard {
   async fetchData(hass) {
     const unit = this.unit;
     const start = startOfDay(Date.now() - (this.days - 1) * 86400000);
-    const stats = await statistics(hass, [electricityEntity(unit), unit.server_heat_today, unit.outdoor], start, "day", ["change", "mean"]);
+    const heats = this.heatEntities();
+    const stats = await statistics(hass, [electricityEntity(unit), ...heats.map(([, id]) => id), unit.outdoor], start, "day", ["change", "mean"]);
     const byDay = new Map();
     const day = (ms) => startOfDay(ms);
     const put = (id, key, field) => {
@@ -2255,7 +2312,7 @@ class CsnetDailyEnergyCard extends CsnetBaseCard {
       }
     };
     put(electricityEntity(unit), "electricity", "change");
-    put(unit.server_heat_today, "heat", "change");
+    for (const [key, id] of heats) put(id, key, "change");
     put(unit.outdoor, "outdoor", "mean");
     return [...byDay.values()].sort((a, b) => a.at - b.at);
   }
@@ -2269,14 +2326,17 @@ class CsnetDailyEnergyCard extends CsnetBaseCard {
     const W = 600;
     const H = 230;
     const pad = { l: 36, r: 34, t: 18, b: 22 };
-    const energies = days.flatMap((d) => [d.electricity, d.heat]).filter(Number.isFinite);
+    const both = this.heatSource === "both";
+    const energies = days.flatMap((d) => [d.electricity, d.heat, d.heat2]).filter(Number.isFinite);
     const estep = niceStep(Math.max(...(energies.length ? energies : [10])));
     const emax = Math.max(estep, Math.ceil(Math.max(...(energies.length ? energies : [10])) / estep) * estep);
     const temps = days.map((d) => d.outdoor).filter(Number.isFinite);
     const [tmin, tmax] = niceRange(temps.length ? temps : [0, 10], 5, 1);
     const n = Math.max(days.length, 1);
     const slot = (W - pad.l - pad.r) / n;
-    const bar = Math.min(16, slot / 2.6);
+    const bar = Math.min(16, slot / (both ? 3.6 : 2.6));
+    // with both sources, CSNet's heat is the lighter bar
+    const csnetHeat = both ? "color-mix(in srgb, var(--csnet-heat) 45%, transparent)" : "var(--csnet-heat)";
     const sy = (v) => H - pad.b - (v / emax) * (H - pad.t - pad.b);
     const st = (v) => H - pad.b - ((v - tmin) / (tmax - tmin || 1)) * (H - pad.t - pad.b);
     let svg = "";
@@ -2288,9 +2348,20 @@ class CsnetDailyEnergyCard extends CsnetBaseCard {
     const outdoorPts = [];
     days.forEach((d, i) => {
       const cx = pad.l + slot * (i + 0.5);
-      if (Number.isFinite(d.electricity)) svg += `<rect x="${cx - bar - 1}" y="${sy(d.electricity)}" width="${bar}" height="${Math.max(0, sy(0) - sy(d.electricity))}" rx="2" fill="var(--csnet-elec)"/>`;
-      if (Number.isFinite(d.heat)) svg += `<rect x="${cx + 1}" y="${sy(d.heat)}" width="${bar}" height="${Math.max(0, sy(0) - sy(d.heat))}" rx="2" fill="var(--csnet-heat)" opacity=".85"/>`;
-      if (d.heat > 0 && d.electricity > 0) {
+      const x0 = both ? cx - bar * 1.5 - 1 : cx - bar - 1;
+      if (Number.isFinite(d.electricity)) svg += `<rect x="${x0}" y="${sy(d.electricity)}" width="${bar}" height="${Math.max(0, sy(0) - sy(d.electricity))}" rx="2" fill="var(--csnet-elec)"/>`;
+      const heatBars = both ? [["heat", x0 + bar + 1, csnetHeat], ["heat2", x0 + 2 * bar + 2, "var(--csnet-heat)"]] : [["heat", cx + 1, csnetHeat]];
+      for (const [key, x, fill] of heatBars) {
+        if (Number.isFinite(d[key])) svg += `<rect x="${x}" y="${sy(d[key])}" width="${bar}" height="${Math.max(0, sy(0) - sy(d[key]))}" rx="2" fill="${fill}" opacity=".85"/>`;
+      }
+      if (both) {
+        // each COP over its own heat bar
+        for (const [key, x] of heatBars) {
+          if (d[key] > 0 && d.electricity > 0) {
+            svg += `<text x="${x + bar / 2}" y="${Math.min(sy(d[key]), sy(d.electricity)) - 4}" text-anchor="middle" font-size="8" fill="var(--csnet-ok)" opacity="${key === "heat" ? 0.6 : 1}">${fmt(hass, d[key] / d.electricity, 1)}</text>`;
+          }
+        }
+      } else if (d.heat > 0 && d.electricity > 0) {
         svg += `<text x="${cx}" y="${Math.min(sy(d.heat), sy(d.electricity)) - 4}" text-anchor="middle" font-size="9" fill="var(--csnet-ok)">${fmt(hass, d.heat / d.electricity, 1)}</text>`;
       }
       if (Number.isFinite(d.outdoor)) outdoorPts.push([cx, st(d.outdoor)]);
@@ -2301,9 +2372,16 @@ class CsnetDailyEnergyCard extends CsnetBaseCard {
       svg += outdoorPts.map((p) => `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.5" fill="var(--csnet-cool)"/>`).join("");
     }
     const unit = this.unit;
+    const source = this.heatSource;
+    const heatItems = source === "both"
+      ? [
+          [csnetHeat, `${t(hass, "heat")} · ${t(hass, "from_csnet")} (kWh)`],
+          ["var(--csnet-heat)", `${t(hass, "heat")} · ${t(hass, "from_unit_counter")} (kWh)`],
+        ]
+      : [["var(--csnet-heat)", `${t(hass, "heat")}${source === "unit_counter" ? ` · ${t(hass, "from_unit_counter")}` : ""} (kWh)`]];
     const items = [
       ["var(--csnet-elec)", `${t(hass, "electricity")} (kWh)`],
-      ["var(--csnet-heat)", `${t(hass, "heat")} (kWh)`],
+      ...heatItems,
       ["var(--csnet-cool)", `${t(hass, "outdoor_mean")} (°C)`],
       ["var(--csnet-ok)", t(hass, "cop")],
     ];
@@ -2531,6 +2609,27 @@ const LANGUAGE_FIELD = {
       ],
     },
   },
+};
+
+/** Where the heat and the COPs of a card come from: the heat sensors (CSNet's, or calculated), the unit's own heat counter, or both. */
+function heatSourceField(withBoth = true) {
+  const options = [
+    { value: "csnet", label: "CSNet" },
+    { value: "unit_counter", label: "Unit counter" },
+  ];
+  if (withBoth) options.push({ value: "both", label: "CSNet + unit counter" });
+  return { name: "heat_source", selector: { select: { mode: "dropdown", options } } };
+}
+
+/** Roles the unit's own heat counter replaces, when a card shows its heat and COPs. */
+const UNIT_COUNTER_ROLES = {
+  server_heat_today: "unit_heat_today",
+  server_heat_yesterday: "unit_heat_yesterday",
+  server_heat_month: "unit_heat_month",
+  cop_today: "unit_cop_today",
+  cop_yesterday: "unit_cop_yesterday",
+  cop_month: "unit_cop_month",
+  cop_last_month: "unit_cop_last_month",
 };
 
 class CsnetCardEditor extends HTMLElement {

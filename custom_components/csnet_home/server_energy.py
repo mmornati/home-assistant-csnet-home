@@ -46,6 +46,13 @@ MIN_ELECTRICITY_FOR_COP_KWH = 0.5
 ESTIMATE_MAX_INTEGRATION_HOURS = 10 / 60
 # The running total of the estimate is written at most this often (and on shutdown)
 ESTIMATE_SAVE_DELAY_S = 60
+# The unit's heat counter (`unitCapacity`, whole kWh) goes back to 0 after 249
+# (seen on a Yutaki S 8 HP, 21 November 2026); CSNet's hourly heat is its rise
+UNIT_HEAT_COUNTER_WRAP = 250
+# A drop from this close to the wrap is the counter starting over; any other drop is a reset
+UNIT_HEAT_COUNTER_WRAP_MARGIN = 30
+# After a longer gap the counter may have gone round more than once: start again from the reading
+UNIT_HEAT_COUNTER_MAX_GAP = timedelta(hours=24)
 # Electricity recorded by the server counts as metered from this share of the recorded heat
 MIN_ELECTRICITY_SHARE = 0.05
 RECENT_MONTHS = 3
@@ -64,6 +71,11 @@ def estimated_meter_storage_key(entry_id: str) -> str:
 def produced_energy_storage_key(entry_id: str) -> str:
     """Return the storage key of the heat the integration measured, by use and period."""
     return f"{DOMAIN}.produced_energy.{entry_id}"
+
+
+def unit_heat_storage_key(entry_id: str) -> str:
+    """Return the storage key of the heat counted from the unit's own heat counter."""
+    return f"{DOMAIN}.unit_heat.{entry_id}"
 
 
 def estimated_energy_storage_key(entry_id: str) -> str:
@@ -317,7 +329,7 @@ class CSNetHomeServerEnergySensor(CoordinatorEntity, SensorEntity):
     def extra_state_attributes(self):
         """Say where the heat or the electricity comes from."""
         if self.entity_description.kind == HEAT:
-            return {"heat_source": "calculated" if self._produced is not None else "csnet"}
+            return {"heat_source": self._produced.source if self._produced is not None else "csnet"}
         if self._tracker is None:
             return {"electricity_source": "csnet"}
         return {"electricity_source": "estimate" if self._counter is not None else "meter"}
@@ -542,11 +554,14 @@ class ProducedEnergyCounter:
     month has none. An outage only loses the heat of its own minutes.
     """
 
-    def __init__(self, hass: HomeAssistant, entry_id: str, max_hours: float = ESTIMATE_MAX_INTEGRATION_HOURS) -> None:
+    # what the heat sensors say their heat is
+    source = "calculated"
+
+    def __init__(self, hass: HomeAssistant, entry_id: str, max_hours: float = ESTIMATE_MAX_INTEGRATION_HOURS, storage_key: str | None = None) -> None:
         """Initialize; it is fed the heat of each new reading."""
         self.hass = hass
         self._max_hours = max_hours
-        self._store = Store(hass, METER_STORAGE_VERSION, produced_energy_storage_key(entry_id))
+        self._store = Store(hass, METER_STORAGE_VERSION, storage_key or produced_energy_storage_key(entry_id))
         self._periods: dict = {}
         self._last_time: datetime | None = None
         self._loaded = False
@@ -568,6 +583,10 @@ class ProducedEnergyCounter:
                 self._last_time = datetime.fromisoformat(stored["last_time"]) if stored.get("last_time") else None
             except (TypeError, ValueError):
                 self._last_time = None
+            self._restore(stored)
+
+    def _restore(self, stored: dict) -> None:
+        """Take back what a subclass keeps besides the periods."""
 
     def _roll(self, now: datetime) -> None:
         """Start a new day or month when one began."""
@@ -592,10 +611,7 @@ class ProducedEnergyCounter:
         self._roll(now)
         if hours is not None and watts > 0 and use:
             # after an outage the last reading says nothing about the gap
-            kwh = watts * min(hours, self._max_hours) / 1000.0
-            for scope in ("day", "month"):
-                uses = self._periods[scope]["uses"]
-                uses[use] = uses.get(use, 0.0) + kwh
+            self._add(watts * min(hours, self._max_hours) / 1000.0, use)
         self._last_time = now
         # saved a minute later at most, and when Home Assistant stops
         self._store.async_delay_save(self._data_to_save, ESTIMATE_SAVE_DELAY_S)
@@ -623,6 +639,88 @@ class ProducedEnergyCounter:
         uses = bucket.get("uses") or {}
         return float(sum(uses.values()) if use is None else uses.get(use, 0.0))
 
+    def _add(self, kwh: float, use: str) -> None:
+        """Add heat to today and this month."""
+        for scope in ("day", "month"):
+            uses = self._periods[scope]["uses"]
+            uses[use] = uses.get(use, 0.0) + kwh
+
+
+class UnitHeatCounter(ProducedEnergyCounter):
+    """The heat the unit counts itself, read from its heat counter, for today, yesterday, this month and last month.
+
+    The unit reports a running total of the heat it produced in whole kWh
+    (``unitCapacity``), which starts over after 249. CSNet's hourly heat is
+    the rise of that counter; counting the rise here gives the same figure
+    without CSNet's records, also while CSNet fails to record it. The last
+    reading is kept across restarts, so the heat of an outage is counted too
+    (on the day it ends).
+    """
+
+    source = "unit_counter"
+
+    def __init__(self, hass: HomeAssistant, entry_id: str) -> None:
+        """Initialize; it is fed the counter of each new reading."""
+        super().__init__(hass, entry_id, storage_key=unit_heat_storage_key(entry_id))
+        self._last_reading: int | None = None
+        # whether the counter ever rose: a unit whose counter stands still gets no sensors
+        self.has_counted = False
+
+    def _restore(self, stored: dict) -> None:
+        """Take back the last reading of the counter."""
+        reading = stored.get("last_reading")
+        self._last_reading = reading if isinstance(reading, int) and not isinstance(reading, bool) else None
+        self.has_counted = stored.get("has_counted") is True
+
+    @staticmethod
+    def rise(previous: int, reading: int) -> int | None:
+        """Return the kWh between two readings of the counter, or None when it was reset."""
+        if reading >= previous:
+            return reading - previous
+        wrap = UNIT_HEAT_COUNTER_WRAP if previous < UNIT_HEAT_COUNTER_WRAP else 256
+        if previous >= wrap - UNIT_HEAT_COUNTER_WRAP_MARGIN:
+            # the counter started over
+            return wrap - previous + reading
+        return None
+
+    @callback
+    def async_update_reading(self, now: datetime, reading, use: str | None) -> None:
+        """Add the rise of the counter since the last reading to the use of the moment."""
+        if not isinstance(reading, int) or isinstance(reading, bool) or reading < 0:
+            return
+        previous = self._last_reading
+        gap = now - self._last_time if self._last_time is not None else None
+        self._roll(now)
+        if previous is not None and gap is not None and timedelta(0) <= gap <= UNIT_HEAT_COUNTER_MAX_GAP:
+            kwh = self.rise(previous, reading)
+            if kwh is None:
+                _LOGGER.debug("The unit's heat counter went from %s to %s: counting again from there", previous, reading)
+            elif kwh:
+                self._add(float(kwh), use or "spaceHeating")
+                self.has_counted = True
+        self._last_reading = reading
+        self._last_time = now
+        self._store.async_delay_save(self._data_to_save, ESTIMATE_SAVE_DELAY_S)
+
+    def _data_to_save(self) -> dict:
+        """Return what is kept across restarts, with the last reading."""
+        return {**super()._data_to_save(), "last_reading": self._last_reading, "has_counted": self.has_counted}
+
+
+def unit_heat_descriptions() -> list[ServerEnergyDescription]:
+    """Return the heat sensors of the unit's own heat counter."""
+    common = {
+        "device_class": SensorDeviceClass.ENERGY,
+        "native_unit_of_measurement": UnitOfEnergy.KILO_WATT_HOUR,
+        "suggested_display_precision": 0,
+    }
+    increasing = {**common, "state_class": SensorStateClass.TOTAL}
+    return [
+        ServerEnergyDescription(key="unit_heat_today", name="Heat today (unit counter)", **increasing),
+        ServerEnergyDescription(key="unit_heat_yesterday", name="Heat yesterday (unit counter)", span="yesterday", **common),
+        ServerEnergyDescription(key="unit_heat_month", name="Heat this month (unit counter)", span="month", **increasing),
+    ]
+
 
 @dataclass(frozen=True, kw_only=True)
 class MeteredCopDescription(SensorEntityDescription):
@@ -645,6 +743,19 @@ ESTIMATED_COP_DESCRIPTIONS = (
     MeteredCopDescription(key="estimated_cop_month", name="COP this month (estimated)", span="month"),
     MeteredCopDescription(key="estimated_cop_last_month", name="COP last month (estimated)", span="last_month"),
 )
+
+
+def unit_cop_descriptions(electricity: str) -> list[MeteredCopDescription]:
+    """Return the COPs with the heat of the unit's own counter, the electricity "metered" or "estimated"."""
+    return [
+        MeteredCopDescription(key=f"unit_cop_{key}", name=f"COP {label} (unit counter, {electricity})", span=span)
+        for key, label, span in (
+            ("today", "today", "today"),
+            ("yesterday", "yesterday", "yesterday"),
+            ("month", "this month", "month"),
+            ("last_month", "last month", "last_month"),
+        )
+    ]
 
 
 class CSNetHomeMeteredCopSensor(CoordinatorEntity, SensorEntity):
@@ -738,7 +849,7 @@ class CSNetHomeMeteredCopSensor(CoordinatorEntity, SensorEntity):
         heat, electricity = self._figures()
         return {
             "heat_kwh": round(heat, 3) if heat is not None else None,
-            "heat_source": "calculated" if self._produced is not None else "csnet",
+            "heat_source": self._produced.source if self._produced is not None else "csnet",
             "electricity_kwh": round(electricity, 3) if electricity is not None else None,
             "meter": None if self._counter is not None else self._tracker.entity_id,
             "electricity_source": "estimate" if self._counter is not None else "meter",
