@@ -1267,11 +1267,11 @@ async def async_setup_entry(hass, entry, async_add_entities):
         # The unit's own heat counter, counted beside the heat above when the unit reports one
         from .server_energy import UnitHeatCounter  # pylint: disable=import-outside-toplevel
 
-        coordinator.unit_heat = None
-        if isinstance((observer._get_heating_status() or {}).get("unitCapacity"), int):  # pylint: disable=protected-access
-            unit_heat = UnitHeatCounter(hass, entry.entry_id)
-            await unit_heat.async_load()
-            coordinator.unit_heat = unit_heat
+        # made also when the first reading has no counter yet (a slow first answer):
+        # it counts from the first reading that has one, and gets sensors once it rose
+        unit_heat = UnitHeatCounter(hass, entry.entry_id)
+        await unit_heat.async_load()
+        coordinator.unit_heat = unit_heat
 
         follow = _power_reading_follower(coordinator, observer)
         follow()

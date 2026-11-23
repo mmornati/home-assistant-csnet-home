@@ -628,7 +628,7 @@ Beside the heat sensors above, whatever their source, the integration counts it 
 
 - They are created once the counter has risen, so a unit that does not report a counter gets none.
 - Each rise goes to the use of the operation status at that moment (see the table above). The last reading is kept across restarts: the heat of a stop of Home Assistant is counted when it comes back, on that day.
-- A drop far from the top of the counter, or a reading more than 24 hours after the previous one, counts nothing and starts again from there.
+- A drop counts as the counter starting over when the heat it means is small (up to 30 kWh), or no more than the unit could make in the time since the last reading (up to 30 kW): a counter that went round while Home Assistant was off is counted. Any other drop, such as one step back near the top, or a reading more than 24 hours after the previous one, counts nothing and starts again from there.
 - Today and this month count from when the counting started, so the first day and month are partial and have no figure as yesterday or last month.
 - Their `heat_source` attribute is `unit_counter`. The cards can show this heat and these COPs instead of, or beside, the others (option `heat_source`, see [Dashboard Cards](Dashboard-Cards.md#options)).
 

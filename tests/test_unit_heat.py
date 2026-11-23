@@ -48,11 +48,19 @@ def coordinator_with(unit_heat, counter=None):
         (254, 1, 3),
         # far from the top: a reset, not the counter going round
         (120, 5, None),
+        # one step back near the top: no 249 kWh in a minute
+        (245, 244, None),
     ],
 )
 def test_rise_of_the_counter(previous, reading, rise):
-    """The rise between two readings, across the counter starting over."""
-    assert UnitHeatCounter.rise(previous, reading) == rise
+    """The rise between two readings a minute apart, across the counter starting over."""
+    assert UnitHeatCounter.rise(previous, reading, 1 / 60) == rise
+
+
+def test_the_counter_went_round_during_an_outage():
+    """150, then 20 eight hours later: 120 kWh, as the unit can make that much in that time."""
+    assert UnitHeatCounter.rise(150, 20, 8) == 120
+    assert UnitHeatCounter.rise(150, 20, 0.5) is None
 
 
 async def test_heat_is_the_rise_of_the_counter_by_use(hass, hass_storage):

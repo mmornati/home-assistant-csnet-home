@@ -49,8 +49,10 @@ ESTIMATE_SAVE_DELAY_S = 60
 # The unit's heat counter (`unitCapacity`, whole kWh) goes back to 0 after 249
 # (seen on a Yutaki S 8 HP, 21 November 2026); CSNet's hourly heat is its rise
 UNIT_HEAT_COUNTER_WRAP = 250
-# A drop from this close to the wrap is the counter starting over; any other drop is a reset
+# A drop is the counter starting over when the kWh it means are no more than this,
+# or than the most heat the unit can make in the time between the readings; else a reset
 UNIT_HEAT_COUNTER_WRAP_MARGIN = 30
+UNIT_HEAT_MAX_KW = 30
 # After a longer gap the counter may have gone round more than once: start again from the reading
 UNIT_HEAT_COUNTER_MAX_GAP = timedelta(hours=24)
 # Electricity recorded by the server counts as metered from this share of the recorded heat
@@ -673,14 +675,21 @@ class UnitHeatCounter(ProducedEnergyCounter):
         self.has_counted = stored.get("has_counted") is True
 
     @staticmethod
-    def rise(previous: int, reading: int) -> int | None:
-        """Return the kWh between two readings of the counter, or None when it was reset."""
+    def rise(previous: int, reading: int, hours: float = 0.0) -> int | None:
+        """Return the kWh between two readings `hours` apart, or None when the counter was reset.
+
+        A drop is the counter starting over when the kWh across the wrap are few
+        (249, then 2), or no more than the unit can make in the time between the
+        readings (150, then 20 after a night without readings). A small step back
+        near the top (245, then 244) is no wrap: it would mean 249 kWh in minutes.
+        """
         if reading >= previous:
             return reading - previous
         wrap = UNIT_HEAT_COUNTER_WRAP if previous < UNIT_HEAT_COUNTER_WRAP else 256
-        if previous >= wrap - UNIT_HEAT_COUNTER_WRAP_MARGIN:
+        across = wrap - previous + reading
+        if across <= max(UNIT_HEAT_COUNTER_WRAP_MARGIN, UNIT_HEAT_MAX_KW * hours):
             # the counter started over
-            return wrap - previous + reading
+            return across
         return None
 
     @callback
@@ -692,7 +701,7 @@ class UnitHeatCounter(ProducedEnergyCounter):
         gap = now - self._last_time if self._last_time is not None else None
         self._roll(now)
         if previous is not None and gap is not None and timedelta(0) <= gap <= UNIT_HEAT_COUNTER_MAX_GAP:
-            kwh = self.rise(previous, reading)
+            kwh = self.rise(previous, reading, gap.total_seconds() / 3600)
             if kwh is None:
                 _LOGGER.debug("The unit's heat counter went from %s to %s: counting again from there", previous, reading)
             elif kwh:
