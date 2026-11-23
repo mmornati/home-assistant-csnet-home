@@ -45,6 +45,7 @@ from .const import (
     POWER_SUPPLY_THREE_PHASE,
 )
 from .coordinator import CSNetHomeCoordinator
+from .heat_calibration import HeatCalibration
 from .helpers import find_indoor_unit, poll_brought_readings, zone_device_identifier, zone_key
 from .power_calibration import CrankcaseHeaterTracker, PowerCalibration
 
@@ -969,6 +970,11 @@ def _power_reading_follower(coordinator, observer):
         if produced is not None:
             watts, op_status, _text = observer._get_thermal_power_values(heating_status)  # pylint: disable=protected-access
             produced.async_update(now, watts, _heat_use(op_status))
+        # what the unit's heat counter teaches about the measured heat
+        heat_calibration = getattr(coordinator, "heat_calibration", None)
+        if heat_calibration is not None:
+            measured, _status, _text, use, clean = observer._measure_heat(heating_status)  # pylint: disable=protected-access
+            heat_calibration.observe(now, heating_status.get("unitCapacity"), use, measured, clean)
         # the unit's own heat counter, counted for what the unit is doing now
         unit_heat = getattr(coordinator, "unit_heat", None)
         if unit_heat is not None:
@@ -1272,6 +1278,10 @@ async def async_setup_entry(hass, entry, async_add_entities):
         unit_heat = UnitHeatCounter(hass, entry.entry_id)
         await unit_heat.async_load()
         coordinator.unit_heat = unit_heat
+        # The measured heat, corrected by what that counter teaches, kept across restarts
+        heat_calibration = HeatCalibration(hass, entry.entry_id)
+        await heat_calibration.async_load()
+        coordinator.heat_calibration = heat_calibration
 
         follow = _power_reading_follower(coordinator, observer)
         follow()
@@ -1984,7 +1994,10 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
 
     @property
     def extra_state_attributes(self):
-        """Show the learnt correction factors on the consumption sensor."""
+        """Show the learnt correction factors: of the power on the consumption sensor, of the heat on the heat power."""
+        if self._key == "heating_power":
+            calibration = getattr(self.coordinator, "heat_calibration", None)
+            return {"heat_calibration": calibration.as_attributes() if calibration is not None else {}}
         if self._key != "instant_consumption":
             return None
         return {
@@ -2117,7 +2130,22 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
         return OPERATION_STATUS_MAP.get(operation_status, "")
 
     def _get_thermal_power_values(self, heating_status):
-        """Calculate thermal output using heating or cooling delta temperature."""
+        """Return (heat in Watts, operation status, its text), corrected by what the unit's heat counter taught."""
+        thermal_power, op_status, op_status_text, use, clean = self._measure_heat(heating_status)
+        if thermal_power and clean:
+            calibration = getattr(self.coordinator, "heat_calibration", None)
+            if calibration is not None:
+                thermal_power = round(thermal_power * calibration.factor(use), 2)
+        return thermal_power, op_status, op_status_text
+
+    def _measure_heat(self, heating_status):
+        """Return (heat in Watts, operation status, its text, use, clean) as the probes measure it, uncorrected.
+
+        ``clean`` is True when the heat was measured at the use's own probe
+        (the water outlet in space heating, the exchanger outlet for hot
+        water), with no defrost, no backup heater or boiler, and no probe
+        standing in for a missing one: the readings a correction applies to.
+        """
         raw_flow = heating_status.get("waterFlow", 0)
         flow_rate = raw_flow / 10.0 if raw_flow else 0
         temp_in = heating_status.get("waterInletTemp", 0)
@@ -2135,15 +2163,17 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
         if op_status == 8 or other_heat_source:
             probes = probes[::-1]
         temp_out = heating_status.get(probes[0])
-        if temp_out is None or _is_missing_probe(temp_out):
+        own_probe = not (temp_out is None or _is_missing_probe(temp_out))
+        if not own_probe:
             if not self._outlet_probe_missing_logged:
                 _LOGGER.debug("No %s temperature (%s): measuring the heat at %s", probes[0], temp_out, probes[1])
                 self._outlet_probe_missing_logged = True
             temp_out = heating_status.get(probes[1], 0)
 
+        use = _heat_use(op_status)
         # Without both probes there is no temperature difference to measure
         if _is_missing_probe(temp_in) or _is_missing_probe(temp_out):
-            return 0, op_status, op_status_text
+            return 0, op_status, op_status_text, use, False
 
         is_cooling = "cooling thermostat on" in op_status_text
         is_heating = "heating thermostat on" in op_status_text or op_status in (6, 8)
@@ -2170,7 +2200,8 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
         if delta_t > 0 and flow_rate >= 0.01:
             thermal_power = round(flow_rate * 1160 * delta_t, 2)
 
-        return thermal_power, op_status, op_status_text
+        clean = own_probe and not other_heat_source and not heating_status.get("defrosting") and not is_cooling
+        return thermal_power, op_status, op_status_text, use, clean
 
     @property
     def native_value(self):
