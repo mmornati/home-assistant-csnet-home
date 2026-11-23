@@ -5,6 +5,16 @@ import logging
 _LOGGER = logging.getLogger(__name__)
 
 
+def poll_brought_readings(coordinator) -> bool:
+    """Return whether the coordinator's last poll brought new readings.
+
+    False after a failed poll, also while the coordinator keeps the last
+    readings on the entities: what adds up over time must not count old
+    values as new ones.
+    """
+    return getattr(coordinator, "last_update_success", True) is not False and getattr(coordinator, "kept_last_readings", False) is not True
+
+
 def find_indoor_unit(installation_devices_data, indoor_id=None):
     """Return the indoor unit a zone belongs to, from installation devices data.
 

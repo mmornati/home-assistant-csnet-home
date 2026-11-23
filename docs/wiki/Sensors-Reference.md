@@ -193,7 +193,7 @@ action:
 **Entity**: `binary_sensor.system_controller_csnet_manager_connection` (diagnostic)  
 **Values**: `on` (connected), `off` (the last poll failed)  
 **Device Class**: `connectivity`  
-**Description**: Whether the last poll of CSNet Manager by Home Assistant brought the readings. The sensors above say whether the **unit** talks to CSNet; this one says whether **Home Assistant** does. It stays available when the polls fail, so it says why the other entities are unavailable.
+**Description**: Whether the last poll of CSNet Manager by Home Assistant brought the readings. The sensors above say whether the **unit** talks to CSNet; this one says whether **Home Assistant** does. It stays available when the polls fail, so it says why the other entities are unavailable. The other entities keep their last readings through one or two failed polls in a row and turn unavailable at the third, so this sensor can be `off` while they still show values.
 
 **Attributes**:
 
@@ -211,7 +211,7 @@ action:
 
 | `problem` | What happened | Usually |
 |-----------|---------------|---------|
-| `timeout` | No answer within 10 seconds | Either side: CSNet slow, or the connection from Home Assistant |
+| `timeout` | No answer in time (30 seconds for the readings, 10 for a sign-in) | Either side: CSNet slow, or the connection from Home Assistant |
 | `dns` | The name `www.csnetmanager.com` could not be looked up | This side: DNS or internet down |
 | `no_connection` | No connection could be opened | This side (internet down), or CSNet down |
 | `connection_lost` | The connection closed before the answer | Either side |

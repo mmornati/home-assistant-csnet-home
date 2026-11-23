@@ -29,6 +29,7 @@ from custom_components.csnet_home.api import (
 from custom_components.csnet_home.binary_sensor import CSNetHomeCloudConnectionSensor
 from custom_components.csnet_home.cloud_connection import CloudConnection
 from custom_components.csnet_home.coordinator import CSNetHomeCoordinator
+from custom_components.csnet_home.helpers import poll_brought_readings
 
 from .test_data_access import FakeResponse, _api_with_session
 
@@ -189,6 +190,74 @@ async def test_coordinator_notes_each_poll(hass):
     assert await coordinator._async_update_data() == {"sensors": []}
     assert coordinator.connection.connected is True
     assert coordinator.connection.response_seconds == 0.3
+
+
+async def test_short_failure_keeps_the_last_readings(hass):
+    """One or two failed polls keep the readings on the entities; the third one fails the poll (#280)."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+    coordinator = _coordinator(hass, api)
+    readings = {"sensors": [{"zone_id": 1}]}
+    coordinator.data = readings
+
+    async def failing():
+        api.note_problem("elements", PROBLEM_TIMEOUT, "TimeoutError")
+        raise UpdateFailed("CSNet Manager returned no data")
+
+    coordinator._async_fetch_data = failing
+    for failed in (1, 2):
+        assert await coordinator._async_update_data() is readings
+        assert coordinator.kept_last_readings is True
+        # the connection sensor reports the failed poll all the same
+        assert (coordinator.connection.connected, coordinator.connection.problem) == (False, PROBLEM_TIMEOUT)
+        assert coordinator.connection.failed_polls_in_a_row == failed
+        assert poll_brought_readings(coordinator) is False
+
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
+    assert coordinator.kept_last_readings is False
+    assert coordinator.connection.failed_polls_in_a_row == 3
+
+    # a poll that works starts the count again
+    coordinator._async_fetch_data = AsyncMock(return_value=readings)
+    await coordinator._async_update_data()
+    assert coordinator.kept_last_readings is False and poll_brought_readings(coordinator) is True
+    coordinator._async_fetch_data = failing
+    assert await coordinator._async_update_data() is readings
+
+
+async def test_failures_that_never_keep_the_last_readings(hass):
+    """Without readings yet, with refused credentials or on an error of the integration, the poll fails."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+    coordinator = _coordinator(hass, api)
+
+    # the first poll: nothing to keep, the setup must be tried again
+    coordinator._async_fetch_data = AsyncMock(side_effect=UpdateFailed("CSNet Manager returned no data"))
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
+
+    coordinator = _coordinator(hass, api)
+    coordinator.data = {"sensors": []}
+    coordinator._async_fetch_data = AsyncMock(side_effect=ConfigEntryAuthFailed("rejected"))
+    with pytest.raises(ConfigEntryAuthFailed):
+        await coordinator._async_update_data()
+    assert coordinator.kept_last_readings is False
+
+    coordinator = _coordinator(hass, api)
+    coordinator.data = {"sensors": []}
+    coordinator._async_fetch_data = AsyncMock(side_effect=KeyError("bug"))
+    with pytest.raises(KeyError):
+        await coordinator._async_update_data()
+    assert coordinator.kept_last_readings is False
+
+
+async def test_readings_get_30_seconds(hass):
+    """The readings wait longer than the other requests: CSNet's short stalls must not fail a poll (#280)."""
+    api = CSNetHomeAPI(hass, "user", "pass")
+    api.session, api.logged_in = MagicMock(closed=False), True
+    api._async_get_json = AsyncMock(return_value=None)
+    await api.async_get_elements_data()
+    await api.async_get_installation_devices_data()
+    assert [call.kwargs["timeout"] for call in api._async_get_json.await_args_list] == [30, 30]
 
 
 async def test_coordinator_notes_rejected_credentials(hass):
