@@ -7,6 +7,17 @@ description: What changed in each version of the CSNet Home (unofficial, for Hit
 
 Every version of the integration, newest first. Install or update from HACS; each version is also on the [GitHub releases page](https://github.com/mmornati/home-assistant-csnet-home/releases).
 
+## 2.22.0
+
+*24 November 2026* · [GitHub release](https://github.com/mmornati/home-assistant-csnet-home/releases/tag/2.22.0)
+
+An automatic heat source, and past COPs recalculated from Home Assistant's own history. Nothing new is sent to the unit, and nothing changes until you choose one of them.
+
+#### New
+
+- **Heat produced: Automatic.** A third choice beside *CSNet* (still the default) and *Calculated*, in Reconfigure. Each full hour keeps CSNet's heat, unless CSNet has no record for that hour or recorded less than half of the heat the integration measured (from 1.5 kWh): then the measured heat stands in, use by use. The hour in progress is the measured heat. The sensors are named *(auto)*, and *Heat today (auto)* says how many of today's hours came from CSNet and how many were calculated. The daily COPs divide only the hours whose electricity was followed from start to end, so a restart or an outage no longer skews them. A corrupt hourly record of CSNet (one hour of 8 November 2026 held 23121 kWh) is left out. ([#285](https://github.com/mmornati/home-assistant-csnet-home/pull/285))
+- **Configure → Recalculate past COPs.** Configure now opens a menu: *Heating curves* (the former form), *Recalculate past COPs*, and *Put back the COPs as they were before the recalculation* once one was made. The recalculation reads Home Assistant's hourly statistics of the calculated heat and of your energy meter, shows day by day the heat, the electricity, the COP shown and the COP recalculated, and writes only once you tick the box. The values it replaces are kept, and that menu entry puts them back. It needs an energy meter in the settings; the heating/cooling COP is rewritten only on installations without hot water or pool. Home Assistant's short-term history of the last days is not rewritten. ([#285](https://github.com/mmornati/home-assistant-csnet-home/pull/285))
+
 ## 2.21.2
 
 *23 November 2026* · [GitHub release](https://github.com/mmornati/home-assistant-csnet-home/releases/tag/2.21.2)
