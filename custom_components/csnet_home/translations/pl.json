@@ -35,7 +35,7 @@
                     "filtered_alarm_codes": "Kody alarmów oddzielone przecinkami, które nigdy nie będą wysyłać powiadomień (domyślnie: -1, błędy komunikacji). Pozostaw puste, aby powiadamiać o wszystkich.",
                     "energy_meter": "Dowolny czujnik energii (kWh), który mierzy zużycie energii przez pompę ciepła, z dowolnego urządzenia. Służy do obliczania COP na podstawie zapisów CSNet dotyczących ciepła. Pozostaw puste, aby zachować jedynie szacunek.",
                     "energy_meter_power": "Czujnik mocy (W lub kW) powiązany z licznikiem energii, używany do chwilowego zużycia. Przy liczniku trójfazowym wybierz sumę faz lub pomocnika, który je sumuje. Pozostaw puste, aby użyć czujnika mocy znalezionego na urządzeniu licznika.",
-                    "heat_source": "Źródło wytworzonego ciepła dla każdego skumulowanego licznika ogrzewania, chłodzenia i ciepłej wody oraz każdego dziennego lub okresowego współczynnika COP. CSNet: ilość ciepła zarejestrowana przez CSNet Manager dla jednostki (w pełnych godzinach). Obliczane: własny pomiar integracji, wyznaczany w czasie rzeczywistym na podstawie przepływu wody i temperatur wymiennika. W przypadku CSNet pomiar integracji jest używany, gdy CSNet nie zarejestrował żadnej ilości ciepła dla jednostki.",
+                    "heat_source": "Źródło wytworzonego ciepła dla każdego skumulowanego licznika ogrzewania, chłodzenia i ciepłej wody oraz każdego dziennego lub okresowego współczynnika COP. CSNet: ilość ciepła zarejestrowana przez CSNet Manager dla jednostki (w pełnych godzinach). Obliczane: własny pomiar integracji, wyznaczany w czasie rzeczywistym na podstawie przepływu wody i temperatur wymiennika. W przypadku CSNet pomiar integracji jest używany, gdy CSNet nie zarejestrował żadnej ilości ciepła dla jednostki. Automatycznie: ciepło z CSNet, godzina po godzinie, a pomiar integracji dla godzin, których CSNet nie zarejestrował lub dla których zarejestrował mniej niż połowę.",
                     "user_agent": "Sposób, w jaki integracja przedstawia się CSNet Managerowi. Pozostaw puste, aby użyć domyślnej wartości (desktopowy Chrome). Zmieniaj tylko w celu przetestowania innej wartości."
                 }
             },
@@ -73,7 +73,7 @@
                     "filtered_alarm_codes": "Kody alarmów oddzielone przecinkami, które nigdy nie będą wysyłać powiadomień (domyślnie: -1, błędy komunikacji). Pozostaw puste, aby powiadamiać o wszystkich.",
                     "energy_meter": "Dowolny czujnik energii (kWh), który mierzy zużycie energii przez pompę ciepła, z dowolnego urządzenia. Służy do obliczania COP na podstawie zapisów CSNet dotyczących ciepła. Pozostaw puste, aby zachować jedynie szacunek.",
                     "energy_meter_power": "Czujnik mocy (W lub kW) powiązany z licznikiem energii, używany do chwilowego zużycia. Przy liczniku trójfazowym wybierz sumę faz lub pomocnika, który je sumuje. Pozostaw puste, aby użyć czujnika mocy znalezionego na urządzeniu licznika.",
-                    "heat_source": "Źródło wytworzonego ciepła dla każdego skumulowanego licznika ogrzewania, chłodzenia i ciepłej wody oraz każdego dziennego lub okresowego współczynnika COP. CSNet: ilość ciepła zarejestrowana przez CSNet Manager dla jednostki (w pełnych godzinach). Obliczane: własny pomiar integracji, wyznaczany w czasie rzeczywistym na podstawie przepływu wody i temperatur wymiennika. W przypadku CSNet pomiar integracji jest używany, gdy CSNet nie zarejestrował żadnej ilości ciepła dla jednostki.",
+                    "heat_source": "Źródło wytworzonego ciepła dla każdego skumulowanego licznika ogrzewania, chłodzenia i ciepłej wody oraz każdego dziennego lub okresowego współczynnika COP. CSNet: ilość ciepła zarejestrowana przez CSNet Manager dla jednostki (w pełnych godzinach). Obliczane: własny pomiar integracji, wyznaczany w czasie rzeczywistym na podstawie przepływu wody i temperatur wymiennika. W przypadku CSNet pomiar integracji jest używany, gdy CSNet nie zarejestrował żadnej ilości ciepła dla jednostki. Automatycznie: ciepło z CSNet, godzina po godzinie, a pomiar integracji dla godzin, których CSNet nie zarejestrował lub dla których zarejestrował mniej niż połowę.",
                     "user_agent": "Sposób, w jaki integracja przedstawia się CSNet Managerowi. Pozostaw puste, aby użyć domyślnej wartości (desktopowy Chrome). Zmieniaj tylko w celu przetestowania innej wartości."
                 }
             },
@@ -126,6 +126,14 @@
     "options": {
         "step": {
             "init": {
+                "title": "Opcje CSNet Home",
+                "menu_options": {
+                    "heating_curves": "Krzywe grzewcze",
+                    "recalculate_cop": "Przelicz wcześniejsze COP",
+                    "restore_cop": "Przywróć COP sprzed przeliczenia"
+                }
+            },
+            "heating_curves": {
                 "title": "Krzywe grzewcze",
                 "description": "CSNet raportuje rodzaj krzywej grzewczej (prawo wodne) używany przez każdy obieg ({circuits}), ale nie podaje jej wartości. Skopiuj wartości ustawione przez instalatora na sterowniku urządzenia (Ogrzewanie przestrzeni > Tryb obliczania temperatury wody). Są one używane wyłącznie do obliczania temperatury wody dla czujników krzywej grzewczej: nic nie jest wysyłane do urządzenia. Pozostaw obieg pusty, jeśli nie chcesz dla niego czujnika.",
                 "data": {
@@ -156,15 +164,38 @@
                     "c2_gradient": "Wartość krzywej ustawiona na urządzeniu (0,2 do 2,2). Krzywa zaczyna się od 20°C wody przy 20°C na zewnątrz",
                     "c2_vertex_offset": "Przesunięcie całej krzywej (-10 do +10°C). Pozostaw puste, jeśli nie dotyczy"
                 }
+            },
+            "recalculate_cop": {
+                "title": "Przelicz wcześniejsze COP",
+                "description": "COP od {first} do {last}, wyliczone ponownie ze statystyk Home Assistant: ciepło z mocy cieplnej wyliczanej przez integrację ({heat}) podzielone przez energię elektryczną zliczoną przez Twój licznik ({meter}). Nic nie jest wysyłane do jednostki.\n\n| Dzień | Ciepło (kWh) | Energia elektryczna (kWh) | COP przed | COP przeliczony |\n|---|---:|---:|---:|---:|\n{table}\n\n\"COP przed\" to wartość, którą COP dzisiaj pokazywał na koniec dnia. Potwierdzenie nadpisuje {hours} statystyk godzinowych {sensors}: wykresy historii i statystyki pokazują przeliczone wartości. Zapisane stany z ostatnich dni się nie zmieniają. Zastąpione wartości są zachowane: to menu może je przywrócić.",
+                "data": {
+                    "confirm": "Zapisz przeliczone COP"
+                }
+            },
+            "restore_cop": {
+                "title": "Przywróć wcześniejsze COP",
+                "description": "Przywraca {hours} statystyk godzinowych czujników COP, które przeliczenie zastąpiło, w postaci sprzed przeliczenia.",
+                "data": {
+                    "confirm": "Przywróć wartości"
+                }
             }
         },
         "error": {
             "incomplete_curve": "Wypełnij wszystkie wartości tej krzywej dla obiegu albo żadnej z nich.",
-            "high_ambient_not_above_low": "Wysoka temperatura otoczenia musi być wyższa niż niska."
+            "high_ambient_not_above_low": "Wysoka temperatura otoczenia musi być wyższa niż niska.",
+            "confirm_required": "Zaznacz pole, aby potwierdzić."
         },
         "abort": {
             "not_loaded": "Integracja musi być załadowana, aby odczytać, z jakich krzywych grzewczych korzysta urządzenie. Spróbuj ponownie, gdy już wystartuje.",
-            "no_heating_curve": "Żaden z obiegów nie używa krzywej grzewczej punktowej ani nachyleniowej, więc nie ma czego opisywać. Stała temperatura wody ma już własną encję."
+            "no_heating_curve": "Żaden z obiegów nie używa krzywej grzewczej punktowej ani nachyleniowej, więc nie ma czego opisywać. Stała temperatura wody ma już własną encję.",
+            "no_recorder": "Przeliczenie odczytuje statystyki Home Assistant, a rejestrator (recorder) nie działa.",
+            "no_energy_meter": "Przeliczenie dzieli przez to, co zliczył Twój licznik energii elektrycznej. Najpierw wybierz licznik pompy ciepła w ustawieniach integracji (Zmień konfigurację).",
+            "no_cop_sensors": "Nie znaleziono czujnika mocy cieplnej ani czujników COP.",
+            "no_statistics": "Home Assistant nie ma jeszcze statystyk godzinowych zawierających jednocześnie moc cieplną i licznik energii.",
+            "cop_history_unchanged": "COP w statystykach już odpowiadają przeliczeniu: nie ma nic do zmiany.",
+            "cop_history_recalculated": "Nadpisano {hours} statystyk godzinowych czujników COP. Odśwież stronę, aby zobaczyć je na wykresach.",
+            "cop_history_restored": "Przywrócono {hours} statystyk godzinowych czujników COP do poprzedniej postaci.",
+            "no_cop_backup": "Nie ma nic do przywrócenia."
         }
     },
     "selector": {
@@ -180,7 +211,8 @@
         "heat_source": {
             "options": {
                 "csnet": "Zapisane przez CSNet",
-                "calculated": "Wyliczone przez integrację"
+                "calculated": "Wyliczone przez integrację",
+                "auto": "Automatycznie: CSNet, wyliczone tam, gdzie CSNet pominął godziny"
             }
         }
     }

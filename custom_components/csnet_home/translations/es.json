@@ -35,7 +35,7 @@
                     "filtered_alarm_codes": "Códigos de alarma, separados por comas, que nunca notifican (por defecto: -1, errores de comunicación). Dejar vacío para notificar todos.",
                     "energy_meter": "Cualquier sensor de energía (kWh) que mida la electricidad de la bomba de calor, de cualquier dispositivo. Se usa para calcular el COP con el calor que registra CSNet. Dejar vacío para mantener solo la estimación.",
                     "energy_meter_power": "El sensor de potencia (W o kW) que acompaña al contador eléctrico, para el consumo instantáneo. Con un contador trifásico, elija el total de las fases, o un ayudante que las sume. Déjelo vacío para usar el sensor de potencia encontrado en el dispositivo del contador.",
-                    "heat_source": "De dónde sale el calor producido, para todos los contadores acumulados de calefacción, refrigeración y ACS y todos los COP diarios o por periodo. CSNet: el calor que registra CSNet Manager para la unidad (por horas completas). Calculado: la medida propia de la integración, a partir del caudal y las temperaturas del intercambiador, al momento. Con CSNet, se usa la medida de la integración cuando CSNet no ha registrado calor para la unidad.",
+                    "heat_source": "De dónde sale el calor producido, para todos los contadores acumulados de calefacción, refrigeración y ACS y todos los COP diarios o por periodo. CSNet: el calor que registra CSNet Manager para la unidad (por horas completas). Calculado: la medida propia de la integración, a partir del caudal y las temperaturas del intercambiador, al momento. Con CSNet, se usa la medida de la integración cuando CSNet no ha registrado calor para la unidad. Automático: el calor de CSNet, hora a hora, y la medida de la integración en las horas que CSNet no registró o de las que registró menos de la mitad.",
                     "user_agent": "Cómo se presenta la integración ante CSNet Manager. Déjelo vacío para usar el valor por defecto (un navegador Chrome de escritorio). Cámbielo solo para probar otro valor."
                 }
             },
@@ -73,7 +73,7 @@
                     "filtered_alarm_codes": "Códigos de alarma, separados por comas, que nunca notifican (por defecto: -1, errores de comunicación). Dejar vacío para notificar todos.",
                     "energy_meter": "Cualquier sensor de energía (kWh) que mida la electricidad de la bomba de calor, de cualquier dispositivo. Se usa para calcular el COP con el calor que registra CSNet. Dejar vacío para mantener solo la estimación.",
                     "energy_meter_power": "El sensor de potencia (W o kW) que acompaña al contador eléctrico, para el consumo instantáneo. Con un contador trifásico, elija el total de las fases, o un ayudante que las sume. Déjelo vacío para usar el sensor de potencia encontrado en el dispositivo del contador.",
-                    "heat_source": "De dónde sale el calor producido, para todos los contadores acumulados de calefacción, refrigeración y ACS y todos los COP diarios o por periodo. CSNet: el calor que registra CSNet Manager para la unidad (por horas completas). Calculado: la medida propia de la integración, a partir del caudal y las temperaturas del intercambiador, al momento. Con CSNet, se usa la medida de la integración cuando CSNet no ha registrado calor para la unidad.",
+                    "heat_source": "De dónde sale el calor producido, para todos los contadores acumulados de calefacción, refrigeración y ACS y todos los COP diarios o por periodo. CSNet: el calor que registra CSNet Manager para la unidad (por horas completas). Calculado: la medida propia de la integración, a partir del caudal y las temperaturas del intercambiador, al momento. Con CSNet, se usa la medida de la integración cuando CSNet no ha registrado calor para la unidad. Automático: el calor de CSNet, hora a hora, y la medida de la integración en las horas que CSNet no registró o de las que registró menos de la mitad.",
                     "user_agent": "Cómo se presenta la integración ante CSNet Manager. Déjelo vacío para usar el valor por defecto (un navegador Chrome de escritorio). Cámbielo solo para probar otro valor."
                 }
             },
@@ -126,6 +126,14 @@
     "options": {
         "step": {
             "init": {
+                "title": "Opciones de CSNet Home",
+                "menu_options": {
+                    "heating_curves": "Curvas de calefacción",
+                    "recalculate_cop": "Recalcular los COP pasados",
+                    "restore_cop": "Volver a los COP de antes del recálculo"
+                }
+            },
+            "heating_curves": {
                 "title": "Curvas de calefacción",
                 "description": "CSNet indica el tipo de curva de calefacción de cada circuito ({circuits}) pero no sus valores. Copie los valores que su instalador configuró en el controlador (Calefacción > Modo de cálculo del agua). Solo se usan para calcular los sensores de temperatura del agua de la curva: no se envía nada a la unidad. Deje un circuito vacío para no tener sensor.",
                 "data": {
@@ -156,15 +164,38 @@
                     "c2_gradient": "Valor de curva configurado en la unidad (0,2 a 2,2). La curva parte de 20 °C de agua para 20 °C exteriores",
                     "c2_vertex_offset": "Desplazamiento de toda la curva (-10 a +10 °C). Dejar vacío para ninguno"
                 }
+            },
+            "recalculate_cop": {
+                "title": "Recalcular los COP pasados",
+                "description": "Los COP del {first} al {last}, calculados de nuevo a partir de las estadísticas de Home Assistant: el calor de la potencia calculada por la integración ({heat}) entre la electricidad que contó su contador ({meter}). No se envía nada a la unidad.\n\n| Día | Calor (kWh) | Electricidad (kWh) | COP antes | COP recalculado |\n|---|---:|---:|---:|---:|\n{table}\n\n\"COP antes\" es lo que mostraba COP de hoy al final del día. Al confirmar se reescriben {hours} estadísticas horarias de {sensors}: los gráficos de historial y las estadísticas muestran los valores recalculados. Los estados registrados de los últimos días no cambian. Los valores sustituidos se guardan: este menú puede restaurarlos.",
+                "data": {
+                    "confirm": "Escribir los COP recalculados"
+                }
+            },
+            "restore_cop": {
+                "title": "Volver a los COP de antes",
+                "description": "Restaura las {hours} estadísticas horarias de los sensores de COP que el recálculo sustituyó, tal como estaban antes.",
+                "data": {
+                    "confirm": "Restaurar los valores"
+                }
             }
         },
         "error": {
             "incomplete_curve": "Rellene todos los valores de la curva de este circuito, o ninguno.",
-            "high_ambient_not_above_low": "La temperatura exterior alta debe ser superior a la temperatura exterior baja."
+            "high_ambient_not_above_low": "La temperatura exterior alta debe ser superior a la temperatura exterior baja.",
+            "confirm_required": "Marque la casilla para confirmar."
         },
         "abort": {
             "not_loaded": "La integración debe estar cargada para leer qué curvas usa la unidad. Inténtelo de nuevo cuando haya arrancado.",
-            "no_heating_curve": "Ningún circuito usa una curva por puntos o por pendiente: no hay nada que describir. Una temperatura de agua fija ya tiene su propia entidad."
+            "no_heating_curve": "Ningún circuito usa una curva por puntos o por pendiente: no hay nada que describir. Una temperatura de agua fija ya tiene su propia entidad.",
+            "no_recorder": "El recálculo lee las estadísticas de Home Assistant, y el registrador (recorder) no está en marcha.",
+            "no_energy_meter": "El recálculo divide por lo que contó su contador eléctrico. Elija primero el contador eléctrico de la bomba de calor en los ajustes de la integración (Reconfigurar).",
+            "no_cop_sensors": "No se encontró el sensor de potencia térmica o los sensores de COP.",
+            "no_statistics": "Home Assistant aún no tiene estadísticas horarias con la potencia térmica y el contador eléctrico a la vez.",
+            "cop_history_unchanged": "Los COP de las estadísticas ya coinciden con el recálculo: no hay nada que cambiar.",
+            "cop_history_recalculated": "{hours} estadísticas horarias de los sensores de COP reescritas. Recargue la página para verlas en los gráficos.",
+            "cop_history_restored": "{hours} estadísticas horarias de los sensores de COP restauradas como estaban.",
+            "no_cop_backup": "No hay nada que restaurar."
         }
     },
     "selector": {
@@ -180,7 +211,8 @@
         "heat_source": {
             "options": {
                 "csnet": "Registrado por CSNet",
-                "calculated": "Calculado por la integración"
+                "calculated": "Calculado por la integración",
+                "auto": "Automático: CSNet, calculado donde CSNet perdió horas"
             }
         }
     }

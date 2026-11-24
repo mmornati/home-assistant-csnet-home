@@ -35,7 +35,7 @@
                     "filtered_alarm_codes": "Comma-separated alarm codes that never notify (default: -1, communication errors). Leave empty to notify all.",
                     "energy_meter": "Any energy sensor (kWh) that measures the heat pump's electricity, from any device. Used to compute the COP from the heat CSNet records. Leave empty to keep the estimate only.",
                     "energy_meter_power": "The power sensor (W or kW) that goes with the electricity meter, for Instant Consumption. With a three-phase meter, choose the total of the phases, or a helper that adds them up. Leave empty to use the power sensor found on the meter's device.",
-                    "heat_source": "Where the heat produced comes from, for every accumulated heating, cooling and hot water counter and every daily or period COP. CSNet: the heat CSNet Manager records for the unit (by full hours). Calculated: the integration's own measure, from the water flow and the exchanger's temperatures, in real time. With CSNet, the integration's measure is used when CSNet has not recorded any heat for the unit.",
+                    "heat_source": "Where the heat produced comes from, for every accumulated heating, cooling and hot water counter and every daily or period COP. CSNet: the heat CSNet Manager records for the unit (by full hours). Calculated: the integration's own measure, from the water flow and the exchanger's temperatures, in real time. With CSNet, the integration's measure is used when CSNet has not recorded any heat for the unit. Automatic: CSNet's heat, hour by hour, and the integration's measure for the hours CSNet has no record for or recorded less than half of it.",
                     "user_agent": "How the integration presents itself to CSNet Manager. Leave empty to use the default (a desktop Chrome browser). Change it only to test another value."
                 }
             },
@@ -73,7 +73,7 @@
                     "filtered_alarm_codes": "Comma-separated alarm codes that never notify (default: -1, communication errors). Leave empty to notify all.",
                     "energy_meter": "Any energy sensor (kWh) that measures the heat pump's electricity, from any device. Used to compute the COP from the heat CSNet records. Leave empty to keep the estimate only.",
                     "energy_meter_power": "The power sensor (W or kW) that goes with the electricity meter, for Instant Consumption. With a three-phase meter, choose the total of the phases, or a helper that adds them up. Leave empty to use the power sensor found on the meter's device.",
-                    "heat_source": "Where the heat produced comes from, for every accumulated heating, cooling and hot water counter and every daily or period COP. CSNet: the heat CSNet Manager records for the unit (by full hours). Calculated: the integration's own measure, from the water flow and the exchanger's temperatures, in real time. With CSNet, the integration's measure is used when CSNet has not recorded any heat for the unit.",
+                    "heat_source": "Where the heat produced comes from, for every accumulated heating, cooling and hot water counter and every daily or period COP. CSNet: the heat CSNet Manager records for the unit (by full hours). Calculated: the integration's own measure, from the water flow and the exchanger's temperatures, in real time. With CSNet, the integration's measure is used when CSNet has not recorded any heat for the unit. Automatic: CSNet's heat, hour by hour, and the integration's measure for the hours CSNet has no record for or recorded less than half of it.",
                     "user_agent": "How the integration presents itself to CSNet Manager. Leave empty to use the default (a desktop Chrome browser). Change it only to test another value."
                 }
             },
@@ -126,6 +126,14 @@
     "options": {
         "step": {
             "init": {
+                "title": "CSNet Home options",
+                "menu_options": {
+                    "heating_curves": "Heating curves",
+                    "recalculate_cop": "Recalculate past COPs",
+                    "restore_cop": "Put back the COPs as they were before the recalculation"
+                }
+            },
+            "heating_curves": {
                 "title": "Heating curves",
                 "description": "CSNet reports the kind of heating curve (water law) each circuit uses ({circuits}) but not its values. Copy the values your installer set on the unit controller (Space heating > Water calculation mode). They are only used to compute the heating curve water temperature sensors: nothing is sent to the unit. Leave a circuit empty to have no sensor for it.",
                 "data": {
@@ -156,15 +164,38 @@
                     "c2_gradient": "Curve value set on the unit (0.2 to 2.2). The curve starts at 20 °C water for 20 °C outside",
                     "c2_vertex_offset": "Shift of the whole curve (-10 to +10 °C). Leave empty for none"
                 }
+            },
+            "recalculate_cop": {
+                "title": "Recalculate past COPs",
+                "description": "The COPs from {first} to {last}, worked out again from Home Assistant's statistics: the heat of the integration's calculated heat power ({heat}) over the electricity your meter counted ({meter}). Nothing is sent to the unit.\n\n| Day | Heat (kWh) | Electricity (kWh) | COP before | Recalculated COP |\n|---|---:|---:|---:|---:|\n{table}\n\n\"COP before\" is what COP today showed at the end of the day. Confirming rewrites {hours} hourly statistics of {sensors}: the history graphs and statistics show the recalculated values. The recorded states of the last days do not change. The values replaced are kept: this menu can put them back.",
+                "data": {
+                    "confirm": "Write the recalculated COPs"
+                }
+            },
+            "restore_cop": {
+                "title": "Put back the COPs as they were",
+                "description": "Puts back the {hours} hourly statistics of the COP sensors that the recalculation replaced, as they were before it.",
+                "data": {
+                    "confirm": "Put the values back"
+                }
             }
         },
         "error": {
             "incomplete_curve": "Fill in every value of this circuit's curve, or none of them.",
-            "high_ambient_not_above_low": "The high ambient temperature must be above the low ambient temperature."
+            "high_ambient_not_above_low": "The high ambient temperature must be above the low ambient temperature.",
+            "confirm_required": "Tick the box to confirm."
         },
         "abort": {
             "not_loaded": "The integration must be loaded to read which heating curves the unit uses. Try again once it has started.",
-            "no_heating_curve": "None of the circuits uses a points or gradient heating curve, so there is nothing to describe. A fixed water temperature already has its own entity."
+            "no_heating_curve": "None of the circuits uses a points or gradient heating curve, so there is nothing to describe. A fixed water temperature already has its own entity.",
+            "no_recorder": "The recalculation reads Home Assistant's statistics, and the recorder is not running.",
+            "no_energy_meter": "The recalculation divides by what your electricity meter counted. Choose the heat pump's electricity meter in the integration's settings (Reconfigure) first.",
+            "no_cop_sensors": "The heat power sensor or the COP sensors were not found.",
+            "no_statistics": "Home Assistant has no hourly statistics with both the heat power and the electricity meter yet.",
+            "cop_history_unchanged": "The COPs in the statistics already match the recalculation: nothing to change.",
+            "cop_history_recalculated": "{hours} hourly statistics of the COP sensors rewritten. Graphs may need a reload of the page to show them.",
+            "cop_history_restored": "{hours} hourly statistics of the COP sensors put back as they were.",
+            "no_cop_backup": "There is nothing to put back."
         }
     },
     "selector": {
@@ -180,7 +211,8 @@
         "heat_source": {
             "options": {
                 "csnet": "Recorded by CSNet",
-                "calculated": "Calculated by the integration"
+                "calculated": "Calculated by the integration",
+                "auto": "Automatic: CSNet, calculated where CSNet missed hours"
             }
         }
     }

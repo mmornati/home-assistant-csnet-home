@@ -35,7 +35,7 @@
                     "filtered_alarm_codes": "Codes d'alarme, séparés par des virgules, qui ne notifient jamais (par défaut : -1, erreurs de communication). Laisser vide pour tout notifier.",
                     "energy_meter": "N'importe quel capteur d'énergie (kWh) mesurant l'électricité de la pompe à chaleur, quel que soit l'appareil. Sert à calculer le COP à partir de la chaleur enregistrée par CSNet. Laisser vide pour ne garder que l'estimation.",
                     "energy_meter_power": "Le capteur de puissance (W ou kW) qui va avec le compteur électrique, pour la consommation instantanée. Avec un compteur triphasé, choisissez le total des phases, ou une entrée d'aide qui les additionne. Laissez vide pour utiliser le capteur de puissance trouvé sur l'appareil du compteur.",
-                    "heat_source": "D'où vient la chaleur produite, pour tous les compteurs cumulés de chauffage, de rafraîchissement et d'ECS et tous les COP journaliers ou par période. CSNet : la chaleur que CSNet Manager enregistre pour l'unité (par heures complètes). Calculée : la mesure de l'intégration, à partir du débit et des températures de l'échangeur, en temps réel. Avec CSNet, la mesure de l'intégration est utilisée quand CSNet n'a enregistré aucune chaleur pour l'unité.",
+                    "heat_source": "D'où vient la chaleur produite, pour tous les compteurs cumulés de chauffage, de rafraîchissement et d'ECS et tous les COP journaliers ou par période. CSNet : la chaleur que CSNet Manager enregistre pour l'unité (par heures complètes). Calculée : la mesure de l'intégration, à partir du débit et des températures de l'échangeur, en temps réel. Avec CSNet, la mesure de l'intégration est utilisée quand CSNet n'a enregistré aucune chaleur pour l'unité. Automatique : la chaleur de CSNet, heure par heure, et la mesure de l'intégration pour les heures que CSNet n'a pas enregistrées ou dont il a enregistré moins de la moitié.",
                     "user_agent": "Comment l'intégration se présente à CSNet Manager. Laissez vide pour utiliser la valeur par défaut (un navigateur Chrome de bureau). À modifier uniquement pour tester une autre valeur."
                 }
             },
@@ -73,7 +73,7 @@
                     "filtered_alarm_codes": "Codes d'alarme, séparés par des virgules, qui ne notifient jamais (par défaut : -1, erreurs de communication). Laisser vide pour tout notifier.",
                     "energy_meter": "N'importe quel capteur d'énergie (kWh) mesurant l'électricité de la pompe à chaleur, quel que soit l'appareil. Sert à calculer le COP à partir de la chaleur enregistrée par CSNet. Laisser vide pour ne garder que l'estimation.",
                     "energy_meter_power": "Le capteur de puissance (W ou kW) qui va avec le compteur électrique, pour la consommation instantanée. Avec un compteur triphasé, choisissez le total des phases, ou une entrée d'aide qui les additionne. Laissez vide pour utiliser le capteur de puissance trouvé sur l'appareil du compteur.",
-                    "heat_source": "D'où vient la chaleur produite, pour tous les compteurs cumulés de chauffage, de rafraîchissement et d'ECS et tous les COP journaliers ou par période. CSNet : la chaleur que CSNet Manager enregistre pour l'unité (par heures complètes). Calculée : la mesure de l'intégration, à partir du débit et des températures de l'échangeur, en temps réel. Avec CSNet, la mesure de l'intégration est utilisée quand CSNet n'a enregistré aucune chaleur pour l'unité.",
+                    "heat_source": "D'où vient la chaleur produite, pour tous les compteurs cumulés de chauffage, de rafraîchissement et d'ECS et tous les COP journaliers ou par période. CSNet : la chaleur que CSNet Manager enregistre pour l'unité (par heures complètes). Calculée : la mesure de l'intégration, à partir du débit et des températures de l'échangeur, en temps réel. Avec CSNet, la mesure de l'intégration est utilisée quand CSNet n'a enregistré aucune chaleur pour l'unité. Automatique : la chaleur de CSNet, heure par heure, et la mesure de l'intégration pour les heures que CSNet n'a pas enregistrées ou dont il a enregistré moins de la moitié.",
                     "user_agent": "Comment l'intégration se présente à CSNet Manager. Laissez vide pour utiliser la valeur par défaut (un navigateur Chrome de bureau). À modifier uniquement pour tester une autre valeur."
                 }
             },
@@ -126,6 +126,14 @@
     "options": {
         "step": {
             "init": {
+                "title": "Options de CSNet Home",
+                "menu_options": {
+                    "heating_curves": "Lois d'eau",
+                    "recalculate_cop": "Recalculer les COP passés",
+                    "restore_cop": "Remettre les COP d'avant le recalcul"
+                }
+            },
+            "heating_curves": {
                 "title": "Lois d'eau",
                 "description": "CSNet indique le type de loi d'eau de chaque circuit ({circuits}) mais pas ses valeurs. Recopiez les valeurs réglées par votre installateur sur le contrôleur (Chauffage > Mode de calcul de l'eau). Elles servent uniquement à calculer les capteurs de température d'eau de la loi d'eau : rien n'est envoyé à la pompe à chaleur. Laissez un circuit vide pour ne pas avoir de capteur.",
                 "data": {
@@ -156,15 +164,38 @@
                     "c2_gradient": "Valeur de courbe réglée sur l'unité (0,2 à 2,2). La courbe part de 20 °C d'eau pour 20 °C dehors",
                     "c2_vertex_offset": "Décalage de toute la courbe (-10 à +10 °C). Laisser vide pour aucun"
                 }
+            },
+            "recalculate_cop": {
+                "title": "Recalculer les COP passés",
+                "description": "Les COP du {first} au {last}, recalculés à partir des statistiques de Home Assistant : la chaleur de la puissance calculée par l'intégration ({heat}) divisée par l'électricité comptée par votre compteur ({meter}). Rien n'est envoyé à l'unité.\n\n| Jour | Chaleur (kWh) | Électricité (kWh) | COP avant | COP recalculé |\n|---|---:|---:|---:|---:|\n{table}\n\n« COP avant » est ce que COP du jour affichait en fin de journée. Confirmer réécrit {hours} statistiques horaires de {sensors} : les graphiques d'historique et les statistiques montrent les valeurs recalculées. Les états enregistrés des derniers jours ne changent pas. Les valeurs remplacées sont gardées : ce menu peut les remettre.",
+                "data": {
+                    "confirm": "Écrire les COP recalculés"
+                }
+            },
+            "restore_cop": {
+                "title": "Remettre les COP d'avant",
+                "description": "Remet les {hours} statistiques horaires des capteurs de COP que le recalcul a remplacées, telles qu'elles étaient avant.",
+                "data": {
+                    "confirm": "Remettre les valeurs"
+                }
             }
         },
         "error": {
             "incomplete_curve": "Renseignez toutes les valeurs de la courbe de ce circuit, ou aucune.",
-            "high_ambient_not_above_low": "La température extérieure haute doit être supérieure à la température extérieure basse."
+            "high_ambient_not_above_low": "La température extérieure haute doit être supérieure à la température extérieure basse.",
+            "confirm_required": "Cochez la case pour confirmer."
         },
         "abort": {
             "not_loaded": "L'intégration doit être chargée pour lire le type de loi d'eau utilisé. Réessayez une fois qu'elle a démarré.",
-            "no_heating_curve": "Aucun circuit n'utilise une loi d'eau par points ou par pente : il n'y a rien à décrire. Une température d'eau fixe a déjà sa propre entité."
+            "no_heating_curve": "Aucun circuit n'utilise une loi d'eau par points ou par pente : il n'y a rien à décrire. Une température d'eau fixe a déjà sa propre entité.",
+            "no_recorder": "Le recalcul lit les statistiques de Home Assistant, et l'enregistreur (recorder) ne tourne pas.",
+            "no_energy_meter": "Le recalcul divise par ce que votre compteur électrique a compté. Choisissez d'abord le compteur électrique de la pompe à chaleur dans les réglages de l'intégration (Reconfigurer).",
+            "no_cop_sensors": "Le capteur de puissance thermique ou les capteurs de COP sont introuvables.",
+            "no_statistics": "Home Assistant n'a pas encore de statistiques horaires avec à la fois la puissance thermique et le compteur électrique.",
+            "cop_history_unchanged": "Les COP des statistiques correspondent déjà au recalcul : rien à changer.",
+            "cop_history_recalculated": "{hours} statistiques horaires des capteurs de COP réécrites. Rechargez la page pour les voir dans les graphiques.",
+            "cop_history_restored": "{hours} statistiques horaires des capteurs de COP remises comme avant.",
+            "no_cop_backup": "Il n'y a rien à remettre."
         }
     },
     "selector": {
@@ -180,7 +211,8 @@
         "heat_source": {
             "options": {
                 "csnet": "Enregistrée par CSNet",
-                "calculated": "Calculée par l'intégration"
+                "calculated": "Calculée par l'intégration",
+                "auto": "Automatique : CSNet, calculée là où CSNet a manqué des heures"
             }
         }
     }

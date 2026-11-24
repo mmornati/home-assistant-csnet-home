@@ -165,7 +165,7 @@ class CsnetHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(config_entry):
-        """Return the options flow: the heating curves of the circuits."""
+        """Return the options flow: the heating curves of the circuits, and the recalculation of past COPs."""
         return CsnetHomeOptionsFlow()
 
     async def async_step_user(self, user_input=None):
@@ -367,12 +367,82 @@ _OptionsFlowBase = getattr(config_entries, "OptionsFlowWithReload", config_entri
 
 
 class CsnetHomeOptionsFlow(_OptionsFlowBase):
-    """Let the user copy the installer's heating curves, which CSNet does not report.
+    """Let the user copy the installer's heating curves, which CSNet does not report, and recalculate past COPs.
 
-    Nothing entered here is sent to the unit: it only feeds the heating curve sensors.
+    Nothing entered here is sent to the unit: the curves only feed the heating
+    curve sensors, and the recalculation only rewrites Home Assistant's
+    statistics of the COP sensors, after showing what it would write.
     """
 
+    # the recalculation shown to the user, written as it was shown once confirmed
+    _plan = None
+    _preview = ""
+
     async def async_step_init(self, user_input=None):
+        """Offer the heating curves and the recalculation of past COPs (and putting them back, after one)."""
+        from .cop_history import async_backup_hours  # pylint: disable=import-outside-toplevel
+
+        options = ["heating_curves", "recalculate_cop"]
+        if await async_backup_hours(self.hass, self.config_entry):
+            options.append("restore_cop")
+        return self.async_show_menu(step_id="init", menu_options=options)
+
+    async def async_step_recalculate_cop(self, user_input=None):
+        """Show what the recalculated COPs would be, and write them once the user confirms."""
+        from .cop_history import PlanError, async_apply, async_plan, preview  # pylint: disable=import-outside-toplevel
+
+        if user_input is not None and self._plan is not None:
+            if not user_input.get("confirm"):
+                return self._show_recalculation({"confirm": "confirm_required"})
+            written = await async_apply(self.hass, self.config_entry, self._plan)
+            return self.async_abort(reason="cop_history_recalculated", description_placeholders={"hours": str(written)})
+        try:
+            self._plan = await async_plan(self.hass, self.config_entry)
+        except PlanError as err:
+            return self.async_abort(reason=str(err))
+        if not self._plan.hours_changed:
+            return self.async_abort(reason="cop_history_unchanged")
+        self._preview = preview(self._plan)
+        return self._show_recalculation({})
+
+    def _show_recalculation(self, errors: dict):
+        plan = self._plan
+        return self.async_show_form(
+            step_id="recalculate_cop",
+            data_schema=vol.Schema({vol.Required("confirm", default=False): bool}),
+            errors=errors,
+            description_placeholders={
+                "first": plan.days[0].day.isoformat(),
+                "last": plan.days[-1].day.isoformat(),
+                "heat": plan.heat_entity or "",
+                "meter": plan.meter_entity or "",
+                "sensors": ", ".join(sorted(plan.values)),
+                "hours": str(plan.hours_changed),
+                "table": self._preview,
+            },
+        )
+
+    async def async_step_restore_cop(self, user_input=None):
+        """Put back the COP statistics a recalculation replaced, once the user confirms."""
+        from .cop_history import async_backup_hours, async_restore  # pylint: disable=import-outside-toplevel
+
+        hours = await async_backup_hours(self.hass, self.config_entry)
+        if not hours:
+            return self.async_abort(reason="no_cop_backup")
+        errors = {}
+        if user_input is not None:
+            if user_input.get("confirm"):
+                written = await async_restore(self.hass, self.config_entry)
+                return self.async_abort(reason="cop_history_restored", description_placeholders={"hours": str(written)})
+            errors = {"confirm": "confirm_required"}
+        return self.async_show_form(
+            step_id="restore_cop",
+            data_schema=vol.Schema({vol.Required("confirm", default=False): bool}),
+            errors=errors,
+            description_placeholders={"hours": str(hours)},
+        )
+
+    async def async_step_heating_curves(self, user_input=None):
         """Ask for the curve of each circuit that uses one, with the fields of the kind of curve it uses."""
         # imported here: the curve module is only needed by the options flow
         from .const import OTC_HEATING_TYPE_NAMES  # pylint: disable=import-outside-toplevel
@@ -412,7 +482,7 @@ class CsnetHomeOptionsFlow(_OptionsFlowBase):
                 fields[vol.Optional(option_key(circuit, field))] = selectors[field]
         schema = self.add_suggested_values_to_schema(vol.Schema(fields), user_input if user_input is not None else current)
         return self.async_show_form(
-            step_id="init",
+            step_id="heating_curves",
             data_schema=schema,
             errors=errors,
             description_placeholders={

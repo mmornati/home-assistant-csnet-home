@@ -534,9 +534,9 @@ With an electricity meter chosen in the integration's settings (Reconfigure → 
 
 The electricity power comes from the power sensor chosen in the settings (Power sensor of the heat pump) or, without one, from the power sensor of the meter's own device. With a three-phase meter that has a power sensor per phase but no total, choose a sensor that adds up the phases: otherwise the power is that of one phase only.
 
-The heat produced comes from the source chosen in the settings (Heat produced): the heat **CSNet** Manager records for the unit (the default), or the integration's own measure, **calculated** from the heat power. The heat sensors and every daily or period COP use it, and show it in their `heat_source` attribute: `csnet` or `calculated`. A unit CSNet has answered for without any heat on record uses the calculated heat. The heat power and the instant COP are always calculated: CSNet records heat by the hour only.
+The heat produced comes from the source chosen in the settings (Heat produced): the heat **CSNet** Manager records for the unit (the default), the integration's own measure, **calculated** from the heat power, or **automatic**. The heat sensors and every daily or period COP use it, and show it in their `heat_source` attribute: `csnet`, `calculated` or `auto`. A unit CSNet has answered for without any heat on record uses the calculated heat. The heat power and the instant COP are always calculated: CSNet records heat by the hour only.
 
-Every sensor is named the same way: what it is (*Electricity*, *Heat*, *COP*), the period, then where it comes from in brackets: *(metered)* or *(estimated)* for the electricity and the COPs, *(csnet)* or *(calculated)* for the heat. The unique IDs did not change with these names, so existing installations keep their entity IDs and history.
+Every sensor is named the same way: what it is (*Electricity*, *Heat*, *COP*), the period, then where it comes from in brackets: *(metered)* or *(estimated)* for the electricity and the COPs, *(csnet)*, *(calculated)* or *(auto)* for the heat. The unique IDs did not change with these names, so existing installations keep their entity IDs and history.
 
 | Sensor | Entity (pattern, new installation) | Unit | What it is |
 |--------|------------------------------------|------|------------|
@@ -544,8 +544,8 @@ Every sensor is named the same way: what it is (*Electricity*, *Heat*, *COP*), t
 | Electricity today (metered / estimated) | `sensor.system_controller_electricity_today_metered` | kWh | Electricity since midnight; the one for the Energy dashboard |
 | Electricity yesterday / this month (metered / estimated) | `sensor.system_controller_electricity_this_month_metered`, … | kWh | Electricity of yesterday and of the month, once a whole day or month has been counted |
 | Heat power (calculated) | `sensor.system_controller_heat_power_calculated` | W | Thermal output now (heating **or** cooling) |
-| Heat today / yesterday / this month (csnet / calculated) | `sensor.system_controller_heat_today_csnet`, … | kWh | Heat produced in the period |
-| Heat today space heating / space cooling / hot water / pool (csnet / calculated) | `sensor.system_controller_heat_today_hot_water_csnet`, … | kWh | Today's heat by use, when there are several |
+| Heat today / yesterday / this month (csnet / calculated / auto) | `sensor.system_controller_heat_today_csnet`, … | kWh | Heat produced in the period |
+| Heat today space heating / space cooling / hot water / pool (csnet / calculated / auto) | `sensor.system_controller_heat_today_hot_water_csnet`, … | kWh | Today's heat by use, when there are several |
 | COP instant (metered / estimated) | `sensor.system_controller_cop_instant_metered` | – | Heat ÷ electricity of the last 15 minutes of the compressor run |
 | COP today heating/cooling (metered / estimated) | `sensor.system_controller_cop_today_heating_cooling_metered` | – | Today's COP for space heating and cooling |
 | COP today hot water (metered / estimated) | `sensor.system_controller_cop_today_hot_water_metered` | – | Today's COP for DHW production |
@@ -664,6 +664,31 @@ Choosing or removing a meter replaces one set with the other; the entities of th
     **Instant COP**, **Daily HVAC COP** and **DHW Daily COP** are now named **COP instant**, **COP today heating/cooling** and **COP today hot water**, with *(metered)* or *(estimated)*. Their unique IDs are unchanged: existing installations keep their entity IDs and history, and only the displayed name changes.
 
 ---
+
+### Automatic heat
+
+CSNet records the unit's heat by full hours, from the unit's own figures: the better measure, when it arrives. It sometimes does not: on 22 and 23 November 2026, while csnethome.com reported the IoT gateway offline, CSNet recorded 0 or 1 kWh an hour for hours while the unit was heating, and a COP of 1.04 for a day whose real COP was about 2.3.
+
+With **Automatic**, each full hour keeps CSNet's heat, unless CSNet has no record for it, or recorded less than half of what the integration measured in that hour while the integration measured at least 1.5 kWh. Then the integration's heat stands in for that hour. The same test is made for each use, so CSNet's heating of an hour can be kept while its missed hot water is the integration's. The hour in progress, which CSNet records only after it ends, is the integration's. *Heat today (auto)* tells how many of today's full hours came from where in its `hours_from_csnet` and `hours_calculated` attributes.
+
+- Today and this month do not step back for CSNet's rounding: when CSNet's record of an hour, in whole kWh, replaces a little more calculated heat (up to 3 kWh, or 10 %), the figure stays where it was until the heat that follows makes up for it. A larger drop, a correction of CSNet's records, is shown.
+- An hourly record of more heat than the unit can make in an hour (30 kWh) is left out, and a day CSNet keeps a daily record of counts that record: the oldest hour CSNet keeps has been seen holding a running total.
+- Hours before the integration started counting, and days of the month before it, are CSNet's.
+- *COP today heating/cooling* and *COP today hot water* divide hour by hour: only the hours whose electricity the integration followed from start to end (and the hour in progress) count, so a restart or an outage does not divide a whole day of CSNet's heat by part of a day's electricity.
+
+### Recalculating past COPs
+
+The COP sensors keep, in Home Assistant's statistics, what they showed: with CSNet's heat on the days CSNet missed hours, or with the estimated electricity before a meter was chosen. **Configure → Recalculate past COPs** works them out again from Home Assistant's own hourly statistics: the heat of *Heat power (calculated)* (its hourly mean) over what the electricity meter chosen in the settings counted in the same hour.
+
+1. Go to **Settings** → **Devices & Services** → **CSNet Home** → **Configure**, and choose **Recalculate past COPs**.
+2. The form shows, for each day since both have statistics, the heat, the electricity, the COP the day ended with and the recalculated COP, and how many hourly statistics it would rewrite, of which sensors. Nothing is written yet.
+3. Tick the box and submit to write them. *COP today*, *COP yesterday*, *COP this month*, *COP last month* (metered), and *COP today heating/cooling* on an installation without hot water or pool (the recalculation cannot split the heat by use), get, for each hour that already has a statistic, the value they would have had: today's heat over today's electricity up to that hour, the whole of yesterday's (a day with hours missing has none), and so on.
+
+The values replaced are kept: **Configure → Put back the COPs as they were before the recalculation** writes them back. Running the recalculation again keeps the values from before the first one. Nothing is sent to the unit and no setting changes.
+
+- It needs an electricity meter in the settings: the estimate is what is being corrected.
+- Only the long-term statistics change: the history graphs of older periods and the statistics cards. The recorded states of the last days (10 by default) cannot be rewritten by an integration and keep the old values.
+- The heat is always the calculated one there, whatever the Heat produced setting: Home Assistant keeps no hourly record of CSNet's heat. Before 13 November 2026 (version 2.13.0) the calculated heat power was worked out slightly differently, so the oldest days are less precise.
 
 ## Compressor / Outdoor Unit Sensors
 

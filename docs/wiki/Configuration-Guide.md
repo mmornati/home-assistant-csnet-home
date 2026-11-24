@@ -40,7 +40,7 @@ You'll see a configuration dialog with the following fields:
 | **Filtered Alarm Codes** | Comma-separated alarm codes that never create a notification | `-1` |
 | **Electricity meter of the heat pump** | Any energy sensor (kWh) that measures the heat pump, for the electricity sensors and the COPs | empty (estimate) |
 | **Power sensor of the heat pump** | The power sensor that goes with the meter, for the electricity power | empty (found on the meter's device) |
-| **Heat produced** | Where the heat produced comes from: recorded by CSNet, or calculated by the integration | Recorded by CSNet |
+| **Heat produced** | Where the heat produced comes from: recorded by CSNet, calculated by the integration, or automatic (CSNet, calculated where CSNet missed hours) | Recorded by CSNet |
 | **User-Agent (advanced)** | How the integration presents itself to CSNet Manager | a desktop Chrome browser |
 
 
@@ -124,6 +124,7 @@ See [Alarm Notifications](Advanced-Features.md#built-in-alarm-notifications) for
 - Where the heat comes from for the heat sensors (Heat today, yesterday, this month, and today by use) and for every daily or period COP
 - **Recorded by CSNet** (default): the heat CSNet Manager records for the unit, by full hours
 - **Calculated by the integration**: from the water flow and the temperatures at the heat exchanger, as it is produced
+- **Automatic**: CSNet's heat hour by hour, and the calculated heat for the hours CSNet has no record for or recorded less than half of it. See [Automatic heat](Sensors-Reference.md#automatic-heat)
 - A unit CSNet has recorded no heat for always uses the calculated heat. See [Heat produced](Sensors-Reference.md#heat-produced)
 
 ### Step 3: Submit Configuration
@@ -344,7 +345,7 @@ group:
 
 ### Adjusting Scan Interval, Language and Other Options
 
-All settings, including credentials, are changed through the **reconfigure** flow. See [Reconfiguring](#reconfiguring). The **Configure** button only holds the heating curve values, which CSNet does not report; see [Heating Curve Values](Advanced-Features.md#heating-curve-values-water-law).
+All settings, including credentials, are changed through the **reconfigure** flow. See [Reconfiguring](#reconfiguring). The **Configure** button holds the heating curve values, which CSNet does not report (see [Heating Curve Values](Advanced-Features.md#heating-curve-values-water-law)), and the recalculation of past COPs (see [Recalculating past COPs](Sensors-Reference.md#recalculating-past-cops)).
 
 **Scan interval recommendations**:
 - **Normal use**: 60-120 seconds
