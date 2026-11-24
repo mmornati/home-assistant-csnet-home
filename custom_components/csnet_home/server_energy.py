@@ -951,6 +951,8 @@ class UnitHeatCounter(ProducedEnergyCounter):
         """Initialize; it is fed the counter of each new reading."""
         super().__init__(hass, entry_id, storage_key=unit_heat_storage_key(entry_id))
         self._last_reading: int | None = None
+        # a drop of the counter not yet confirmed by the next reading
+        self._dropped_to: int | None = None
         # whether the counter ever rose: a unit whose counter stands still gets no sensors
         self.has_counted = False
 
@@ -968,12 +970,15 @@ class UnitHeatCounter(ProducedEnergyCounter):
         (249, then 2), or no more than the unit can make in the time between the
         readings (150, then 20 after a night without readings). A small step back
         near the top (245, then 244) is no wrap: it would mean 249 kWh in minutes.
+        A rise of more than the unit can make in that time is no heat either
+        (24, then 116 a minute later, after a wrong reading of 24).
         """
+        most = max(UNIT_HEAT_COUNTER_WRAP_MARGIN, UNIT_HEAT_MAX_KW * hours)
         if reading >= previous:
-            return reading - previous
+            return reading - previous if reading - previous <= most else None
         wrap = UNIT_HEAT_COUNTER_WRAP if previous < UNIT_HEAT_COUNTER_WRAP else 256
         across = wrap - previous + reading
-        if across <= max(UNIT_HEAT_COUNTER_WRAP_MARGIN, UNIT_HEAT_MAX_KW * hours):
+        if across <= most:
             # the counter started over
             return across
         return None
@@ -988,11 +993,27 @@ class UnitHeatCounter(ProducedEnergyCounter):
         self._roll(now)
         if previous is not None and gap is not None and timedelta(0) <= gap <= UNIT_HEAT_COUNTER_MAX_GAP:
             kwh = self.rise(previous, reading, gap.total_seconds() / 3600)
-            if kwh is None:
+            if kwh is None and reading < previous and self._dropped_to is None:
+                # A drop that is no wrap: a wrong reading (CSNet sent 24 once between two
+                # readings of 116 on 24 November 2026) or the counter reset. Keep the last
+                # reading until the next one says which.
+                _LOGGER.debug("The unit's heat counter went from %s to %s: waiting for the next reading", previous, reading)
+                self._dropped_to = reading
+                self._last_time = now
+                return
+            if kwh is None and reading < previous and reading >= self._dropped_to:
+                # the next reading goes on from the drop: the counter was reset
+                _LOGGER.debug("The unit's heat counter was reset to %s: counting again from there", self._dropped_to)
+                kwh = self.rise(self._dropped_to, reading, gap.total_seconds() / 3600)
+                if kwh:
+                    self._add(float(kwh), use or "spaceHeating")
+                    self.has_counted = True
+            elif kwh is None:
                 _LOGGER.debug("The unit's heat counter went from %s to %s: counting again from there", previous, reading)
             elif kwh:
                 self._add(float(kwh), use or "spaceHeating")
                 self.has_counted = True
+        self._dropped_to = None
         self._last_reading = reading
         self._last_time = now
         self._store.async_delay_save(self._data_to_save, ESTIMATE_SAVE_DELAY_S)

@@ -7,6 +7,16 @@ description: What changed in each version of the CSNet Home (unofficial, for Hit
 
 Every version of the integration, newest first. Install or update from HACS; each version is also on the [GitHub releases page](https://github.com/mmornati/home-assistant-csnet-home/releases).
 
+## 2.22.1
+
+*24 November 2026* · [GitHub release](https://github.com/mmornati/home-assistant-csnet-home/releases/tag/2.22.1)
+
+One wrong reading of the unit's heat counter no longer counts as heat. Nothing new is sent to the unit.
+
+#### Fixed
+
+- **The heat and COP of the unit counter could jump after one wrong reading.** On 24 November 2026 CSNet sent the counter as 24 once, between two readings of 116; the integration took the drop for a reset and counted the way back up as 92 kWh in a minute, so *COP today (unit counter)* showed 4.45 instead of about 2.3. A rise larger than the unit can make in the time between two readings is no longer counted, and a drop is held until the next reading says whether it was a wrong reading or a real reset. Heat already counted before the update stays as it was. ([#287](https://github.com/mmornati/home-assistant-csnet-home/pull/287))
+
 ## 2.22.0
 
 *24 November 2026* · [GitHub release](https://github.com/mmornati/home-assistant-csnet-home/releases/tag/2.22.0)
