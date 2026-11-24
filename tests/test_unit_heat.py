@@ -105,6 +105,23 @@ async def test_a_reset_or_a_long_gap_starts_counting_again(hass, hass_storage):
     assert counter.energy("today", None, later) == 0
 
 
+def test_a_rise_the_unit_cannot_make_is_no_heat():
+    """24, then 116 a minute later: no 92 kWh in a minute."""
+    assert UnitHeatCounter.rise(24, 116, 1 / 60) is None
+    assert UnitHeatCounter.rise(24, 116, 4) == 92
+
+
+async def test_one_wrong_reading_counts_nothing(hass, hass_storage):
+    """24 November 2026: 116, then 24 once, then 116 again: today stays as it was (it went to 187)."""
+    counter = UnitHeatCounter(hass, "entry")
+    counter.async_update_reading(local(24, 13, 40), 115, "spaceHeating")
+    counter.async_update_reading(local(24, 13, 41), 116, "spaceHeating")
+    counter.async_update_reading(local(24, 13, 45), 24, "spaceHeating")
+    counter.async_update_reading(local(24, 13, 46), 116, "spaceHeating")
+    counter.async_update_reading(local(24, 14, 13), 117, "spaceHeating")
+    assert counter.energy("today", None, local(24, 14, 13)) == 2
+
+
 async def test_readings_that_are_not_a_counter_are_ignored(hass, hass_storage):
     """A missing or odd value leaves the count as it was."""
     counter = UnitHeatCounter(hass, "entry")
