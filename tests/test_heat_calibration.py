@@ -27,11 +27,11 @@ def run(calibration, counter_kwh, measured_watts, use="spaceHeating", clean=True
     return when, counter + counter_kwh
 
 
-def test_the_first_window_teaches_the_ratio_of_counter_to_measured_heat():
-    """The counter counts 5 % more than the probes: the factor goes to about 1.05."""
+def test_the_first_windows_teach_the_ratio_of_counter_to_measured_heat():
+    """The counter counts 5 % more than the probes: the first windows take the factor to about 1.05."""
     calibration = HeatCalibration()
     run(calibration, 7, 6000, ratio=1.05)
-    assert calibration.windows == {"spaceHeating": 1}
+    assert calibration.windows == {"spaceHeating": 2}
     assert calibration.factor("spaceHeating") == pytest.approx(1.05, abs=0.02)
 
 
@@ -82,9 +82,9 @@ def test_a_change_of_use_inside_a_window_teaches_nothing():
     """A window that turns from space heating to hot water says nothing about space heating."""
     calibration = HeatCalibration()
     for minute in range(61):
-        use = "spaceHeating" if minute < 50 else "dhw"
+        use = "spaceHeating" if minute < 30 else "dhw"
         calibration.observe(START + timedelta(minutes=minute), 100 + minute // 9, use, 6000, True)
-    assert calibration.factors == {}
+    assert "spaceHeating" not in calibration.factors
 
 
 def test_a_gap_in_the_readings_breaks_the_window():
@@ -173,6 +173,35 @@ def test_the_heat_power_is_left_as_measured_elsewhere(reading):
     heating_status = RUNNING | reading
     sensor = _heat_sensor(heating_status, {"spaceHeating": 1.05, "dhw": 0.9})
     assert sensor._get_thermal_power_values(heating_status)[0] == sensor._measure_heat(heating_status)[0]  # pylint: disable=protected-access
+
+
+@pytest.mark.parametrize(
+    ("reading", "learnable"),
+    [
+        ({"operationStatus": 6}, True),  # compressor running
+        ({"operationStatus": 6, "ouHz": 0}, False),  # stopped, the pump still running
+        ({"operationStatus": 5, "ouHz": 0}, False),  # thermostat off
+        ({"operationStatus": 6, "systemStatus2Flags": 1 << 8, "waterOutletHPTemp": 45}, False),  # backup heater on
+    ],
+    ids=["compressor running", "compressor stopped", "thermostat off", "backup heater"],
+)
+def test_only_readings_with_the_compressor_running_teach(reading, learnable):
+    """The unit's counter keeps rising while the compressor is stopped: those readings teach nothing."""
+    heating_status = RUNNING | reading
+    sensor = _heat_sensor(heating_status, {})
+    measured, use, may_learn = sensor._calibration_reading(heating_status)  # pylint: disable=protected-access
+    assert may_learn is learnable
+    assert use == "spaceHeating"
+    assert measured == sensor._measure_heat(heating_status)[0]  # pylint: disable=protected-access
+
+
+def test_a_window_with_the_compressor_stopped_teaches_nothing():
+    """The counter rising with the compressor stopped spoils the window it falls in."""
+    calibration = HeatCalibration()
+    for minute in range(91):
+        running = not 30 <= minute < 60
+        calibration.observe(START + timedelta(minutes=minute), 100 + minute // 10, "spaceHeating", 6000 if running else 0, running)
+    assert calibration.windows.get("spaceHeating", 0) <= 1
 
 
 def test_the_heat_power_shows_what_was_learnt():

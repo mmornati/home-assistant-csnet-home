@@ -973,8 +973,8 @@ def _power_reading_follower(coordinator, observer):
         # what the unit's heat counter teaches about the measured heat
         heat_calibration = getattr(coordinator, "heat_calibration", None)
         if heat_calibration is not None:
-            measured, _status, _text, use, clean = observer._measure_heat(heating_status)  # pylint: disable=protected-access
-            heat_calibration.observe(now, heating_status.get("unitCapacity"), use, measured, clean)
+            measured, use, learnable = observer._calibration_reading(heating_status)  # pylint: disable=protected-access
+            heat_calibration.observe(now, heating_status.get("unitCapacity"), use, measured, learnable)
         # the unit's own heat counter, counted for what the unit is doing now
         unit_heat = getattr(coordinator, "unit_heat", None)
         if unit_heat is not None:
@@ -2137,6 +2137,16 @@ class CSNetHomeCalculatedSensor(CSNetHomeInstallationSensor):
             if calibration is not None:
                 thermal_power = round(thermal_power * calibration.factor(use), 2)
         return thermal_power, op_status, op_status_text
+
+    def _calibration_reading(self, heating_status):
+        """Return (heat in Watts as measured, use, whether the calibration may learn from it).
+
+        Only readings with the compressor running teach the calibration: the
+        unit's counter keeps rising while the compressor is stopped and the
+        pump runs, with nothing to make that heat.
+        """
+        measured, _status, _text, use, clean = self._measure_heat(heating_status)
+        return measured, use, clean and (heating_status.get("ouHz") or 0) > 0
 
     def _measure_heat(self, heating_status):
         """Return (heat in Watts, operation status, its text, use, clean) as the probes measure it, uncorrected.

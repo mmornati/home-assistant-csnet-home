@@ -29,6 +29,7 @@ from custom_components.csnet_home.const import (
 )
 from custom_components.csnet_home.coordinator import ALARM_STORAGE_VERSION, CSNetHomeConfigEntry, CSNetHomeCoordinator, CSNetHomeData, alarm_storage_key
 from custom_components.csnet_home.dashboard import async_register_dashboard, meter_power_for
+from custom_components.csnet_home.heat_calibration import HEAT_CALIBRATION_STORAGE_VERSION, heat_calibration_storage_key
 from custom_components.csnet_home.migration import async_migrate_zone_identifiers
 from custom_components.csnet_home.power_calibration import POWER_CALIBRATION_STORAGE_VERSION, power_calibration_storage_key
 from custom_components.csnet_home.sample_recorder import SHARE_URL, SampleRecorder, sample_header, sample_path
@@ -271,6 +272,7 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     await Store(hass, METER_STORAGE_VERSION, estimated_energy_storage_key(entry.entry_id)).async_remove()
     await Store(hass, METER_STORAGE_VERSION, produced_energy_storage_key(entry.entry_id)).async_remove()
     await Store(hass, POWER_CALIBRATION_STORAGE_VERSION, power_calibration_storage_key(entry.entry_id)).async_remove()
+    await Store(hass, HEAT_CALIBRATION_STORAGE_VERSION, heat_calibration_storage_key(entry.entry_id)).async_remove()
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: CSNetHomeConfigEntry) -> bool:

@@ -13,8 +13,11 @@ another, and kept across restarts. One factor is kept for each use: space
 heating and cooling (both at the water outlet; a unit's probes may read
 differently cold than warm) and hot water (the exchanger outlet).
 
-A window counts only when all of it was one use, measured at its own probe,
-with no defrost, no backup heater or boiler, and no reading missing.
+A window counts only when the compressor ran all of it, in one use, measured
+at its own probe, with no defrost, no backup heater or boiler, and no reading
+missing. The counter keeps rising while the compressor is stopped and the
+pump runs, by 20 to 40 kWh a day on a unit that cycles, with nothing to make
+that heat: learnt from, it would inflate the heat and the COP.
 """
 
 from __future__ import annotations
@@ -35,7 +38,7 @@ CALIBRATED_USES = ("spaceHeating", "spaceCooling", "dhw")
 # kWh of the counter a window needs before it is learnt from: the counter's
 # steps are seen at the next reading, so a window is a few readings long at
 # each end; a longer window makes that share small
-MIN_WINDOW_KWH = {"spaceHeating": 5, "spaceCooling": 5, "dhw": 2}
+MIN_WINDOW_KWH = {"spaceHeating": 3, "spaceCooling": 3, "dhw": 2}
 # Readings further apart than this break a window: heat in between is unknown
 MAX_READING_GAP = timedelta(minutes=5)
 # A window whose ratio falls outside these says something else went on: it is left out
