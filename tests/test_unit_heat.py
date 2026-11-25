@@ -122,6 +122,29 @@ async def test_one_wrong_reading_counts_nothing(hass, hass_storage):
     assert counter.energy("today", None, local(24, 14, 13)) == 2
 
 
+async def test_heat_only_while_the_compressor_ran(hass, hass_storage):
+    """19 November 2026: the counter kept rising for an hour with the compressor stopped; only the steps with it running count."""
+    counter = UnitHeatCounter(hass, "entry")
+    counter.async_update_reading(local(19, 12, 0), 100, "spaceHeating", True)
+    counter.async_update_reading(local(19, 12, 3), 101, "spaceHeating", True)
+    # the step seen at the first reading after the stop is the heat of the run
+    counter.async_update_reading(local(19, 12, 4), 102, "spaceHeating", False)
+    # then the counter goes on with nothing to make that heat
+    counter.async_update_reading(local(19, 12, 30), 103, "spaceHeating", False)
+    counter.async_update_reading(local(19, 13, 0), 104, "spaceHeating", False)
+    counter.async_update_reading(local(19, 13, 10), 106, "spaceHeating", True)
+    assert counter.energy("today", None, local(19, 13, 10)) == 1 + 1 + 2
+
+
+async def test_a_unit_that_does_not_say_whether_the_compressor_runs_counts_every_rise(hass, hass_storage):
+    """Without the compressor frequency, every rise counts as before."""
+    counter = UnitHeatCounter(hass, "entry")
+    counter.async_update_reading(local(19, 12, 0), 100, "spaceHeating", None)
+    counter.async_update_reading(local(19, 12, 30), 103, "spaceHeating", None)
+    counter.async_update_reading(local(19, 13, 0), 104, "spaceHeating")
+    assert counter.energy("today", None, local(19, 13, 0)) == 4
+
+
 async def test_readings_that_are_not_a_counter_are_ignored(hass, hass_storage):
     """A missing or odd value leaves the count as it was."""
     counter = UnitHeatCounter(hass, "entry")

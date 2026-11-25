@@ -979,7 +979,13 @@ def _power_reading_follower(coordinator, observer):
         # the unit's own heat counter, counted for what the unit is doing now
         unit_heat = getattr(coordinator, "unit_heat", None)
         if unit_heat is not None:
-            unit_heat.async_update_reading(now, heating_status.get("unitCapacity"), _heat_use(heating_status.get("operationStatus")))
+            hz = heating_status.get("ouHz")
+            unit_heat.async_update_reading(
+                now,
+                heating_status.get("unitCapacity"),
+                _heat_use(heating_status.get("operationStatus")),
+                hz > 0 if isinstance(hz, (int, float)) and not isinstance(hz, bool) else None,
+            )
 
     return _follow
 

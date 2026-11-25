@@ -943,6 +943,12 @@ class UnitHeatCounter(ProducedEnergyCounter):
     without CSNet's records, also while CSNet fails to record it. The last
     reading is kept across restarts, so the heat of an outage is counted too
     (on the day it ends).
+
+    A rise counts only when the compressor ran at one of the two readings:
+    the counter keeps rising while the compressor is stopped and the pump
+    runs, by 20 to 40 kWh a day on a unit that cycles, with nothing to make
+    that heat. Counting the rise while the compressor ran at either reading
+    keeps the step the counter shows just after a stop.
     """
 
     source = "unit_counter"
@@ -951,6 +957,8 @@ class UnitHeatCounter(ProducedEnergyCounter):
         """Initialize; it is fed the counter of each new reading."""
         super().__init__(hass, entry_id, storage_key=unit_heat_storage_key(entry_id))
         self._last_reading: int | None = None
+        # whether the compressor ran at the last reading (None: not known)
+        self._last_running: bool | None = None
         # a drop of the counter not yet confirmed by the next reading
         self._dropped_to: int | None = None
         # whether the counter ever rose: a unit whose counter stands still gets no sensors
@@ -984,12 +992,17 @@ class UnitHeatCounter(ProducedEnergyCounter):
         return None
 
     @callback
-    def async_update_reading(self, now: datetime, reading, use: str | None) -> None:
-        """Add the rise of the counter since the last reading to the use of the moment."""
+    def async_update_reading(self, now: datetime, reading, use: str | None, compressor_running: bool | None = None) -> None:
+        """Add the rise of the counter since the last reading to the use of the moment.
+
+        `compressor_running` is None when the unit does not say: the rise then counts as before.
+        """
         if not isinstance(reading, int) or isinstance(reading, bool) or reading < 0:
             return
         previous = self._last_reading
         gap = now - self._last_time if self._last_time is not None else None
+        ran = compressor_running is not False or self._last_running is True
+        self._last_running = compressor_running
         self._roll(now)
         if previous is not None and gap is not None and timedelta(0) <= gap <= UNIT_HEAT_COUNTER_MAX_GAP:
             kwh = self.rise(previous, reading, gap.total_seconds() / 3600)
@@ -1005,14 +1018,16 @@ class UnitHeatCounter(ProducedEnergyCounter):
                 # the next reading goes on from the drop: the counter was reset
                 _LOGGER.debug("The unit's heat counter was reset to %s: counting again from there", self._dropped_to)
                 kwh = self.rise(self._dropped_to, reading, gap.total_seconds() / 3600)
-                if kwh:
+                if kwh and ran:
                     self._add(float(kwh), use or "spaceHeating")
                     self.has_counted = True
             elif kwh is None:
                 _LOGGER.debug("The unit's heat counter went from %s to %s: counting again from there", previous, reading)
-            elif kwh:
+            elif kwh and ran:
                 self._add(float(kwh), use or "spaceHeating")
                 self.has_counted = True
+            elif kwh:
+                _LOGGER.debug("The unit's heat counter rose by %s kWh with the compressor stopped: not counted", kwh)
         self._dropped_to = None
         self._last_reading = reading
         self._last_time = now
