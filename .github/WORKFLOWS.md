@@ -203,7 +203,7 @@ Instead of testing arbitrary version counts, the workflow selects the latest ver
 - ✅ The approval is decided by a job without an LLM, gated on CI and on the head commit
 - ✅ Fork PRs get no secret and are never approved automatically: use `@claude review` instead
 
-**Requires:** `ANTHROPIC_API_KEY` secret, the Claude GitHub App, and Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests". Model: `HA_REVIEW_MODEL` variable.
+**Requires:** `ANTHROPIC_API_KEY` secret, the Claude GitHub App, and Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests". Model: `CLAUDE_MODEL` variable, else `HA_REVIEW_MODEL`, else `claude-opus-5-5`.
 
 ### 10. Claude Code (`claude.yaml`)
 

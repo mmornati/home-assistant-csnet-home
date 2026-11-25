@@ -9,7 +9,8 @@
 # subprocess Claude starts (it reduces the risk of an injected instruction, it does not remove it).
 #
 # Requires the ANTHROPIC_API_KEY repository secret (already used by ha-release-review.yaml)
-# and the Claude GitHub App. Model: the HA_REVIEW_MODEL repository variable, like the HA reviews.
+# and the Claude GitHub App. Model: the CLAUDE_MODEL repository variable (e.g. claude-sonnet-5-5),
+# else HA_REVIEW_MODEL (shared with the HA release reviews), else claude-opus-5-5.
 name: Claude Code
 
 'on':
@@ -65,6 +66,6 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          claude_args: --model ${{ vars.HA_REVIEW_MODEL || 'claude-opus-5-5' }}
+          claude_args: --model ${{ vars.CLAUDE_MODEL || vars.HA_REVIEW_MODEL || 'claude-opus-5-5' }}
           additional_permissions: |
             actions: read

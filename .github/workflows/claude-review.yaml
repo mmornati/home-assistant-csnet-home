@@ -17,7 +17,8 @@
 #
 # Requires: the ANTHROPIC_API_KEY secret, the Claude GitHub App, and Settings > Actions >
 # General > "Allow GitHub Actions to create and approve pull requests" (without it the review
-# is posted and the approval step fails). Model: the HA_REVIEW_MODEL repository variable.
+# is posted and the approval step fails). Model: the CLAUDE_MODEL repository variable (e.g.
+# claude-sonnet-5-5), else HA_REVIEW_MODEL (shared with the HA release reviews), else claude-opus-5-5.
 name: Claude Review
 
 'on':
@@ -81,7 +82,7 @@ jobs:
                "changes". Summarise in 1 to 3 sentences.
           # yamllint disable rule:line-length
           claude_args: |
-            --model ${{ vars.HA_REVIEW_MODEL || 'claude-opus-5-5' }}
+            --model ${{ vars.CLAUDE_MODEL || vars.HA_REVIEW_MODEL || 'claude-opus-5-5' }}
             --max-turns 40
             --allowedTools "Read,Grep,Glob,Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr comment:*),Bash(git diff:*),Bash(git log:*),mcp__github_inline_comment__create_inline_comment"
             --json-schema '{"type":"object","properties":{"verdict":{"type":"string","enum":["approve","changes"]},"summary":{"type":"string"}},"required":["verdict","summary"]}'
