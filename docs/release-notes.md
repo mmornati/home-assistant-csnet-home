@@ -7,6 +7,16 @@ description: What changed in each version of the CSNet Home (unofficial, for Hit
 
 Every version of the integration, newest first. Install or update from HACS; each version is also on the [GitHub releases page](https://github.com/mmornati/home-assistant-csnet-home/releases).
 
+## 2.22.2
+
+*25 November 2026* · [GitHub release](https://github.com/mmornati/home-assistant-csnet-home/releases/tag/2.22.2)
+
+The calculated heat is calibrated against the unit's own heat counter. Nothing new is sent to the unit. Thanks to @davigar1391 for the calibration, and for finding why the counter overstates the heat on units that cycle.
+
+#### New
+
+- **The calculated heat learns from the unit's heat counter.** On units that report their counter (`unitCapacity`), the integration compares the heat it measures (flow × ΔT) with the counter's rise, and learns one factor for space heating, one for cooling and one for hot water, kept across restarts and limited to 0.6–1.6. It applies to the heat power, the instant COP, and the calculated heat and COPs; the `heat_calibration` attribute of the heat power shows each factor and the number of windows behind it. It learns only while the compressor runs: the counter keeps rising while the compressor is stopped and the pump runs, by 20 to 40 kWh a day on a unit that cycles, with nothing to make that heat. When the first windows are learnt, the values above step by the factor, so history graphs show a step at that moment; values recorded before are not changed. On units whose probes already agree with the counter, the factor stays close to 1 and nothing visibly changes. ([#286](https://github.com/mmornati/home-assistant-csnet-home/pull/286))
+
 ## 2.22.1
 
 *24 November 2026* · [GitHub release](https://github.com/mmornati/home-assistant-csnet-home/releases/tag/2.22.1)
