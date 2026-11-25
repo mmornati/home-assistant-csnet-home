@@ -16,7 +16,7 @@ The cards find their entities themselves, so a card works as soon as you add it,
 | Activity | `custom:csnet-activity-card` | What ran over the last hours, with the total time: compressor, defrost, each circuit's demand, hot water (the heat pump heating the tank), the tank's electric heater, pumps, backup heater, boiler |
 | Energy per day | `custom:csnet-daily-energy-card` | Electricity and heat per day, the COP of each day and the average outdoor temperature |
 | Power today | `custom:csnet-power-profile-card` | Today's power against the average day of the last two weeks |
-| Energy signature | `custom:csnet-energy-signature-card` | Tomorrow's electricity from the weather forecast, kWh per degree colder, 7-day average and base load |
+| Energy signature | `custom:csnet-energy-signature-card` | Today's and tomorrow's electricity from the weather forecast, kWh per degree colder, 7-day average and base load |
 | Connection | `custom:csnet-connection-card` | Whether Home Assistant and the unit reach CSNet Manager: the last hours as timelines with the share of time connected, failed polls today and in a row, answer time, last data, last problem and why, the unit's last contact and Wi-Fi |
 
 Tap any value to open its entity's details.
@@ -193,6 +193,6 @@ The COP needs an electricity figure. With an electricity meter chosen in the int
 
 ## Energy signature card
 
-Each past day gives a point: the electricity used against the day's average outdoor temperature. A straight line through these points (kWh = a + b × outdoor temperature) says how much more the house needs per degree colder, and, with tomorrow's forecast, about how much tomorrow will use. The fit quality (r²) tells how well the line explains the days: low values mean other things (holidays, hot water, sun) weigh more than the outdoor temperature. It needs at least 7 days of history, and is an estimate, not a promise.
+Each past day gives a point: the electricity used against the day's average outdoor temperature. A straight line through these points (kWh = a + b × outdoor temperature) says how much more the house needs per degree colder, and, with the forecast of today and of tomorrow, about how much each day will use. Today's figure is for the whole day; it shows "no forecast available" once the weather entity no longer gives today. The fit quality (r²) tells how well the line explains the days: low values mean other things (holidays, hot water, sun) weigh more than the outdoor temperature. It needs at least 7 days of history, and is an estimate, not a promise.
 
 The base load is the lowest hourly power of the last 14 days: what the unit draws when it does not heat (pumps, electronics).

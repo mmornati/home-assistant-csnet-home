@@ -12,7 +12,7 @@
  * power meter.
  */
 
-const CARD_VERSION = "1.3.1";
+const CARD_VERSION = "1.3.2";
 
 // ---------------------------------------------------------------------------
 // Texts
@@ -121,6 +121,7 @@ const TEXTS = {
     now: "Now",
     usual_at_this_hour: "Usual at this hour ({d} days)",
     average_profile: "average day ({d} days)",
+    today_weather: "Today (forecast)",
     tomorrow_weather: "Tomorrow (forecast)",
     mean_outdoor: "~{v} °C average",
     no_forecast: "no forecast available",
@@ -275,6 +276,7 @@ const TEXTS = {
     now: "Maintenant",
     usual_at_this_hour: "Habituel à cette heure ({d} jours)",
     average_profile: "journée moyenne ({d} jours)",
+    today_weather: "Aujourd'hui (météo)",
     tomorrow_weather: "Demain (météo)",
     mean_outdoor: "~{v} °C en moyenne",
     no_forecast: "prévision indisponible",
@@ -429,6 +431,7 @@ const TEXTS = {
     now: "Ahora",
     usual_at_this_hour: "Habitual a esta hora ({d} días)",
     average_profile: "día medio ({d} días)",
+    today_weather: "Hoy (previsión)",
     tomorrow_weather: "Mañana (previsión)",
     mean_outdoor: "~{v} °C de media",
     no_forecast: "previsión no disponible",
@@ -583,6 +586,7 @@ const TEXTS = {
     now: "Teraz",
     usual_at_this_hour: "Zwykle o tej porze ({d} dni)",
     average_profile: "średni dzień ({d} dni)",
+    today_weather: "Dziś (prognoza)",
     tomorrow_weather: "Jutro (prognoza)",
     mean_outdoor: "średnio ~{v} °C",
     no_forecast: "brak dostępnej prognozy",
@@ -2547,14 +2551,19 @@ class CsnetEnergySignatureCard extends CsnetBaseCard {
       .map((r) => [outdoorByDay.get(startOfDay(r.start)), r.change, r.start]);
     const last7 = points.filter((p) => p[2] >= today - 7 * 86400000).map((p) => p[1]);
     const floors = (hourly[unit.power] || []).map((r) => r.min).filter((v) => Number.isFinite(v) && v > 0);
-    const tomorrow = startOfDay(today + 36 * 3600000);
-    const entry = (forecast || []).find((f) => startOfDay(toMs(f.datetime)) === tomorrow);
-    const tomorrowMean = entry && Number.isFinite(entry.temperature) ? (entry.temperature + (Number.isFinite(entry.templow) ? entry.templow : entry.temperature)) / 2 : null;
+    // the day's mean outdoor temperature in the forecast: the average of its high and low
+    const forecastMean = (day) => {
+      const entry = (forecast || []).find((f) => startOfDay(toMs(f.datetime)) === day);
+      return entry && Number.isFinite(entry.temperature) ? (entry.temperature + (Number.isFinite(entry.templow) ? entry.templow : entry.temperature)) / 2 : null;
+    };
+    const todayMean = forecastMean(today);
+    const tomorrowMean = forecastMean(startOfDay(today + 36 * 3600000));
     return {
       fit: regression(points.map((p) => [p[0], p[1]])),
       points,
       avg7: last7.length ? last7.reduce((a, b) => a + b, 0) / last7.length : null,
       floor: floors.length ? Math.min(...floors) : null,
+      todayMean,
       tomorrowMean,
       price,
     };
@@ -2563,6 +2572,8 @@ class CsnetEnergySignatureCard extends CsnetBaseCard {
   css() {
     return `
       .grid4 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 12px; }
+      .grid6 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px 12px; }
+      @media (max-width: 500px) { .grid6 { grid-template-columns: 1fr 1fr; } }
       .k { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--csnet-muted); }
       .v { font-size: 28px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
       .s { font-size: 11px; color: var(--csnet-muted); }
@@ -2581,25 +2592,31 @@ class CsnetEnergySignatureCard extends CsnetBaseCard {
     const price = this.price(hass);
     const money = (kwh) => (price !== null && Number.isFinite(kwh) ? ` · ≈ ${fmt(hass, kwh * price, 2)} ${escapeHtml(hass.config?.currency || "€")}` : "");
     const fit = d.fit && d.fit.n >= 7 ? d.fit : null;
-    const predicted = fit && d.tomorrowMean !== null ? Math.max(0, fit.a + fit.b * d.tomorrowMean) : null;
+    const predict = (mean) => (fit && mean !== null && mean !== undefined ? Math.max(0, fit.a + fit.b * mean) : null);
     const cell = (k, v, s, color) => `<div><div class="k">${escapeHtml(k)}</div><div class="v" style="${color ? `color:${color}` : ""}">${v}</div><div class="s">${s}</div></div>`;
-    const cells = [
-      cell(
-        t(hass, "tomorrow_weather"),
+    const forecastCell = (key, mean) => {
+      const predicted = predict(mean);
+      return cell(
+        t(hass, key),
         predicted !== null ? `≈ ${fmt(hass, predicted, 1)} kWh` : "–",
-        predicted !== null ? `${escapeHtml(t(hass, "mean_outdoor", { v: fmt(hass, d.tomorrowMean, 1) }))}${money(predicted)}` : escapeHtml(t(hass, this.weather ? "no_forecast" : "no_weather")),
+        predicted !== null ? `${escapeHtml(t(hass, "mean_outdoor", { v: fmt(hass, mean, 1) }))}${money(predicted)}` : escapeHtml(t(hass, this.weather ? "no_forecast" : "no_weather")),
         "var(--csnet-heat)",
-      ),
-      cell(t(hass, "average_7_days"), d.avg7 !== null ? `${fmt(hass, d.avg7, 1)} kWh` : "–", `${escapeHtml(t(hass, "per_day"))}${money(d.avg7)}`),
+      );
+    };
+    // three columns: tomorrow and today side by side with the base load, then the slope and the 7-day average
+    const cells = [
+      forecastCell("tomorrow_weather", d.tomorrowMean),
+      forecastCell("today_weather", d.todayMean),
+      cell(t(hass, "base_load"), d.floor !== null ? `${fmt(hass, d.floor, 0)} W` : "–", escapeHtml(t(hass, "base_load_detail"))),
       cell(
         t(hass, "per_degree"),
         fit ? `+${fmt(hass, Math.abs(fit.b), 1)} kWh` : "–",
         fit ? escapeHtml(t(hass, "fit_quality", { r: fmt(hass, fit.r2 * 100, 0), n: fit.n })) : escapeHtml(t(hass, "not_enough_history")),
         "var(--csnet-cool)",
       ),
-      cell(t(hass, "base_load"), d.floor !== null ? `${fmt(hass, d.floor, 0)} W` : "–", escapeHtml(t(hass, "base_load_detail"))),
+      cell(t(hass, "average_7_days"), d.avg7 !== null ? `${fmt(hass, d.avg7, 1)} kWh` : "–", `${escapeHtml(t(hass, "per_day"))}${money(d.avg7)}`),
     ];
-    return `${this.title(hass, "energy_signature")}<div class="grid4">${cells.join("")}</div><div class="note">${escapeHtml(t(hass, "signature_note", { d: this.days }))}</div>`;
+    return `${this.title(hass, "energy_signature")}<div class="grid6">${cells.join("")}</div><div class="note">${escapeHtml(t(hass, "signature_note", { d: this.days }))}</div>`;
   }
 }
 
@@ -2821,7 +2838,7 @@ const CARDS = [
   ["csnet-activity-card", CsnetActivityCard, "CSNet · Activity", "What ran over the last hours: compressor, defrost, circuit demands, hot water, pumps, backup heater."],
   ["csnet-daily-energy-card", CsnetDailyEnergyCard, "CSNet · Energy per day", "Electricity and heat per day with the COP and the average outdoor temperature."],
   ["csnet-power-profile-card", CsnetPowerProfileCard, "CSNet · Power today", "Today's power against the average day of the last two weeks."],
-  ["csnet-energy-signature-card", CsnetEnergySignatureCard, "CSNet · Energy signature", "Tomorrow's electricity from the weather forecast, kWh per degree, 7-day average and base load."],
+  ["csnet-energy-signature-card", CsnetEnergySignatureCard, "CSNet · Energy signature", "Today's and tomorrow's electricity from the weather forecast, kWh per degree, 7-day average and base load."],
   ["csnet-refrigerant-card", CsnetRefrigerantCard, "CSNet · Refrigerant circuit", "Compressor, temperatures, pressures and expansion valve of the outdoor unit."],
   ["csnet-connection-card", CsnetConnectionCard, "CSNet · Connection", "Whether Home Assistant and the unit reach CSNet Manager: last hours, failed polls, answer time, what went wrong."],
 ];
