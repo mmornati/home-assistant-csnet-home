@@ -185,6 +185,38 @@ Instead of testing arbitrary version counts, the workflow selects the latest ver
 - Handles multiple patches per month (takes latest)
 - Proper Python version matching for each release
 
+### 9. Claude Review (`claude-review.yaml`)
+
+**Purpose:** Automatic review of pull requests by Claude, then an approval once all CI checks are green
+
+**Triggers:**
+- Pull requests from a branch of this repository (opened, synchronized, ready for review, reopened); not drafts, not bots, not forks
+
+**How it works:**
+- `review`: Claude reads the diff against `AGENTS.md`, `CONTRIBUTING.md` and Home Assistant conventions, posts inline comments and one summary, and returns a structured verdict (`approve` / `changes`). It changes nothing and runs no test.
+- `approve`: no LLM. On an `approve` verdict, waits for every other check of the PR, checks that the reviewed commit is still the PR head, then approves with the `GITHUB_TOKEN`.
+- Merging and releasing stay manual.
+
+**Security Measures:**
+- ✅ Claude only gets read tools, `gh pr diff/view/comment` and inline comments
+- ✅ The PR content is treated as data (explicit instruction in the prompt)
+- ✅ The approval is decided by a job without an LLM, gated on CI and on the head commit
+- ✅ Fork PRs get no secret and are never approved automatically: use `@claude review` instead
+
+**Requires:** `ANTHROPIC_API_KEY` secret, the Claude GitHub App, and Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests". Model: `CLAUDE_MODEL` variable, else `HA_REVIEW_MODEL`, else `claude-opus-5-5`.
+
+### 10. Claude Code (`claude.yaml`)
+
+**Purpose:** `@claude` on demand in issues and pull requests (including `@claude review` on a fork PR)
+
+**Triggers:**
+- Comments, reviews and new issues mentioning `@claude`, from the owner, members and collaborators only
+
+**Security Measures:**
+- ✅ Read-only permissions for the workflow token
+- ✅ `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB` strips credentials from the subprocesses Claude starts
+- ⚠️ Read the raw content of a fork PR before tagging Claude on it (prompt injection)
+
 ## Testing Strategy Overview
 
 The repository uses a multi-layered testing approach for Home Assistant compatibility:

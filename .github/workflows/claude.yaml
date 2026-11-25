@@ -1,0 +1,71 @@
+---
+# `@claude` on demand in issues and pull requests (comments, reviews, issue body or title).
+# Only the owner, members and collaborators can trigger it: the action rejects anyone without
+# write access. This is the way to get a Claude review on a fork pull request (comment
+# `@claude review`), since the automatic review (claude-review.yaml) gets no secret on forks.
+#
+# A fork pull request is untrusted text that ends up in the prompt: read the raw PR first.
+# CLAUDE_CODE_SUBPROCESS_ENV_SCRUB strips the Anthropic and GitHub credentials from every
+# subprocess Claude starts (it reduces the risk of an injected instruction, it does not remove it).
+#
+# Requires the ANTHROPIC_API_KEY repository secret (already used by ha-release-review.yaml)
+# and the Claude GitHub App. Model: the CLAUDE_MODEL repository variable (e.g. claude-sonnet-5-5),
+# else HA_REVIEW_MODEL (shared with the HA release reviews), else claude-opus-5-5.
+name: Claude Code
+
+'on':
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  issues:
+    types: [opened, assigned]
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: read
+
+jobs:
+  claude:
+    if: >-
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'),
+        github.event.comment.author_association || github.event.review.author_association ||
+        github.event.issue.author_association) &&
+      ((github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
+      (github.event_name == 'issues' &&
+        (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude'))))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      id-token: write
+      actions: read  # lets Claude read the CI results of a pull request
+    env:
+      CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      # The env scrub needs bubblewrap (the Claude Code install aborts without it); Ubuntu 24.04
+      # blocks the unprivileged user namespaces it uses through AppArmor. The Bash sandbox also
+      # needs socat, otherwise Claude falls back to read-only.
+      - name: Install bubblewrap and socat
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq bubblewrap socat
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+
+      - name: Run Claude Code
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: --model ${{ vars.CLAUDE_MODEL || vars.HA_REVIEW_MODEL || 'claude-opus-5-5' }}
+          additional_permissions: |
+            actions: read
