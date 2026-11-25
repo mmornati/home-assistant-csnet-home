@@ -7,6 +7,16 @@ description: What changed in each version of the CSNet Home (unofficial, for Hit
 
 Every version of the integration, newest first. Install or update from HACS; each version is also on the [GitHub releases page](https://github.com/mmornati/home-assistant-csnet-home/releases).
 
+## 2.22.3
+
+*25 November 2026* · [GitHub release](https://github.com/mmornati/home-assistant-csnet-home/releases/tag/2.22.3)
+
+The heat and COP of the unit counter no longer count heat made with the compressor stopped. Nothing new is sent to the unit. Thanks to @davigar1391 for finding it.
+
+#### Fixed
+
+- **The unit counter's heat and COP were too high on units that cycle.** The unit's heat counter keeps rising while the compressor is stopped and the pump runs, by 20 to 40 kWh a day on a unit that cycles, with nothing to make that heat. A rise now counts only when the compressor ran at that reading or at the previous one. On a Yutaki S 8 HP from 15 to 24 November 2026, *Heat today (unit counter)* goes from 1.08–1.42 to 0.95–1.10 times the calculated heat, and the COP of 19 November from 4.1 to 3.0. A unit that does not report its compressor frequency counts as before. Heat already counted before the update stays as it was. CSNet's hourly heat is the rise of the same counter, so the *CSNet* heat source, and the hours *Automatic* takes from CSNet, include that heat too; this release does not change them. The *Calculated* source counts heat only while the compressor runs.
+
 ## 2.22.2
 
 *25 November 2026* · [GitHub release](https://github.com/mmornati/home-assistant-csnet-home/releases/tag/2.22.2)
