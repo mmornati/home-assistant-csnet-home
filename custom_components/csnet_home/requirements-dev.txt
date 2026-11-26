@@ -11,3 +11,4 @@ homeassistant
 bandit
 pbr
 black
+pytest-xdist

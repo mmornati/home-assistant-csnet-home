@@ -5,7 +5,10 @@ Usage, to compare the figures of two branches::
     python -m tests.replay.report base.json head.json > comparison.md
 
 where each JSON file was written by the replay tests with
-``CSNET_REPLAY_REPORT=<file> pytest -m replay``.
+``CSNET_REPLAY_REPORT=<file> pytest -m replay``. A run with pytest-xdist
+writes one file per worker beside it (``<file>.gw0.json``...): give the same
+``<file>`` and they are read together. Without a base report, the head is
+shown alone.
 """
 
 from __future__ import annotations
@@ -14,6 +17,7 @@ import json
 import sys
 from collections import defaultdict
 from datetime import date
+from pathlib import Path
 from typing import Any
 
 from .harness import ReplayResult
@@ -193,16 +197,38 @@ def compare(base: list[dict], head: list[dict]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def worker_report_path(target: Path, worker: str | None) -> Path:
+    """Return the file a replay run writes its report to: one per pytest-xdist worker."""
+    if not worker:
+        return target
+    return target.with_name(f"{target.stem}.{worker}{target.suffix}")
+
+
+def load_report(target: Path) -> list[dict] | None:
+    """Return the report written to ``target`` and by each worker beside it, or None without any."""
+    paths = [target] if target.is_file() else []
+    paths += sorted(target.parent.glob(f"{target.stem}.gw*{target.suffix}"))
+    if not paths:
+        return None
+    report = []
+    for path in paths:
+        report += json.loads(path.read_text(encoding="utf-8"))
+    # workers finish in any order: keep the table in the same order on each run
+    return sorted(report, key=lambda s: (s["sample"], s.get("heat_source") or ""))
+
+
 def main(argv: list[str]) -> int:
-    """Print the comparison of two report files."""
+    """Print the comparison of two reports."""
     if len(argv) != 3:
         print(__doc__)
         return 2
-    with open(argv[1], encoding="utf-8") as file:
-        base = json.load(file)
-    with open(argv[2], encoding="utf-8") as file:
-        head = json.load(file)
-    sys.stdout.write(compare(base, head))
+    base, head = load_report(Path(argv[1])), load_report(Path(argv[2]))
+    if head is None:
+        print("No report was written.")
+        return 0
+    if base is not None:
+        print("Figures of each complete day, base branch → this change.\n")
+    sys.stdout.write(compare(base or head, head))
     return 0
 
 
