@@ -7,10 +7,15 @@ name: Replay samples
 
 "on":
   pull_request:
+    # The cards, the translations and the docs never change a replayed figure
+    # (the harness reads the entities by unique id, not by their names).
     paths:
       - "custom_components/csnet_home/**"
       - "tests/replay/**"
       - ".github/workflows/replay.yaml"
+      - "!custom_components/csnet_home/frontend/**"
+      - "!custom_components/csnet_home/translations/**"
+      - "!**/*.md"
   workflow_dispatch:
 
 permissions:
@@ -43,16 +48,18 @@ jobs:
       - name: Install Home Assistant and its test harness
         run: |
           python -m pip install --upgrade pip
-          python -m pip install pytest-homeassistant-custom-component pytest-asyncio
+          python -m pip install pytest-homeassistant-custom-component pytest-asyncio pytest-xdist
           python -c 'from homeassistant.const import __version__; print("Home Assistant", __version__)'
 
       - name: Fetch the samples
         run: python3 scripts/fetch_samples.py --all
 
+      # One replay per CPU: each test has its own Home Assistant and clock, and
+      # each worker writes its own report file (head.gw0.json...).
       - name: Replay with this change
         env:
           CSNET_REPLAY_REPORT: ${{ runner.temp }}/head.json
-        run: pytest tests/replay -m replay -q -p no:cacheprovider
+        run: pytest tests/replay -m replay -q -p no:cacheprovider -n auto
 
       - name: Replay with the base branch
         if: always() && github.event_name == 'pull_request'
@@ -67,7 +74,8 @@ jobs:
           cp -r tests/replay tests/samples "$RUNNER_TEMP/base/tests/"
           cp setup.cfg "$RUNNER_TEMP/base/setup.cfg"
           cd "$RUNNER_TEMP/base"
-          pytest tests/replay -m replay -q -p no:cacheprovider || true
+          # the summary only compares the figures test_replay writes
+          pytest "tests/replay/test_replay.py::test_replay" -m replay -q -p no:cacheprovider -n auto || true
 
       - name: Summary
         if: always()
@@ -75,13 +83,5 @@ jobs:
           {
             echo "## Replay of the shared samples"
             echo
-            if [ -f "$RUNNER_TEMP/head.json" ] && [ -f "$RUNNER_TEMP/base.json" ]; then
-              echo "Figures of each complete day, base branch → this change."
-              echo
-              python3 -m tests.replay.report "$RUNNER_TEMP/base.json" "$RUNNER_TEMP/head.json"
-            elif [ -f "$RUNNER_TEMP/head.json" ]; then
-              python3 -m tests.replay.report "$RUNNER_TEMP/head.json" "$RUNNER_TEMP/head.json"
-            else
-              echo "No report was written."
-            fi
+            python3 -m tests.replay.report "$RUNNER_TEMP/base.json" "$RUNNER_TEMP/head.json"
           } >> "$GITHUB_STEP_SUMMARY"

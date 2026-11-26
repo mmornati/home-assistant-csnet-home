@@ -4,6 +4,8 @@ The small samples in tests/fixtures/samples always run. Samples fetched with
 ``python scripts/fetch_samples.py`` (into tests/samples) run with
 ``pytest -m replay``. Set ``CSNET_REPLAY_REPORT=<file>`` to write each day's
 figures to a JSON file, to compare two branches with tests/replay/report.py.
+Under pytest-xdist (``-n auto``) each worker writes its own file next to it
+(``<file>.gw0.json``...), and report.py reads them together.
 """
 
 from __future__ import annotations
@@ -17,7 +19,7 @@ import pytest
 from custom_components.csnet_home.const import HEAT_SOURCE_CALCULATED, HEAT_SOURCES
 
 from .harness import replay_sample
-from .report import check_invariants, summary
+from .report import check_invariants, summary, worker_report_path
 from .sample import REPO_ROOT, find_samples, read_sample
 
 BUNDLED = REPO_ROOT / "tests" / "fixtures" / "samples"
@@ -37,7 +39,8 @@ def _write_report():
     yield
     target = os.environ.get("CSNET_REPLAY_REPORT")
     if target and _REPORT:
-        Path(target).write_text(json.dumps(_REPORT, indent=1), encoding="utf-8")
+        path = worker_report_path(Path(target), os.environ.get("PYTEST_XDIST_WORKER"))
+        path.write_text(json.dumps(_REPORT, indent=1), encoding="utf-8")
 
 
 @pytest.mark.parametrize("path", _params())

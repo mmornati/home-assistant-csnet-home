@@ -75,5 +75,10 @@ python -m tests.replay.report base.json head.json
 For each complete day this prints the estimated electricity, the heat, CSNet's
 own heat and the HVAC COP, before → after, next to the meter's kWh.
 
+The replays are slow. With `pytest-xdist` installed, `pytest -m replay -n auto`
+runs one per CPU; each worker then writes its own report beside the file you
+named (`head.gw0.json`, `head.gw1.json`...), and the report command reads them
+together when given `head.json`. A new run deletes the files of the previous one.
+
 The small samples in `tests/fixtures/samples/` run with every `pytest`, so the
 replay itself is always tested.
