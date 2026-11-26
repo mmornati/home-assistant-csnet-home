@@ -88,6 +88,22 @@ jobs:
             --json-schema '{"type":"object","properties":{"verdict":{"type":"string","enum":["approve","changes"]},"summary":{"type":"string"}},"required":["verdict","summary"]}'
           # yamllint enable rule:line-length
 
+      # show_full_output stays off (the log is public): when Claude Code ends on an error, such
+      # as an API call refused for the key or the credit, print only that error's message.
+      - name: Show why the review failed
+        if: failure() && steps.claude.outputs.execution_file != ''
+        env:
+          EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
+        run: |
+          [ -f "$EXECUTION_FILE" ] || exit 0
+          message=$(jq -rs '[flatten[] | select(.type == "result" and .is_error == true)] | last | .result // empty' \
+            "$EXECUTION_FILE" 2>/dev/null | tr '\r\n' '  ' | cut -c1-500) || true
+          if [ -n "$message" ]; then
+            echo "::error title=Claude Code error::$message"
+          else
+            echo "No error message in the Claude Code output."
+          fi
+
   approve:
     name: Approve when CI is green
     needs: review
