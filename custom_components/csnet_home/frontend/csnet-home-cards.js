@@ -2573,7 +2573,9 @@ class CsnetEnergySignatureCard extends CsnetBaseCard {
     return `
       .grid4 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 12px; }
       .grid6 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px 12px; }
-      @media (max-width: 500px) { .grid6 { grid-template-columns: 1fr 1fr; } }
+      /* columns follow the card's own width, not the window's: dashboard columns are narrow on a wide screen */
+      ha-card { container-type: inline-size; }
+      @container (max-width: 560px) { .grid6 { grid-template-columns: 1fr 1fr; } }
       .k { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--csnet-muted); }
       .v { font-size: 28px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
       .s { font-size: 11px; color: var(--csnet-muted); }
